@@ -1,0 +1,18 @@
+{
+  "name": "lorekit",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "A reusable knowledge-management and agent-workflow kit for AI-assisted repositories.",
+  "type": "module",
+  "bin": {
+    "lorekit": "./bin/lorekit.mjs"
+  },
+  "scripts": {
+    "test": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "4.1.11",
+    "vitest": "4.1.11"
+  }
+}
