@@ -1,0 +1,20 @@
+{
+  "$schema": "../schema.json",
+  "section": "general",
+  "heading": "General",
+  "title": "General work items",
+  "spec": "",
+  "items": [
+    {
+      "id": "WI-001",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "Replace this example item with the project's real backlog.",
+      "body": [
+        "Seeded by lorekit init. Add sections as `backlog/items/<section>.json` files; keep ids unique across the backlog.",
+        "Read the backlog with `tools/backlog.sh list --open`, `get <id>`, `batch <n>`; tick items with `set <id> status=done batch=<n>`."
+      ]
+    }
+  ]
+}

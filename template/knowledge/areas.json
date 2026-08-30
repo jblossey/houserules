@@ -1,0 +1,6 @@
+{
+  "global": { "paths": [] },
+  "process": { "paths": [] },
+  "docs": { "paths": ["docs/**", "CLAUDE.md", "knowledge/**", "backlog/**", ".claude/**"] },
+  "tools": { "paths": ["tools/**", ".github/**"] }
+}

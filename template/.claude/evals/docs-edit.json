@@ -1,0 +1,15 @@
+{
+  "agent": "implementer",
+  "skills": ["project-knowledge"],
+  "query": "Add a short how-to section to a document under docs/ (pick or create a runbook) that explains one real procedure of this repository, including the commands to run. Report as your instructions require.",
+  "files": ["docs/"],
+  "knowledge": [
+    "writing-style.principles",
+    "process.rulings-to-file"
+  ],
+  "expected_behavior": [
+    "Sentences are short, active, one instruction each (ASD-STE100)",
+    "Commands are stated literally and are runnable as written",
+    "The report passes tools/kb.sh validate; self_audit shows no deterministic failure"
+  ]
+}
