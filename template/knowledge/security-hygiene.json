@@ -1,0 +1,104 @@
+{
+  "$schema": "./schema.json",
+  "topic": "security-hygiene",
+  "title": "Dependency, commit, and test hygiene",
+  "entries": [
+    {
+      "id": "security-hygiene.exact-pins",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Pin exact versions. Install only with a CLI (`pnpm add --save-exact`, `cargo add <crate>@=<version>`). Never write a version number by hand.",
+      "body": [
+        "Ranges (`^`, `~`) widen the attack surface. Resolve to the latest stable version at install time.",
+        "The deterministic check covers `package.json`; ranges inside the `engines` object are floors, not dependency pins, and are exempt. Other ecosystems are judged by the reviewer under the same rule."
+      ],
+      "tags": ["dependencies", "supply-chain"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "check": {
+        "type": "grep-absent",
+        "level": "fail",
+        "files": "**/package.json",
+        "pattern": "(?<!\"engines\":\\s*\\{[^}]*)(\"([\\^~]|>=?|<=?)\\s*\\d|\"\\*\"|\"latest\"|\"\\d+(\\.\\d+)*\\.x\")",
+        "scope": "changed"
+      }
+    },
+    {
+      "id": "security-hygiene.dependency-vetting",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Verify every new dependency is well-maintained before adding it. Record the check in the task report's `dependency_vetting` field.",
+      "body": [
+        "Check recent releases, commit activity, and issue responsiveness.",
+        "Outdated, stale, or abandoned dependencies are a no-go."
+      ],
+      "tags": ["dependencies", "supply-chain"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "check": {
+        "type": "report-field",
+        "level": "fail",
+        "if": [
+          "**/package.json", "package-lock.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock",
+          "**/Cargo.toml", "Cargo.lock",
+          "**/pyproject.toml", "**/requirements*.txt", "uv.lock",
+          "go.mod", "go.sum", "**/Gemfile", "Gemfile.lock", "**/composer.json", "composer.lock"
+        ],
+        "field": "dependency_vetting"
+      }
+    },
+    {
+      "id": "security-hygiene.no-coauthor",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Never add a co-author line to any commit.",
+      "body": [],
+      "tags": ["git"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "check": { "type": "commits", "level": "fail", "body_absent": "co-authored-by", "flags": "i" }
+    },
+    {
+      "id": "security-hygiene.no-focused-tests",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Never commit a focused test (`.only(`).",
+      "body": [],
+      "tags": ["testing"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "check": {
+        "type": "grep-absent",
+        "level": "fail",
+        "files": [
+          "**/*.test.ts", "**/*.test.tsx", "**/*.test.js", "**/*.test.jsx", "**/*.test.mjs",
+          "**/*.spec.ts", "**/*.spec.tsx", "**/*.spec.js", "**/*.spec.mjs"
+        ],
+        "pattern": "\\.only\\(",
+        "scope": "changed"
+      }
+    },
+    {
+      "id": "security-hygiene.verify-current-docs",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Verify every library, tool, and framework API against current docs before use. Internal knowledge is stale.",
+      "body": [
+        "Use a docs source that is current (a docs MCP such as context7 when available, or the official documentation site). Record what you verified in the report's `docs_verified`."
+      ],
+      "tags": ["docs", "dependencies"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "check": {
+        "type": "report-field",
+        "level": "warn",
+        "if": [
+          "**/*.mjs", "**/*.mts", "**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx",
+          "**/*.rs", "**/*.py", "**/*.go", "**/*.rb",
+          "**/package.json", "**/Cargo.toml", "**/pyproject.toml", "go.mod"
+        ],
+        "field": "docs_verified"
+      }
+    }
+  ]
+}

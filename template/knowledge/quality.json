@@ -1,0 +1,26 @@
+{
+  "$schema": "./schema.json",
+  "topic": "quality",
+  "title": "Quality principles",
+  "entries": [
+    {
+      "id": "quality.principles",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "YAGNI, KISS, DRY; prefer a well-maintained library to custom code; one responsibility per unit; tests assert behavior; a11y and i18n are part of done.",
+      "body": [
+        "YAGNI: build only what the current backlog item needs.",
+        "KISS: choose the simplest design that meets the requirement. No abstraction for one caller, no option without a second use, no layer that only forwards.",
+        "DRY once logic has two real call sites: never leave a copy that can drift (shared constants, option factories, one write path). One call site is not yet duplication.",
+        "Prefer a well-maintained library (vetted, exact-pinned) to a custom implementation of a solved problem: parsing, validation, globbing, dates, retries. A standing project decision may rule an exception; record it as an entry.",
+        "One responsibility per file and per function. Each unit boundary is one a reader can understand without its internals.",
+        "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test.",
+        "A dedicated compliance pass over the existing codebase is its own backlog item; new code complies immediately."
+      ],
+      "tags": ["quality"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "see": ["process.no-tech-debt", "security-hygiene.dependency-vetting"]
+    }
+  ]
+}
