@@ -149,7 +149,7 @@ Each item records the ruling with its date, or stays marked open.
    `groundrules`, `codelore`, `kbkit`, `lorebook`, `repolore`, `codecanon`
    (taken on npm). The rename covers the package and bin name, the stamp
    file (`.lorekit.json` → `.houserules.json`), the README, this record,
-   and the tests; it is the first work item after the decisions round.
+   and the tests. Done in 7db7db9 on 2026-08-31.
 2. **License — ruled 2026-08-31: MIT.** The source project tag-pilot is
    `UNLICENSED`/private with the same owner, and the payload contains no
    third-party material (the superpowers plugin is only named, in
@@ -163,7 +163,8 @@ Each item records the ruling with its date, or stays marked open.
    corporate SPDX allowlists), Apache-2.0 (NOTICE handling is heavy for
    vendored files), staying UNLICENSED (only coherent for a local-only
    clone). To do: LICENSE file ("2026 Jannis Blossey"), `"license": "MIT"`
-   in `package.json`, the headers, the README sentence.
+   in `package.json`, the headers, the README sentence. Done in a1d31ac on
+   2026-08-31.
 3. **Publishing — open, deferred by the owner on 2026-08-31.** No remote,
    no npm publish, no marketplace registration was performed. Options, in
    effort order: keep using the local clone; push to GitHub as
@@ -179,8 +180,8 @@ Each item records the ruling with its date, or stays marked open.
    `tools/kb.mjs` and `tools/backlog.mjs`) with a regression test that runs
    the bin through a symlink; (b) `package.json` has no `files` field, so a
    git or npm install also carries `tests/`, `docs/`, `mise.toml`, and
-   `vitest.config.mts`. Both are scheduled with the rename, independent of
-   this ruling.
+   `vitest.config.mts`. (a) is backlog item HR-001; (b) was done in a1d31ac
+   on 2026-08-31 (`files`: bin, template, README.md, LICENSE).
 4. **Adoption path for tag-pilot itself — open, deferred by the owner on
    2026-08-31 until PR #42 is merged.** TagPilot already runs the source of
    this setup and is fine as-is. Until the ruling, tag-pilot stays the
@@ -212,7 +213,8 @@ Each item records the ruling with its date, or stays marked open.
    copies or the generated files. Coverage globs list only
    `template/tools/*` and `bin/`, so the copies do not distort coverage.
    Rejected: no dogfooding (rules by instruction only, nothing exercises
-   `init`/`update` between releases); deferring.
+   `init`/`update` between releases); deferring. Done in 3bc142e on
+   2026-08-31; the backlog lives in `backlog/` from then on.
 6. **SessionStart matcher — ruled 2026-08-31: `startup|resume|clear|fork`
    for the `start` ritual; the `compact` entry stays.** Verified against the
    current hooks reference on 2026-08-31: `source` has five values —
@@ -226,4 +228,4 @@ Each item records the ruling with its date, or stays marked open.
    seed-once and `init` merges by exact matcher string, so the new value
    reaches new installs only; existing adopters edit one line. Known
    upstream quirk, irrelevant here: in VS Code `/clear` reports `startup`
-   (anthropics/claude-code#26794).
+   (anthropics/claude-code#26794). Done in d356fba on 2026-08-31.
