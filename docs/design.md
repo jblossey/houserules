@@ -130,22 +130,100 @@ extended enum); backlog id prefix is parameterized (`--id-prefix`, default
 actions/checkout@v7 and actions/setup-node@v7 (verified current 2026-08-30);
 `milestone` and backlog section-name patterns were loosened to generic ones.
 
-## 5. Open decisions for the owner
+## 5. Decisions for the owner
 
-1. **Name.** `lorekit` — checked unclaimed on the npm registry on
-   2026-08-30; rename before publishing if desired.
-2. **License.** Currently `UNLICENSED`/private. Decide (MIT/Apache-2.0
-   would suit a kit meant for reuse) and add a LICENSE file.
-3. **Publishing.** No remote, no npm publish, no marketplace registration
-   was performed. Options, in effort order: keep using the local clone; push
-   to GitHub and run via `npx github:<user>/lorekit init`; publish to npm.
-4. **Adoption path for tag-pilot itself.** TagPilot already runs the source
-   of this setup and is fine as-is. If it should become a lorekit consumer:
-   run `lorekit update` semantics manually (adopt the kit-owned files),
-   keep its own knowledge/backlog data, and reconcile renames — agent and
-   skill names (`tagpilot-*` → unprefixed, `tagpilot-knowledge` →
-   `project-knowledge`), the `a19` → `dependency_vetting` report field, and
-   its `TP-`/`E01` id patterns (lorekit's loosened patterns accept both).
-   Ids are permanent there; keep TagPilot's entry ids as they are.
-5. **SessionStart `clear` matcher.** The seeded hook fires on
-   `startup|resume|clear` and `compact`, matching tag-pilot's proven config.
+Each item records the ruling with its date, or stays marked open.
+
+1. **Name — ruled 2026-08-31: rename to `houserules`.** `lorekit` was
+   unclaimed on the npm registry (checked 2026-08-30 and 2026-08-31) but is
+   taken in the wild: lorekit.io ("Persistent memory for your AI agents",
+   MIT, aimed at the same Claude Code, Cursor, and Codex users), the GitHub
+   organization `lorekit`, matluz1/lorekit (an MCP tabletop-RPG engine),
+   lorekit.app, and lorekit.ai. A search for the name would never surface
+   this kit, and adopters would confuse it with lorekit.io. `houserules`
+   was free on npm on 2026-08-31; its nearest neighbours are the npm package
+   `house-rules` (an input-validation library, last modified 2022) and
+   board-game house-rule trackers — no AI-agent product. Rejected
+   candidates: `praxiskit` (free, less self-explaining), `agentlore`
+   (collides with a Claude Code session-log product), and `canonkit`,
+   `groundrules`, `codelore`, `kbkit`, `lorebook`, `repolore`, `codecanon`
+   (taken on npm). The rename covers the package and bin name, the stamp
+   file (`.lorekit.json` → `.houserules.json`), the README, this record,
+   and the tests; it is the first work item after the decisions round.
+2. **License — ruled 2026-08-31: MIT.** The source project tag-pilot is
+   `UNLICENSED`/private with the same owner, and the payload contains no
+   third-party material (the superpowers plugin is only named, in
+   `knowledge/process.json`), so the choice was free. MIT is on every
+   allowlist. Because `init`/`update` vendor the payload into adopters'
+   repositories, the kit-owned `.mjs` and `.sh` files carry a two-line
+   SPDX/copyright header so that copies carry the notice by construction;
+   the markdown agents and skills get no header (prompt tokens), and the
+   README states that files produced by `init` are the adopter's under the
+   same terms. Rejected: MIT-0 (cleaner for vendoring, but absent from some
+   corporate SPDX allowlists), Apache-2.0 (NOTICE handling is heavy for
+   vendored files), staying UNLICENSED (only coherent for a local-only
+   clone). To do: LICENSE file ("2026 Jannis Blossey"), `"license": "MIT"`
+   in `package.json`, the headers, the README sentence.
+3. **Publishing — open, deferred by the owner on 2026-08-31.** No remote,
+   no npm publish, no marketplace registration was performed. Options, in
+   effort order: keep using the local clone; push to GitHub as
+   `jblossey/houserules` (the name was free on 2026-08-31) and run via
+   `npx github:jblossey/houserules#<tag> init`; publish to npm as
+   `houserules`. Findings from the 2026-08-31 check that apply to every
+   published path: (a) npm installs the `bin` as a symlink in
+   `node_modules/.bin`, Node resolves `import.meta.url` through the symlink
+   but keeps `process.argv[1]` as the `.bin` path, so the entry guard in
+   `bin/lorekit.mjs` never matches and the CLI exits 0 without output —
+   verified live with `npm exec --package=git+file://<this repo>`; the fix
+   is `realpathSync(process.argv[1])` in the guard (same idiom in
+   `tools/kb.mjs` and `tools/backlog.mjs`) with a regression test that runs
+   the bin through a symlink; (b) `package.json` has no `files` field, so a
+   git or npm install also carries `tests/`, `docs/`, `mise.toml`, and
+   `vitest.config.mts`. Both are scheduled with the rename, independent of
+   this ruling.
+4. **Adoption path for tag-pilot itself — open, deferred by the owner on
+   2026-08-31 until PR #42 is merged.** TagPilot already runs the source of
+   this setup and is fine as-is. Until the ruling, tag-pilot stays the
+   upstream of every kit-owned file: diff its `tools/`, `.claude/agents/`,
+   and `.claude/skills/` against `template/` before every release and port
+   the drift (first item: the `process.evals-rerun` rule with its
+   `co-change` check and `.claude/evals/record.json`, tag-pilot `fc3241b`).
+   Measured drift on 2026-08-31: `kb.mjs` 10 lines, `backlog.mjs` 2, the
+   wrappers 2–3 each, the agents 10–16 each, `finishing-a-feature` 28,
+   `cli.mjs` and `json-store.mjs` 0. If tag-pilot becomes a consumer: run
+   `update` semantics manually (adopt the kit-owned files), keep its own
+   knowledge/backlog data, and reconcile renames — agent and skill names
+   (`tagpilot-*` → unprefixed, `tagpilot-orchestrating` → `orchestrating`,
+   `tagpilot-knowledge` → `project-knowledge`), the `a19` →
+   `dependency_vetting` report field, and its `TP-`/`E01` id patterns (the
+   loosened patterns accept both). Ids are permanent there; keep TagPilot's
+   entry ids as they are. That migration is tag-pilot work, done there.
+5. **Dogfooding — ruled 2026-08-31: yes, full.** After the rename, this
+   repository installs its own kit: `init --dir . --id-prefix HR`, then a
+   repository-specific `CLAUDE.md`, areas (`template`, `cli`, `tests`,
+   `docs`), topics, and a backlog that holds the open work items. The CLIs
+   resolve their data from the git root of the cwd, so the root
+   `knowledge/` and `backlog/` do not collide with `template/` (the seed
+   payload, read only by `init` and the tests). The 12 kit-owned files
+   exist twice — in `template/` (the source) and at the root (the
+   installed copy); `update --dir .` syncs them and a parity test pins the
+   root copies to `template/` byte for byte. A standing rule here says:
+   edit `template/`, then run `update --dir .`; never hand-edit the root
+   copies or the generated files. Coverage globs list only
+   `template/tools/*` and `bin/`, so the copies do not distort coverage.
+   Rejected: no dogfooding (rules by instruction only, nothing exercises
+   `init`/`update` between releases); deferring.
+6. **SessionStart matcher — ruled 2026-08-31: `startup|resume|clear|fork`
+   for the `start` ritual; the `compact` entry stays.** Verified against the
+   current hooks reference on 2026-08-31: `source` has five values —
+   `startup`, `resume`, `clear` ("context was reset while maintaining the
+   same session"), `compact`, `fork` ("a session was forked from another
+   session"). Forked sessions report `fork` since Claude Code v2.1.214
+   (before: `resume`), so tag-pilot's four-value matcher misses them on the
+   installed 2.1.251. `clear` stays because the ritual is most needed right
+   after a context reset, and the `start` mode prints one line. Rejected:
+   the unchanged four-value matcher; dropping `clear`. Note: settings are
+   seed-once and `init` merges by exact matcher string, so the new value
+   reaches new installs only; existing adopters edit one line. Known
+   upstream quirk, irrelevant here: in VS Code `/clear` reports `startup`
+   (anthropics/claude-code#26794).
