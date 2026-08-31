@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Jannis Blossey
 // Knowledge base CLI, shipped by houserules. The design record lives in the houserules repository (docs/design.md).
 import { execFileSync } from 'node:child_process';
 import {

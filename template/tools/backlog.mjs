@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Jannis Blossey
 // Backlog CLI, shipped by houserules. The design record lives in the houserules repository (docs/design.md).
 import { readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';

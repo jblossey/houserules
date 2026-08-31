@@ -101,5 +101,9 @@ tools/backlog.sh list --open | get WI-001 | batch 1 | set WI-001 status=done bat
 mise exec -- npm test        # vitest with coverage
 ```
 
-License: not yet decided by the owner; the package is marked UNLICENSED
-until then. Not published to npm or any plugin marketplace.
+## License
+
+MIT — see [LICENSE](LICENSE). The files that `init` and `update` write into
+your project are yours under the same terms; the kit-owned scripts carry an
+SPDX header, so vendored copies keep the notice. Not published to npm or any
+plugin marketplace yet (owner decision pending, `docs/design.md` §5.3).

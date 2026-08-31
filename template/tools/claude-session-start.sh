@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Jannis Blossey
 # Claude Code SessionStart hook. Prints the recovery ritual; after a
 # compaction also the standing rules, so they sit at the recency end of
 # the context. Usage: claude-session-start.sh start|compact

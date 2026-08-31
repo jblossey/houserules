@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Jannis Blossey
 // Shared argv parsing and usage-error type for the kb and backlog CLIs.
 // Node built-ins only.
 
