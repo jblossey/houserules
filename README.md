@@ -56,8 +56,9 @@ node ~/projects/houserules/bin/houserules.mjs init --id-prefix ABC
   Copy the `## Knowledge base` and `## Workflow` sections from
   `template/CLAUDE.md` into yours by hand.
 - An existing `.claude/settings.json` is merged: the two SessionStart hook
-  entries are appended only if their matchers are absent. Nothing else in
-  your settings is touched.
+  entries (`startup|resume|clear|fork` for the session ritual, `compact` for
+  the standing rules) are appended only if their matchers are absent.
+  Nothing else in your settings is touched.
 - Existing files under `knowledge/`, `backlog/`, evals, or the workflow are
   kept as they are.
 
