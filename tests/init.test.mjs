@@ -129,6 +129,17 @@ describe('init', () => {
     );
     expect(again.hooks.SessionStart).toHaveLength(2);
   });
+  it('seeds a start hook for startup, resume, clear, and fork sessions, and a compact hook', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    const { SessionStart } = JSON.parse(
+      readFileSync(join(dir, '.claude/settings.json'), 'utf8'),
+    ).hooks;
+    expect(SessionStart.map((e) => e.matcher).sort()).toEqual([
+      'compact',
+      'startup|resume|clear|fork',
+    ]);
+  });
   it('refuses a target that is not a git repository', () => {
     const dir = mkdtempSync(join(tmpdir(), 'houserules-nogit-'));
     const io = capture();
