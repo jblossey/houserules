@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// lorekit: installs and updates the knowledge-management setup in a project
+// houserules: installs and updates the knowledge-management setup in a project
 // repository. Design record: docs/design.md in this repository.
 import { execFileSync } from 'node:child_process';
 import {
@@ -20,7 +20,7 @@ const VERSION = JSON.parse(
 ).version;
 
 /**
- * Machinery files lorekit owns: `init` writes them and `update` overwrites
+ * Machinery files houserules owns: `init` writes them and `update` overwrites
  * them. A project edit to one of these is lost on the next update — project
  * customization belongs in the seed-once files instead.
  */
@@ -73,7 +73,7 @@ const PREFIXED = new Set([
   '.claude/schemas/deliverables.json',
 ]);
 
-const USAGE = 'usage: lorekit <init|update|files> [--dir <target>] [--id-prefix <PREFIX>]';
+const USAGE = 'usage: houserules <init|update|files> [--dir <target>] [--id-prefix <PREFIX>]';
 
 /** Reads one template file, rewriting the backlog id prefix where it applies. */
 function templateContent(file, prefix) {
@@ -122,7 +122,7 @@ function mergeSettings(target) {
 /**
  * Installs the setup into `target`: kit-owned files always, seed-once files
  * only when `seed` is set and the file is absent. Renders the generated
- * markdown afterwards and stamps `.lorekit.json`.
+ * markdown afterwards and stamps `.houserules.json`.
  */
 function install(io, opts, { seed }, cwd) {
   const target = resolve(cwd, typeof opts.dir === 'string' ? opts.dir : '.');
@@ -155,7 +155,7 @@ function install(io, opts, { seed }, cwd) {
       io.out('wrote .claude/settings.json\n');
     }
   }
-  const markerPath = join(target, '.lorekit.json');
+  const markerPath = join(target, '.houserules.json');
   const marker = existsSync(markerPath)
     ? JSON.parse(readFileSync(markerPath, 'utf8'))
     : { idPrefix: prefix };
@@ -166,7 +166,7 @@ function install(io, opts, { seed }, cwd) {
     { cwd: target, encoding: 'utf8' },
   );
   io.out(rendered);
-  io.out(`lorekit: ${seed ? 'initialized' : 'updated'} ${target}\n`);
+  io.out(`houserules: ${seed ? 'initialized' : 'updated'} ${target}\n`);
   io.out('next: tools/kb.sh check && tools/backlog.sh check\n');
   return 0;
 }

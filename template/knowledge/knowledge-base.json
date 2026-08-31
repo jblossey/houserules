@@ -13,7 +13,7 @@
         "The summary is the only text that renders into rule files and indexes."
       ],
       "tags": ["knowledge", "authoring"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "verify": ["knowledge/schema.json"]
     },
     {
@@ -26,7 +26,7 @@
         "When two sources disagree, read the code and record which one the entry follows."
       ],
       "tags": ["knowledge", "authoring", "fidelity"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" }
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     },
     {
       "id": "knowledge-base.ids-are-permanent",
@@ -37,7 +37,7 @@
         "Dispatches, reports, audits, and `see` lists cite ids; a rename breaks every one of them silently."
       ],
       "tags": ["knowledge", "authoring", "ids"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" }
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     }
   ]
 }

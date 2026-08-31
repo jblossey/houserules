@@ -12,12 +12,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
-import { KIT_OWNED, SEED_ONCE, main } from '../bin/lorekit.mjs';
+import { KIT_OWNED, SEED_ONCE, main } from '../bin/houserules.mjs';
 import { UsageError } from '../template/tools/lib/cli.mjs';
 
 /** A fresh temporary git repository to initialize into. */
 function makeTarget() {
-  const dir = mkdtempSync(join(tmpdir(), 'lorekit-target-'));
+  const dir = mkdtempSync(join(tmpdir(), 'houserules-target-'));
   execFileSync('git', ['init', '-q', '-b', 'main', dir]);
   return dir;
 }
@@ -80,7 +80,7 @@ describe('init', () => {
     expect(existsSync(join(dir, '.claude/rules/standing-rules.md'))).toBe(true);
     expect(runTool(dir, 'kb.mjs', 'check')).toBe(0);
     expect(runTool(dir, 'backlog.mjs', 'check')).toBe(0);
-    const marker = JSON.parse(readFileSync(join(dir, '.lorekit.json'), 'utf8'));
+    const marker = JSON.parse(readFileSync(join(dir, '.houserules.json'), 'utf8'));
     expect(marker.idPrefix).toBe('WI');
     expect(marker.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(io.stdout).toContain('wrote tools/kb.mjs\n');
@@ -102,7 +102,7 @@ describe('init', () => {
     ).toContain('TG-[0-9]+');
     expect(runTool(dir, 'backlog.mjs', 'check')).toBe(0);
     expect(
-      JSON.parse(readFileSync(join(dir, '.lorekit.json'), 'utf8')).idPrefix,
+      JSON.parse(readFileSync(join(dir, '.houserules.json'), 'utf8')).idPrefix,
     ).toBe('TG');
   });
   it('keeps an existing CLAUDE.md and merges hooks into an existing settings.json', () => {
@@ -130,7 +130,7 @@ describe('init', () => {
     expect(again.hooks.SessionStart).toHaveLength(2);
   });
   it('refuses a target that is not a git repository', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'lorekit-nogit-'));
+    const dir = mkdtempSync(join(tmpdir(), 'houserules-nogit-'));
     const io = capture();
     expect(main(['init', '--dir', dir], io)).toBe(2);
     expect(io.stderr).toContain('not a git repository');
@@ -191,10 +191,10 @@ describe('update marker', () => {
     expect(main(['init', '--dir', dir, '--id-prefix', 'TG'], capture())).toBe(
       0,
     );
-    writeFileSync(join(dir, '.lorekit.json'), '{"version":"0.0.1"}\n');
+    writeFileSync(join(dir, '.houserules.json'), '{"version":"0.0.1"}\n');
     expect(main(['update', '--dir', dir], capture())).toBe(0);
     expect(
-      JSON.parse(readFileSync(join(dir, '.lorekit.json'), 'utf8')).idPrefix,
+      JSON.parse(readFileSync(join(dir, '.houserules.json'), 'utf8')).idPrefix,
     ).toBe('WI');
   });
 });
@@ -211,11 +211,11 @@ describe('main', () => {
     expect(main(['bogus'], io)).toBe(2);
     const shebangOut = execFileSync(
       process.execPath,
-      [fileURLToPath(new URL('../bin/lorekit.mjs', import.meta.url)), 'files'],
+      [fileURLToPath(new URL('../bin/houserules.mjs', import.meta.url)), 'files'],
       { encoding: 'utf8' },
     );
     expect(JSON.parse(shebangOut).kitOwned).toEqual(KIT_OWNED);
-    expect(io.stderr).toMatch(/^usage: lorekit </);
+    expect(io.stderr).toMatch(/^usage: houserules </);
     expect(new UsageError('x')).toBeInstanceOf(Error);
   });
 });

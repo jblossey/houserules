@@ -3,7 +3,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig(() => ({
   root: import.meta.dirname,
   test: {
-    name: 'lorekit',
+    name: 'houserules',
     watch: false,
     globals: true,
     environment: 'node',
@@ -14,7 +14,7 @@ export default defineConfig(() => ({
       reportsDirectory: './test-output/vitest/coverage',
       provider: 'v8' as const,
       include: [
-        'bin/lorekit.mjs',
+        'bin/houserules.mjs',
         'template/tools/kb.mjs',
         'template/tools/backlog.mjs',
         'template/tools/lib/json-store.mjs',

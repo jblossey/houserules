@@ -11,7 +11,7 @@
       "summary": "Ask the user when information is missing. Do not assume.",
       "body": [],
       "tags": ["users"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" }
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     },
     {
       "id": "process.backlog-drives-work",
@@ -23,7 +23,7 @@
         "The backlog lives in `backlog/` (JSON). Read it with `tools/backlog.sh list --open`, `get <id>`, `batch <n>`; tick items with `set <id> status=done batch=<n>`."
       ],
       "tags": ["backlog"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "verify": ["backlog/schema.json"]
     },
     {
@@ -36,7 +36,7 @@
         "Use the superpowers brainstorming and spec skills when the plugin is installed; otherwise write the spec by hand. Specs live in `docs/specs/`."
       ],
       "tags": ["batch", "design"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" }
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     },
     {
       "id": "process.conventional-commits",
@@ -48,7 +48,7 @@
         "Start the subject in lowercase; a subject that starts with an uppercase token fails common commitlint configurations."
       ],
       "tags": ["git"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "check": {
         "type": "commits",
         "level": "fail",
@@ -66,7 +66,7 @@
         "The project skill `finishing-a-feature` is the procedure."
       ],
       "tags": ["git"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "verify": [".claude/skills/finishing-a-feature/SKILL.md"]
     },
     {
@@ -77,7 +77,7 @@
       "summary": "Before you change a file, read its knowledge: the ids in your task and `tools/kb.sh for <path>`. Cite the ids you relied on in your report.",
       "body": [],
       "tags": ["knowledge"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "check": { "type": "report-field", "level": "warn", "if": "**", "field": "knowledge_used" }
     },
     {
@@ -91,7 +91,7 @@
         "A ledger note may accompany a ruling; it never substitutes for the tracked write."
       ],
       "tags": ["rulings", "compaction"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" }
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     },
     {
       "id": "process.sequential-agents",
@@ -103,7 +103,7 @@
         "Parallel dispatches conflict in the working tree and hide which run produced a change."
       ],
       "tags": ["dispatch"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" }
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     },
     {
       "id": "process.tdd",
@@ -118,7 +118,7 @@
         "Never fabricate a cycle: an empty `tdd` with named gates is honest evidence; a manufactured RED is not."
       ],
       "tags": ["testing"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" }
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     },
     {
       "id": "process.model-policy",
@@ -132,7 +132,7 @@
         "Name the model on every dispatch; an omitted model inherits the session's most expensive one."
       ],
       "tags": ["dispatch", "models"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" }
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     },
     {
       "id": "process.no-tech-debt",
@@ -146,7 +146,7 @@
         "No `TODO`, `FIXME`, or `HACK` marker in source files; the deterministic check fails the audit on a new one. Todos live in `backlog/`."
       ],
       "tags": ["review", "debt"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "see": ["quality.principles"],
       "check": {
         "type": "grep-absent",
@@ -175,7 +175,7 @@
         "This rule never justifies over-engineering: no abstraction for one caller, no configurability without a second use, no rewrite of working code the batch does not touch. Speculative generality is itself a smell."
       ],
       "tags": ["planning", "refactoring", "code-health"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "see": ["quality.principles", "process.no-tech-debt", "process.brainstorm-first"]
     },
     {
@@ -191,7 +191,7 @@
         "`tools/kb.sh stats` and the branch retrospective read these files; prose is invisible to them."
       ],
       "tags": ["reports", "deliverables"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "see": ["process.knowledge-first"],
       "verify": [".claude/schemas/deliverables.json"],
       "check": { "type": "report-field", "level": "fail", "if": "**", "field": "self_audit" }
@@ -206,7 +206,7 @@
         "CI and deploy runs cost money and time; a live run catches what unit tests cannot. Record the project's live-run recipe as a `procedure` entry."
       ],
       "tags": ["live-run", "ci"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" }
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     },
     {
       "id": "process.keep-knowledge-current",
@@ -217,7 +217,7 @@
         "Write the entry in the same turn you learn the fact. Then run `tools/kb.sh render` and commit the generated files with it."
       ],
       "tags": ["knowledge"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "verify": ["knowledge/schema.json"],
       "see": ["process.rulings-to-file"]
     },
@@ -228,7 +228,7 @@
       "summary": "Create a project skill (`.claude/skills/`) for a repeatable procedure. Author it with the writing-skills skill when available.",
       "body": [],
       "tags": ["skills"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" }
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     }
   ]
 }
