@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Backlog CLI, shipped by lorekit. The design record lives in the lorekit repository (docs/design.md).
+// Backlog CLI, shipped by houserules. The design record lives in the houserules repository (docs/design.md).
 import { readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';

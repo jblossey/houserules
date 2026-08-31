@@ -14,7 +14,7 @@
         "The deterministic check covers `package.json`; ranges inside the `engines` object are floors, not dependency pins, and are exempt. Other ecosystems are judged by the reviewer under the same rule."
       ],
       "tags": ["dependencies", "supply-chain"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "check": {
         "type": "grep-absent",
         "level": "fail",
@@ -34,7 +34,7 @@
         "Outdated, stale, or abandoned dependencies are a no-go."
       ],
       "tags": ["dependencies", "supply-chain"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "check": {
         "type": "report-field",
         "level": "fail",
@@ -55,7 +55,7 @@
       "summary": "Never add a co-author line to any commit.",
       "body": [],
       "tags": ["git"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "check": { "type": "commits", "level": "fail", "body_absent": "co-authored-by", "flags": "i" }
     },
     {
@@ -66,7 +66,7 @@
       "summary": "Never commit a focused test (`.only(`).",
       "body": [],
       "tags": ["testing"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "check": {
         "type": "grep-absent",
         "level": "fail",
@@ -88,7 +88,7 @@
         "Use a docs source that is current (a docs MCP such as context7 when available, or the official documentation site). Record what you verified in the report's `docs_verified`."
       ],
       "tags": ["docs", "dependencies"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "check": {
         "type": "report-field",
         "level": "warn",

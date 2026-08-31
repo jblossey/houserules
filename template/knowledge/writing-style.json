@@ -19,7 +19,7 @@
         "End on the emphasis."
       ],
       "tags": ["docs", "style"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" }
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     },
     {
       "id": "writing-style.code-comments",
@@ -29,7 +29,7 @@
       "summary": "Write a code comment only for a constraint the code cannot show.",
       "body": [],
       "tags": ["comments"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" }
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     },
     {
       "id": "writing-style.doc-comments",
@@ -44,7 +44,7 @@
         "Comments inside a body still follow writing-style.code-comments: only for a constraint the code cannot show."
       ],
       "tags": ["docs", "comments", "naming"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "see": ["writing-style.code-comments", "writing-style.principles"]
     }
   ]

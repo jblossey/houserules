@@ -19,7 +19,7 @@
         "A dedicated compliance pass over the existing codebase is its own backlog item; new code complies immediately."
       ],
       "tags": ["quality"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "lorekit seed" },
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "see": ["process.no-tech-debt", "security-hygiene.dependency-vetting"]
     }
   ]

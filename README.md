@@ -1,11 +1,11 @@
-# lorekit
+# houserules
 
 A reusable knowledge-management and agent-workflow kit for repositories that
 are developed with AI agents (Claude Code first, any harness that reads plain
 files second). Extracted from the TagPilot project's knowledge-management
 setup; the design record lives in [docs/design.md](docs/design.md).
 
-lorekit installs, into your project's own repository:
+houserules installs, into your project's own repository:
 
 - **A knowledge base** (`knowledge/*.json`): addressable entries (`id`,
   `kind`, `area`, `summary`, `body`, `tags`, `source`, `see`, `verify`,
@@ -34,13 +34,13 @@ lorekit installs, into your project's own repository:
 
 ```sh
 mkdir my-project && cd my-project && git init
-node ~/projects/lorekit/bin/lorekit.mjs init
-# or, once published: npx lorekit init
+node ~/projects/houserules/bin/houserules.mjs init
+# or, once published: npx houserules init
 tools/kb.sh check && tools/backlog.sh check
-git add -A && git commit -m 'chore: install lorekit knowledge setup'
+git add -A && git commit -m 'chore: install houserules knowledge setup'
 ```
 
-`init` seeds everything, runs `render`, and stamps `.lorekit.json`. Restart
+`init` seeds everything, runs `render`, and stamps `.houserules.json`. Restart
 Claude Code once after the first install (the first `.claude/agents/` file
 and the new hook need a fresh session).
 
@@ -48,7 +48,7 @@ and the new hook need a fresh session).
 
 ```sh
 cd my-project
-node ~/projects/lorekit/bin/lorekit.mjs init --id-prefix ABC
+node ~/projects/houserules/bin/houserules.mjs init --id-prefix ABC
 ```
 
 - `--id-prefix ABC` sets your backlog id prefix (`ABC-001`); default `WI`.
@@ -69,11 +69,11 @@ the `area` enum in `knowledge/schema.json` together with the globs in
 ## Update an existing installation
 
 ```sh
-node ~/projects/lorekit/bin/lorekit.mjs update
+node ~/projects/houserules/bin/houserules.mjs update
 ```
 
 `update` overwrites only kit-owned machinery and re-renders; it never touches
-project data. `node bin/lorekit.mjs files` prints the ownership manifest:
+project data. `node bin/houserules.mjs files` prints the ownership manifest:
 
 | kit-owned (update overwrites) | seed-once (yours after init) |
 |---|---|

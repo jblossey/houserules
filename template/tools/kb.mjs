@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Knowledge base CLI, shipped by lorekit. The design record lives in the lorekit repository (docs/design.md).
+// Knowledge base CLI, shipped by houserules. The design record lives in the houserules repository (docs/design.md).
 import { execFileSync } from 'node:child_process';
 import {
   existsSync,

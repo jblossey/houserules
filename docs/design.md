@@ -1,4 +1,4 @@
-# lorekit design: packaging the knowledge-management setup
+# houserules design: packaging the knowledge-management setup
 
 Date: 2026-08-30. Status: implemented. Source: the TagPilot knowledge-management
 setup (tag-pilot branch `knowledge-management`, PR #42), extracted into a
@@ -44,7 +44,7 @@ plugin could ship only the static agent templates and the orchestrating
 skill — the least project-bound tenth of the setup — while splitting the
 machinery across two update channels.
 
-### Option B: installable npm package (`npx lorekit init`)
+### Option B: installable npm package (`npx houserules init`)
 
 Standard scaffolder pattern; the tooling is already Node. Two variants:
 runtime dependency (project imports the CLIs from `node_modules`) or
@@ -62,11 +62,11 @@ machinery fixes never reach adopters.
 ## 3. Decision
 
 **B+C hybrid: a scaffold-and-vendor CLI with an ownership manifest.**
-`lorekit init` copies the payload into the project; `lorekit update`
+`houserules init` copies the payload into the project; `houserules update`
 overwrites only kit-owned machinery; per-project data is seeded once and
 never touched again. Runnable today from a local clone
-(`node ~/projects/lorekit/bin/lorekit.mjs init`), publishable later as
-`npx lorekit init` without structural change (the `bin` field is wired).
+(`node ~/projects/houserules/bin/houserules.mjs init`), publishable later as
+`npx houserules init` without structural change (the `bin` field is wired).
 
 The two strongest reasons:
 
@@ -79,7 +79,7 @@ The two strongest reasons:
    (`tools/`, agent templates, orchestrating/finishing skills, hook) stay
    upgradable byte-for-byte; seed-once files (schemas, topics, backlog,
    evals, CI workflow, CLAUDE.md, settings) belong to the project from the
-   first write. `lorekit files` prints the split; `.lorekit.json` records
+   first write. `houserules files` prints the split; `.houserules.json` records
    the installed version.
 
 Harness portability comes free: the payload is plain JSON, markdown, and
@@ -173,7 +173,7 @@ Each item records the ruling with its date, or stays marked open.
    published path: (a) npm installs the `bin` as a symlink in
    `node_modules/.bin`, Node resolves `import.meta.url` through the symlink
    but keeps `process.argv[1]` as the `.bin` path, so the entry guard in
-   `bin/lorekit.mjs` never matches and the CLI exits 0 without output —
+   `bin/houserules.mjs` never matches and the CLI exits 0 without output —
    verified live with `npm exec --package=git+file://<this repo>`; the fix
    is `realpathSync(process.argv[1])` in the guard (same idiom in
    `tools/kb.mjs` and `tools/backlog.mjs`) with a regression test that runs
