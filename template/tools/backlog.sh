@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Jannis Blossey
 # Backlog CLI wrapper. Uses node from PATH; falls back to mise.
 set -euo pipefail
 dir=$(cd "$(dirname "$0")" && pwd)

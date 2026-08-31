@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Jannis Blossey
 // houserules: installs and updates the knowledge-management setup in a project
 // repository. Design record: docs/design.md in this repository.
 import { execFileSync } from 'node:child_process';

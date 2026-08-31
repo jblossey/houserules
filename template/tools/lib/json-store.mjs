@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Jannis Blossey
 // Shared JSON loading and JSON-Schema-subset validation for the kb and
 // backlog CLIs. Node built-ins only.
 import { readFileSync, readdirSync } from 'node:fs';

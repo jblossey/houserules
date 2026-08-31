@@ -2,12 +2,18 @@
   "name": "houserules",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "description": "A reusable knowledge-management and agent-workflow kit for AI-assisted repositories.",
   "type": "module",
   "bin": {
     "houserules": "./bin/houserules.mjs"
   },
+  "files": [
+    "bin",
+    "template",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "vitest run --coverage"
   },
