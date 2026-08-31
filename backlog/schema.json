@@ -1,0 +1,459 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Backlog",
+  "description": "Source of truth for work. Items HR-nnn live in items/<section>.json; amendments A-nn, batches, decisions, and parked polish PP-<batch>-<nn> in their own files.",
+  "$defs": {
+    "itemId": {
+      "type": "string",
+      "pattern": "^HR-\\d{3}$"
+    },
+    "anyId": {
+      "type": "string",
+      "pattern": "^(HR-\\d{3}|A-\\d{2}|PP-\\d+-\\d{2})$"
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "text": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "type": {
+      "enum": [
+        "feat",
+        "nfr",
+        "constraint",
+        "decision",
+        "process",
+        "bug",
+        "fix",
+        "chore",
+        "research",
+        "question",
+        "risk",
+        "test"
+      ]
+    },
+    "milestone": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Za-z0-9./-]{1,16}$"
+    },
+    "status": {
+      "enum": [
+        "open",
+        "partial",
+        "done",
+        "dropped"
+      ]
+    },
+    "ruling": {
+      "type": "object",
+      "required": [
+        "date",
+        "by",
+        "text"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/date"
+        },
+        "by": {
+          "enum": [
+            "user",
+            "review",
+            "controller"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "amendment": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "status",
+        "text"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^A-\\d{2}$"
+        },
+        "type": {
+          "enum": [
+            "constraint",
+            "process",
+            "decision"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "date": {
+          "$ref": "#/$defs/date"
+        },
+        "status": {
+          "enum": [
+            "open",
+            "done"
+          ]
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "milestone",
+        "status",
+        "title",
+        "body"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/itemId"
+        },
+        "type": {
+          "$ref": "#/$defs/type"
+        },
+        "milestone": {
+          "$ref": "#/$defs/milestone"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "body": {
+          "$ref": "#/$defs/text"
+        },
+        "extra_lines": {
+          "$ref": "#/$defs/text"
+        },
+        "rulings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ruling"
+          }
+        },
+        "batch": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "see": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/anyId"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "batch": {
+      "type": "object",
+      "required": [
+        "number",
+        "items",
+        "summary",
+        "kickoff",
+        "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/itemId"
+          }
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kickoff": {
+          "type": "string"
+        },
+        "status": {
+          "type": "object",
+          "required": [
+            "state",
+            "text"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "enum": [
+                "planned",
+                "in-progress",
+                "done"
+              ]
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": [
+        "date",
+        "text"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/date"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "parkedItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "text"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^PP-\\d+-\\d{2}$"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resolved": {
+          "type": "object",
+          "required": [
+            "batch",
+            "note"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "batch": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "parkedGroup": {
+      "type": "object",
+      "required": [
+        "batch",
+        "intro",
+        "items"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "batch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "intro": {
+          "type": "string",
+          "minLength": 1
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/parkedItem"
+          }
+        }
+      }
+    },
+    "amendmentsFile": {
+      "type": "object",
+      "required": [
+        "heading",
+        "amendments"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "heading": {
+          "type": "string",
+          "minLength": 1
+        },
+        "amendments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/amendment"
+          }
+        }
+      }
+    },
+    "itemsFile": {
+      "type": "object",
+      "required": [
+        "section",
+        "heading",
+        "title",
+        "spec",
+        "items"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "section": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-]+$"
+        },
+        "heading": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spec": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/item"
+          }
+        }
+      }
+    },
+    "batchesFile": {
+      "type": "object",
+      "required": [
+        "heading",
+        "intro",
+        "table_header",
+        "batches"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "heading": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intro": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "table_header": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "batches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/batch"
+          }
+        }
+      }
+    },
+    "decisionsFile": {
+      "type": "object",
+      "required": [
+        "preamble",
+        "decisions",
+        "notes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "preamble": {
+          "type": "string"
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/decision"
+          }
+        },
+        "notes": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "parkedFile": {
+      "type": "object",
+      "required": [
+        "groups"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/parkedGroup"
+          }
+        }
+      }
+    }
+  }
+}

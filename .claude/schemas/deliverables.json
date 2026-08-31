@@ -1,0 +1,918 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent deliverables",
+  "description": "Task reports, task reviews, re-reviews, and branch reviews written by the agent templates in .claude/agents/. The `kind` field selects the definition. Validate with tools/kb.sh validate <file>.",
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$"
+    },
+    "ruleId": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+$"
+    },
+    "backlogId": {
+      "type": "string",
+      "pattern": "^(HR-[0-9]+|PP-[0-9]+-[0-9]+)$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "textList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "taskNumber": {
+      "type": [
+        "integer",
+        "string"
+      ]
+    },
+    "commit": {
+      "type": "object",
+      "required": [
+        "sha",
+        "subject"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "sha": {
+          "$ref": "#/$defs/sha"
+        },
+        "subject": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "required": [
+        "command",
+        "output"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "$ref": "#/$defs/text"
+        },
+        "output": {
+          "type": "string"
+        }
+      }
+    },
+    "tddCycle": {
+      "type": "object",
+      "required": [
+        "test",
+        "red",
+        "green"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "test": {
+          "$ref": "#/$defs/text"
+        },
+        "red": {
+          "$ref": "#/$defs/run"
+        },
+        "green": {
+          "$ref": "#/$defs/run"
+        }
+      }
+    },
+    "docCheck": {
+      "type": "object",
+      "required": [
+        "api",
+        "source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "api": {
+          "$ref": "#/$defs/text"
+        },
+        "source": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "dependencyVetting": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "evidence",
+        "verdict"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/text"
+        },
+        "version": {
+          "$ref": "#/$defs/text"
+        },
+        "evidence": {
+          "$ref": "#/$defs/text"
+        },
+        "verdict": {
+          "enum": [
+            "accepted",
+            "rejected"
+          ]
+        }
+      }
+    },
+    "coverageMeasure": {
+      "type": "object",
+      "required": [
+        "target",
+        "metric",
+        "measured",
+        "floor"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/text"
+        },
+        "metric": {
+          "enum": [
+            "regions",
+            "lines",
+            "branches"
+          ]
+        },
+        "measured": {
+          "type": "number",
+          "minimum": 0
+        },
+        "floor": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "auditRow": {
+      "type": "object",
+      "required": [
+        "id",
+        "mode",
+        "result",
+        "evidence"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ruleId"
+        },
+        "kind": {
+          "enum": [
+            "rule",
+            "invariant",
+            "gotcha",
+            "procedure",
+            "decision",
+            "history"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "deterministic",
+            "judged"
+          ]
+        },
+        "level": {
+          "enum": [
+            "fail",
+            "warn",
+            null
+          ]
+        },
+        "result": {
+          "enum": [
+            "pass",
+            "fail",
+            "warn",
+            "skipped"
+          ]
+        },
+        "evidence": {
+          "type": "string"
+        }
+      }
+    },
+    "auditSummary": {
+      "type": "object",
+      "required": [
+        "base",
+        "head",
+        "deterministic",
+        "pass",
+        "fail",
+        "warn",
+        "skipped",
+        "judged"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "$ref": "#/$defs/sha"
+        },
+        "head": {
+          "$ref": "#/$defs/sha"
+        },
+        "deterministic": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pass": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fail": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warn": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "judged": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "selfAudit": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "summary",
+        "rows"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "summary": {
+          "$ref": "#/$defs/auditSummary"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/auditRow"
+          }
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "required": [
+        "severity",
+        "file",
+        "what",
+        "why",
+        "fix"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "severity": {
+          "enum": [
+            "critical",
+            "important",
+            "minor"
+          ]
+        },
+        "file": {
+          "$ref": "#/$defs/text"
+        },
+        "what": {
+          "$ref": "#/$defs/text"
+        },
+        "why": {
+          "$ref": "#/$defs/text"
+        },
+        "fix": {
+          "$ref": "#/$defs/text"
+        },
+        "rule": {
+          "$ref": "#/$defs/ruleId"
+        },
+        "plan_mandated": {
+          "type": "boolean"
+        },
+        "backlog": {
+          "$ref": "#/$defs/backlogId"
+        }
+      }
+    },
+    "fixRound": {
+      "type": "object",
+      "required": [
+        "round",
+        "findings",
+        "commits",
+        "tests"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "round": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "finding",
+              "fix"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "finding": {
+                "$ref": "#/$defs/text"
+              },
+              "fix": {
+                "$ref": "#/$defs/text"
+              },
+              "file": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        },
+        "commits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/commit"
+          }
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/run"
+          }
+        }
+      }
+    },
+    "taskReport": {
+      "type": "object",
+      "required": [
+        "kind",
+        "task",
+        "backlog",
+        "status",
+        "implemented",
+        "commits",
+        "tests",
+        "tdd",
+        "files_changed",
+        "docs_verified",
+        "dependency_vetting",
+        "coverage",
+        "self_audit",
+        "self_review",
+        "concerns",
+        "knowledge_used"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "task-report"
+          ]
+        },
+        "task": {
+          "$ref": "#/$defs/taskNumber"
+        },
+        "backlog": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/backlogId"
+          },
+          "uniqueItems": true
+        },
+        "status": {
+          "enum": [
+            "DONE",
+            "DONE_WITH_CONCERNS",
+            "BLOCKED",
+            "NEEDS_CONTEXT"
+          ]
+        },
+        "implemented": {
+          "$ref": "#/$defs/text"
+        },
+        "commits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/commit"
+          }
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/run"
+          }
+        },
+        "tdd": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tddCycle"
+          }
+        },
+        "files_changed": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/text"
+          },
+          "uniqueItems": true
+        },
+        "docs_verified": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/docCheck"
+          }
+        },
+        "coverage": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/coverageMeasure"
+          }
+        },
+        "self_audit": {
+          "$ref": "#/$defs/selfAudit"
+        },
+        "self_review": {
+          "$ref": "#/$defs/textList"
+        },
+        "concerns": {
+          "$ref": "#/$defs/textList"
+        },
+        "knowledge_used": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ruleId"
+          },
+          "uniqueItems": true
+        },
+        "fix_rounds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fixRound"
+          }
+        },
+        "dependency_vetting": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "manifests",
+            "dependencies"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "manifests": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/text"
+              }
+            },
+            "dependencies": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/dependencyVetting"
+              }
+            }
+          }
+        }
+      }
+    },
+    "taskReview": {
+      "type": "object",
+      "required": [
+        "kind",
+        "task",
+        "base",
+        "head",
+        "spec_compliance",
+        "rule_adherence",
+        "strengths",
+        "issues",
+        "assessment"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "task-review"
+          ]
+        },
+        "task": {
+          "$ref": "#/$defs/taskNumber"
+        },
+        "base": {
+          "$ref": "#/$defs/sha"
+        },
+        "head": {
+          "$ref": "#/$defs/sha"
+        },
+        "spec_compliance": {
+          "type": "object",
+          "required": [
+            "verdict",
+            "items"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "verdict": {
+              "enum": [
+                "compliant",
+                "issues",
+                "cannot-verify"
+              ]
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "file",
+                  "text"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "enum": [
+                      "missing",
+                      "extra",
+                      "misunderstood",
+                      "unverifiable"
+                    ]
+                  },
+                  "file": {
+                    "$ref": "#/$defs/text"
+                  },
+                  "text": {
+                    "$ref": "#/$defs/text"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "rule_adherence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/auditRow"
+          }
+        },
+        "strengths": {
+          "$ref": "#/$defs/textList"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue"
+          }
+        },
+        "assessment": {
+          "type": "object",
+          "required": [
+            "verdict",
+            "text"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "verdict": {
+              "enum": [
+                "approved",
+                "needs-fixes"
+              ]
+            },
+            "text": {
+              "$ref": "#/$defs/text"
+            }
+          }
+        }
+      }
+    },
+    "reReview": {
+      "type": "object",
+      "required": [
+        "kind",
+        "task",
+        "round",
+        "fix_base",
+        "head",
+        "finding_verdicts",
+        "rule_adherence",
+        "new_breakage",
+        "out_of_scope",
+        "verdict"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "re-review"
+          ]
+        },
+        "task": {
+          "$ref": "#/$defs/taskNumber"
+        },
+        "round": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fix_base": {
+          "$ref": "#/$defs/sha"
+        },
+        "head": {
+          "$ref": "#/$defs/sha"
+        },
+        "finding_verdicts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "finding",
+              "verdict",
+              "evidence"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "finding": {
+                "$ref": "#/$defs/text"
+              },
+              "verdict": {
+                "enum": [
+                  "addressed",
+                  "not-addressed"
+                ]
+              },
+              "evidence": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        },
+        "rule_adherence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/auditRow"
+          }
+        },
+        "new_breakage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue"
+          }
+        },
+        "out_of_scope": {
+          "$ref": "#/$defs/textList"
+        },
+        "verdict": {
+          "type": "object",
+          "required": [
+            "state",
+            "open"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "enum": [
+                "all-addressed",
+                "findings-remain"
+              ]
+            },
+            "open": {
+              "$ref": "#/$defs/textList"
+            }
+          }
+        }
+      }
+    },
+    "branchReview": {
+      "type": "object",
+      "required": [
+        "kind",
+        "base",
+        "head",
+        "strengths",
+        "issues",
+        "rule_adherence",
+        "recommendations",
+        "retrospective",
+        "assessment"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "branch-review"
+          ]
+        },
+        "base": {
+          "$ref": "#/$defs/sha"
+        },
+        "head": {
+          "$ref": "#/$defs/sha"
+        },
+        "strengths": {
+          "$ref": "#/$defs/textList"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue"
+          }
+        },
+        "rule_adherence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/auditRow"
+          }
+        },
+        "recommendations": {
+          "$ref": "#/$defs/textList"
+        },
+        "retrospective": {
+          "type": "object",
+          "required": [
+            "violated_rules",
+            "uncovered_findings",
+            "stale_entries",
+            "unused_ids",
+            "template_defects"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "violated_rules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "count",
+                  "tasks",
+                  "proposal"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/ruleId"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "tasks": {
+                    "$ref": "#/$defs/textList"
+                  },
+                  "proposal": {
+                    "type": "object"
+                  }
+                }
+              }
+            },
+            "uncovered_findings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "finding",
+                  "entry"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "finding": {
+                    "$ref": "#/$defs/text"
+                  },
+                  "entry": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "kind",
+                      "area",
+                      "summary",
+                      "body",
+                      "tags",
+                      "source"
+                    ]
+                  }
+                }
+              }
+            },
+            "stale_entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "edit"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/ruleId"
+                  },
+                  "edit": {
+                    "$ref": "#/$defs/text"
+                  }
+                }
+              }
+            },
+            "unused_ids": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "tasks",
+                  "decision",
+                  "reason"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/ruleId"
+                  },
+                  "tasks": {
+                    "$ref": "#/$defs/textList"
+                  },
+                  "decision": {
+                    "enum": [
+                      "keep",
+                      "drop"
+                    ]
+                  },
+                  "reason": {
+                    "$ref": "#/$defs/text"
+                  }
+                }
+              }
+            },
+            "template_defects": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "where",
+                  "what",
+                  "fix"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "where": {
+                    "$ref": "#/$defs/text"
+                  },
+                  "what": {
+                    "$ref": "#/$defs/text"
+                  },
+                  "fix": {
+                    "$ref": "#/$defs/text"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "assessment": {
+          "type": "object",
+          "required": [
+            "ready",
+            "text"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "ready": {
+              "enum": [
+                "yes",
+                "no",
+                "with-fixes"
+              ]
+            },
+            "text": {
+              "$ref": "#/$defs/text"
+            }
+          }
+        }
+      }
+    }
+  }
+}

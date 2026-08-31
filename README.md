@@ -101,6 +101,12 @@ tools/backlog.sh list --open | get WI-001 | batch 1 | set WI-001 status=done bat
 mise exec -- npm test        # vitest with coverage
 ```
 
+This repository runs its own kit (id prefix `HR`): `template/` is the source,
+the root `tools/`, `.claude/agents/`, and `.claude/skills/` are the installed
+copy. Edit `template/`, then run `node bin/houserules.mjs update --dir .`;
+`tests/dogfood.test.mjs` pins the copies to their sources. `knowledge/` and
+`backlog/` at the root are this repository's own rules and work items.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). The files that `init` and `update` write into

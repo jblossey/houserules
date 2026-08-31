@@ -1,0 +1,51 @@
+{
+  "$schema": "./schema.json",
+  "topic": "writing-style",
+  "title": "Writing style for docs, comments, commits, reports",
+  "entries": [
+    {
+      "id": "writing-style.principles",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Write docs, comments, commit messages, and reports in ASD-STE100 style: short sentences, active voice, one instruction per sentence, concise.",
+      "body": [
+        "Sources: Williams, *Style*; Gopen & Swan, \"The Science of Scientific Writing\". They apply on top of ASD-STE100.",
+        "Make the main character the subject and its action the verb.",
+        "Unpack nominalizations into verbs: \"perform validation of\" becomes \"validate\".",
+        "Delete expletives (\"there is\", \"it is\"), filler (\"in order to\", \"the fact that\", \"note that\"), and hedges that carry no information.",
+        "Put old information in the topic position, new information in the stress position.",
+        "Keep subject and verb adjacent.",
+        "End on the emphasis."
+      ],
+      "tags": ["docs", "style"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+    },
+    {
+      "id": "writing-style.code-comments",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Write a code comment only for a constraint the code cannot show.",
+      "body": [],
+      "tags": ["comments"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+    },
+    {
+      "id": "writing-style.doc-comments",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Document every exported symbol with the language's doc-comment convention. Name things so the code reads without comments.",
+      "body": [
+        "A doc comment states what the item is for, its invariants, and what it returns or raises when the signature does not say so. It never restates the signature.",
+        "Conventions: TSDoc in TypeScript, JSDoc in JavaScript, rustdoc in Rust, docstrings in Python — the language's standard form.",
+        "Self-documenting code first: full words, verbs for functions, `is`/`has` for booleans, no abbreviation a newcomer must decode, one meaning per name. A comment that explains a name means the name is wrong.",
+        "Comments inside a body still follow writing-style.code-comments: only for a constraint the code cannot show."
+      ],
+      "tags": ["docs", "comments", "naming"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
+      "see": ["writing-style.code-comments", "writing-style.principles"]
+    }
+  ]
+}

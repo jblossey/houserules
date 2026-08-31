@@ -1,0 +1,21 @@
+{
+  "heading": "Batch planning",
+  "intro": ["Batch numbers start at 1; the approved spec of 2026-08-31 calls the first batch 'batch 0'."],
+  "table_header": ["Batch", "Items", "Summary", "Kickoff", "Status"],
+  "batches": [
+    {
+      "number": 1,
+      "items": [],
+      "summary": "Bootstrap: owner rulings, rename to houserules, SessionStart fork matcher, MIT license and headers, dogfood install.",
+      "kickoff": "docs/specs/2026-08-31-batch-0-bootstrap.md",
+      "status": { "state": "done", "text": "Commits 6721668, 7db7db9, d356fba, a1d31ac, and the dogfood commit that closes the batch; implemented by the orchestrator under the bootstrap exception (decisions)." }
+    },
+    {
+      "number": 2,
+      "items": ["HR-001", "HR-002"],
+      "summary": "CLI robustness: npm .bin symlink entry guard, clean invalid-JSON errors.",
+      "kickoff": "",
+      "status": { "state": "planned", "text": "First batch through the agent layer: implementer on sonnet, task review on opus, branch review on fable." }
+    }
+  ]
+}

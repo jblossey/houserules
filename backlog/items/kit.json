@@ -1,0 +1,49 @@
+{
+  "$schema": "../schema.json",
+  "section": "kit",
+  "heading": "Kit",
+  "title": "Kit machinery and payload",
+  "spec": "docs/design.md",
+  "items": [
+    {
+      "id": "HR-001",
+      "type": "bug",
+      "milestone": null,
+      "status": "open",
+      "title": "Run the CLI through npm's .bin symlink",
+      "body": [
+        "npm installs `bin` as a symlink `node_modules/.bin/houserules -> ../houserules/bin/houserules.mjs`. Node resolves `import.meta.url` through the symlink but keeps `process.argv[1]` as the `.bin` path, so the entry guard in `bin/houserules.mjs` never matches and the CLI exits 0 without output.",
+        "Fix: compare against `realpathSync(process.argv[1])` in the guard; apply the same idiom in `template/tools/kb.mjs` and `template/tools/backlog.mjs`. Regression test: run the bin through a symlink and expect the manifest.",
+        "Verified live on 2026-08-31 with `npm exec --package=git+file://<clone> -- houserules files`: 0 lines, exit 0; the direct path prints the manifest."
+      ],
+      "batch": 2,
+      "tags": ["cli", "npm"]
+    },
+    {
+      "id": "HR-002",
+      "type": "fix",
+      "milestone": null,
+      "status": "open",
+      "title": "Report invalid JSON in knowledge and backlog files as a usage error",
+      "body": [
+        "`loadBase` and `loadBacklog` let `JSON.parse` errors escape as stack traces (`SyntaxError: Expected property name or '}' in JSON at position 1`); `tools/kb.sh render` inside `init` then dies with the raw trace.",
+        "Fix: `readJson` raises a `UsageError` that names the file and the parse message, as `audit --report` already does for a malformed report. `init` keeps failing with a non-zero exit; the init test `lets a render failure on broken project data propagate as a real error` stays valid."
+      ],
+      "batch": 2,
+      "tags": ["tools", "errors"]
+    },
+    {
+      "id": "HR-003",
+      "type": "process",
+      "milestone": null,
+      "label": "blocked: tag-pilot PR #42",
+      "status": "open",
+      "title": "Port process.evals-rerun with its co-change check and evals record from tag-pilot",
+      "body": [
+        "tag-pilot `fc3241b` (2026-08-31) adds the rule `process.evals-rerun`: re-run every `.claude/evals/` scenario whenever the implementer or task-reviewer template or a scenario changes; a `co-change` check fails the audit until `.claude/evals/record.json` changes with them; the record keys runs by the templates' git blob ids. The orchestrating skill gains a 'Template evaluation' procedure and the branch reviewer compares the record's blob ids with HEAD.",
+        "Blocked until PR #42 is merged (owner instruction). Then port it to `template/` (knowledge entry, orchestrating skill bullet, branch-reviewer check, and the `kb.mjs` co-change lines if the drift holds them) and diff the remaining drift."
+      ],
+      "tags": ["tag-pilot", "evals", "parity"]
+    }
+  ]
+}
