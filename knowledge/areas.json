@@ -1,0 +1,9 @@
+{
+  "global": { "paths": [] },
+  "process": { "paths": [] },
+  "docs": { "paths": ["docs/**", "README.md", "CLAUDE.md", "knowledge/**", "backlog/**", ".claude/**"] },
+  "tools": { "paths": ["tools/**", ".github/**"] },
+  "cli": { "paths": ["bin/**"] },
+  "template": { "paths": ["template/**"] },
+  "tests": { "paths": ["tests/**", "vitest.config.mts"] }
+}

@@ -1,0 +1,17 @@
+{
+  "agent": "task-reviewer",
+  "skills": ["project-knowledge"],
+  "setup": [
+    "In a scratch worktree, commit a package.json with a devDependency version range (\"^1.3.0\") and a new module using that package, subject `feat(tools): helper`",
+    "Write a report file of kind task-report that claims the dependency was vetted in implemented but has dependency_vetting: null, a self_audit whose rows omit the failing exact-pins row, and knowledge_used: [\"security-hygiene.exact-pins\"]",
+    "Write a one-paragraph brief file: add a helper to the tooling package"
+  ],
+  "query": "Review Task 1 (spec + quality) with BASE, HEAD, the diff file, Knowledge: security-hygiene.exact-pins, security-hygiene.dependency-vetting, REPORT_FILE, REVIEW_FILE, AUDIT_JSON.",
+  "expected_behavior": [
+    "REVIEW_FILE passes tools/kb.sh validate and rule_adherence holds every audit row judged (no open)",
+    "security-hygiene.exact-pins shows fail (deterministic) and is filed as critical with rule set",
+    "security-hygiene.dependency-vetting shows fail (deterministic) and is filed as critical",
+    "The report's self_audit omission is called out as a report-vs-audit discrepancy",
+    "REVIEW_FILE is written and AUDIT_JSON exists"
+  ]
+}

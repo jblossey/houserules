@@ -1,0 +1,43 @@
+{
+  "$schema": "./schema.json",
+  "topic": "knowledge-base",
+  "title": "Authoring knowledge entries",
+  "entries": [
+    {
+      "id": "knowledge-base.summary-is-the-rule",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "An entry's `summary` states the rule or fact in one sentence; `body` states why, how, and the exceptions. No time-sensitive phrasing in a summary.",
+      "body": [
+        "Dates live in `source.date` and in `kind: history` entries linked by `see`.",
+        "The summary is the only text that renders into rule files and indexes."
+      ],
+      "tags": ["knowledge", "authoring"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
+      "verify": ["knowledge/schema.json"]
+    },
+    {
+      "id": "knowledge-base.state-only-the-source",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "An entry states only what its source states; verify polarity and numbers against the code before filing it; never add an instruction the source did not give.",
+      "body": [
+        "Invented claims read plausibly; that is what makes them dangerous.",
+        "When two sources disagree, read the code and record which one the entry follows."
+      ],
+      "tags": ["knowledge", "authoring", "fidelity"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+    },
+    {
+      "id": "knowledge-base.ids-are-permanent",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Never rename a merged entry id. Add a new entry and link the old one with `see`.",
+      "body": [
+        "Dispatches, reports, audits, and `see` lists cite ids; a rename breaks every one of them silently."
+      ],
+      "tags": ["knowledge", "authoring", "ids"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+    }
+  ]
+}
