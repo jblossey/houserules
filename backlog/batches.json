@@ -15,7 +15,7 @@
       "items": ["HR-004", "HR-001", "HR-002"],
       "summary": "pnpm workspace like tag-pilot (HR-004); CLI robustness: symlinked-path entry guard (HR-001), clean invalid-JSON errors (HR-002).",
       "kickoff": "docs/specs/2026-09-01-batch-2-pnpm-workspace-and-cli-robustness.md",
-      "status": { "state": "planned", "text": "Spec approved on 2026-09-01; in progress on branch batch-2 — implementer on sonnet, task review on opus, branch review on fable." }
+      "status": { "state": "done", "text": "Done 2026-09-01: merged into main fast-forward after the branch review (fable: ready with-fixes; the fixes are in the finishing commit). Implementers on sonnet, task reviews on opus; task 3 fix round 1 ran on an opus implementer after four sonnet endpoint drops, its re-review on fable. Ten task findings fixed, none deferred. Retrospective items: HR-005 to HR-009; standing-rule proposals await the owner (decisions notes)." }
     }
   ]
 }

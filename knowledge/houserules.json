@@ -122,7 +122,7 @@
       "summary": "The payload in `template/` runs on Node built-ins and POSIX shell only: no dependency, no build step; the CLIs work in a fresh clone before any install.",
       "body": [
         "The SessionStart hook and the CI gates run where nothing is installed; a runtime dependency would break both (docs/design.md §2, option B).",
-        "This repository's devDependencies (vitest) serve its own tests only and never enter `template/`."
+        "This repository's devDependencies (vitest, commitlint) serve its own tests and commit hook only and never enter `template/`."
       ],
       "tags": [
         "payload",

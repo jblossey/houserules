@@ -9,7 +9,7 @@
       "id": "HR-001",
       "type": "bug",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "title": "Run the CLI through a symlinked path (npm .bin link, node_modules/<pkg> under pnpm)",
       "body": [
         "npm installs `bin` as a symlink `node_modules/.bin/houserules -> ../houserules/bin/houserules.mjs`. Node resolves `import.meta.url` through the symlink but keeps `process.argv[1]` as the `.bin` path, so the entry guard in `bin/houserules.mjs` never matches and the CLI exits 0 without output.",
@@ -18,20 +18,28 @@
         "Probe of 2026-09-01 under pnpm 11.18.0 (`pnpm add --save-exact git+file://<clone>` in a scratch project): `pnpm exec houserules files` and `pnpm dlx git+file://<clone> files` print the manifest, because pnpm's bin shim execs the real path under `node_modules/.pnpm/`; `node node_modules/houserules/bin/houserules.mjs files` through the package symlink prints nothing and exits 0. The defect is independent of the package manager."
       ],
       "batch": 2,
-      "tags": ["cli", "npm", "pnpm", "symlink"]
+      "tags": [
+        "cli",
+        "npm",
+        "pnpm",
+        "symlink"
+      ]
     },
     {
       "id": "HR-002",
       "type": "fix",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "title": "Report invalid JSON in knowledge and backlog files as a usage error",
       "body": [
         "`loadBase` and `loadBacklog` let `JSON.parse` errors escape as stack traces (`SyntaxError: Expected property name or '}' in JSON at position 1`); `tools/kb.sh render` inside `init` then dies with the raw trace.",
         "Fix: `readJson` raises a `UsageError` that names the file and the parse message, as `audit --report` already does for a malformed report. `init` keeps failing with a non-zero exit; the init test `lets a render failure on broken project data propagate as a real error` stays valid."
       ],
       "batch": 2,
-      "tags": ["tools", "errors"]
+      "tags": [
+        "tools",
+        "errors"
+      ]
     },
     {
       "id": "HR-003",
@@ -44,13 +52,17 @@
         "tag-pilot `fc3241b` (2026-08-31) adds the rule `process.evals-rerun`: re-run every `.claude/evals/` scenario whenever the implementer or task-reviewer template or a scenario changes; a `co-change` check fails the audit until `.claude/evals/record.json` changes with them; the record keys runs by the templates' git blob ids. The orchestrating skill gains a 'Template evaluation' procedure and the branch reviewer compares the record's blob ids with HEAD.",
         "Blocked until PR #42 is merged (owner instruction). Then port it to `template/` (knowledge entry, orchestrating skill bullet, branch-reviewer check, and the `kb.mjs` co-change lines if the drift holds them) and diff the remaining drift."
       ],
-      "tags": ["tag-pilot", "evals", "parity"]
+      "tags": [
+        "tag-pilot",
+        "evals",
+        "parity"
+      ]
     },
     {
       "id": "HR-004",
       "type": "chore",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "title": "Switch this repository to pnpm and set the workspace up like tag-pilot",
       "body": [
         "Owner ruling of 2026-09-01 (docs/design.md §5.7): use pnpm only, never npm or npx.",
@@ -58,7 +70,93 @@
         "The batch 2 spec fixes the file list and settles the commitlint commit-msg hook."
       ],
       "batch": 2,
-      "tags": ["pnpm", "workspace", "mise"]
+      "tags": [
+        "pnpm",
+        "workspace",
+        "mise"
+      ]
+    },
+    {
+      "id": "HR-005",
+      "type": "fix",
+      "milestone": null,
+      "status": "open",
+      "title": "Capture the render child's stderr in init instead of inheriting it",
+      "body": [
+        "`install` in `bin/houserules.mjs` spawns `tools/kb.mjs render` with an inherited stderr, so the init test on broken project data prints one usage-error line into the suite output (tests/init.test.mjs, 'lets a render failure on broken project data propagate as a real error').",
+        "Fix: spawn with `stdio: ['ignore', 'pipe', 'pipe']` and put the child's stderr into the thrown error; the test asserts the message and the suite output stays silent.",
+        "Source: task 3 re-review and the batch 2 branch review (2026-09-01)."
+      ],
+      "tags": [
+        "cli",
+        "tests"
+      ]
+    },
+    {
+      "id": "HR-006",
+      "type": "process",
+      "milestone": null,
+      "status": "open",
+      "title": "Enforce the commit body line limit in the commits check",
+      "body": [
+        "The `commits` check of `tools/kb.sh audit` tests the subject pattern and `body_absent` only; two controller commits with 190- and 227-character body lines passed the batch 2 audits as '9 commits checked'. Only the commit-msg hook catches it, for commits made after it was installed.",
+        "Fix: add the optional key `body_line_max` (integer, minimum 1) to `$defs.check` in `knowledge/schema.json` and `template/knowledge/schema.json`; in the `commits` runner of `template/tools/kb.mjs`, fail a commit with a body line longer than the limit; regression tests for 100 and 101 characters and a `checkShape` case; `update --dir .`.",
+        "Needs the owner's ruling on the standing entry: set `body_line_max: 100` on `process.conventional-commits` in `knowledge/process.json` and `template/knowledge/process.json`. Source: batch 2 branch review, violated_rules."
+      ],
+      "tags": [
+        "tools",
+        "audit",
+        "standing"
+      ]
+    },
+    {
+      "id": "HR-007",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "Agent template and deliverables refinements from the batch 2 retrospective",
+      "body": [
+        "Deliverables schema (`template/.claude/schemas/deliverables.json` and the root copy): add an optional integer `exit` to `$defs.run`; the implementer template's Report section names it for every run whose exit code is evidence, and `output` stays verbatim (batch 2: exit codes were written into `output` as prose).",
+        "Implementer template `coverage`: 'one measure per target whenever the project has a coverage gate and the full suite ran, so the batch keeps a baseline; null only when the suite did not run' (batch 2 task 1 left it null and a fix round repaired it).",
+        "Orchestrating skill, dispatch protocol: a brief names no version number for a tool, action, or package (security-hygiene.exact-pins); it names the verification the implementer runs and shows placeholders such as `jdx/mise-action@<current major>` (batch 2 task 1 brief carried a stale `@v2`).",
+        "Source: batch 2 branch review, template_defects 2-4."
+      ],
+      "tags": [
+        "template",
+        "agents",
+        "schemas"
+      ]
+    },
+    {
+      "id": "HR-008",
+      "type": "feat",
+      "milestone": null,
+      "status": "open",
+      "title": "Audit report-field checks over a workspace of task reports",
+      "body": [
+        "A branch has no single report, so the four report-field rows (deliverables-json, knowledge-first, dependency-vetting, verify-current-docs) come back `skipped` from `tools/kb.sh audit` and the branch reviewer judges them by hand from the task reports.",
+        "Fix: accept `--report` more than once, or add `--workspace <dir>` that reads every `task-*-report.json`; a report-field check passes when every report whose changed files trigger it sets the field, and names the offending report otherwise. Source: batch 2 branch review, template_defects 5."
+      ],
+      "tags": [
+        "tools",
+        "audit"
+      ]
+    },
+    {
+      "id": "HR-009",
+      "type": "bug",
+      "milestone": null,
+      "status": "open",
+      "title": "Diff the audit range from the merge base",
+      "body": [
+        "`changedFiles` in `template/tools/kb.mjs` diffs `base..head`, so the pull-request audit (`.github/workflows/ci.yml`) sees unrelated files when main moves after the branch was cut. Inherited from tag-pilot's knowledge.yml.",
+        "Fix: `git diff --name-only --diff-filter=ACMR --merge-base <base> <head>` for the files, `git log <base>..<head>` for the commits; a test with a moved base. Source: batch 2 branch review, recommendations."
+      ],
+      "tags": [
+        "tools",
+        "audit",
+        "ci"
+      ]
     }
   ]
 }
