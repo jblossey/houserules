@@ -5,7 +5,7 @@
       "intro": "Deferred by the owner on 2026-08-31; each item returns with its trigger.",
       "items": [
         { "id": "PP-1-01", "text": "Publishing path (GitHub remote with `npx github:jblossey/houserules`, or npm). Trigger: the owner's ruling on docs/design.md §5.3. Prerequisite HR-001; the `files` whitelist is done." },
-        { "id": "PP-1-02", "text": "tag-pilot becomes a consumer of the kit. Trigger: PR #42 merged, then the owner's ruling on docs/design.md §5.4." },
+        { "id": "PP-1-02", "text": "Adoption path for tag-pilot. Trigger: the first houserules release or publish (raise with decision 3; re-deferred 2026-09-01 after PR #42 merged). Until then tag-pilot stays the upstream of the kit-owned files; diff tools/, .claude/agents/, .claude/skills/ against template/ before every release and port the drift." },
         { "id": "PP-1-03", "text": "A Claude Code plugin as a complement for the static agent templates and the orchestrating skill (docs/design.md §3). Trigger: a second adopter that wants central updates." }
       ]
     }
