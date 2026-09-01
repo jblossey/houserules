@@ -56,7 +56,8 @@
         "tag-pilot",
         "evals",
         "parity"
-      ]
+      ],
+      "batch": 4
     },
     {
       "id": "HR-004",
@@ -177,7 +178,8 @@
       "tags": [
         "cli",
         "errors"
-      ]
+      ],
+      "batch": 4
     },
     {
       "id": "HR-011",
@@ -194,7 +196,8 @@
         "tools",
         "audit",
         "errors"
-      ]
+      ],
+      "batch": 4
     },
     {
       "id": "HR-012",
@@ -211,6 +214,41 @@
         "template",
         "skills",
         "dispatch"
+      ],
+      "batch": 4
+    },
+    {
+      "id": "HR-013",
+      "type": "feat",
+      "milestone": null,
+      "status": "open",
+      "title": "A migration skill: move a pre-existing codebase’s knowledge into the houserules style",
+      "body": [
+        "Owner request of 2026-09-01: when houserules is installed into a codebase that already has knowledge (CLAUDE.md prose, docs, wikis, comments, ad-hoc rules files), a skill in the payload explains how to migrate it: inventory the sources, split rule/invariant/gotcha/procedure/decision/history, write entries per the schema (summary is the rule, ≤160; body why/how/exceptions; source with date and by; verify paths; check where deterministic), extend areas, park the leftovers, delete the migrated originals, and gate with tools/kb.sh check plus render.",
+        "Shape to design in the batch spec: a kit-owned skill (template/.claude/skills/, overwritten by update) that the README’s install-to-existing section points to; likely with a worked example and the knowledge-base.* rules by pointer.",
+        "Candidate for batch 5 with its own spec gate."
+      ],
+      "tags": [
+        "template",
+        "skills",
+        "migration",
+        "adoption"
+      ]
+    },
+    {
+      "id": "HR-014",
+      "type": "fix",
+      "milestone": null,
+      "status": "open",
+      "title": "Read settings.json through readJson in the bin",
+      "body": [
+        "`mergeSettings` in `bin/houserules.mjs` still parses `.claude/settings.json` by hand and wraps the failure as `not readable JSON (...)`, a second wording for the failure class the stamp path now reports as `invalid JSON` through `readJson`.",
+        "Fix: `settings = readJson(path)` and drop the catch; the existing test asserts exit 2 and the file name only. Decide the one semantic change: an unreadable (not just invalid) settings.json then propagates as a plain Error, like the stamp.",
+        "Source: batch 4 task 1 review, minor (2026-09-01); deferred out of HR-010 because of that semantics decision."
+      ],
+      "tags": [
+        "cli",
+        "errors"
       ]
     }
   ]

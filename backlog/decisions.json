@@ -52,6 +52,10 @@
     {
       "date": "2026-09-01",
       "text": "process.rulings-to-file summary includes a deferral’s backlog item (one word shorter than quoted at the gate, for the 160-character cap); applied in knowledge/process.json and template/knowledge/process.json. docs/design.md §5.12."
+    },
+    {
+      "date": "2026-09-01",
+      "text": "tag-pilot adoption: deferred again (the PR #42 trigger fired); new trigger: the first houserules release or publish, raised together with decision 3. Until then tag-pilot stays the upstream of the kit-owned files. docs/design.md §5.4."
     }
   ],
   "notes": []

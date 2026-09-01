@@ -199,6 +199,13 @@ Each item records the ruling with its date, or stays marked open.
    `dependency_vetting` report field, and its `TP-`/`E01` id patterns (the
    loosened patterns accept both). Ids are permanent there; keep TagPilot's
    entry ids as they are. That migration is tag-pilot work, done there.
+   Update 2026-09-01: PR #42 is merged and the trigger fired; the owner
+   deferred again. New trigger: the first houserules release or publish
+   (raised together with decision 3). The drift check of 2026-09-01 found
+   one tag-pilot novelty since the port base — fc3241b, the evals-rerun
+   rule — which batch 4 ports as HR-003; every other difference is a
+   houserules improvement tag-pilot lacks. The tag-pilot-only scenario
+   rust-test-near-coverage stays unported by design.
 5. **Dogfooding — ruled 2026-08-31: yes, full.** After the rename, this
    repository installs its own kit: `init --dir . --id-prefix HR`, then a
    repository-specific `CLAUDE.md`, areas (`template`, `cli`, `tests`,
