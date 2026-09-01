@@ -35,7 +35,7 @@ houserules installs, into your project's own repository:
 ```sh
 mkdir my-project && cd my-project && git init
 node ~/projects/houserules/bin/houserules.mjs init
-# or, once published: npx houserules init
+# or, once published: pnpm dlx houserules init
 tools/kb.sh check && tools/backlog.sh check
 git add -A && git commit -m 'chore: install houserules knowledge setup'
 ```
@@ -98,14 +98,18 @@ tools/backlog.sh list --open | get WI-001 | batch 1 | set WI-001 status=done bat
 ## Development (this repository)
 
 ```sh
-mise exec -- npm test        # vitest with coverage
+mise run setup    # pnpm install, commit-msg hook (commitlint)
+mise run test     # vitest with coverage
+mise run lint     # shellcheck, kb check, backlog check
 ```
 
-This repository runs its own kit (id prefix `HR`): `template/` is the source,
-the root `tools/`, `.claude/agents/`, and `.claude/skills/` are the installed
-copy. Edit `template/`, then run `node bin/houserules.mjs update --dir .`;
-`tests/dogfood.test.mjs` pins the copies to their sources. `knowledge/` and
-`backlog/` at the root are this repository's own rules and work items.
+Package operations go through pnpm only (`pnpm add --save-exact …`); tool
+versions are pinned in `mise.toml`. This repository runs its own kit (id
+prefix `HR`): `template/` is the source, the root `tools/`, `.claude/agents/`,
+and `.claude/skills/` are the installed copy. Edit `template/`, then run
+`node bin/houserules.mjs update --dir .`; `tests/dogfood.test.mjs` pins the
+copies to their sources. `knowledge/` and `backlog/` at the root are this
+repository's own rules and work items.
 
 ## License
 

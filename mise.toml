@@ -1,2 +1,24 @@
 [tools]
-node = "24"
+node = "24.18.1"
+pnpm = "11.18.0"
+shellcheck = "0.11.0"
+
+[tasks.setup]
+description = "One-command dev setup: install and the commit-msg hook"
+run = ["pnpm install", "git config core.hooksPath .githooks"]
+
+[tasks.test]
+description = "Run all tests with coverage"
+run = "pnpm test"
+
+[tasks.lint]
+description = "shellcheck, then the knowledge and backlog gates"
+run = [
+  "shellcheck tools/*.sh template/tools/*.sh .githooks/commit-msg",
+  "tools/kb.sh check",
+  "tools/backlog.sh check",
+]
+
+[tasks.audit]
+description = "Audit a git range against the knowledge base rule package (pass --base <ref>)"
+run = "tools/kb.sh audit"

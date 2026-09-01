@@ -57,7 +57,7 @@
       "summary": "Live-run every CLI change in a fresh scratch `git init` repository: `init --dir <scratch>`, then `tools/kb.sh check && tools/backlog.sh check` there.",
       "body": [
         "Scratch repositories live under the session scratchpad, never inside this repository and never in tag-pilot.",
-        "`npm exec --yes --package=git+file://<this clone> -- houserules files` exercises the npm `.bin` path that `npx github:` and `npx houserules` use; it prints nothing until HR-001 is fixed.",
+        "`pnpm dlx git+file://<this clone> files` exercises the published path (pnpm's bin shim execs the real file); `node <scratch>/node_modules/houserules/bin/houserules.mjs files` after `pnpm add --save-exact git+file://<this clone>` exercises the symlinked path (HR-001).",
         "For a change to `update`, run `init` and then `update` in the same scratch repository and confirm that only kit-owned files changed."
       ],
       "tags": [
@@ -78,9 +78,9 @@
       "id": "houserules.node-under-mise",
       "kind": "gotcha",
       "area": "global",
-      "summary": "`node` and `npm` are on PATH only under `mise exec --` (`mise exec -- npm test`); in a directory without `mise.toml`, mise resolves no tools at all.",
+      "summary": "`node` and `pnpm` are on PATH only under `mise exec --` or `mise run` (`mise exec -- pnpm test`); without `mise.toml`, mise resolves no tools.",
       "body": [
-        "For a scratch directory, put `$(dirname \"$(mise which node)\")` on PATH before you run `node` or `npm` there.",
+        "For a scratch directory, run tools as `mise x node@24.18.1 pnpm@11.18.0 -- <command>`; mise strips the paths of inactive tools, so a PATH export does not survive `mise x`.",
         "The shipped wrappers `tools/kb.sh` and `tools/backlog.sh` use `node` from PATH and fall back to `mise exec node` on their own."
       ],
       "tags": [
@@ -91,7 +91,7 @@
       "source": {
         "date": "2026-08-31",
         "by": "controller",
-        "ref": "session of 2026-08-31: mise could not exec npm in a scratch directory"
+        "ref": "session of 2026-08-31: mise could not exec npm in a scratch directory; probe of 2026-09-01"
       }
     },
     {
