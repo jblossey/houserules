@@ -88,7 +88,8 @@
       "summary": "Write every ruling to its home file in the same turn it is made. A work ledger and the chat are not home files; neither survives compaction.",
       "body": [
         "Home files: scope or product rulings go to a backlog entry; process rulings to a knowledge entry (`standing: true` when non-negotiable); design rulings to the batch spec.",
-        "A ledger note may accompany a ruling; it never substitutes for the tracked write."
+        "A ledger note may accompany a ruling; it never substitutes for the tracked write.",
+        "A dispatch deviation from the spec's process line (model, order, gate) is a ruling: amend that spec line in the same turn. The batch report at the tick repeats it; it does not replace it."
       ],
       "tags": ["rulings", "compaction"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }

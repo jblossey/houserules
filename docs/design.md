@@ -259,3 +259,14 @@ Each item records the ruling with its date, or stays marked open.
    `template/knowledge/process.json`. Rejected: the commit-msg hook as the
    only enforcement (it covers only commits made after it is installed, and
    only in this repository).
+9. **Rulings-to-file body — ruled 2026-09-01: the dispatch-deviation bullet
+   is added, as the batch 2 branch review proposed.** The ruling that moved a
+   fix round to an opus implementer sat only in the git-ignored ledger until
+   the branch review found it. The body of the standing entry
+   `process.rulings-to-file` already named the home files (backlog entry,
+   knowledge entry, batch spec) and said that a ledger note never substitutes
+   for the tracked write; it now also makes a dispatch deviation from the
+   spec's process line (model, order, gate) a ruling to amend in that spec
+   line in the same turn. The summary is unchanged. Applied in
+   `knowledge/process.json` and `template/knowledge/process.json` so every
+   new installation carries it.
