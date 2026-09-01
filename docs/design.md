@@ -239,7 +239,8 @@ Each item records the ruling with its date, or stays marked open.
    `mise exec -- pnpm exec commitlint --edit`, activated by
    `git config core.hooksPath .githooks` in the `setup` task; CI installs
    with `pnpm install --frozen-lockfile` after `jdx/mise-action`. Applied
-   here as HR-004 in batch 2; the batch spec fixes the file list. The
+   here as HR-004 in batch 2; the batch spec fixes the file list; done on
+   2026-09-01. The
    payload in `template/` has no package manager (§2, option B), so the
    ruling changes nothing there. Probe of 2026-09-01 in a scratch project
    (`pnpm add --save-exact git+file://<this clone>`): pnpm writes

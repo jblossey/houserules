@@ -6,7 +6,8 @@ Driver: backlog batch 2 — HR-004 (owner ruling of 2026-09-01, `docs/design.md`
 `3eef303` is its first commit.
 Process: the first batch through the agent layer — implementer on sonnet, task
 review on opus, branch review on fable (`process.model-policy`), strictly
-sequential. Workspace: `.superpowers/sdd/2026-09-01-batch-2/` (git-ignored)
+sequential. Ruling of 2026-09-01: task 3 fix round 1 ran on an opus implementer
+after four consecutive sonnet endpoint drops; its re-review ran on fable. Workspace: `.superpowers/sdd/2026-09-01-batch-2/` (git-ignored)
 with the ledger `progress.md`.
 
 ## 1. Goal
@@ -127,7 +128,7 @@ path; a malformed knowledge or backlog file yields one usage-error line.
 ### T3 `fix(tools): report invalid json in knowledge and backlog files as a usage error` (HR-002)
 
 - `template/tools/lib/json-store.mjs` `readJson`: on a parse error throw
-  `UsageError` with `<path>: invalid JSON: <parse message>`, using the
+  `UsageError` with `<path>: invalid JSON (<parse message>)`, using the
   existing class (if `cli.mjs` imports `json-store.mjs`, move `UsageError`
   to the module that avoids the cycle; ids and exports stay documented).
   `kb.mjs` and `backlog.mjs` already turn a `UsageError` into one `error:`
