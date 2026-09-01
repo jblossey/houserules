@@ -14,7 +14,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { UsageError, isMainModule, parseArgs } from '../template/tools/lib/cli.mjs';
-import { emit } from '../template/tools/lib/json-store.mjs';
+import { emit, readJson } from '../template/tools/lib/json-store.mjs';
 
 const TEMPLATE_DIR = fileURLToPath(new URL('../template/', import.meta.url));
 const VERSION = JSON.parse(
@@ -179,9 +179,7 @@ function install(io, opts, { seed }, cwd) {
     }
   }
   const markerPath = join(target, '.houserules.json');
-  const marker = existsSync(markerPath)
-    ? JSON.parse(readFileSync(markerPath, 'utf8'))
-    : { idPrefix: prefix };
+  const marker = existsSync(markerPath) ? readJson(markerPath) : { idPrefix: prefix };
   writeFileSync(markerPath, emit({ version: VERSION, idPrefix: marker.idPrefix ?? prefix }));
   io.out(renderIn(target));
   io.out(`houserules: ${seed ? 'initialized' : 'updated'} ${target}\n`);

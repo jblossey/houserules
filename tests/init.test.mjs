@@ -244,10 +244,31 @@ describe('update marker', () => {
       JSON.parse(readFileSync(join(dir, '.houserules.json'), 'utf8')).idPrefix,
     ).toBe('WI');
   });
-  it('propagates an unreadable marker, which is a defect and not a usage error', () => {
+  it('reports an unreadable stamp as one usage error', () => {
     const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
     writeFileSync(join(dir, '.houserules.json'), '{');
-    expect(() => main(['update', '--dir', dir], capture())).toThrow(SyntaxError);
+    const io = capture();
+    expect(main(['update', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toContain('.houserules.json');
+    expect(io.stderr).toMatch(/invalid JSON/);
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
+  it('propagates a stamp file that cannot be read, which is a defect and not a usage error', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    rmSync(join(dir, '.houserules.json'));
+    mkdirSync(join(dir, '.houserules.json'));
+    let caught;
+    try {
+      main(['update', '--dir', dir], capture());
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).not.toBeInstanceOf(UsageError);
+    expect(caught.message).toMatch(/EISDIR/);
   });
 });
 
