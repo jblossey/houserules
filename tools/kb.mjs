@@ -362,6 +362,7 @@ function git(root, args, options = {}) {
     cwd: root,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, LC_ALL: 'C' },
     ...options,
   });
 }
@@ -383,19 +384,26 @@ const lines = (text) => text.split('\n').filter(Boolean);
  */
 const range = (base, head) => `${base}...${head}`;
 /**
- * Runs `git diff` with `args` (which must place `range(base, head)` wherever
- * the caller needs it). `base` and `head` can share no merge base (an orphan
- * branch, or two grafted histories); `git diff` then exits non-zero, so this
- * throws a `UsageError` instead of letting the raw failure reach `main` as a
- * crash.
+ * Runs `git diff` with `args`, which must place `range(base, head)`
+ * wherever the caller needs it.
+ * When `base` and `head` share no merge base (an orphan branch, or two
+ * grafted histories), this throws the fixed `UsageError` message
+ * `no merge base between "<base>" and "<head>"`.
+ * Any other failure (a bad pathspec in `args`, for example) throws a
+ * `UsageError` carrying the stderr's first non-empty line, trimmed, or the
+ * caught error's own message when stderr is empty.
  */
-function gitDiff(root, base, head, args) {
+export function gitDiff(root, base, head, args) {
   try {
     return git(root, ['diff', ...args], {
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
-  } catch {
-    throw new UsageError(`no merge base between "${base}" and "${head}"`);
+  } catch (error) {
+    const stderr = error.stderr ?? '';
+    if (stderr.includes('no merge base'))
+      throw new UsageError(`no merge base between "${base}" and "${head}"`);
+    const firstLine = stderr.split('\n').find((line) => line.trim() !== '');
+    throw new UsageError((firstLine ?? error.message).trim());
   }
 }
 const changedFiles = (root, base, head) =>
