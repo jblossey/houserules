@@ -5,6 +5,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { UsageError } from './cli.mjs';
 
 /** Finds the repo root from `cwd` so every tool works from any directory inside the repo. */
 export function repoRoot(cwd = process.cwd()) {
@@ -17,7 +18,12 @@ export function repoRoot(cwd = process.cwd()) {
 /** Serializes `value` as indented JSON with a trailing newline, the CLIs' only output format. */
 export const emit = (value) => `${JSON.stringify(value, null, 2)}\n`;
 
-/** Reads and parses a JSON file, naming the file in any read or parse error. */
+/**
+ * Reads and parses a JSON file, naming the file in any read or parse error.
+ * A missing or unreadable file raises a plain `Error`, a bug the caller did
+ * not cause. Invalid JSON raises `UsageError`: project data the CLIs report
+ * on stderr with exit code 2, never a stack trace.
+ */
 export function readJson(path) {
   let text;
   try {
@@ -28,7 +34,7 @@ export function readJson(path) {
   try {
     return JSON.parse(text);
   } catch (error) {
-    throw new Error(`${path}: invalid JSON (${error.message})`, {
+    throw new UsageError(`${path}: invalid JSON (${error.message})`, {
       cause: error,
     });
   }

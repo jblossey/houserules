@@ -644,10 +644,20 @@ describe('main (read commands)', () => {
     io = capture();
     expect(main([], io, root)).toBe(2);
   });
-  it('lets unexpected errors propagate', () => {
+  it('reports invalid JSON in a knowledge file as a usage error, not a stack trace', () => {
     const root = makeRepo();
     write(root, 'knowledge/process.json', '{');
-    expect(() => main(['topics'], capture(), root)).toThrow(/invalid JSON/);
+    const io = capture();
+    expect(main(['topics'], io, root)).toBe(2);
+    expect(io.stderr).toMatch(/knowledge\/process\.json: invalid JSON/);
+    expect(io.stdout).toBe('');
+    expect(io.stderr.split('\n')).toEqual([expect.stringMatching(/./), '']);
+  });
+  it('lets a missing knowledge file propagate as a real error, not a usage error', () => {
+    const root = makeRepo();
+    unlinkSync(join(root, 'knowledge/schema.json'));
+    expect(() => main(['topics'], capture(), root)).toThrow(/schema\.json/);
+    expect(() => main(['topics'], capture(), root)).not.toThrow(UsageError);
   });
 });
 

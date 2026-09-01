@@ -11,6 +11,7 @@ import {
   repoRoot,
   validate,
 } from '../template/tools/lib/json-store.mjs';
+import { UsageError } from '../template/tools/lib/cli.mjs';
 
 function tmp() {
   return mkdtempSync(join(tmpdir(), 'json-store-'));
@@ -37,6 +38,7 @@ describe('readJson', () => {
     expect(() => readJson(join(dir, 'bad.json'))).toThrow(
       /bad\.json: invalid JSON/,
     );
+    expect(() => readJson(join(dir, 'bad.json'))).toThrow(UsageError);
   });
 });
 
