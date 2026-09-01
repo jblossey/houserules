@@ -229,3 +229,22 @@ Each item records the ruling with its date, or stays marked open.
    reaches new installs only; existing adopters edit one line. Known
    upstream quirk, irrelevant here: in VS Code `/clear` reports `startup`
    (anthropics/claude-code#26794). Done in d356fba on 2026-08-31.
+7. **Package manager — ruled 2026-09-01: pnpm only; the workspace is set
+   up like tag-pilot's.** The owner's instruction of 2026-09-01: use pnpm,
+   never npm or npx, and set the workspace up as tag-pilot does. tag-pilot
+   on 2026-09-01: `mise.toml` pins `node = "24.18.1"` and
+   `pnpm = "11.18.0"` and defines the tasks `setup`, `test`, `lint`, and
+   `audit`; `pnpm-lock.yaml` is the only lockfile; `pnpm-workspace.yaml`
+   holds the pnpm settings; `.githooks/commit-msg` runs commitlint through
+   `mise exec -- pnpm exec commitlint --edit`, activated by
+   `git config core.hooksPath .githooks` in the `setup` task; CI installs
+   with `pnpm install --frozen-lockfile` after `jdx/mise-action`. Applied
+   here as HR-004 in batch 2; the batch spec fixes the file list. The
+   payload in `template/` has no package manager (§2, option B), so the
+   ruling changes nothing there. Probe of 2026-09-01 in a scratch project
+   (`pnpm add --save-exact git+file://<this clone>`): pnpm writes
+   `node_modules/.bin/houserules` as a shell shim that execs the real path
+   under `node_modules/.pnpm/`, and links `node_modules/houserules` as a
+   symlink; `node node_modules/houserules/bin/houserules.mjs files` through
+   that symlink prints nothing and exits 0 — the HR-001 defect, independent
+   of the package manager.

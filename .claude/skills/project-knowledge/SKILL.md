@@ -9,6 +9,7 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 
 ## Standing rules
 
+- [houserules.pnpm-only] Use pnpm for every package operation in this repository (`pnpm install`, `pnpm add --save-exact`, `pnpm test`, `pnpm dlx`); never `npm` or `npx`.
 - [houserules.tag-pilot-is-read-only] Treat `~/projects/tag-pilot` as a read-only reference: never modify it, commit there, run its agents, or run `init` or `update` against it.
 - [houserules.template-is-the-source] Edit the kit in `template/`, then run `node bin/houserules.mjs update --dir .`; never hand-edit the root copies or the generated rules and skill.
 - [process.ask-when-missing] Ask the user when information is missing. Do not assume.
@@ -43,7 +44,7 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 
 ## Topics
 
-houserules  6  Working in the houserules kit repository
+houserules  7  Working in the houserules kit repository
 knowledge-base  3  Authoring knowledge entries
 process  16  How work runs: batches, dispatch, reviews, rulings
 quality  1  Quality principles

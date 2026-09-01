@@ -10,14 +10,15 @@
       "type": "bug",
       "milestone": null,
       "status": "open",
-      "title": "Run the CLI through npm's .bin symlink",
+      "title": "Run the CLI through a symlinked path (npm .bin link, node_modules/<pkg> under pnpm)",
       "body": [
         "npm installs `bin` as a symlink `node_modules/.bin/houserules -> ../houserules/bin/houserules.mjs`. Node resolves `import.meta.url` through the symlink but keeps `process.argv[1]` as the `.bin` path, so the entry guard in `bin/houserules.mjs` never matches and the CLI exits 0 without output.",
         "Fix: compare against `realpathSync(process.argv[1])` in the guard; apply the same idiom in `template/tools/kb.mjs` and `template/tools/backlog.mjs`. Regression test: run the bin through a symlink and expect the manifest.",
-        "Verified live on 2026-08-31 with `npm exec --package=git+file://<clone> -- houserules files`: 0 lines, exit 0; the direct path prints the manifest."
+        "Verified live on 2026-08-31 with `npm exec --package=git+file://<clone> -- houserules files`: 0 lines, exit 0; the direct path prints the manifest.",
+        "Probe of 2026-09-01 under pnpm 11.18.0 (`pnpm add --save-exact git+file://<clone>` in a scratch project): `pnpm exec houserules files` and `pnpm dlx git+file://<clone> files` print the manifest, because pnpm's bin shim execs the real path under `node_modules/.pnpm/`; `node node_modules/houserules/bin/houserules.mjs files` through the package symlink prints nothing and exits 0. The defect is independent of the package manager."
       ],
       "batch": 2,
-      "tags": ["cli", "npm"]
+      "tags": ["cli", "npm", "pnpm", "symlink"]
     },
     {
       "id": "HR-002",
@@ -44,6 +45,20 @@
         "Blocked until PR #42 is merged (owner instruction). Then port it to `template/` (knowledge entry, orchestrating skill bullet, branch-reviewer check, and the `kb.mjs` co-change lines if the drift holds them) and diff the remaining drift."
       ],
       "tags": ["tag-pilot", "evals", "parity"]
+    },
+    {
+      "id": "HR-004",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "Switch this repository to pnpm and set the workspace up like tag-pilot",
+      "body": [
+        "Owner ruling of 2026-09-01 (docs/design.md §5.7): use pnpm only, never npm or npx.",
+        "Scope: exact `node` and `pnpm` pins in `mise.toml` written by `mise use`; `pnpm-lock.yaml` replaces `package-lock.json`; `pnpm-workspace.yaml` for the pnpm settings; the mise tasks `setup`, `test`, `lint`, and `audit` as in tag-pilot; README, knowledge entries, and the development commands name pnpm. `template/` stays dependency-free.",
+        "The batch 2 spec fixes the file list and settles the commitlint commit-msg hook."
+      ],
+      "batch": 2,
+      "tags": ["pnpm", "workspace", "mise"]
     }
   ]
 }
