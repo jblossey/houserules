@@ -249,3 +249,13 @@ Each item records the ruling with its date, or stays marked open.
    symlink; `node node_modules/houserules/bin/houserules.mjs files` through
    that symlink prints nothing and exits 0 — the HR-001 defect, independent
    of the package manager.
+8. **Commit body line limit in the audit — ruled 2026-09-01: yes.** The
+   batch 2 branch review found two controller commits, made before the
+   commit-msg hook existed, with body lines of 190 and 227 characters that
+   the audit's `commits` check passed, because the check tests the subject
+   only. HR-006 adds the optional `body_line_max` key to the check (schema,
+   `kb.mjs`, tests); the same task sets `body_line_max: 100` on the standing
+   entry `process.conventional-commits` in `knowledge/process.json` and
+   `template/knowledge/process.json`. Rejected: the commit-msg hook as the
+   only enforcement (it covers only commits made after it is installed, and
+   only in this repository).
