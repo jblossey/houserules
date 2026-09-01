@@ -32,10 +32,13 @@
     {
       "date": "2026-09-01",
       "text": "Package manager: pnpm only, never npm or npx; the workspace follows tag-pilot (exact mise pins for node and pnpm, pnpm-lock.yaml, mise tasks setup, test, lint, audit). docs/design.md §5.7."
+    },
+    {
+      "date": "2026-09-01",
+      "text": "Commit body line limit in the audit: process.conventional-commits sets body_line_max 100 in knowledge/process.json and template/knowledge/process.json once HR-006 ships the check. docs/design.md §5.8."
     }
   ],
   "notes": [
-    "2026-09-01: Pending owner ruling (batch 2 branch review): add a deterministic body-line check (body_line_max 100) to the standing entry process.conventional-commits, once HR-006 ships the check.",
     "2026-09-01: Pending owner ruling (batch 2 branch review): extend the body of the standing entry process.rulings-to-file — a dispatch deviation from the spec's process line (model, order, gate) is a ruling; amend that spec line in the same turn; the batch report repeats it, it does not replace it."
   ]
 }

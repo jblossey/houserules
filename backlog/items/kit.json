@@ -101,7 +101,7 @@
       "body": [
         "The `commits` check of `tools/kb.sh audit` tests the subject pattern and `body_absent` only; two controller commits with 190- and 227-character body lines passed the batch 2 audits as '9 commits checked'. Only the commit-msg hook catches it, for commits made after it was installed.",
         "Fix: add the optional key `body_line_max` (integer, minimum 1) to `$defs.check` in `knowledge/schema.json` and `template/knowledge/schema.json`; in the `commits` runner of `template/tools/kb.mjs`, fail a commit with a body line longer than the limit; regression tests for 100 and 101 characters and a `checkShape` case; `update --dir .`.",
-        "Needs the owner's ruling on the standing entry: set `body_line_max: 100` on `process.conventional-commits` in `knowledge/process.json` and `template/knowledge/process.json`. Source: batch 2 branch review, violated_rules."
+        "Ruled 2026-09-01 (docs/design.md §5.8): the same task sets `body_line_max: 100` on `process.conventional-commits` in `knowledge/process.json` and `template/knowledge/process.json`. Source: batch 2 branch review, violated_rules."
       ],
       "tags": [
         "tools",
