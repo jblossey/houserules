@@ -122,6 +122,27 @@ function mergeSettings(target) {
 }
 
 /**
+ * Runs `tools/kb.mjs render` in `target` and returns its stdout. The piped
+ * stdio keeps the child's stderr out of the parent's output. A failed render
+ * throws `UsageError` with the child's stderr, or with the spawn error's
+ * message when no child ran. When that text is empty, the message is the
+ * fixed `tools/kb.mjs render failed`.
+ */
+function renderIn(target) {
+  try {
+    return execFileSync(process.execPath, [join(target, 'tools/kb.mjs'), 'render'], {
+      cwd: target,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    throw new UsageError(
+      (error.stderr ?? error.message).trim() || 'tools/kb.mjs render failed',
+    );
+  }
+}
+
+/**
  * Installs the setup into `target`: kit-owned files always, seed-once files
  * only when `seed` is set and the file is absent. Renders the generated
  * markdown afterwards and stamps `.houserules.json`.
@@ -162,12 +183,7 @@ function install(io, opts, { seed }, cwd) {
     ? JSON.parse(readFileSync(markerPath, 'utf8'))
     : { idPrefix: prefix };
   writeFileSync(markerPath, emit({ version: VERSION, idPrefix: marker.idPrefix ?? prefix }));
-  const rendered = execFileSync(
-    process.execPath,
-    [join(target, 'tools/kb.mjs'), 'render'],
-    { cwd: target, encoding: 'utf8' },
-  );
-  io.out(rendered);
+  io.out(renderIn(target));
   io.out(`houserules: ${seed ? 'initialized' : 'updated'} ${target}\n`);
   io.out('next: tools/kb.sh check && tools/backlog.sh check\n');
   return 0;

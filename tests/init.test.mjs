@@ -11,9 +11,23 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { KIT_OWNED, SEED_ONCE, main } from '../bin/houserules.mjs';
 import { UsageError } from '../template/tools/lib/cli.mjs';
+
+// `init` and `update` write the render child's script themselves, so no
+// fixture can make that child fail without a message. Wrapping execFileSync
+// simulates what only the real world reaches: a child killed by a signal, and
+// a spawn that never starts a child. `restoreMocks` restores `vi.spyOn` spies
+// only, so the mock from this factory needs the `afterEach` below.
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, execFileSync: vi.fn(actual.execFileSync) };
+});
+
+afterEach(() => {
+  execFileSync.mockReset();
+});
 
 /** A fresh temporary git repository to initialize into. */
 function makeTarget() {
@@ -159,11 +173,33 @@ describe('init', () => {
     expect(main(['init', '--dir', dir], io)).toBe(2);
     expect(io.stderr).toContain('settings.json');
   });
-  it('lets a render failure on broken project data propagate as a real error', () => {
+  it('reports a render failure on broken project data as one usage error', () => {
     const dir = makeTarget();
     mkdirSync(join(dir, 'knowledge'), { recursive: true });
     writeFileSync(join(dir, 'knowledge/process.json'), '{');
-    expect(() => main(['init', '--dir', dir], capture())).toThrow();
+    const io = capture();
+    expect(main(['init', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toMatch(/knowledge\/process\.json: invalid JSON/);
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
+  it('reports a render child that dies with an empty stderr as a fixed message', () => {
+    const dir = makeTarget();
+    execFileSync.mockImplementationOnce(() => {
+      throw Object.assign(new Error('Command failed'), { stderr: '' });
+    });
+    const io = capture();
+    expect(main(['init', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toBe('tools/kb.mjs render failed\n');
+  });
+  it('reports a spawn that never started a child, which leaves stderr null', () => {
+    const dir = makeTarget();
+    execFileSync.mockImplementationOnce(() => {
+      throw Object.assign(new Error('spawnSync node ENOMEM'), { stderr: null });
+    });
+    const io = capture();
+    expect(main(['init', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toBe('spawnSync node ENOMEM\n');
   });
   it('refuses a malformed id prefix', () => {
     const dir = makeTarget();
@@ -207,6 +243,11 @@ describe('update marker', () => {
     expect(
       JSON.parse(readFileSync(join(dir, '.houserules.json'), 'utf8')).idPrefix,
     ).toBe('WI');
+  });
+  it('propagates an unreadable marker, which is a defect and not a usage error', () => {
+    const dir = makeTarget();
+    writeFileSync(join(dir, '.houserules.json'), '{');
+    expect(() => main(['update', '--dir', dir], capture())).toThrow(SyntaxError);
   });
 });
 
