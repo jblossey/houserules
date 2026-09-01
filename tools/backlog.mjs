@@ -3,9 +3,8 @@
 // Copyright (c) 2026 Jannis Blossey
 // Backlog CLI, shipped by houserules. The design record lives in the houserules repository (docs/design.md).
 import { readdirSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { UsageError, parseArgs } from './lib/cli.mjs';
+import { join } from 'node:path';
+import { UsageError, isMainModule, parseArgs } from './lib/cli.mjs';
 import {
   Errors,
   emit,
@@ -255,10 +254,7 @@ export function main(argv, io, cwd) {
   }
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
-) {
+if (isMainModule(import.meta.url)) {
   process.exitCode = main(
     process.argv.slice(2),
     {
