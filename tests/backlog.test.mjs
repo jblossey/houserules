@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -412,7 +418,17 @@ describe('main', () => {
     io = capture();
     expect(main(['bogus'], io, root)).toBe(2);
     expect(io.stderr).toMatch(/^usage: backlog </);
-    write(root, 'backlog/parked.json', '{');
-    expect(() => main(['check'], capture(), root)).toThrow(/invalid JSON/);
+    write(root, 'backlog/items/E01.json', '{');
+    io = capture();
+    expect(main(['list'], io, root)).toBe(2);
+    expect(io.stderr).toMatch(/backlog\/items\/E01\.json: invalid JSON/);
+    expect(io.stdout).toBe('');
+    expect(io.stderr.split('\n')).toEqual([expect.stringMatching(/./), '']);
+  });
+  it('lets a missing backlog file propagate as a real error, not a usage error', () => {
+    const root = makeRepo();
+    unlinkSync(join(root, 'backlog/schema.json'));
+    expect(() => main(['list'], capture(), root)).toThrow(/schema\.json/);
+    expect(() => main(['list'], capture(), root)).not.toThrow(UsageError);
   });
 });
