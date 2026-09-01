@@ -368,13 +368,35 @@ function rev(root, ref) {
   }
 }
 const lines = (text) => text.split('\n').filter(Boolean);
+/**
+ * A three-dot `git diff` range from the merge base of `base` and `head` to
+ * `head` (`git diff A...B` is `git diff $(git merge-base A B) B`). A file
+ * `base`'s branch gains after `head` was cut is not on either side of this
+ * range, so it is never attributed to `head`'s own changes.
+ */
+const range = (base, head) => `${base}...${head}`;
+/**
+ * Runs `git diff` with `args` (which must place `range(base, head)` wherever
+ * the caller needs it). `base` and `head` can share no merge base (an orphan
+ * branch, or two grafted histories); `git diff` then exits non-zero, so this
+ * throws a `UsageError` instead of letting the raw failure reach `main` as a
+ * crash.
+ */
+function gitDiff(root, base, head, args) {
+  try {
+    return git(root, ['diff', ...args], {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    throw new UsageError(`no merge base between "${base}" and "${head}"`);
+  }
+}
 const changedFiles = (root, base, head) =>
   lines(
-    git(root, [
-      'diff',
+    gitDiff(root, base, head, [
       '--name-only',
       '--diff-filter=ACMR',
-      `${base}..${head}`,
+      range(base, head),
     ]),
   );
 const treeFiles = (root, head) =>
@@ -391,7 +413,7 @@ function commitsIn(root, base, head) {
     });
 }
 const removedLines = (root, base, head, files) =>
-  git(root, ['diff', `${base}..${head}`, '--', ...files])
+  gitDiff(root, base, head, [range(base, head), '--', ...files])
     .split('\n')
     .filter((l) => l.startsWith('-') && !l.startsWith('---'));
 const matchAny = (path, globs) =>
