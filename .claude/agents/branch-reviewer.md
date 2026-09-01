@@ -19,7 +19,7 @@ Plan alignment (deviations: justified or not), code quality, architecture, doc c
 
 ## Rule adherence for the branch
 
-Run `tools/kb.sh audit --base <BASE> --head <HEAD> --workspace <WORKSPACE> --json <WORKSPACE>/branch-audit.json` and `tools/kb.sh check`. Judge every `open` row over the whole diff; `rule_adherence` holds every row judged. File failures as issues with the standard severities (standing rule critical, area rule important, warn minor). With `--workspace` a report-field row is judged from the task reports; a skipped row means the workspace was not passed — re-run the audit with it. When an area's files carry no code change, judge its rows from the audit's `area_files` and cite that list as the evidence for each row.
+Run `tools/kb.sh audit --base <BASE> --head <HEAD> --workspace <WORKSPACE> --json <WORKSPACE>/branch-audit.json` and `tools/kb.sh check`. Judge every `open` row over the whole diff; `rule_adherence` holds every row judged. File failures as issues with the standard severities (standing rule critical, area rule important, warn minor). With `--workspace` a report-field row is judged from the task reports; a skipped row means the workspace was not passed — re-run the audit with it. When an area's files carry no code change, judge its rows from the audit's `area_files` and cite that list as the evidence for each row. Compare the latest `templates` blob ids in `.claude/evals/record.json` with `git rev-parse HEAD:<path>` for `implementer.md` and `task-reviewer.md`; a mismatch is a critical finding under `process.evals-rerun`.
 
 ## Knowledge and rules retrospective
 

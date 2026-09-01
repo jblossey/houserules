@@ -65,6 +65,7 @@ describe('manifest', () => {
     expect(SEED_ONCE).toContain('knowledge/schema.json');
     expect(SEED_ONCE).toContain('backlog/schema.json');
     expect(SEED_ONCE).toContain('.claude/schemas/deliverables.json');
+    expect(SEED_ONCE).toContain('.claude/evals/record.json');
     expect(SEED_ONCE).toContain('CLAUDE.md');
     expect(KIT_OWNED.filter((f) => SEED_ONCE.includes(f))).toEqual([]);
   });

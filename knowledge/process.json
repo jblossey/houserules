@@ -219,6 +219,32 @@
       "check": { "type": "report-field", "level": "fail", "if": "**", "field": "self_audit" }
     },
     {
+      "id": "process.evals-rerun",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Re-run every `.claude/evals/` scenario when the implementer or task-reviewer template or a scenario changes; append the run to `.claude/evals/record.json`.",
+      "body": [
+        "The scenarios are the regression suite for the agent templates. The check is a `co-change`: a change to `.claude/agents/implementer.md`, `.claude/agents/task-reviewer.md`, or `.claude/evals/*.json` without a change to `.claude/evals/record.json` fails the audit. The entry routes through the `docs` area (`.claude/**`), so every audit that touches the templates carries it without `--ids`; the `process` area has no paths.",
+        "Run every scenario in a detached scratch worktree at the branch head before the branch review; the orchestrating skill holds the procedure. Keep nothing from a worktree; workspace artifacts carry the `eval-` prefix.",
+        "A run set in the record names `date`, `templates` (the git blob id of each template under test from `git rev-parse HEAD:<path>`; blob ids survive commit aggregation, commit SHAs do not), and one row per scenario: `scenario`, `agent`, `model`, `pass`, `of`, `notes`. The branch reviewer compares the latest blob ids with `HEAD`.",
+        "No scenario covers `branch-reviewer` or the orchestrating skill; a change there needs no run. The retrieval protocol text in `tools/kb.mjs` shapes the generated skill the implementer loads; run the scenarios after a change there too — the check cannot see it."
+      ],
+      "tags": ["evals", "templates", "agents"],
+      "source": { "date": "2026-08-31", "by": "user", "ref": "tag-pilot fc3241b" },
+      "see": ["process.deliverables-json", "process.keep-knowledge-current"],
+      "verify": [".claude/skills/orchestrating/SKILL.md"],
+      "check": {
+        "type": "co-change",
+        "level": "fail",
+        "if": [
+          ".claude/agents/implementer.md",
+          ".claude/agents/task-reviewer.md",
+          ".claude/evals/*.json"
+        ],
+        "then": ".claude/evals/record.json"
+      }
+    },
+    {
       "id": "process.live-run-before-ci",
       "kind": "rule",
       "area": "process",
