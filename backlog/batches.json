@@ -12,10 +12,10 @@
     },
     {
       "number": 2,
-      "items": ["HR-001", "HR-002"],
-      "summary": "CLI robustness: npm .bin symlink entry guard, clean invalid-JSON errors.",
-      "kickoff": "",
-      "status": { "state": "planned", "text": "First batch through the agent layer: implementer on sonnet, task review on opus, branch review on fable." }
+      "items": ["HR-004", "HR-001", "HR-002"],
+      "summary": "pnpm workspace like tag-pilot (HR-004); CLI robustness: symlinked-path entry guard (HR-001), clean invalid-JSON errors (HR-002).",
+      "kickoff": "docs/specs/2026-09-01-batch-2-pnpm-workspace-and-cli-robustness.md",
+      "status": { "state": "planned", "text": "Spec approved on 2026-09-01; in progress on branch batch-2 — implementer on sonnet, task review on opus, branch review on fable." }
     }
   ]
 }
