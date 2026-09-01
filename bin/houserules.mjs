@@ -12,8 +12,8 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { UsageError, parseArgs } from '../template/tools/lib/cli.mjs';
+import { fileURLToPath } from 'node:url';
+import { UsageError, isMainModule, parseArgs } from '../template/tools/lib/cli.mjs';
 import { emit } from '../template/tools/lib/json-store.mjs';
 
 const TEMPLATE_DIR = fileURLToPath(new URL('../template/', import.meta.url));
@@ -198,10 +198,7 @@ export function main(argv, io, cwd = process.cwd()) {
   }
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
-) {
+if (isMainModule(import.meta.url)) {
   process.exitCode = main(process.argv.slice(2), {
     out: (s) => process.stdout.write(s),
     err: (s) => process.stderr.write(s),

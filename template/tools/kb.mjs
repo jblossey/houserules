@@ -11,8 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, matchesGlob, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { UsageError, parseArgs } from './lib/cli.mjs';
+import { UsageError, isMainModule, parseArgs } from './lib/cli.mjs';
 import {
   Errors,
   emit,
@@ -843,10 +842,7 @@ export function main(argv, io, cwd) {
   }
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
-) {
+if (isMainModule(import.meta.url)) {
   process.exitCode = main(
     process.argv.slice(2),
     {
