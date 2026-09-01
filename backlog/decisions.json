@@ -56,10 +56,15 @@
     {
       "date": "2026-09-01",
       "text": "tag-pilot adoption: deferred again (the PR #42 trigger fired); new trigger: the first houserules release or publish, raised together with decision 3. Until then tag-pilot stays the upstream of the kit-owned files. docs/design.md §5.4."
+    },
+    {
+      "date": "2026-09-02",
+      "text": "process.tdd body gains the fix-round and reconstruction clauses (a narrowing/widening fix round carries its own RED or counter-example; a post-commit cycle says so and keeps the real order); applied in knowledge/process.json and template/knowledge/process.json. docs/design.md §5.13."
+    },
+    {
+      "date": "2026-09-02",
+      "text": "process.rulings-to-file body gains the accepted-deviation clause (home it in the turn it is accepted, before the next dispatch); applied in knowledge/process.json and template/knowledge/process.json. docs/design.md §5.14."
     }
   ],
-  "notes": [
-    "2026-09-02: Pending owner ruling (batch 4 branch review): append to the process.tdd body — a fix round that narrows or widens matching behavior carries its own RED or counter-example test; a cycle captured after the commit says so and presents the runs in their real order.",
-    "2026-09-02: Pending owner ruling (batch 4 branch review): append to the process.rulings-to-file body — an accepted implementer deviation is a ruling; home it (a spec amendment or a backlog item) in the turn it is accepted, before the next dispatch."
-  ]
+  "notes": []
 }
