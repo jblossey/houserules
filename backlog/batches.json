@@ -62,8 +62,8 @@
       "summary": "Evals-rerun port and polish: stamp usage error, gitDiff stderr, dispatch-protocol bullets, the evals-rerun rule with record seed and a first real run.",
       "kickoff": "docs/specs/2026-09-01-batch-4-evals-port-and-polish.md",
       "status": {
-        "state": "planned",
-        "text": "Spec approved on 2026-09-01 (T5 included); in progress on branch batch-4 — implementer on sonnet, task review on opus, branch review on fable; one tier up after two endpoint drops."
+        "state": "done",
+        "text": "Done 2026-09-02: merged into main fast-forward after the branch review (fable: ready yes, zero issues). HR-010, HR-011, HR-012, HR-003 delivered; the T5 evaluation run produced the first blob-keyed record (docs-edit 3/3, dependency-add 5/5, seeded-violations 5/5). Sixteen findings over nine review rounds fixed; one reasoned deferral (HR-014). Retrospective: HR-015 to HR-018 filed; two standing-rule proposals await the owner (decisions notes)."
       }
     }
   ]

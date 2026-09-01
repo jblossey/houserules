@@ -58,5 +58,8 @@
       "text": "tag-pilot adoption: deferred again (the PR #42 trigger fired); new trigger: the first houserules release or publish, raised together with decision 3. Until then tag-pilot stays the upstream of the kit-owned files. docs/design.md §5.4."
     }
   ],
-  "notes": []
+  "notes": [
+    "2026-09-02: Pending owner ruling (batch 4 branch review): append to the process.tdd body — a fix round that narrows or widens matching behavior carries its own RED or counter-example test; a cycle captured after the commit says so and presents the runs in their real order.",
+    "2026-09-02: Pending owner ruling (batch 4 branch review): append to the process.rulings-to-file body — an accepted implementer deviation is a ruling; home it (a spec amendment or a backlog item) in the turn it is accepted, before the next dispatch."
+  ]
 }

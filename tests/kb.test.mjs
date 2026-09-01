@@ -1976,6 +1976,7 @@ describe('the repository knowledge base', () => {
     // process.ff-only-merges, process.evals-rerun) name files a real `init`
     // would seed too.
     for (const path of [
+      '.claude/evals/record.json',
       'backlog/schema.json',
       '.claude/skills/finishing-a-feature/SKILL.md',
       '.claude/skills/orchestrating/SKILL.md',
