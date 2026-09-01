@@ -1262,6 +1262,44 @@ describe('audit', () => {
       evidence: '2 commits checked',
     });
   });
+  // HR-009: a two-dot diff between `base` and `head` compares their tips
+  // directly, so a file `main` moves after the branch is cut shows up in
+  // the branch's own diff. A three-dot diff compares from their merge base
+  // to `head`, so main's later change to a file the branch never touches
+  // stays out of it.
+  it('diffs from the merge base, not a base tip that moved past the branch', () => {
+    const root = makeRepo(
+      [
+        entry({
+          id: 'process.mainonly',
+          summary: 'main-only.txt stays off the branch diff.',
+          check: {
+            type: 'grep-absent',
+            level: 'fail',
+            files: 'main-only.txt',
+            pattern: 'from-main',
+          },
+        }),
+      ],
+      { 'main-only.txt': 'seed\n' },
+    );
+    git(root, 'checkout', '-q', '-b', 'topic');
+    write(root, 'topic.txt', 'topic\n');
+    commit(root, 'feat: topic file');
+    git(root, 'checkout', '-q', 'main');
+    write(root, 'main-only.txt', 'seed\nfrom-main\n');
+    commit(root, 'chore: main-only change');
+    const { result } = audit(loadBase(root), {
+      baseRef: 'main',
+      headRef: 'topic',
+    });
+    expect(result.changed_files).toEqual(['topic.txt']);
+    expect(result.rules[0]).toMatchObject({
+      id: 'process.mainonly',
+      result: 'pass',
+      evidence: '0 files checked',
+    });
+  });
 });
 
 const statsRules = (result) => [
@@ -1476,6 +1514,27 @@ describe('main (audit, stats)', () => {
     expect(existsSync(join(dir, 'out.json'))).toBe(true);
     expect(JSON.parse(readFileSync(join(dir, 'out.json'), 'utf8')).base).toBe(
       JSON.parse(io.stdout).base,
+    );
+  });
+  // Review fix round 1 (HR-009, Minor #1): `base` and `head` on an orphan
+  // branch share no merge base, so the three-dot `git diff` this fix
+  // introduced fails with exit 128. Before the fix, that raw failure
+  // propagated past `main`'s UsageError-only catch as a stack trace.
+  it('reports a usage error, not a stack trace, when base and head share no merge base', () => {
+    const root = makeRepo();
+    git(root, 'checkout', '-q', '--orphan', 'orphan');
+    git(root, 'rm', '-rf', '-q', '.');
+    write(root, 'orphan.txt', 'x\n');
+    commit(root, 'chore: orphan commit');
+    git(root, 'checkout', '-q', 'main');
+    const mainSha = git(root, 'rev-parse', '--short', 'main').trim();
+    const orphanSha = git(root, 'rev-parse', '--short', 'orphan').trim();
+    const io = capture();
+    expect(
+      main(['audit', '--base', 'main', '--head', 'orphan'], io, root),
+    ).toBe(2);
+    expect(io.stderr).toBe(
+      `no merge base between "${mainSha}" and "${orphanSha}"\n`,
     );
   });
 });
