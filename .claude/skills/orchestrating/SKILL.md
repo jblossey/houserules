@@ -40,6 +40,8 @@ You are the controller. Subagents get knowledge through their templates; you get
 - A fix-round dispatch names `FIX_BASE`; the fix-diff audit goes into the report's `fix_rounds` entry, and `self_audit` stays the `BASE..HEAD` audit (`process.deliverables-json`).
 - The branch review dispatch names `WORKSPACE`, `BASE` (the merge base), `HEAD`, the plan and spec paths, and `REVIEW_FILE: <workspace>/branch-review.json`, through `branch-reviewer`; its audit runs `--workspace <WORKSPACE>` in place of `--report`.
 - A brief names no version number for a tool, action, or package (`security-hygiene.exact-pins`); it names the verification the implementer runs and records in `docs_verified`, and shows placeholders such as `jdx/mise-action@<current major>`.
+- A brief names every test, gate, and file its spec task lists, verbatim or by pointer (`process.brief-carries-the-spec`); an implementer who cannot satisfy one flags it instead of dropping it.
+- When a batch edits an agent template or skill, the dispatch message carries the changed instruction verbatim: templates load at session start, so the running session's copy is stale until a restart.
 
 ## Handling reviews
 
@@ -49,6 +51,12 @@ You are the controller. Subagents get knowledge through their templates; you get
 - Every finding is fixed (`process.no-tech-debt`). A deferral is a backlog item with a reason, named in the finding.
 - Ledger line per task: `Adherence: <pass>/<fail>/<warn>; judged fails: <ids or none>`.
 - Retrospective proposals from the branch review: apply every proposal that does not change a `standing` entry in one `docs(knowledge): ...` commit before finishing; list standing-rule proposals in the batch report for the user's ruling.
+
+## Template evaluation
+
+- A change to `.claude/agents/implementer.md`, `.claude/agents/task-reviewer.md`, or `.claude/evals/*.json` needs a run of every scenario in `.claude/evals/` before the branch review (`process.evals-rerun`); the audit fails until `.claude/evals/record.json` changes with them.
+- Run each scenario in a detached scratch worktree at the branch head: implementer scenarios through `implementer` (sonnet) with the scenario's `query` as the brief file and its `knowledge` as the `Knowledge:` line; `seeded-violations` through `task-reviewer` (opus) on a fixture built from its `setup`. Workspace artifacts carry the `eval-` prefix; keep nothing from a worktree.
+- Judge every `expected_behavior` line from the report or review. Append one run set to `.claude/evals/record.json`: `date`, `templates` (`git rev-parse HEAD:<path>` for both templates), `runs` (`scenario`, `agent`, `model`, `pass`, `of`, `notes`).
 
 ## Rulings
 

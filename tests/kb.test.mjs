@@ -1972,21 +1972,16 @@ describe('the repository knowledge base', () => {
     }
     write(root, '.claude/schemas/deliverables.json', DELIVERABLES_SCHEMA_CONTENT);
     write(root, 'CLAUDE.md', readFileSync(join(TEMPLATE_ROOT, 'CLAUDE.md'), 'utf8'));
-    // The seed's own `verify` paths (process.backlog-drives-work,
-    // process.ff-only-merges) name two more files a real `init` would seed.
-    write(
-      root,
+    // Other entries' `verify` paths (process.backlog-drives-work,
+    // process.ff-only-merges, process.evals-rerun) name files a real `init`
+    // would seed too.
+    for (const path of [
       'backlog/schema.json',
-      readFileSync(join(TEMPLATE_ROOT, 'backlog/schema.json'), 'utf8'),
-    );
-    write(
-      root,
       '.claude/skills/finishing-a-feature/SKILL.md',
-      readFileSync(
-        join(TEMPLATE_ROOT, '.claude/skills/finishing-a-feature/SKILL.md'),
-        'utf8',
-      ),
-    );
+      '.claude/skills/orchestrating/SKILL.md',
+    ]) {
+      write(root, path, readFileSync(join(TEMPLATE_ROOT, path), 'utf8'));
+    }
     commit(root, 'chore: seed');
     return root;
   }

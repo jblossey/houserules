@@ -63,6 +63,7 @@ export const SEED_ONCE = [
   '.claude/schemas/deliverables.json',
   '.claude/evals/dependency-add.json',
   '.claude/evals/docs-edit.json',
+  '.claude/evals/record.json',
   '.claude/evals/seeded-violations.json',
   '.github/workflows/knowledge.yml',
   'CLAUDE.md',
