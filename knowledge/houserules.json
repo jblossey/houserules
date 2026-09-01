@@ -58,7 +58,8 @@
       "body": [
         "Scratch repositories live under the session scratchpad, never inside this repository and never in tag-pilot. Run `tools/kb.sh check` and `tools/backlog.sh check` there and record each command’s verbatim output as its own report tests entry (batch 3 task 3 recorded only one of a chained pair).",
         "`pnpm dlx git+file://<this clone> files` exercises the published path (pnpm's bin shim execs the real file); `node <scratch>/node_modules/houserules/bin/houserules.mjs files` after `pnpm add --save-exact git+file://<this clone>` exercises the symlinked path (HR-001).",
-        "For a change to `update`, run `init` and then `update` in the same scratch repository and confirm that only kit-owned files changed."
+        "For a change to `update`, run `init` and then `update` in the same scratch repository and confirm that only kit-owned files changed.",
+        "The report names the scratch path (a `cd` entry or the path in the command) and records the init and both check gates as their own entries; a live run without them fails the recipe."
       ],
       "tags": [
         "live-run",

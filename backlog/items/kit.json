@@ -46,7 +46,7 @@
       "type": "process",
       "milestone": null,
       "label": "blocked: tag-pilot PR #42",
-      "status": "open",
+      "status": "done",
       "title": "Port process.evals-rerun with its co-change check and evals record from tag-pilot",
       "body": [
         "tag-pilot `fc3241b` (2026-08-31) adds the rule `process.evals-rerun`: re-run every `.claude/evals/` scenario whenever the implementer or task-reviewer template or a scenario changes; a `co-change` check fails the audit until `.claude/evals/record.json` changes with them; the record keys runs by the templates' git blob ids. The orchestrating skill gains a 'Template evaluation' procedure and the branch reviewer compares the record's blob ids with HEAD.",
@@ -168,7 +168,7 @@
       "id": "HR-010",
       "type": "fix",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "title": "Report an unreadable .houserules.json as a usage error",
       "body": [
         "`install` parses the stamp with raw `JSON.parse(readFileSync(markerPath))`; an unreadable `.houserules.json` escapes as a SyntaxError stack trace. `tests/init.test.mjs` (the test \"propagates an unreadable marker, which is a defect and not a usage error\") pins the current behavior until this item.",
@@ -185,7 +185,7 @@
       "id": "HR-011",
       "type": "fix",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "title": "Carry the git stderr in the no-merge-base usage error",
       "body": [
         "`gitDiff` in `template/tools/kb.mjs` reports every `git diff` failure as `no merge base between \"<base>\" and \"<head>\"` and discards the child stderr, so a different failure (a missing object in a shallow clone, repository corruption) is mislabeled and its diagnostic lost.",
@@ -203,7 +203,7 @@
       "id": "HR-012",
       "type": "chore",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "title": "Dispatch-protocol bullets: a brief carries the spec, a dispatch carries changed templates",
       "body": [
         "Two additions to the orchestrating skill’s dispatch protocol (`template/.claude/skills/orchestrating/SKILL.md`, kit-owned, then `update --dir .`): a brief names every test and gate its spec task lists, verbatim or by pointer (batch 3 task 3’s brief dropped the seed-checkBase test and the gap cost a review round); when a batch edits an agent template, the dispatch message carries the changed instruction verbatim, because templates load at session start (batch 3’s branch review ran on the pre-branch template).",
@@ -250,6 +250,68 @@
         "cli",
         "errors"
       ]
+    },
+    {
+      "id": "HR-015",
+      "type": "fix",
+      "title": "Commit-msg hook rejects trailers; ship .githooks in the payload",
+      "body": [
+        "The hook runs commitlint only, so a harness-injected Co-Authored-By trailer reached a batch 4 commit and was caught by hand (task 3); security-hygiene.no-coauthor is enforced only post-hoc by the audit.",
+        "Fix: a trailer gate in .githooks/commit-msg before commitlint (grep -qiE for Co-Authored-By → one error line, exit 1). Consider shipping .githooks in the kit payload (KIT_OWNED) so consumers get the gate; this repository has no template copy of the hook today.",
+        "Source: batch 4 branch review, template_defects 1 (2026-09-02)."
+      ],
+      "tags": [
+        "hooks",
+        "template"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-016",
+      "type": "feat",
+      "title": "A structured live_run field in task reports, with a recipe check",
+      "body": [
+        "Live-run evidence has no structured field, so a missing scratch recipe is findable only in prose (batch 4 task 2). Add an optional live_run array (command, output, exit) to $defs.taskReport in both deliverables schema copies; give houserules.live-run-recipe a report-field check at warn on live_run; the implementer template names the field.",
+        "Source: batch 4 branch review, template_defects 2 (2026-09-02)."
+      ],
+      "tags": [
+        "schemas",
+        "template",
+        "audit"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-017",
+      "type": "feat",
+      "title": "A mode field on tdd cycles: natural, mutation, or reconstructed",
+      "body": [
+        "A tdd cycle cannot say how it was produced; batch 4 task 4 spent two report rounds wording the difference between a natural RED, a mutation proof, and a post-commit reconstruction. Add an optional mode enum (natural | mutation | reconstructed) to $defs.tddCycle in both schema copies and one implementer-template sentence: set mode when the cycle is not a natural pre-commit RED.",
+        "Source: batch 4 branch review, template_defects 3 (2026-09-02)."
+      ],
+      "tags": [
+        "schemas",
+        "template"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-018",
+      "type": "fix",
+      "title": "Co-change evidence names a record-only change plainly",
+      "body": [
+        "When the then file itself matches the if glob, the co-change evidence is circular (\"record.json changed with record.json\"). In template/tools/kb.mjs: when the only if match is the then path, print \"only <then> changed; the co-change is satisfied by definition\"; otherwise exclude the then path from the listed if matches. Behavior unchanged; one test.",
+        "Source: batch 4 branch review, template_defects 4 (2026-09-02)."
+      ],
+      "tags": [
+        "tools",
+        "audit"
+      ],
+      "milestone": null,
+      "status": "open"
     }
   ]
 }

@@ -1,0 +1,35 @@
+[
+  {
+    "date": "2026-09-02",
+    "templates": {
+      ".claude/agents/implementer.md": "72bd3789c2a0153c54b182bc816bc17a4c9d3881",
+      ".claude/agents/task-reviewer.md": "8877db2b1a818e8ac014943d3827157a6c3baff2"
+    },
+    "runs": [
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 3,
+        "of": 3,
+        "notes": "ASD-STE100 runbook (sync-template); commands literal and live-run (update idempotent); report validates, self_audit 10/10; injected trailer refused."
+      },
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 5,
+        "of": 5,
+        "notes": "slugify pinned 1.6.9 via pnpm add -E; vetting recorded with evidence; docs_verified via current docs; natural RED (module missing) then GREEN; exact-pins and dependency-vetting rows pass."
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 5,
+        "of": 5,
+        "notes": "Both seeded rules fail deterministic and filed critical with rule set; the omitted self_audit exact-pins row called out with the understated summary; review validates, every row judged; extras: lockfile gap, DONE over a fail row."
+      }
+    ]
+  }
+]

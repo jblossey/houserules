@@ -232,7 +232,7 @@
       "tags": ["evals", "templates", "agents"],
       "source": { "date": "2026-08-31", "by": "user", "ref": "tag-pilot fc3241b" },
       "see": ["process.deliverables-json", "process.keep-knowledge-current"],
-      "verify": [".claude/skills/orchestrating/SKILL.md"],
+      "verify": [".claude/evals/record.json", ".claude/skills/orchestrating/SKILL.md"],
       "check": {
         "type": "co-change",
         "level": "fail",
