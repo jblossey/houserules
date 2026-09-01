@@ -40,11 +40,19 @@
     {
       "date": "2026-09-01",
       "text": "process.rulings-to-file body gains the dispatch-deviation bullet: a deviation from the spec's process line (model, order, gate) is a ruling to amend in the same turn (the home-file and ledger bullets were already present); applied in knowledge/process.json and template/knowledge/process.json. docs/design.md §5.9."
+    },
+    {
+      "date": "2026-09-01",
+      "text": "process.tdd summary names the disclosed-mutation proof for already-correct behavior (shortened to the 160-character cap; the body keeps the detail); applied in knowledge/process.json and template/knowledge/process.json. docs/design.md §5.10."
+    },
+    {
+      "date": "2026-09-01",
+      "text": "quality.principles body gains the test-state-hygiene bullet (behavior-asserting tests that can fail; explicit afterEach reset for module-mock factories); applied in knowledge/quality.json and template/knowledge/quality.json. docs/design.md §5.11."
+    },
+    {
+      "date": "2026-09-01",
+      "text": "process.rulings-to-file summary includes a deferral’s backlog item (one word shorter than quoted at the gate, for the 160-character cap); applied in knowledge/process.json and template/knowledge/process.json. docs/design.md §5.12."
     }
   ],
-  "notes": [
-    "2026-09-01: Pending owner ruling (batch 3 branch review): extend the process.tdd summary — for behavior that is already correct, prove the new test can fail with a disclosed mutation.",
-    "2026-09-01: Pending owner ruling (batch 3 branch review): extend the quality.principles body — clean up global and module state (mocks) after each test; an auto-restore setting covers only spies.",
-    "2026-09-01: Pending owner ruling (batch 3 branch review): extend the process.rulings-to-file summary — a deferral’s new backlog item is part of the same-turn write."
-  ]
+  "notes": []
 }

@@ -270,3 +270,31 @@ Each item records the ruling with its date, or stays marked open.
    line in the same turn. The summary is unchanged. Applied in
    `knowledge/process.json` and `template/knowledge/process.json` so every
    new installation carries it.
+10. **TDD summary names the disclosed-mutation proof — ruled 2026-09-01:
+    yes, in shortened form.** The batch 3 branch review proposed promoting
+    the body's already-correct-behavior clause into the `process.tdd`
+    summary after task 1 added a coverage-keeping test with no RED. The
+    proposed sentence exceeds the schema's 160-character summary cap, so the
+    summary now reads "Test-driven development for every executable change:
+    the failing test first, or a disclosed-mutation proof for
+    already-correct behavior; verbatim RED and GREEN." and the body keeps
+    the detail. Applied in `knowledge/process.json` and
+    `template/knowledge/process.json`.
+11. **Test-state hygiene in quality.principles — ruled 2026-09-01: yes.**
+    The body of `quality.principles` gains the batch 3 retrospective's
+    bullet: tests assert behavior and can fail; global and module state
+    (mocks, prototypes) is cleaned up after each test; an auto-restore
+    setting covers only spies, so a module-mock factory's mock gets its own
+    explicit afterEach reset. The summary is unchanged. Applied in
+    `knowledge/quality.json` and `template/knowledge/quality.json`; the
+    gotcha `houserules.vitest-restore-mocks-scope` records the Vitest
+    specifics.
+12. **Rulings-to-file summary names deferrals — ruled 2026-09-01: yes, in
+    shortened form.** The HR-010 deferral ruling sat only in the git-ignored
+    ledger until the batch 3 branch review caught it. The summary of
+    `process.rulings-to-file` now reads "Every ruling goes to its home file
+    in the same turn — a deferral's backlog item included. A ledger and the
+    chat are not home files; neither survives compaction." (the wording
+    quoted at the gate measured 161 characters against the 160 cap; one
+    word shorter ships). Applied in `knowledge/process.json` and
+    `template/knowledge/process.json`.

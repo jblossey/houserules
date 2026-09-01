@@ -106,7 +106,7 @@
       "kind": "rule",
       "area": "process",
       "standing": true,
-      "summary": "Write every ruling to its home file in the same turn it is made. A work ledger and the chat are not home files; neither survives compaction.",
+      "summary": "Every ruling goes to its home file in the same turn — a deferral’s backlog item included. A ledger and the chat are not home files; neither survives compaction.",
       "body": [
         "Home files: scope or product rulings go to a backlog entry; process rulings to a knowledge entry (`standing: true` when non-negotiable); design rulings to the batch spec.",
         "A ledger note may accompany a ruling; it never substitutes for the tracked write.",
@@ -132,7 +132,7 @@
       "kind": "rule",
       "area": "process",
       "standing": true,
-      "summary": "Use test-driven development for every change to executable code: write the failing test first; keep verbatim RED and GREEN evidence in the task report.",
+      "summary": "Test-driven development for every executable change: the failing test first, or a disclosed-mutation proof for already-correct behavior; verbatim RED and GREEN.",
       "body": [
         "Data-only and docs-only changes carry no RED/GREEN. The report's `tests` names the gates that ran instead (`kb check`, `backlog check`, `validate`, render drift, lint); the reviewer judges their sufficiency.",
         "A data change with a testable consumer — a check pattern with a regression test, a rendered artifact a test pins — is a code change for this rule: the consumer test comes first.",

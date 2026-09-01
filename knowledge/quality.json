@@ -16,7 +16,8 @@
         "Prefer a well-maintained library (vetted, exact-pinned) to a custom implementation of a solved problem: parsing, validation, globbing, dates, retries. A standing project decision may rule an exception; record it as an entry.",
         "One responsibility per file and per function. Each unit boundary is one a reader can understand without its internals.",
         "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test.",
-        "A dedicated compliance pass over the existing codebase is its own backlog item; new code complies immediately."
+        "A dedicated compliance pass over the existing codebase is its own backlog item; new code complies immediately.",
+        "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test; an auto-restore setting covers only spies, so a mock created in a module-mock factory gets its own explicit afterEach reset."
       ],
       "tags": ["quality"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
