@@ -27,6 +27,7 @@ import {
   cmdIndex,
   cmdStanding,
   cmdTopics,
+  gitDiff,
   list,
   loadBase,
   main,
@@ -1729,6 +1730,31 @@ describe('main (audit, stats)', () => {
     expect(io.stderr).toBe(
       `no merge base between "${mainSha}" and "${orphanSha}"\n`,
     );
+  });
+  it('carries git\'s own stderr line for a diff failure that is not a merge-base miss', () => {
+    const root = makeRepo();
+    expect(() =>
+      gitDiff(root, 'main', 'main', ['--name-only', ':(bad']),
+    ).toThrow(new UsageError("fatal: Invalid pathspec magic 'bad' in ':(bad'"));
+  });
+  it('does not mislabel a pathspec failure whose text happens to contain "merge base"', () => {
+    const root = makeRepo();
+    expect(() =>
+      gitDiff(root, 'main', 'main', ['--name-only', ':(bad merge base']),
+    ).toThrow(
+      new UsageError(
+        "fatal: Invalid pathspec magic 'bad merge base' in ':(bad merge base'",
+      ),
+    );
+  });
+  it('falls back to the caught error\'s own message when git never runs and leaves no stderr', () => {
+    const missingRoot = join(mkdtempSync(join(tmpdir(), 'kb-')), 'missing');
+    expect(() =>
+      gitDiff(missingRoot, 'main', 'main', ['--name-only']),
+    ).toThrow(UsageError);
+    expect(() =>
+      gitDiff(missingRoot, 'main', 'main', ['--name-only']),
+    ).toThrow(/ENOENT/);
   });
   it('forwards --workspace from the CLI to audit', () => {
     const root = makeRepo([reportFieldEntry()]);
