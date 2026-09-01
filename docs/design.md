@@ -305,3 +305,19 @@ Each item records the ruling with its date, or stays marked open.
     quoted at the gate measured 161 characters against the 160 cap; one
     word shorter ships). Applied in `knowledge/process.json` and
     `template/knowledge/process.json`.
+13. **Fix-round and reconstruction clauses in process.tdd — ruled
+    2026-09-02: yes.** The batch 4 reviews found an untested behavior
+    narrowing shipped behind a wrong claim (task 2) and a post-commit
+    reconstruction presented as a natural cycle (task 4). The body of
+    `process.tdd` now says a fix round that narrows or widens matching
+    behavior carries its own RED or counter-example test, and a cycle
+    captured after the commit says so and presents the runs in their real
+    order. Applied in `knowledge/process.json` and
+    `template/knowledge/process.json`; the summary is unchanged.
+14. **Accepted deviations are rulings — ruled 2026-09-02: yes.** The
+    batch 4 task 4 verify-path deferral lived only in the git-ignored ledger
+    and report until the review forced the spec amendment. The body of
+    `process.rulings-to-file` now says an accepted implementer deviation is
+    a ruling, homed (a spec amendment or a backlog item) in the turn it is
+    accepted, before the next dispatch. Applied in `knowledge/process.json`
+    and `template/knowledge/process.json`; the summary is unchanged.

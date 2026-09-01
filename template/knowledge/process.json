@@ -110,7 +110,8 @@
       "body": [
         "Home files: scope or product rulings go to a backlog entry; process rulings to a knowledge entry (`standing: true` when non-negotiable); design rulings to the batch spec.",
         "A ledger note may accompany a ruling; it never substitutes for the tracked write.",
-        "A dispatch deviation from the spec's process line (model, order, gate) is a ruling: amend that spec line in the same turn. The batch report at the tick repeats it; it does not replace it."
+        "A dispatch deviation from the spec's process line (model, order, gate) is a ruling: amend that spec line in the same turn. The batch report at the tick repeats it; it does not replace it.",
+        "An accepted implementer deviation is a ruling. Home it (a spec amendment or a backlog item) in the turn it is accepted, before the next dispatch."
       ],
       "tags": ["rulings", "compaction"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
@@ -137,7 +138,8 @@
         "Data-only and docs-only changes carry no RED/GREEN. The report's `tests` names the gates that ran instead (`kb check`, `backlog check`, `validate`, render drift, lint); the reviewer judges their sufficiency.",
         "A data change with a testable consumer — a check pattern with a regression test, a rendered artifact a test pins — is a code change for this rule: the consumer test comes first.",
         "A new test for behavior that is already correct proves it can fail through a deliberate, disclosed mutation, not a natural RED.",
-        "Never fabricate a cycle: an empty `tdd` with named gates is honest evidence; a manufactured RED is not."
+        "Never fabricate a cycle: an empty `tdd` with named gates is honest evidence; a manufactured RED is not.",
+        "A fix round that narrows or widens matching behavior carries its own RED or counter-example test. A cycle captured after the commit says so in the report's tdd entry and presents the runs in the order they really happened."
       ],
       "tags": ["testing"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
