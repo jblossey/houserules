@@ -124,6 +124,10 @@
           "type": "string",
           "minLength": 1
         },
+        "body_line_max": {
+          "type": "integer",
+          "minimum": 1
+        },
         "if": {
           "$ref": "#/$defs/glob"
         },

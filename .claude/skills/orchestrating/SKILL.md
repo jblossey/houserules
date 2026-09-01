@@ -38,11 +38,12 @@ You are the controller. Subagents get knowledge through their templates; you get
   - `REPORT_FILE: <workspace>/task-<N>-report.json`
 - A reviewer dispatch adds `BASE`, `HEAD`, the same `Backlog:` and `Knowledge:` lines, `REPORT_FILE`, `REVIEW_FILE: <workspace>/task-<N>-review.json` (re-review: `task-<N>-review-r<R>.json`), and `AUDIT_JSON: <workspace>/task-<N>-audit.json` (re-review: `-r<R>`).
 - A fix-round dispatch names `FIX_BASE`; the fix-diff audit goes into the report's `fix_rounds` entry, and `self_audit` stays the `BASE..HEAD` audit (`process.deliverables-json`).
-- The branch review dispatch names `WORKSPACE`, `BASE` (the merge base), `HEAD`, the plan and spec paths, and `REVIEW_FILE: <workspace>/branch-review.json`, through `branch-reviewer`.
+- The branch review dispatch names `WORKSPACE`, `BASE` (the merge base), `HEAD`, the plan and spec paths, and `REVIEW_FILE: <workspace>/branch-review.json`, through `branch-reviewer`; its audit runs `--workspace <WORKSPACE>` in place of `--report`.
 
 ## Handling reviews
 
 - A review that fails `tools/kb.sh validate` (an `open` row included) or is not at `REVIEW_FILE` with its `AUDIT_JSON` is incomplete: re-dispatch it. `tools/kb.sh stats` reads only those files.
+- A branch review's audit runs `--workspace <WORKSPACE>`: its `report-field` rows are judged from every task report, not skipped.
 - Severity of an adherence failure: standing rule is Critical; area rule is Important; `warn` is Minor.
 - Every finding is fixed (`process.no-tech-debt`). A deferral is a backlog item with a reason, named in the finding.
 - Ledger line per task: `Adherence: <pass>/<fail>/<warn>; judged fails: <ids or none>`.
