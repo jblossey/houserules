@@ -60,6 +60,9 @@
         },
         "output": {
           "type": "string"
+        },
+        "exit": {
+          "type": "integer"
         }
       }
     },

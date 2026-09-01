@@ -54,9 +54,9 @@
       "id": "houserules.live-run-recipe",
       "kind": "procedure",
       "area": "cli",
-      "summary": "Live-run every CLI change in a fresh scratch `git init` repository: `init --dir <scratch>`, then `tools/kb.sh check && tools/backlog.sh check` there.",
+      "summary": "Live-run every CLI change in a scratch `git init` repository: `init --dir <scratch>`, both checks there, each gate’s output as its own report entry.",
       "body": [
-        "Scratch repositories live under the session scratchpad, never inside this repository and never in tag-pilot.",
+        "Scratch repositories live under the session scratchpad, never inside this repository and never in tag-pilot. Run `tools/kb.sh check` and `tools/backlog.sh check` there and record each command’s verbatim output as its own report tests entry (batch 3 task 3 recorded only one of a chained pair).",
         "`pnpm dlx git+file://<this clone> files` exercises the published path (pnpm's bin shim execs the real file); `node <scratch>/node_modules/houserules/bin/houserules.mjs files` after `pnpm add --save-exact git+file://<this clone>` exercises the symlinked path (HR-001).",
         "For a change to `update`, run `init` and then `update` in the same scratch repository and confirm that only kit-owned files changed."
       ],
@@ -163,6 +163,26 @@
         "mise.toml",
         "package.json"
       ]
+    },
+    {
+      "id": "houserules.vitest-restore-mocks-scope",
+      "kind": "gotcha",
+      "area": "tests",
+      "summary": "Vitest `restoreMocks` restores `vi.spyOn` spies only; reset a `vi.mock` factory’s `vi.fn` in an explicit `afterEach` with `mockReset()`.",
+      "body": [
+        "`mockReset()` on a mock made with `vi.fn(impl)` also restores `impl` and drops queued `mockImplementationOnce` entries, so the wrapped real function comes back (verified against the Vitest 4 docs in the batch 3 task 1 fix round).",
+        "`tests/init.test.mjs` (the `vi.mock` factory for node:child_process and its `afterEach`) is the in-repo example."
+      ],
+      "tags": [
+        "vitest",
+        "mocks",
+        "tests"
+      ],
+      "source": {
+        "date": "2026-09-01",
+        "by": "review",
+        "ref": "batch 3 task 1 review, critical 2; task-1-report.json docs_verified"
+      }
     }
   ]
 }

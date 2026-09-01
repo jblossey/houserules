@@ -1822,6 +1822,32 @@ describe('validate', () => {
       `${file}: unknown field "extra"`,
     ]);
   });
+  it('accepts a run whose exit code is an integer', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...REPORT,
+        tests: [{ command: 'vitest', output: 'ok', exit: 2 }],
+      }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([]);
+  });
+  it('rejects a run whose exit code is not an integer', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...REPORT,
+        tests: [{ command: 'vitest', output: 'ok', exit: '2' }],
+      }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([
+      `${file}.tests[0].exit: must be integer`,
+    ]);
+  });
   it('validates a task-review, rejecting a rule_adherence result the schema forbids', () => {
     const root = makeRepo();
     const file = join(root, 'review.json');

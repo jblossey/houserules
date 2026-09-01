@@ -27,6 +27,26 @@
       "verify": ["backlog/schema.json"]
     },
     {
+      "id": "process.brief-carries-the-spec",
+      "kind": "rule",
+      "area": "process",
+      "standing": false,
+      "summary": "A task brief carries every test, gate, and file its spec task names; an implementer who cannot satisfy one flags it instead of dropping it.",
+      "body": [
+        "The controller writes briefs from the spec and plan; a silent omission surfaces only in review, one round late (batch 3, task 3).",
+        "When a brief and the spec disagree, the spec wins and the disagreement is a ruling to record."
+      ],
+      "tags": [
+        "dispatch",
+        "briefs"
+      ],
+      "source": {
+        "date": "2026-09-01",
+        "by": "review",
+        "ref": "batch 3 branch review, uncovered_findings; task 3 review, finding 2"
+      }
+    },
+    {
       "id": "process.brainstorm-first",
       "kind": "rule",
       "area": "process",

@@ -42,5 +42,9 @@
       "text": "process.rulings-to-file body gains the dispatch-deviation bullet: a deviation from the spec's process line (model, order, gate) is a ruling to amend in the same turn (the home-file and ledger bullets were already present); applied in knowledge/process.json and template/knowledge/process.json. docs/design.md §5.9."
     }
   ],
-  "notes": []
+  "notes": [
+    "2026-09-01: Pending owner ruling (batch 3 branch review): extend the process.tdd summary — for behavior that is already correct, prove the new test can fail with a disclosed mutation.",
+    "2026-09-01: Pending owner ruling (batch 3 branch review): extend the quality.principles body — clean up global and module state (mocks) after each test; an auto-restore setting covers only spies.",
+    "2026-09-01: Pending owner ruling (batch 3 branch review): extend the process.rulings-to-file summary — a deferral’s new backlog item is part of the same-turn write."
+  ]
 }

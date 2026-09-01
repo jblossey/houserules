@@ -39,6 +39,7 @@ You are the controller. Subagents get knowledge through their templates; you get
 - A reviewer dispatch adds `BASE`, `HEAD`, the same `Backlog:` and `Knowledge:` lines, `REPORT_FILE`, `REVIEW_FILE: <workspace>/task-<N>-review.json` (re-review: `task-<N>-review-r<R>.json`), and `AUDIT_JSON: <workspace>/task-<N>-audit.json` (re-review: `-r<R>`).
 - A fix-round dispatch names `FIX_BASE`; the fix-diff audit goes into the report's `fix_rounds` entry, and `self_audit` stays the `BASE..HEAD` audit (`process.deliverables-json`).
 - The branch review dispatch names `WORKSPACE`, `BASE` (the merge base), `HEAD`, the plan and spec paths, and `REVIEW_FILE: <workspace>/branch-review.json`, through `branch-reviewer`; its audit runs `--workspace <WORKSPACE>` in place of `--report`.
+- A brief names no version number for a tool, action, or package (`security-hygiene.exact-pins`); it names the verification the implementer runs and records in `docs_verified`, and shows placeholders such as `jdx/mise-action@<current major>`.
 
 ## Handling reviews
 
