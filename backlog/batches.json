@@ -1,21 +1,55 @@
 {
   "heading": "Batch planning",
-  "intro": ["Batch numbers start at 1; the approved spec of 2026-08-31 calls the first batch 'batch 0'."],
-  "table_header": ["Batch", "Items", "Summary", "Kickoff", "Status"],
+  "intro": [
+    "Batch numbers start at 1; the approved spec of 2026-08-31 calls the first batch 'batch 0'."
+  ],
+  "table_header": [
+    "Batch",
+    "Items",
+    "Summary",
+    "Kickoff",
+    "Status"
+  ],
   "batches": [
     {
       "number": 1,
       "items": [],
       "summary": "Bootstrap: owner rulings, rename to houserules, SessionStart fork matcher, MIT license and headers, dogfood install.",
       "kickoff": "docs/specs/2026-08-31-batch-0-bootstrap.md",
-      "status": { "state": "done", "text": "Commits 6721668, 7db7db9, d356fba, a1d31ac, and the dogfood commit that closes the batch; implemented by the orchestrator under the bootstrap exception (decisions)." }
+      "status": {
+        "state": "done",
+        "text": "Commits 6721668, 7db7db9, d356fba, a1d31ac, and the dogfood commit that closes the batch; implemented by the orchestrator under the bootstrap exception (decisions)."
+      }
     },
     {
       "number": 2,
-      "items": ["HR-004", "HR-001", "HR-002"],
+      "items": [
+        "HR-004",
+        "HR-001",
+        "HR-002"
+      ],
       "summary": "pnpm workspace like tag-pilot (HR-004); CLI robustness: symlinked-path entry guard (HR-001), clean invalid-JSON errors (HR-002).",
       "kickoff": "docs/specs/2026-09-01-batch-2-pnpm-workspace-and-cli-robustness.md",
-      "status": { "state": "done", "text": "Done 2026-09-01: merged into main fast-forward after the branch review (fable: ready with-fixes; the fixes are in the finishing commit). Implementers on sonnet, task reviews on opus; task 3 fix round 1 ran on an opus implementer after four sonnet endpoint drops, its re-review on fable. Ten task findings fixed, none deferred. Retrospective items: HR-005 to HR-009; standing-rule proposals await the owner (decisions notes)." }
+      "status": {
+        "state": "done",
+        "text": "Done 2026-09-01: merged into main fast-forward after the branch review (fable: ready with-fixes; the fixes are in the finishing commit). Implementers on sonnet, task reviews on opus; task 3 fix round 1 ran on an opus implementer after four sonnet endpoint drops, its re-review on fable. Ten task findings fixed, none deferred. Retrospective items: HR-005 to HR-009; standing-rule proposals await the owner (decisions notes)."
+      }
+    },
+    {
+      "number": 3,
+      "items": [
+        "HR-005",
+        "HR-009",
+        "HR-006",
+        "HR-008",
+        "HR-007"
+      ],
+      "summary": "Exact gates and a sharper agent layer: init usage error, merge-base audit range, body-line check (ruling 7), workspace audit, deliverables exit and template wording.",
+      "kickoff": "docs/specs/2026-09-01-batch-3-gates-and-agent-layer.md",
+      "status": {
+        "state": "planned",
+        "text": "Spec approved on 2026-09-01; in progress on branch batch-3 — implementer on sonnet, task review on opus, branch review on fable."
+      }
     }
   ]
 }
