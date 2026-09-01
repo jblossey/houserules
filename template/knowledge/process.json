@@ -52,7 +52,8 @@
       "check": {
         "type": "commits",
         "level": "fail",
-        "subject": "^(?=.{1,100}$)(feat|fix|chore|test|ci|docs|refactor|perf|build|style|revert)(\\([^)]+\\))?!?: .+"
+        "subject": "^(?=.{1,100}$)(feat|fix|chore|test|ci|docs|refactor|perf|build|style|revert)(\\([^)]+\\))?!?: .+",
+        "body_line_max": 100
       }
     },
     {

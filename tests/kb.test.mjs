@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -83,11 +84,13 @@ export function write(root, path, content) {
   mkdirSync(join(root, dirname(path)), { recursive: true });
   writeFileSync(join(root, path), content);
 }
-/** Stages and commits everything in `root`'s worktree, returning the new commit's full SHA. */
-export function commit(root, message) {
+/**
+ * Stages and commits everything in `root`'s worktree, returning the new commit's full SHA.
+ * An optional `body` becomes the commit's second `-m`.
+ */
+export function commit(root, message, body) {
   git(root, 'add', '-A');
-  git(
-    root,
+  const args = [
     '-c',
     'user.name=t',
     '-c',
@@ -100,7 +103,9 @@ export function commit(root, message) {
     '--allow-empty',
     '-m',
     message,
-  );
+  ];
+  if (body != null) args.push('-m', body);
+  git(root, ...args);
   return git(root, 'rev-parse', 'HEAD').trim();
 }
 /** A standing process rule, with every field a caller might need to override. */
@@ -259,7 +264,7 @@ describe('checkBase', () => {
         'knowledge/process.json process.dup: verify path "missing.txt" does not exist',
         'knowledge/process.json process.bad-check: check "grep-absent" needs "files"',
         'knowledge/process.json process.bad-check: check "grep-absent" needs "scope"',
-        'knowledge/process.json process.bad-commits: check "commits" needs "subject" or "body_absent"',
+        'knowledge/process.json process.bad-commits: check "commits" needs "subject", "body_absent", or "body_line_max"',
       ]),
     );
     expect(
@@ -283,6 +288,27 @@ describe('checkBase', () => {
     expect(checkBase(loadBase(root))).toContain(
       'knowledge/process.json: topic "other" must equal the file name "process"',
     );
+  });
+  it('accepts a commits check that has only body_line_max', () => {
+    const root = makeRepo([
+      entry({
+        check: { type: 'commits', level: 'warn', body_line_max: 80 },
+      }),
+    ]);
+    render(loadBase(root));
+    expect(checkBase(loadBase(root))).toEqual([]);
+  });
+  it('rejects a commits check with body_line_max below 1', () => {
+    const root = makeRepo([
+      entry({
+        check: { type: 'commits', level: 'warn', body_line_max: 0 },
+      }),
+    ]);
+    expect(
+      checkBase(loadBase(root)).some((e) =>
+        e.endsWith('check.body_line_max: below 1'),
+      ),
+    ).toBe(true);
   });
   it('exports the constants later tasks render with', () => {
     expect(GENERATED).toBe(
@@ -888,6 +914,27 @@ function auditEntries() {
   ];
 }
 
+/** A report-field check on any package.json -> `dependency_vetting`, shared by the workspace tests. */
+function reportFieldEntry() {
+  return entry({
+    id: 'process.reportws',
+    summary: 'Every triggered report carries dependency_vetting.',
+    check: {
+      type: 'report-field',
+      level: 'fail',
+      if: '**/package.json',
+      field: 'dependency_vetting',
+    },
+  });
+}
+/** Writes a temp workspace directory holding one JSON file per `reports` entry (name -> body). */
+function writeWorkspace(reports) {
+  const dir = mkdtempSync(join(tmpdir(), 'ws-'));
+  for (const [name, body] of Object.entries(reports))
+    writeFileSync(join(dir, name), JSON.stringify(body));
+  return dir;
+}
+
 describe('audit', () => {
   it('derives the package from standing rules, touched areas, and ids, and runs every check', () => {
     const root = makeRepo(auditEntries(), {
@@ -899,21 +946,7 @@ describe('audit', () => {
     write(root, 'tools/package.json', '{"dependencies":{"x":"^1.0.0"}}\n');
     write(root, 'crates/db/migrations.rs', 'a\n');
     write(root, 'crates/lib.rs', 'y\n');
-    git(root, 'add', '-A');
-    git(
-      root,
-      '-c',
-      'user.name=t',
-      '-c',
-      'user.email=t@t.t',
-      'commit',
-      '-q',
-      '--no-verify',
-      '-m',
-      'feat: change',
-      '-m',
-      'Co-Authored-By: someone',
-    );
+    commit(root, 'feat: change', 'Co-Authored-By: someone');
     const json = join(root, 'audit.json');
     const { result, failed } = audit(loadBase(root), {
       baseRef: base,
@@ -1143,6 +1176,41 @@ describe('audit', () => {
       'pass',
     );
   });
+  it('passes a body_line_max check when the longest body line is exactly the limit', () => {
+    const root = makeRepo([
+      entry({
+        id: 'process.bodylimit',
+        summary: 'Wrapped commit bodies.',
+        check: { type: 'commits', level: 'fail', body_line_max: 100 },
+      }),
+    ]);
+    const base = commit(root, 'chore: base');
+    commit(root, 'feat: at limit', 'x'.repeat(100));
+    const rows = audit(loadBase(root), { baseRef: base }).result.rules;
+    expect(rows[0]).toMatchObject({
+      id: 'process.bodylimit',
+      result: 'pass',
+      evidence: '1 commits checked',
+    });
+  });
+  it('fails a body_line_max check when a body line is one character over the limit', () => {
+    const root = makeRepo([
+      entry({
+        id: 'process.bodylimit',
+        summary: 'Wrapped commit bodies.',
+        check: { type: 'commits', level: 'fail', body_line_max: 100 },
+      }),
+    ]);
+    const base = commit(root, 'chore: base');
+    commit(root, 'feat: over limit', 'x'.repeat(101));
+    const rows = audit(loadBase(root), { baseRef: base }).result.rules;
+    expect(rows[0]).toMatchObject({
+      id: 'process.bodylimit',
+      result: 'fail',
+      evidence:
+        'commit "feat: over limit" has a body line over 100 characters',
+    });
+  });
   it('reports a report-field check as not triggered when its trigger files do not change', () => {
     const root = makeRepo([
       entry({
@@ -1214,19 +1282,9 @@ describe('audit', () => {
       }),
     ]);
     const base = commit(root, 'chore: base');
-    git(
+    commit(
       root,
-      '-c',
-      'user.name=t',
-      '-c',
-      'user.email=t@t.t',
-      'commit',
-      '-q',
-      '--no-verify',
-      '--allow-empty',
-      '-m',
       'feat: change',
-      '-m',
       'An innocent first line.\nCo-Authored-By: someone',
     );
     const rows = audit(loadBase(root), { baseRef: base }).result.rules;
@@ -1299,6 +1357,141 @@ describe('audit', () => {
       result: 'pass',
       evidence: '0 files checked',
     });
+  });
+  // HR-008: `--workspace` judges a `report-field` check against every
+  // `task-<n>-report.json` in a workspace directory, instead of the single
+  // `--report` file.
+  it('fails a workspace report-field check naming the first report lacking the field', () => {
+    const root = makeRepo([reportFieldEntry()]);
+    const base = commit(root, 'chore: base');
+    write(root, 'tools/package.json', '{}\n');
+    commit(root, 'feat: add a dependency');
+    const dir = writeWorkspace({
+      'task-1-report.json': {
+        kind: 'task-report',
+        files_changed: ['tools/package.json'],
+        dependency_vetting: {
+          manifests: ['tools/package.json'],
+          dependencies: [],
+        },
+      },
+      'task-2-report.json': {
+        kind: 'task-report',
+        files_changed: ['tools/package.json'],
+        dependency_vetting: null,
+      },
+    });
+    const { result, failed } = audit(loadBase(root), {
+      baseRef: base,
+      workspace: dir,
+    });
+    expect(failed).toBe(true);
+    expect(result.rules[0]).toMatchObject({
+      result: 'fail',
+      evidence:
+        'task-2-report.json lacks a value for dependency_vetting (triggered by tools/package.json)',
+    });
+  });
+  it('passes a workspace report-field check with the hit count when every report has the field', () => {
+    const root = makeRepo([reportFieldEntry()]);
+    const base = commit(root, 'chore: base');
+    write(root, 'tools/package.json', '{}\n');
+    commit(root, 'feat: add a dependency');
+    const vetted = {
+      kind: 'task-report',
+      files_changed: ['tools/package.json'],
+      dependency_vetting: { manifests: ['tools/package.json'], dependencies: [] },
+    };
+    const dir = writeWorkspace({
+      'task-1-report.json': vetted,
+      'task-2-report.json': vetted,
+    });
+    const { result, failed } = audit(loadBase(root), {
+      baseRef: base,
+      workspace: dir,
+    });
+    expect(failed).toBe(false);
+    expect(result.rules[0]).toMatchObject({
+      result: 'pass',
+      evidence: 'report field dependency_vetting is set in 2 reports',
+    });
+  });
+  it('passes a workspace report-field check as not triggered by any report', () => {
+    const root = makeRepo([reportFieldEntry()]);
+    const base = commit(root, 'chore: base');
+    write(root, 'tools/package.json', '{}\n');
+    commit(root, 'feat: add a dependency');
+    const dir = writeWorkspace({
+      'task-1-report.json': { kind: 'task-report', files_changed: ['docs/x.md'] },
+    });
+    const { result, failed } = audit(loadBase(root), {
+      baseRef: base,
+      workspace: dir,
+    });
+    expect(failed).toBe(false);
+    expect(result.rules[0]).toMatchObject({
+      result: 'pass',
+      evidence: 'not triggered by any report',
+    });
+  });
+  // Task 4 review, Important #2: a workspace report is required to carry
+  // `files_changed` (`.claude/schemas/deliverables.json`); one that lacks it
+  // is malformed, not silently "no hit" — the row fails naming it, so a
+  // truncated or hand-written report cannot escape a report-field check.
+  it('fails a workspace report-field check naming a report that lacks files_changed', () => {
+    const root = makeRepo([reportFieldEntry()]);
+    const base = commit(root, 'chore: base');
+    write(root, 'tools/package.json', '{}\n');
+    commit(root, 'feat: add a dependency');
+    const dir = writeWorkspace({
+      'task-1-report.json': { kind: 'task-report' },
+    });
+    const { result, failed } = audit(loadBase(root), {
+      baseRef: base,
+      workspace: dir,
+    });
+    expect(failed).toBe(true);
+    expect(result.rules[0]).toMatchObject({
+      result: 'fail',
+      evidence: 'task-1-report.json lacks files_changed',
+    });
+  });
+  // Task 4 review, Minor #3: a missing --workspace directory used to dump a
+  // raw Node ENOENT stack from readdirSync; it now reads like every other
+  // audit misuse (--report on a missing file already threw UsageError).
+  it('rejects a missing --workspace directory as a usage error, not a stack trace', () => {
+    const root = makeRepo(auditEntries());
+    const base = commit(root, 'chore: base');
+    const missing = join(mkdtempSync(join(tmpdir(), 'ws-')), 'missing');
+    expect(() =>
+      audit(loadBase(root), { baseRef: base, workspace: missing }),
+    ).toThrow(UsageError);
+    const io = capture();
+    expect(main(['audit', '--base', base, '--workspace', missing], io, root)).toBe(
+      2,
+    );
+    expect(io.stderr.split('\n').filter(Boolean)).toHaveLength(1);
+  });
+  it('rejects --report together with --workspace', () => {
+    const root = makeRepo(auditEntries());
+    const base = commit(root, 'chore: base');
+    const reportPath = join(root, 'report.json');
+    writeFileSync(reportPath, JSON.stringify({}));
+    const dir = mkdtempSync(join(tmpdir(), 'ws-'));
+    expect(() =>
+      audit(loadBase(root), {
+        baseRef: base,
+        report: reportPath,
+        workspace: dir,
+      }),
+    ).toThrow(UsageError);
+    expect(() =>
+      audit(loadBase(root), {
+        baseRef: base,
+        report: reportPath,
+        workspace: dir,
+      }),
+    ).toThrow(/audit takes --report or --workspace, not both/);
   });
 });
 
@@ -1537,6 +1730,48 @@ describe('main (audit, stats)', () => {
       `no merge base between "${mainSha}" and "${orphanSha}"\n`,
     );
   });
+  it('forwards --workspace from the CLI to audit', () => {
+    const root = makeRepo([reportFieldEntry()]);
+    const base = commit(root, 'chore: base');
+    write(root, 'tools/package.json', '{}\n');
+    commit(root, 'feat: add a dependency');
+    const dir = writeWorkspace({
+      'task-1-report.json': {
+        kind: 'task-report',
+        files_changed: ['tools/package.json'],
+        dependency_vetting: {
+          manifests: ['tools/package.json'],
+          dependencies: [],
+        },
+      },
+    });
+    const io = capture();
+    expect(main(['audit', '--base', base, '--workspace', dir], io, root)).toBe(
+      0,
+    );
+    expect(JSON.parse(io.stdout).rules[0]).toMatchObject({
+      result: 'pass',
+      evidence: 'report field dependency_vetting is set in 1 reports',
+    });
+  });
+  it('reports a usage error from the CLI when --report and --workspace are both given', () => {
+    const root = makeRepo(auditEntries());
+    const base = commit(root, 'chore: base');
+    const reportPath = join(root, 'report.json');
+    writeFileSync(reportPath, JSON.stringify({}));
+    const dir = mkdtempSync(join(tmpdir(), 'ws-'));
+    const io = capture();
+    expect(
+      main(
+        ['audit', '--base', base, '--report', reportPath, '--workspace', dir],
+        io,
+        root,
+      ),
+    ).toBe(2);
+    expect(io.stderr).toBe(
+      'audit takes --report or --workspace, not both\n',
+    );
+  });
 });
 
 const REPORT = {
@@ -1668,10 +1903,72 @@ describe('main (validate)', () => {
 });
 
 describe('the repository knowledge base', () => {
+  const TEMPLATE_ROOT = fileURLToPath(new URL('../template', import.meta.url));
+  /** A temp git repo seeded with the real `template/knowledge` content and starter CLAUDE.md. */
+  function makeSeedRepo() {
+    const root = mkdtempSync(join(tmpdir(), 'kb-seed-'));
+    git(root, 'init', '-q', '-b', 'main');
+    const knowledgeFiles = readdirSync(join(TEMPLATE_ROOT, 'knowledge'))
+      .filter((name) => name.endsWith('.json'))
+      .toSorted();
+    for (const name of knowledgeFiles) {
+      write(
+        root,
+        `knowledge/${name}`,
+        readFileSync(join(TEMPLATE_ROOT, 'knowledge', name), 'utf8'),
+      );
+    }
+    write(root, '.claude/schemas/deliverables.json', DELIVERABLES_SCHEMA_CONTENT);
+    write(root, 'CLAUDE.md', readFileSync(join(TEMPLATE_ROOT, 'CLAUDE.md'), 'utf8'));
+    // The seed's own `verify` paths (process.backlog-drives-work,
+    // process.ff-only-merges) name two more files a real `init` would seed.
+    write(
+      root,
+      'backlog/schema.json',
+      readFileSync(join(TEMPLATE_ROOT, 'backlog/schema.json'), 'utf8'),
+    );
+    write(
+      root,
+      '.claude/skills/finishing-a-feature/SKILL.md',
+      readFileSync(
+        join(TEMPLATE_ROOT, '.claude/skills/finishing-a-feature/SKILL.md'),
+        'utf8',
+      ),
+    );
+    commit(root, 'chore: seed');
+    return root;
+  }
+
+  // Spec §4 T3's third test. This is a regression check over data that is
+  // already correct, not new behavior, so it has no natural RED (process.tdd);
+  // the next test proves it is not vacuous by breaking the same seed on purpose.
+  it('renders and passes checkBase against the real template/knowledge seed', () => {
+    const root = makeSeedRepo();
+    render(loadBase(root));
+    expect(checkBase(loadBase(root))).toEqual([]);
+  });
+  // Disclosed-mutation proof for the test above: a copy of the seed with
+  // process.conventional-commits' new body_line_max set to 0 (the schema's
+  // minimum is 1) must fail checkBase, showing the check above is not vacuous.
+  it('fails checkBase when the seeded process.json is deliberately broken', () => {
+    const root = makeSeedRepo();
+    render(loadBase(root));
+    const processPath = join(root, 'knowledge/process.json');
+    const broken = JSON.parse(readFileSync(processPath, 'utf8'));
+    broken.entries.find(
+      (e) => e.id === 'process.conventional-commits',
+    ).check.body_line_max = 0;
+    write(root, 'knowledge/process.json', JSON.stringify(broken));
+    expect(
+      checkBase(loadBase(root)).some((e) =>
+        e.endsWith('check.body_line_max: below 1'),
+      ),
+    ).toBe(true);
+  });
   // A manifest holds glob strings as well as version requirements, so the
   // `exact-pins` pattern has to read a version context, not a bare `*`.
   it('matches a range requirement with the exact-pins pattern, and no glob', () => {
-    const base = loadBase(fileURLToPath(new URL('../template', import.meta.url)));
+    const base = loadBase(TEMPLATE_ROOT);
     const { check } = base.entries.get('security-hygiene.exact-pins');
     const pattern = new RegExp(check.pattern, check.flags ?? '');
     for (const line of [

@@ -122,8 +122,15 @@ function checkShape(check, at, errors) {
   for (const field of fields)
     if (!(field in check))
       errors.add(`${at}: check "${check.type}" needs "${field}"`);
-  if (check.type === 'commits' && !check.subject && !check.body_absent) {
-    errors.add(`${at}: check "commits" needs "subject" or "body_absent"`);
+  if (
+    check.type === 'commits' &&
+    !check.subject &&
+    !check.body_absent &&
+    !check.body_line_max
+  ) {
+    errors.add(
+      `${at}: check "commits" needs "subject", "body_absent", or "body_line_max"`,
+    );
   }
   for (const field of ['pattern', 'subject', 'body_absent']) {
     if (typeof check[field] !== 'string') continue;
@@ -433,6 +440,29 @@ const fieldValue = (object, field) =>
     .split('.')
     .reduce((node, key) => (node == null ? undefined : node[key]), object);
 
+/**
+ * Lists a workspace directory's deliverable filenames by kind, each sorted:
+ * `audits` (`task-*-audit*.json`), `reports` (`task-<n>-report.json`), and
+ * `reviews` (`task-*-review*.json`). Shared by `stats` and `audit --workspace`.
+ */
+function workspaceFiles(dir) {
+  let names;
+  try {
+    names = readdirSync(dir);
+  } catch (error) {
+    throw new UsageError(error.message);
+  }
+  return {
+    audits: names.filter((n) => /^task-.+-audit.*\.json$/.test(n)).toSorted(),
+    reports: names
+      .filter((n) => /^task-\d+-report\.json$/.test(n))
+      .toSorted(),
+    reviews: names
+      .filter((n) => /^task-.+-review.*\.json$/.test(n))
+      .toSorted(),
+  };
+}
+
 // ---- audit --------------------------------------------------------------------------
 
 function runCheck(entry, ctx) {
@@ -484,6 +514,15 @@ function runCheck(entry, ctx) {
           return violate(
             `commit "${commit.subject}" body matches ${c.body_absent}`,
           );
+        if (
+          c.body_line_max &&
+          commit.body
+            .split('\n')
+            .some((line) => line.length > c.body_line_max)
+        )
+          return violate(
+            `commit "${commit.subject}" has a body line over ${c.body_line_max} characters`,
+          );
       }
       row.evidence = `${ctx.commits().length} commits checked`;
       return row;
@@ -523,19 +562,44 @@ function runCheck(entry, ctx) {
         row.evidence = 'not triggered';
         return row;
       }
-      if (ctx.report === null) {
-        row.result = 'skipped';
-        row.evidence = 'no --report given';
+      const hasField = (data) => {
+        const value = fieldValue(data, c.field);
+        return value !== undefined && value !== null;
+      };
+      if (ctx.report !== null) {
+        if (hasField(ctx.report)) {
+          row.evidence = `report field ${c.field} is set`;
+          return row;
+        }
+        return violate(
+          `report lacks a value for ${c.field} (triggered by ${trigger[0]})`,
+        );
+      }
+      if (ctx.reports !== null) {
+        const malformed = ctx.reports.find((r) => r.data.files_changed == null);
+        if (malformed) return violate(`${malformed.name} lacks files_changed`);
+        const hits = ctx.reports.filter((r) =>
+          r.data.files_changed.some((f) => matchAny(f, c.if)),
+        );
+        if (hits.length === 0) {
+          row.evidence = 'not triggered by any report';
+          return row;
+        }
+        const missing = hits.find((r) => !hasField(r.data));
+        if (missing) {
+          const file = missing.data.files_changed.find((f) =>
+            matchAny(f, c.if),
+          );
+          return violate(
+            `${missing.name} lacks a value for ${c.field} (triggered by ${file})`,
+          );
+        }
+        row.evidence = `report field ${c.field} is set in ${hits.length} reports`;
         return row;
       }
-      const value = fieldValue(ctx.report, c.field);
-      if (value !== undefined && value !== null) {
-        row.evidence = `report field ${c.field} is set`;
-        return row;
-      }
-      return violate(
-        `report lacks a value for ${c.field} (triggered by ${trigger[0]})`,
-      );
+      row.result = 'skipped';
+      row.evidence = 'no --report given';
+      return row;
     }
   }
 }
@@ -544,9 +608,12 @@ function runCheck(entry, ctx) {
  * Builds the rule package for a git range — every standing rule, plus every
  * rule or invariant in a touched or global area, plus any `--ids` addition —
  * runs each rule's deterministic check, and reports the result and whether
- * any check failed. `report` and `json` are paths resolved against `cwd`
- * (default `process.cwd()`); the result carries `area_files`, the changed
- * files that pulled in each area.
+ * any check failed. `report` and `workspace` are exclusive: `report` names
+ * one JSON deliverable a `report-field` check reads directly; `workspace`
+ * names a directory of `task-<n>-report.json` files a `report-field` check
+ * judges by each report's `files_changed`. `report`, `workspace`, and `json`
+ * are paths resolved against `cwd` (default `process.cwd()`); the result
+ * carries `area_files`, the changed files that pulled in each area.
  */
 export function audit(
   base,
@@ -555,11 +622,14 @@ export function audit(
     headRef = 'HEAD',
     ids = [],
     report,
+    workspace,
     json,
     cwd = process.cwd(),
   } = {},
 ) {
   if (!baseRef) throw new UsageError('audit needs --base <ref>');
+  if (report && workspace)
+    throw new UsageError('audit takes --report or --workspace, not both');
   const { root } = base;
   const baseSha = rev(root, baseRef);
   const headSha = rev(root, headRef);
@@ -582,6 +652,12 @@ export function audit(
   const ctx = {
     changed,
     report: report ? readDeliverable(resolve(cwd, report)) : null,
+    reports: workspace
+      ? workspaceFiles(resolve(cwd, workspace)).reports.map((name) => ({
+          name,
+          data: readDeliverable(resolve(cwd, workspace, name)),
+        }))
+      : null,
     show: (path) => {
       if (!cache.has(path)) cache.set(path, showFile(root, headSha, path));
       return cache.get(path);
@@ -663,10 +739,7 @@ const statsTasks = (set) => [...set].toSorted();
  * for the ids a report cites as used.
  */
 export function stats(dir) {
-  const names = readdirSync(dir);
-  const audits = names.filter((n) => /^task-.+-audit.*\.json$/.test(n));
-  const reports = names.filter((n) => /^task-\d+-report\.json$/.test(n));
-  const reviews = names.filter((n) => /^task-.+-review.*\.json$/.test(n));
+  const { audits, reports, reviews } = workspaceFiles(dir);
   const violations = new Map();
   const injected = new Map();
   for (const name of audits) {
@@ -770,7 +843,8 @@ export function cmdStanding(base) {
 const BOOLEAN_OPTS = new Set(['full', 'standing', 'check']);
 
 const USAGE =
-  'usage: kb <topics|index|get|for|standing|render|check|audit|stats|validate> [options]';
+  'usage: kb <topics|index|get|for|standing|render|check|audit|stats|validate> [options]\n' +
+  'audit --base <ref> [--head <ref>] [--ids <id,id>] [--report <file> | --workspace <dir>] [--json <file>]';
 
 /** Parses argv, dispatches to the matching command, and writes its result through `io`. */
 export function main(argv, io, cwd) {
@@ -832,6 +906,8 @@ export function main(argv, io, cwd) {
                   .filter(Boolean)
               : [],
           report: typeof opts.report === 'string' ? opts.report : undefined,
+          workspace:
+            typeof opts.workspace === 'string' ? opts.workspace : undefined,
           json: typeof opts.json === 'string' ? opts.json : undefined,
           cwd,
         });
