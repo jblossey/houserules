@@ -47,8 +47,8 @@
       "summary": "Exact gates and a sharper agent layer: init usage error, merge-base audit range, body-line check (ruling 7), workspace audit, deliverables exit and template wording.",
       "kickoff": "docs/specs/2026-09-01-batch-3-gates-and-agent-layer.md",
       "status": {
-        "state": "planned",
-        "text": "Spec approved on 2026-09-01; in progress on branch batch-3 — implementer on sonnet, task review on opus, branch review on fable."
+        "state": "done",
+        "text": "Done 2026-09-01: merged into main fast-forward after the branch review (fable: ready with-fixes; the fixes are in the closing commit and the aggregation). Implementers on sonnet (task 1 finished on opus after endpoint drops, its reviews on fable), task reviews on opus, branch review on fable with the new --workspace audit. Sixteen findings over five tasks fixed, one deferral (HR-011, reasoned). Retrospective: HR-010, HR-011, HR-012 filed; three standing-rule proposals await the owner (decisions notes)."
       }
     }
   ]

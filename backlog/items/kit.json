@@ -80,7 +80,7 @@
       "id": "HR-005",
       "type": "fix",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "title": "Capture the render child's stderr in init instead of inheriting it",
       "body": [
         "`install` in `bin/houserules.mjs` spawns `tools/kb.mjs render` with an inherited stderr, so the init test on broken project data prints one usage-error line into the suite output (tests/init.test.mjs, 'lets a render failure on broken project data propagate as a real error').",
@@ -97,7 +97,7 @@
       "id": "HR-006",
       "type": "process",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "title": "Enforce the commit body line limit in the commits check",
       "body": [
         "The `commits` check of `tools/kb.sh audit` tests the subject pattern and `body_absent` only; two controller commits with 190- and 227-character body lines passed the batch 2 audits as '9 commits checked'. Only the commit-msg hook catches it, for commits made after it was installed.",
@@ -115,7 +115,7 @@
       "id": "HR-007",
       "type": "chore",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "title": "Agent template and deliverables refinements from the batch 2 retrospective",
       "body": [
         "Deliverables schema (`template/.claude/schemas/deliverables.json` and the root copy): add an optional integer `exit` to `$defs.run`; the implementer template's Report section names it for every run whose exit code is evidence, and `output` stays verbatim (batch 2: exit codes were written into `output` as prose).",
@@ -134,7 +134,7 @@
       "id": "HR-008",
       "type": "feat",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "title": "Audit report-field checks over a workspace of task reports",
       "body": [
         "A branch has no single report, so the four report-field rows (deliverables-json, knowledge-first, dependency-vetting, verify-current-docs) come back `skipped` from `tools/kb.sh audit` and the branch reviewer judges them by hand from the task reports.",
@@ -150,7 +150,7 @@
       "id": "HR-009",
       "type": "bug",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "title": "Diff the audit range from the merge base",
       "body": [
         "`changedFiles` in `template/tools/kb.mjs` diffs `base..head`, so the pull-request audit (`.github/workflows/ci.yml`) sees unrelated files when main moves after the branch was cut. Inherited from tag-pilot's knowledge.yml.",
@@ -162,6 +162,56 @@
         "ci"
       ],
       "batch": 3
+    },
+    {
+      "id": "HR-010",
+      "type": "fix",
+      "milestone": null,
+      "status": "open",
+      "title": "Report an unreadable .houserules.json as a usage error",
+      "body": [
+        "`install` parses the stamp with raw `JSON.parse(readFileSync(markerPath))`; an unreadable `.houserules.json` escapes as a SyntaxError stack trace. `tests/init.test.mjs` (the test \"propagates an unreadable marker, which is a defect and not a usage error\") pins the current behavior until this item.",
+        "Fix: reuse `readJson` from `template/tools/lib/json-store.mjs` (it raises `UsageError` with `<path>: invalid JSON (...)`; the bin already imports from that module) and rewrite the pinning test the way HR-005 rewrote its predecessor.",
+        "Source: batch 3 task 1 review (2026-09-01); the branch review filed the missing item as its critical finding."
+      ],
+      "tags": [
+        "cli",
+        "errors"
+      ]
+    },
+    {
+      "id": "HR-011",
+      "type": "fix",
+      "milestone": null,
+      "status": "open",
+      "title": "Carry the git stderr in the no-merge-base usage error",
+      "body": [
+        "`gitDiff` in `template/tools/kb.mjs` reports every `git diff` failure as `no merge base between \"<base>\" and \"<head>\"` and discards the child stderr, so a different failure (a missing object in a shallow clone, repository corruption) is mislabeled and its diagnostic lost.",
+        "Fix: pipe the child stderr and include it in the `UsageError`, or use the no-merge-base text only when the stderr indicates it; sync the root copy; one test.",
+        "Deferred from batch 3 with the branch review’s reason: `rev` pre-validates both refs, so the remaining failure modes are exotic. Source: batch 3 branch review, minor 2 (2026-09-01)."
+      ],
+      "tags": [
+        "tools",
+        "audit",
+        "errors"
+      ]
+    },
+    {
+      "id": "HR-012",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "Dispatch-protocol bullets: a brief carries the spec, a dispatch carries changed templates",
+      "body": [
+        "Two additions to the orchestrating skill’s dispatch protocol (`template/.claude/skills/orchestrating/SKILL.md`, kit-owned, then `update --dir .`): a brief names every test and gate its spec task lists, verbatim or by pointer (batch 3 task 3’s brief dropped the seed-checkBase test and the gap cost a review round); when a batch edits an agent template, the dispatch message carries the changed instruction verbatim, because templates load at session start (batch 3’s branch review ran on the pre-branch template).",
+        "Consider seeding `process.brief-carries-the-spec` (added to the root knowledge at the batch 3 close) into `template/knowledge/process.json` in the same task.",
+        "Source: batch 3 branch review, template_defects 1 and 3 (2026-09-01)."
+      ],
+      "tags": [
+        "template",
+        "skills",
+        "dispatch"
+      ]
     }
   ]
 }
