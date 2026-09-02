@@ -439,7 +439,8 @@
         "schemas"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 8
     },
     {
       "id": "HR-026",
@@ -455,7 +456,8 @@
         "audit"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 8
     },
     {
       "id": "HR-027",
@@ -470,7 +472,8 @@
         "stamp"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 8
     },
     {
       "id": "HR-028",
@@ -485,7 +488,8 @@
         "stamp"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 8
     },
     {
       "id": "HR-029",
@@ -501,7 +505,8 @@
         "template"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 8
     },
     {
       "id": "HR-030",
@@ -517,7 +522,8 @@
         "agents"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 8
     }
   ]
 }
