@@ -22,3 +22,20 @@ describe('dogfood', () => {
     });
   });
 });
+
+describe('the deliverables schema copies', () => {
+  // .claude/schemas/deliverables.json is SEED_ONCE: update never writes it, so its
+  // root and template copies are hand-synced. `init` seeds the root copy once,
+  // rewriting every WI- occurrence to the project's id prefix (bin/houserules.mjs's
+  // PREFIXED rewrite); `update` skips it. That same rewrite is the exact pin: any
+  // other drift, a dropped or reformatted backlogId pattern included, fails the
+  // suite.
+  const SCHEMA_PATH = '.claude/schemas/deliverables.json';
+
+  it('equals its template source with the id prefix rewrite applied', () => {
+    const { idPrefix } = JSON.parse(read('.houserules.json'));
+    expect(read(SCHEMA_PATH)).toBe(
+      read(`template/${SCHEMA_PATH}`).replaceAll('WI-', `${idPrefix}-`),
+    );
+  });
+});
