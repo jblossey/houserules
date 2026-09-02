@@ -329,3 +329,12 @@ Each item records the ruling with its date, or stays marked open.
     and the kit skills — are the installed copy. Applied in
     `knowledge/houserules.json` (root-only topic); the summary is
     unchanged. Source: batch 5 branch review, stale_entries.
+16. **Anchored, widened trailer check — ruled 2026-09-02: yes.** The
+    `security-hygiene.no-coauthor` check grepped commit bodies for an
+    unanchored substring, so honest prose naming the trailer turned the
+    batch 6 branch audit red and forced a reword in task 4's self-review.
+    The check now anchors to real trailer lines and covers the session
+    trailer the harness also injects; the summary says both. Applied in
+    `knowledge/security-hygiene.json` and
+    `template/knowledge/security-hygiene.json`. Source: batch 6 branch
+    review, violated_rules and template_defects 3.
