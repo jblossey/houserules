@@ -338,3 +338,11 @@ Each item records the ruling with its date, or stays marked open.
     `knowledge/security-hygiene.json` and
     `template/knowledge/security-hygiene.json`. Source: batch 6 branch
     review, violated_rules and template_defects 3.
+17. **Before/after captures in process.tdd — ruled 2026-09-02: yes.**
+    Batch 6 twice fixed a change where no assertion can change (an
+    output-noise fix, a report-only round) and both re-reviews accepted
+    disclosed before/after captures as the honest evidence. The body of
+    `process.tdd` now names that form: captures of the observable
+    difference, presented in the order they ran. Applied in
+    `knowledge/process.json` and `template/knowledge/process.json`; the
+    summary is unchanged. Source: batch 6 branch review, violated_rules.
