@@ -65,6 +65,19 @@
         "state": "done",
         "text": "Done 2026-09-02: merged into main fast-forward after the branch review (fable: ready yes, zero issues). HR-010, HR-011, HR-012, HR-003 delivered; the T5 evaluation run produced the first blob-keyed record (docs-edit 3/3, dependency-add 5/5, seeded-violations 5/5). Sixteen findings over nine review rounds fixed; one reasoned deferral (HR-014). Retrospective: HR-015 to HR-018 filed; two standing-rule proposals await the owner (decisions notes)."
       }
+    },
+    {
+      "number": 5,
+      "items": [
+        "HR-013",
+        "HR-014"
+      ],
+      "summary": "The knowledge-migration skill for pre-existing codebases, and the settings.json read through readJson.",
+      "kickoff": "docs/specs/2026-09-02-batch-5-migration-skill.md",
+      "status": {
+        "state": "planned",
+        "text": "Spec approved on 2026-09-02; in progress on branch batch-5 — implementer on sonnet, task review on opus, branch review on fable."
+      }
     }
   ]
 }
