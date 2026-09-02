@@ -44,7 +44,7 @@
       "id": "knowledge-base.rules-need-a-loading-path",
       "kind": "rule",
       "area": "docs",
-      "summary": "Give every rule or invariant entry a loading path: `standing: true`, or an area whose globs match the files the rule governs.",
+      "summary": "Give every rule, invariant, or checked entry a loading path: `standing: true`, or an area whose globs match the files it governs.",
       "body": [
         "A non-standing entry in an area with empty globs (`global` and `process` in the seed) never loads with a file, renders into no rules file, and joins no audit package.",
         "After filing, run `tools/kb.sh for <a file the rule governs>` and confirm the entry appears.",
