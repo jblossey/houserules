@@ -284,7 +284,8 @@
         "audit"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 7
     },
     {
       "id": "HR-017",
@@ -299,7 +300,8 @@
         "template"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 7
     },
     {
       "id": "HR-018",
@@ -368,7 +370,8 @@
         "reviews"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 7
     },
     {
       "id": "HR-022",
@@ -384,7 +387,8 @@
         "stamp"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 7
     },
     {
       "id": "HR-023",
@@ -401,7 +405,8 @@
         "agents"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 7
     },
     {
       "id": "HR-024",
@@ -415,6 +420,23 @@
       "tags": [
         "tools",
         "audit"
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 7
+    },
+    {
+      "id": "HR-025",
+      "type": "test",
+      "title": "Pin the two SEED_ONCE deliverables schema copies in sync",
+      "body": [
+        "tests/dogfood.test.mjs pins every KIT_OWNED root copy byte-for-byte, but .claude/schemas/deliverables.json is SEED_ONCE: update never writes it, and its root and template copies are hand-synced. They differ only in the backlogId pattern (HR- vs WI-) by design.",
+        "Batch 7 hand-synced four new fields across both copies on manual diligence alone. Add a test that compares the copies modulo the known backlogId pattern difference, so a drift fails the suite.",
+        "Source: batch 7 task 3 review, controller note (2026-09-02)."
+      ],
+      "tags": [
+        "tests",
+        "schemas"
       ],
       "milestone": null,
       "status": "open"
