@@ -233,7 +233,8 @@
         "skills",
         "migration",
         "adoption"
-      ]
+      ],
+      "batch": 5
     },
     {
       "id": "HR-014",
@@ -249,7 +250,8 @@
       "tags": [
         "cli",
         "errors"
-      ]
+      ],
+      "batch": 5
     },
     {
       "id": "HR-015",
