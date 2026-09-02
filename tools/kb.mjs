@@ -670,18 +670,20 @@ function runCheck(entry, ctx) {
 }
 
 /**
- * Builds the rule package for a git range — every standing rule, plus every
- * rule or invariant in a touched or global area, plus any `--ids` addition —
- * runs each rule's deterministic check, and reports the result and whether
- * any check failed. `report` and `workspace` are exclusive: `report` names
- * one JSON deliverable a `report-field` check reads directly; `workspace`
- * names a directory of `task-<n>-report.json` files a `report-field` check
- * judges by each report's `files_changed`. `report`, `workspace`, and `json`
- * are paths resolved against `cwd` (default `process.cwd()`); the result
- * carries `area_files`, the changed files that pulled in each area. When the
- * range holds no commits, the summary gains `empty_range: true` and every
- * deterministic row's evidence is prefixed `empty range:`, so a vacuous
- * audit never reads as clean evidence.
+ * Builds the rule package for a git range — every standing rule, every rule
+ * or invariant in a touched or global area, every entry of any kind that
+ * carries a `check` in a touched or global area, plus any `--ids` addition
+ * — runs each member's deterministic check, and reports the result and
+ * whether any check failed. `report` and `workspace` are exclusive:
+ * `report` names one JSON deliverable a `report-field` check reads
+ * directly; `workspace` names a directory of `task-<n>-report.json` files
+ * a `report-field` check judges by each report's `files_changed`.
+ * `report`, `workspace`, and `json` are paths resolved against `cwd`
+ * (default `process.cwd()`); the result carries `area_files`, the changed
+ * files that pulled in each area. When the range holds no commits, the
+ * summary gains `empty_range: true` and every deterministic row's evidence
+ * is prefixed `empty range:`, so a vacuous audit never reads as clean
+ * evidence.
  */
 export function audit(
   base,
@@ -706,7 +708,11 @@ export function audit(
   const areas = Object.keys(areaFileMap).toSorted();
   const pkg = new Map();
   for (const e of base.entries.values()) {
-    if (e.standing || (RULE_KINDS.includes(e.kind) && areas.includes(e.area)))
+    if (
+      e.standing ||
+      (RULE_KINDS.includes(e.kind) && areas.includes(e.area)) ||
+      (e.check && areas.includes(e.area))
+    )
       pkg.set(e.id, e);
   }
   for (const id of ids) {
