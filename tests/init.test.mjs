@@ -177,6 +177,36 @@ describe('init', () => {
     expect(io.stderr).not.toContain('    at ');
     expect(io.stderr.trim().split('\n')).toHaveLength(1);
   });
+  it('reports a null settings.json as one usage error', () => {
+    const dir = makeTarget();
+    mkdirSync(join(dir, '.claude'), { recursive: true });
+    writeFileSync(join(dir, '.claude/settings.json'), 'null');
+    const io = capture();
+    expect(main(['init', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toMatch(/settings\.json: not a JSON object/);
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
+  it('reports an array settings.json as one usage error', () => {
+    const dir = makeTarget();
+    mkdirSync(join(dir, '.claude'), { recursive: true });
+    writeFileSync(join(dir, '.claude/settings.json'), '[]');
+    const io = capture();
+    expect(main(['init', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toMatch(/settings\.json: not a JSON object/);
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
+  it('reports a string settings.json as one usage error', () => {
+    const dir = makeTarget();
+    mkdirSync(join(dir, '.claude'), { recursive: true });
+    writeFileSync(join(dir, '.claude/settings.json'), '"nope"');
+    const io = capture();
+    expect(main(['init', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toMatch(/settings\.json: not a JSON object/);
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
   it('propagates a settings.json that cannot be read, which is a defect and not a usage error', () => {
     const dir = makeTarget();
     mkdirSync(join(dir, '.claude/settings.json'), { recursive: true });
