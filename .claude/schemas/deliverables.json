@@ -251,6 +251,9 @@
         "judged": {
           "type": "integer",
           "minimum": 0
+        },
+        "empty_range": {
+          "enum": [true]
         }
       }
     },

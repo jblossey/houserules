@@ -1018,6 +1018,7 @@ describe('audit', () => {
       skipped: 1,
       judged: 2,
     });
+    expect(result.summary).not.toHaveProperty('empty_range');
     const data = JSON.parse(readFileSync(json, 'utf8'));
     expect(data).toEqual(result);
     expect(data.ids).toEqual(['process.proc']);
@@ -1033,6 +1034,35 @@ describe('audit', () => {
       rust: ['crates/db/migrations.rs', 'crates/lib.rs'],
     });
     expect(data.rules).toHaveLength(8);
+  });
+  // HR-024: an audit whose range holds no commits used to read as clean
+  // evidence ('0 commits checked') instead of a vacuous one.
+  it('stamps a base==head audit as vacuous', () => {
+    const root = makeRepo(auditEntries());
+    const base = commit(root, 'chore: base');
+    const { result } = audit(loadBase(root), {
+      baseRef: base,
+      headRef: base,
+      ids: ['infra.a19', 'rust.judged'],
+    });
+    expect(result.summary.empty_range).toBe(true);
+    const deterministic = result.rules.filter(
+      (r) => r.mode === 'deterministic',
+    );
+    expect(deterministic.length).toBeGreaterThan(1);
+    expect(
+      deterministic.every((r) => r.evidence.startsWith('empty range: ')),
+    ).toBe(true);
+    expect(
+      result.rules.find((r) => r.id === 'process.commits').evidence,
+    ).toBe('empty range: 0 commits checked');
+    expect(result.rules.find((r) => r.id === 'infra.a19').evidence).toBe(
+      'empty range: not triggered',
+    );
+    expect(result.rules.find((r) => r.id === 'rust.judged')).toMatchObject({
+      mode: 'judged',
+      evidence: '—',
+    });
   });
   it('passes a clean range and reports report-field against a JSON report', () => {
     const root = makeRepo(auditEntries(), {
@@ -1309,7 +1339,9 @@ describe('audit', () => {
         check: { type: 'commits', level: 'warn', subject: '^ok: ' },
       }),
     ]);
-    const rows = audit(loadBase(root), { baseRef: 'HEAD' }).result.rules;
+    const base = commit(root, 'chore: base');
+    commit(root, 'ok: real commit', 'No trailer here.');
+    const rows = audit(loadBase(root), { baseRef: base }).result.rules;
     expect(rows.find((r) => r.id === 'process.bodyonly').result).toBe('pass');
     expect(rows.find((r) => r.id === 'process.subjectonly').result).toBe(
       'pass',
@@ -1363,7 +1395,9 @@ describe('audit', () => {
         },
       }),
     ]);
-    const rows = audit(loadBase(root), { baseRef: 'HEAD' }).result.rules;
+    const base = commit(root, 'chore: base');
+    commit(root, 'chore: unrelated');
+    const rows = audit(loadBase(root), { baseRef: base }).result.rules;
     expect(rows[0]).toMatchObject({
       id: 'process.reportcheck',
       result: 'pass',
@@ -1973,6 +2007,75 @@ describe('validate', () => {
       kind: 'task-report',
       errors: [],
     });
+  });
+  // HR-024: self_audit.summary is a verbatim copy of the audit tool's own
+  // summary output, so the schema must accept the field the tool now
+  // stamps on an empty range.
+  it('accepts a self_audit summary stamped empty_range: true', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...REPORT,
+        self_audit: {
+          summary: {
+            base: 'abc1234',
+            head: 'abc1234',
+            deterministic: 1,
+            pass: 1,
+            fail: 0,
+            warn: 0,
+            skipped: 0,
+            judged: 0,
+            empty_range: true,
+          },
+          rows: [
+            {
+              id: 'process.sequential',
+              mode: 'deterministic',
+              result: 'pass',
+              evidence: 'empty range: 0 commits checked',
+            },
+          ],
+        },
+      }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([]);
+  });
+  it('rejects a self_audit summary with empty_range: false', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...REPORT,
+        self_audit: {
+          summary: {
+            base: 'abc1234',
+            head: 'abc1235',
+            deterministic: 1,
+            pass: 1,
+            fail: 0,
+            warn: 0,
+            skipped: 0,
+            judged: 0,
+            empty_range: false,
+          },
+          rows: [
+            {
+              id: 'process.sequential',
+              mode: 'deterministic',
+              result: 'pass',
+              evidence: '1 commits checked',
+            },
+          ],
+        },
+      }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([
+      `${file}.self_audit.summary.empty_range: must be one of true`,
+    ]);
   });
   it('reports a bad enum value and an unknown field', () => {
     const root = makeRepo();

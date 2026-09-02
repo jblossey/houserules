@@ -96,21 +96,30 @@ function writeInto(target, file, content) {
 }
 
 /**
+ * Reads and parses `path` as JSON, requiring the result to be a plain
+ * object: not `null`, a string, a number, a boolean, or an array. Raises
+ * `UsageError('<path>: not a JSON object')` for any other shape. `readJson`
+ * itself raises `UsageError` for invalid JSON and a plain `Error` when the
+ * file cannot be read.
+ */
+function readJsonObject(path) {
+  const value = readJson(path);
+  if (value === null || typeof value !== 'object' || Array.isArray(value))
+    throw new UsageError(`${path}: not a JSON object`);
+  return value;
+}
+
+/**
  * Merges the template's SessionStart hooks into an existing settings.json,
  * appending only entries whose `matcher` is not already present. Returns
- * true when the merge changed the file. The target's settings.json throws
- * `UsageError` for invalid JSON or for JSON that is not a plain object
- * (`null`, a string, a number, a boolean, an array); a settings.json that
- * cannot be read propagates as a plain `Error`.
+ * true when the merge changed the file.
  */
 function mergeSettings(target) {
   const path = join(target, '.claude/settings.json');
   const template = JSON.parse(
     readFileSync(join(TEMPLATE_DIR, '.claude/settings.json'), 'utf8'),
   );
-  const settings = readJson(path);
-  if (settings === null || typeof settings !== 'object' || Array.isArray(settings))
-    throw new UsageError(`${path}: not a JSON object`);
+  const settings = readJsonObject(path);
   settings.hooks ??= {};
   settings.hooks.SessionStart ??= [];
   const matchers = new Set(settings.hooks.SessionStart.map((e) => e.matcher));
@@ -182,7 +191,7 @@ function install(io, opts, { seed }, cwd) {
     }
   }
   const markerPath = join(target, '.houserules.json');
-  const marker = existsSync(markerPath) ? readJson(markerPath) : { idPrefix: prefix };
+  const marker = existsSync(markerPath) ? readJsonObject(markerPath) : { idPrefix: prefix };
   writeFileSync(markerPath, emit({ version: VERSION, idPrefix: marker.idPrefix ?? prefix }));
   io.out(renderIn(target));
   io.out(`houserules: ${seed ? 'initialized' : 'updated'} ${target}\n`);
