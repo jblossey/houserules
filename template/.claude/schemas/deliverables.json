@@ -70,6 +70,7 @@
       "type": "object",
       "required": [
         "test",
+        "mode",
         "red",
         "green"
       ],
@@ -77,6 +78,13 @@
       "properties": {
         "test": {
           "$ref": "#/$defs/text"
+        },
+        "mode": {
+          "enum": [
+            "natural",
+            "mutation",
+            "reconstructed"
+          ]
         },
         "red": {
           "$ref": "#/$defs/run"
@@ -380,6 +388,7 @@
         "implemented",
         "commits",
         "tests",
+        "live_run",
         "tdd",
         "files_changed",
         "docs_verified",
@@ -425,6 +434,12 @@
           }
         },
         "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/run"
+          }
+        },
+        "live_run": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/run"
@@ -708,6 +723,9 @@
             },
             "open": {
               "$ref": "#/$defs/textList"
+            },
+            "text": {
+              "$ref": "#/$defs/text"
             }
           }
         }

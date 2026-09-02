@@ -20,7 +20,7 @@ The report is a set of unverified claims. Verify each against the diff. A ration
 ## Rule adherence (mandatory)
 
 1. Run `tools/kb.sh get <Knowledge ids>` and `tools/kb.sh validate <REPORT_FILE>`.
-2. Run `tools/kb.sh audit --base <BASE> --head <HEAD> --ids <ids, comma-separated> --report <REPORT_FILE> --json <AUDIT_JSON>` (re-review: `--base <FIX_BASE>`).
+2. Run `tools/kb.sh audit --base <BASE> --head <HEAD> --ids <ids, comma-separated> --report <REPORT_FILE> --json <AUDIT_JSON>` (re-review: `--base <FIX_BASE>`). Refuse to run the audit without `--ids` when the dispatch's `Knowledge:` list is non-empty; record the refusal in the review (`assessment.text`, or `verdict.text` in a re-review) instead of running a narrowed package.
 3. Judge every `open` row against the diff and the report: set its `result` to `pass` or `fail` with `file:line` or report evidence. `rule_adherence` in your review holds every audit row, judged rows included; the schema rejects `open`.
 4. File every `fail` under `issues` with `rule` set: a standing rule is `critical`; an area rule is `important`; a `warn` is `minor` unless the damage is worse. A `skipped` row, or a dispatch without a `Backlog:` line, is a finding against the dispatch, not the implementer.
 5. Compare the report's `self_audit.rows` with the audit: an omitted or altered row is a finding.
@@ -35,4 +35,4 @@ Write `REVIEW_FILE` as JSON: kind `task-review` (re-review: `re-review`); schema
 
 Task review fields: `task`, `base`, `head`, `spec_compliance` (`verdict`: `compliant` | `issues` | `cannot-verify`; `items`: `type` `missing` | `extra` | `misunderstood` | `unverifiable`, `file`, `text`), `rule_adherence`, `strengths`, `issues` (each: `severity`, `file`, `what`, `why`, `fix`, optional `rule`, `plan_mandated`, `backlog`), `assessment` (`verdict`: `approved` | `needs-fixes`; `text`).
 
-Re-review fields: `task`, `round`, `fix_base`, `head`, `finding_verdicts` (`finding`, `verdict`: `addressed` | `not-addressed` — "attempted" is not addressed; `evidence` with `file:line`), `rule_adherence` (the fix-diff audit, judged), `new_breakage` (issues), `out_of_scope`, `verdict` (`state`: `all-addressed` | `findings-remain`; `open`).
+Re-review fields: `task`, `round`, `fix_base`, `head`, `finding_verdicts` (`finding`, `verdict`: `addressed` | `not-addressed` — "attempted" is not addressed; `evidence` with `file:line`), `rule_adherence` (the fix-diff audit, judged), `new_breakage` (issues), `out_of_scope`, `verdict` (`state`: `all-addressed` | `findings-remain`; `open`; optional `text`). `open` lists only prior findings still unaddressed; a newly introduced issue goes in `new_breakage`, never restated in `open`; a status sentence or a scheduled-elsewhere note goes in `verdict.text`, never in `open`.
