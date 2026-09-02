@@ -22,7 +22,8 @@ houserules installs, into your project's own repository:
 - **An agent layer**: three agent templates (`implementer`, `task-reviewer`,
   `branch-reviewer`) with rule-adherence audits and a JSON deliverables
   contract (`.claude/schemas/deliverables.json`), an `orchestrating` skill,
-  a `finishing-a-feature` skill, a SessionStart hook, and eval scenarios.
+  a `finishing-a-feature` skill, a `migrating-knowledge` skill, a
+  SessionStart hook, and eval scenarios.
 - **Seed rules**: a generic standing-rule set (TDD, conventional commits,
   ff-only merges, sequential agents, no tech debt, dependency vetting, exact
   pins, doc comments, ASD-STE100 writing style, and more). Your project adds
@@ -65,7 +66,8 @@ node ~/projects/houserules/bin/houserules.mjs init --id-prefix ABC
 Then move your real rules in: add topics as `knowledge/<topic>.json`, extend
 the `area` enum in `knowledge/schema.json` together with the globs in
 `knowledge/areas.json`, replace the example backlog item, and run
-`tools/kb.sh render`.
+`tools/kb.sh render`. The `migrating-knowledge` skill walks that move step
+by step, from inventory to entries to gates.
 
 ## Update an existing installation
 
@@ -80,7 +82,7 @@ project data. `node bin/houserules.mjs files` prints the ownership manifest:
 |---|---|
 | `tools/` CLIs, wrappers, session hook | `knowledge/` schema, areas, topics |
 | `.claude/agents/*.md` | `backlog/` schema and data |
-| `.claude/skills/orchestrating`, `finishing-a-feature` | `.claude/schemas/deliverables.json`, evals |
+| `.claude/skills/orchestrating`, `finishing-a-feature`, `migrating-knowledge` | `.claude/schemas/deliverables.json`, evals |
 | | `.github/workflows/knowledge.yml`, `CLAUDE.md`, settings |
 
 Do not hand-edit kit-owned files or the generated `.claude/rules/*.md` and

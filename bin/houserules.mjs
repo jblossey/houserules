@@ -39,6 +39,7 @@ export const KIT_OWNED = [
   '.claude/agents/branch-reviewer.md',
   '.claude/skills/orchestrating/SKILL.md',
   '.claude/skills/finishing-a-feature/SKILL.md',
+  '.claude/skills/migrating-knowledge/SKILL.md',
 ];
 
 /**

@@ -62,6 +62,7 @@ describe('manifest', () => {
     expect(KIT_OWNED).toContain('tools/kb.mjs');
     expect(KIT_OWNED).toContain('.claude/agents/implementer.md');
     expect(KIT_OWNED).toContain('.claude/skills/orchestrating/SKILL.md');
+    expect(KIT_OWNED).toContain('.claude/skills/migrating-knowledge/SKILL.md');
     expect(SEED_ONCE).toContain('knowledge/schema.json');
     expect(SEED_ONCE).toContain('backlog/schema.json');
     expect(SEED_ONCE).toContain('.claude/schemas/deliverables.json');
