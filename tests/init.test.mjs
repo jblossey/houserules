@@ -167,13 +167,28 @@ describe('init', () => {
     expect(main(['init'], capture(), dir)).toBe(0);
     expect(existsSync(join(dir, 'tools/kb.mjs'))).toBe(true);
   });
-  it('reports an unreadable settings.json as a usage error', () => {
+  it('reports invalid settings.json as one usage error', () => {
     const dir = makeTarget();
     mkdirSync(join(dir, '.claude'), { recursive: true });
     writeFileSync(join(dir, '.claude/settings.json'), '{');
     const io = capture();
     expect(main(['init', '--dir', dir], io)).toBe(2);
-    expect(io.stderr).toContain('settings.json');
+    expect(io.stderr).toMatch(/settings\.json: invalid JSON/);
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
+  it('propagates a settings.json that cannot be read, which is a defect and not a usage error', () => {
+    const dir = makeTarget();
+    mkdirSync(join(dir, '.claude/settings.json'), { recursive: true });
+    let caught;
+    try {
+      main(['init', '--dir', dir], capture());
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).not.toBeInstanceOf(UsageError);
+    expect(caught.message).toMatch(/EISDIR/);
   });
   it('reports a render failure on broken project data as one usage error', () => {
     const dir = makeTarget();
