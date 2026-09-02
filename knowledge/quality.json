@@ -22,6 +22,21 @@
       "tags": ["quality"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "see": ["process.no-tech-debt", "security-hygiene.dependency-vetting"]
+    },
+    {
+      "id": "quality.no-compat-softening",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Never soften a design for backward compatibility. Make the correct change and migrate everything it breaks; the codebase is not built on compromises.",
+      "body": [
+        "When a better contract, field, or shape exists, adopt it and update every consumer, fixture, report, and document in the same change.",
+        "Do not keep a deprecated field, alias, fallback, or optional-for-compat setting alive for old callers; the migration is part of the change, not a later batch.",
+        "A genuinely optional concept stays optional on its merits; optionality is never a compatibility device."
+      ],
+      "tags": ["quality", "compatibility"],
+      "source": { "date": "2026-09-02", "by": "user", "ref": "owner instruction of 2026-09-02, batch 7" },
+      "see": ["process.no-tech-debt"]
     }
   ]
 }

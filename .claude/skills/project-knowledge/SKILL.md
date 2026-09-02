@@ -26,6 +26,7 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 - [process.rulings-to-file] Every ruling goes to its home file in the same turn — a deferral’s backlog item included. A ledger and the chat are not home files; neither survives compaction.
 - [process.sequential-agents] Run all agent work strictly sequentially. Never dispatch two implementers or two reviewers at the same time.
 - [process.tdd] Test-driven development for every executable change: the failing test first, or a disclosed-mutation proof for already-correct behavior; verbatim RED and GREEN.
+- [quality.no-compat-softening] Never soften a design for backward compatibility. Make the correct change and migrate everything it breaks; the codebase is not built on compromises.
 - [quality.principles] YAGNI, KISS, DRY; prefer a well-maintained library to custom code; one responsibility per unit; tests assert behavior; a11y and i18n are part of done.
 - [security-hygiene.dependency-vetting] Verify every new dependency is well-maintained before adding it. Record the check in the task report's `dependency_vetting` field.
 - [security-hygiene.exact-pins] Pin exact versions. Install only with a CLI (`pnpm add --save-exact`, `cargo add <crate>@=<version>`). Never write a version number by hand.
@@ -47,6 +48,6 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 houserules  10  Working in the houserules kit repository
 knowledge-base  4  Authoring knowledge entries
 process  18  How work runs: batches, dispatch, reviews, rulings
-quality  1  Quality principles
+quality  2  Quality principles
 security-hygiene  5  Dependency, commit, and test hygiene
 writing-style  3  Writing style for docs, comments, commits, reports
