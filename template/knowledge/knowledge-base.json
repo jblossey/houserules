@@ -7,7 +7,7 @@
       "id": "knowledge-base.summary-is-the-rule",
       "kind": "rule",
       "area": "docs",
-      "summary": "An entry's `summary` states the rule or fact in one sentence; `body` states why, how, and the exceptions. No time-sensitive phrasing in a summary.",
+      "summary": "The `summary` states the rule in one sentence; `body` carries why, how, exceptions; examples in docs and skills model this split. No time-sensitive phrasing.",
       "body": [
         "Dates live in `source.date` and in `kind: history` entries linked by `see`.",
         "The summary is the only text that renders into rule files and indexes."
@@ -20,7 +20,7 @@
       "id": "knowledge-base.state-only-the-source",
       "kind": "rule",
       "area": "docs",
-      "summary": "An entry states only what its source states; verify polarity and numbers against the code before filing it; never add an instruction the source did not give.",
+      "summary": "State only what the source states; verify polarity, counts, and mechanisms against the code before filing an entry or shipping teaching prose.",
       "body": [
         "Invented claims read plausibly; that is what makes them dangerous.",
         "When two sources disagree, read the code and record which one the entry follows."

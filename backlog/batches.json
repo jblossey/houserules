@@ -75,8 +75,8 @@
       "summary": "The knowledge-migration skill for pre-existing codebases, and the settings.json read through readJson.",
       "kickoff": "docs/specs/2026-09-02-batch-5-migration-skill.md",
       "status": {
-        "state": "planned",
-        "text": "Spec approved on 2026-09-02; in progress on branch batch-5 — implementer on sonnet, task review on opus, branch review on fable."
+        "state": "done",
+        "text": "Done 2026-09-02: merged into main fast-forward after the branch review (fable: with-fixes; both findings fixed in-branch). HR-013, HR-014 delivered: the migrating-knowledge skill (KIT_OWNED +1) and settings.json through readJson. Twelve task findings over five review rounds plus two branch findings fixed; zero deferrals. Retrospective: HR-019 to HR-021 filed; one standing-rule proposal awaits the owner (ruling 15)."
       }
     }
   ]

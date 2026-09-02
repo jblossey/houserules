@@ -54,7 +54,7 @@
       "id": "houserules.live-run-recipe",
       "kind": "procedure",
       "area": "cli",
-      "summary": "Live-run every CLI change in a scratch `git init` repository: `init --dir <scratch>`, both checks there, each gate’s output as its own report entry.",
+      "summary": "Live-run every CLI change in a scratch `git init` repo: `init --dir <scratch>`, both checks inside the scratch; each gate is its own report entry with `exit`.",
       "body": [
         "Scratch repositories live under the session scratchpad, never inside this repository and never in tag-pilot. Run `tools/kb.sh check` and `tools/backlog.sh check` there and record each command’s verbatim output as its own report tests entry (batch 3 task 3 recorded only one of a chained pair).",
         "`pnpm dlx git+file://<this clone> files` exercises the published path (pnpm's bin shim execs the real file); `node <scratch>/node_modules/houserules/bin/houserules.mjs files` after `pnpm add --save-exact git+file://<this clone>` exercises the symlinked path (HR-001).",
@@ -184,6 +184,29 @@
         "by": "review",
         "ref": "batch 3 task 1 review, critical 2; task-1-report.json docs_verified"
       }
+    },
+    {
+      "id": "houserules.readme-mirrors-kit-owned",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "When `KIT_OWNED` gains or loses a path, update README's agent-layer bullet and ownership table in the same commit.",
+      "body": [
+        "README.md enumerates the kit-owned skills twice: the agent-layer bullet and the ownership-manifest table.",
+        "No test pins these enumerations; batch 5's task 1 review caught both stale after KIT_OWNED grew. A co-change check would misfire (bin changes without README constantly), so the rule stays judged."
+      ],
+      "tags": [
+        "readme",
+        "kit-owned"
+      ],
+      "source": {
+        "date": "2026-09-02",
+        "by": "review",
+        "ref": "batch 5 task 1 review, finding 3"
+      },
+      "verify": [
+        "README.md",
+        "bin/houserules.mjs"
+      ]
     }
   ]
 }
