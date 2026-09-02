@@ -325,6 +325,26 @@ describe('update marker', () => {
     expect(caught).not.toBeInstanceOf(UsageError);
     expect(caught.message).toMatch(/EISDIR/);
   });
+  it('reports a null stamp file as one usage error', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    writeFileSync(join(dir, '.houserules.json'), 'null');
+    const io = capture();
+    expect(main(['update', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toMatch(/\.houserules\.json: not a JSON object/);
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
+  it('reports a string stamp file as one usage error', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    writeFileSync(join(dir, '.houserules.json'), '"nope"');
+    const io = capture();
+    expect(main(['update', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toMatch(/\.houserules\.json: not a JSON object/);
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
 });
 
 describe('main', () => {

@@ -678,7 +678,10 @@ function runCheck(entry, ctx) {
  * names a directory of `task-<n>-report.json` files a `report-field` check
  * judges by each report's `files_changed`. `report`, `workspace`, and `json`
  * are paths resolved against `cwd` (default `process.cwd()`); the result
- * carries `area_files`, the changed files that pulled in each area.
+ * carries `area_files`, the changed files that pulled in each area. When the
+ * range holds no commits, the summary gains `empty_range: true` and every
+ * deterministic row's evidence is prefixed `empty range:`, so a vacuous
+ * audit never reads as clean evidence.
  */
 export function audit(
   base,
@@ -745,6 +748,9 @@ export function audit(
   );
   const det = rows.filter((r) => r.mode === 'deterministic');
   const count = (result) => det.filter((r) => r.result === result).length;
+  const emptyRange = ctx.commits().length === 0;
+  if (emptyRange)
+    for (const row of det) row.evidence = `empty range: ${row.evidence}`;
   const summary = {
     base: baseSha,
     head: headSha,
@@ -754,6 +760,7 @@ export function audit(
     warn: count('warn'),
     skipped: count('skipped'),
     judged: rows.length - det.length,
+    ...(emptyRange ? { empty_range: true } : {}),
   };
   const result = {
     base: baseSha,
