@@ -1035,6 +1035,52 @@ describe('audit', () => {
     });
     expect(data.rules).toHaveLength(8);
   });
+  // HR-026: a check needs an audit loading path of its own; an area match
+  // must admit a checked entry of any kind, not only rule and invariant.
+  it('joins a checked procedure entry when its area is touched', () => {
+    const root = makeRepo(
+      [
+        entry({
+          id: 'infra.checked-proc',
+          kind: 'procedure',
+          area: 'infra',
+          standing: false,
+          summary: 'A checked procedure.',
+          check: {
+            type: 'report-field',
+            level: 'warn',
+            if: '**',
+            field: 'live_run',
+          },
+        }),
+      ],
+      { 'tools/x.txt': 'a\n' },
+    );
+    const base = commit(root, 'chore: base');
+    write(root, 'tools/x.txt', 'b\n');
+    commit(root, 'feat: touch infra');
+    const rows = audit(loadBase(root), { baseRef: base }).result.rules;
+    expect(rows.map((r) => r.id)).toContain('infra.checked-proc');
+  });
+  it('still excludes an unchecked procedure entry even when its area is touched', () => {
+    const root = makeRepo(
+      [
+        entry({
+          id: 'infra.unchecked-proc',
+          kind: 'procedure',
+          area: 'infra',
+          standing: false,
+          summary: 'An unchecked procedure.',
+        }),
+      ],
+      { 'tools/x.txt': 'a\n' },
+    );
+    const base = commit(root, 'chore: base');
+    write(root, 'tools/x.txt', 'b\n');
+    commit(root, 'feat: touch infra');
+    const rows = audit(loadBase(root), { baseRef: base }).result.rules;
+    expect(rows.map((r) => r.id)).not.toContain('infra.unchecked-proc');
+  });
   // HR-024: an audit whose range holds no commits used to read as clean
   // evidence ('0 commits checked') instead of a vacuous one.
   it('stamps a base==head audit as vacuous', () => {

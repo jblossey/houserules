@@ -48,7 +48,7 @@
       "body": [
         "A non-standing entry in an area with empty globs (`global` and `process` in the seed) never loads with a file, renders into no rules file, and joins no audit package.",
         "After filing, run `tools/kb.sh for <a file the rule governs>` and confirm the entry appears.",
-        "A `check` needs an audit loading path too: the package builder admits standing entries and area-matched rule or invariant kinds only, so a check on a procedure entry fires only via `--ids` until HR-026 widens the builder (batch 7 branch review)."
+        "A `check` needs an audit loading path too: it joins the package when its entry is `standing`, sits in a touched or global area (any kind, not only rule and invariant), or is named in `--ids`."
       ],
       "tags": ["knowledge", "authoring", "areas", "standing"],
       "source": { "date": "2026-09-02", "by": "review", "ref": "batch 5 branch review, issue 1" },

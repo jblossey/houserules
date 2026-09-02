@@ -155,9 +155,13 @@ function renderIn(target) {
 }
 
 /**
- * Installs the setup into `target`: kit-owned files always, seed-once files
- * only when `seed` is set and the file is absent. Renders the generated
- * markdown afterwards and stamps `.houserules.json`.
+ * Installs the setup into `target`. Reads and validates the existing
+ * `.houserules.json` stamp before writing anything, so a corrupt stamp
+ * leaves `target` untouched: raises `UsageError` when the stamp is not a
+ * JSON object, or when its `idPrefix` is present but is not a non-empty
+ * string. Then writes kit-owned files always, seed-once files only when
+ * `seed` is set and the file is absent, restamps `.houserules.json`, and
+ * renders the generated markdown.
  */
 function install(io, opts, { seed }, cwd) {
   const target = resolve(cwd, typeof opts.dir === 'string' ? opts.dir : '.');
@@ -166,6 +170,13 @@ function install(io, opts, { seed }, cwd) {
   const prefix = typeof opts['id-prefix'] === 'string' ? opts['id-prefix'] : 'WI';
   if (!/^[A-Z][A-Z0-9]{0,7}$/.test(prefix))
     throw new UsageError('id-prefix must be 1-8 characters, A-Z then A-Z0-9');
+  const markerPath = join(target, '.houserules.json');
+  const marker = existsSync(markerPath) ? readJsonObject(markerPath) : { idPrefix: prefix };
+  if (
+    marker.idPrefix !== undefined &&
+    (typeof marker.idPrefix !== 'string' || marker.idPrefix === '')
+  )
+    throw new UsageError(`${markerPath}: invalid idPrefix`);
   for (const file of KIT_OWNED) {
     writeInto(target, file, templateContent(file, prefix));
     io.out(`wrote ${file}\n`);
@@ -190,8 +201,6 @@ function install(io, opts, { seed }, cwd) {
       io.out('wrote .claude/settings.json\n');
     }
   }
-  const markerPath = join(target, '.houserules.json');
-  const marker = existsSync(markerPath) ? readJsonObject(markerPath) : { idPrefix: prefix };
   writeFileSync(markerPath, emit({ version: VERSION, idPrefix: marker.idPrefix ?? prefix }));
   io.out(renderIn(target));
   io.out(`houserules: ${seed ? 'initialized' : 'updated'} ${target}\n`);

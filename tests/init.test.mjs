@@ -345,6 +345,55 @@ describe('update marker', () => {
     expect(io.stderr).not.toContain('    at ');
     expect(io.stderr.trim().split('\n')).toHaveLength(1);
   });
+  it('reports a numeric idPrefix in the stamp as one usage error', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    writeFileSync(
+      join(dir, '.houserules.json'),
+      '{"version":"0.0.1","idPrefix":3}',
+    );
+    const io = capture();
+    expect(main(['update', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toMatch(/\.houserules\.json: invalid idPrefix/);
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
+  it('reports an empty-string idPrefix in the stamp as one usage error', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    writeFileSync(
+      join(dir, '.houserules.json'),
+      '{"version":"0.0.1","idPrefix":""}',
+    );
+    const io = capture();
+    expect(main(['update', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toMatch(/\.houserules\.json: invalid idPrefix/);
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
+  it('leaves kit-owned files untouched when update fails on invalid JSON in the stamp', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    writeFileSync(join(dir, 'tools/kb.mjs'), '// clobbered\n');
+    writeFileSync(join(dir, '.houserules.json'), '{');
+    expect(main(['update', '--dir', dir], capture())).toBe(2);
+    expect(readFileSync(join(dir, 'tools/kb.mjs'), 'utf8').slice(0, 32)).toBe(
+      '// clobbered\n',
+    );
+  });
+  it('leaves kit-owned files untouched when update fails on an invalid idPrefix in the stamp', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    writeFileSync(join(dir, 'tools/kb.mjs'), '// clobbered\n');
+    writeFileSync(
+      join(dir, '.houserules.json'),
+      '{"version":"0.0.1","idPrefix":3}',
+    );
+    expect(main(['update', '--dir', dir], capture())).toBe(2);
+    expect(readFileSync(join(dir, 'tools/kb.mjs'), 'utf8').slice(0, 32)).toBe(
+      '// clobbered\n',
+    );
+  });
 });
 
 describe('main', () => {
