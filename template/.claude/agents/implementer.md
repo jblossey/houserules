@@ -29,7 +29,24 @@ You implement exactly one task of an implementation plan. Your task message name
 
 ## Report
 
-`REPORT_FILE` is JSON of kind `task-report`; the schema is `.claude/schemas/deliverables.json` (`$defs.taskReport`). Fill every required field: `task`, `backlog`, `status`, `implemented`, `commits` (`sha`, `subject`), `tests` (one literal, re-runnable `command` per entry: real paths, pinned SHAs, no `;` or `|`; with its verbatim `output`, and `exit` whenever the exit code is evidence — a rejected commit, a usage error; the suite, lint, and audit runs stay here, not the live-run commands), `live_run` (the commands that ran the change for real, each its own entry with `exit`: the app, service, or tool exercised the way a user runs it, following the project's live-run procedure from your `Knowledge:` ids; `[]` only for a docs-only task whose live evidence is the gates), `tdd` (per test: `test`, `red`, `green`, each with the verbatim `command` and `output`, and `mode` — `natural` only when the shown red is a genuine pre-commit run, `mutation` for a disclosed-mutation proof, `reconstructed` for a cycle captured or assembled after the fact), `files_changed`, `docs_verified` (`api`, `source`; `[]` when you verified nothing), `dependency_vetting` (an object with `manifests` and `dependencies` whenever a dependency manifest or lockfile changed — `dependencies: []` when none is new; `null` otherwise; each dependency: `name`, `version`, `evidence` of maintenance, `verdict`), `coverage` (one measure per target whenever the project has a coverage gate and the full suite ran, so the batch keeps a baseline: `target`, `metric`, `measured`, `floor`; `null` only when the suite did not run), `self_audit` (`null` until the next step), `self_review`, `concerns`, `knowledge_used` (the ids you relied on).
+`REPORT_FILE` is JSON of kind `task-report`; the schema is `.claude/schemas/deliverables.json` (`$defs.taskReport`). Fill every required field:
+
+- `task`.
+- `backlog`.
+- `status`.
+- `implemented`.
+- `commits` (`sha`, `subject`).
+- `tests` (one literal, re-runnable `command` per entry: real paths, pinned SHAs, no `;` or `|`; with its verbatim `output`, and `exit` whenever the exit code is evidence — a rejected commit, a usage error; the suite, lint, and audit runs stay here, not the live-run commands).
+- `live_run` (the commands that ran the change for real, each its own entry with `exit`: the app, service, or tool exercised the way a user runs it, following the project's live-run procedure from your `Knowledge:` ids; `[]` only for a docs-only task whose live evidence is the gates).
+- `tdd` (per test: `test`, `red`, `green`, each with the verbatim `command` and `output`, and `mode` — `natural` only when the shown red is a genuine pre-commit run, `mutation` for a disclosed-mutation proof, `reconstructed` for a cycle captured or assembled after the fact).
+- `files_changed`.
+- `docs_verified` (`api`, `source`; `[]` when you verified nothing).
+- `dependency_vetting` (an object with `manifests` and `dependencies` whenever a dependency manifest or lockfile changed — `dependencies: []` when none is new; `null` otherwise; each dependency: `name`, `version`, `evidence` of maintenance, `verdict`).
+- `coverage` (one measure per target whenever the project has a coverage gate and the full suite ran, so the batch keeps a baseline: `target`, `metric`, `measured`, `floor`; `null` only when the suite did not run).
+- `self_audit` (`null` until the next step).
+- `self_review`.
+- `concerns`.
+- `knowledge_used` (the ids you relied on).
 
 ## Before answering: validate, self-audit, self-review
 
