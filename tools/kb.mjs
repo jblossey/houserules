@@ -139,6 +139,9 @@ function globToRegExp(glob) {
  * package. globMatch tries `matchesGlob` first and falls back to
  * `globToRegExp` only when it returns false, so every glob `matchesGlob`
  * already matched still matches, and dot-segment globs now match too.
+ * A glob that combines `?`, a bracket class, or a brace list with a
+ * dot-segment crossing matches neither engine: write area and check globs
+ * with `**`, `*`, and literals, or extend `globToRegExp` first.
  */
 function globMatch(path, glob) {
   return matchesGlob(path, glob) || globToRegExp(glob).test(path);
