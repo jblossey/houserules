@@ -37,6 +37,20 @@
       "tags": ["quality", "compatibility"],
       "source": { "date": "2026-09-02", "by": "user", "ref": "owner instruction of 2026-09-02, batch 7" },
       "see": ["process.no-tech-debt"]
+    },
+    {
+      "id": "quality.pin-copies-byte-exact",
+      "kind": "rule",
+      "area": "tests",
+      "summary": "Pin a hand-synced copy byte-exact modulo its one designed difference, expressed as the production transform; never normalize by deleting the differing field.",
+      "body": [
+        "Deleting the differing property from both sides pins the copies modulo the property, not modulo its value: a dropped field, whitespace drift, or key reordering still passes (batch 8 task 1, round 0).",
+        "Assert copyA equals transform(copyB) with the transform the production code applies (batch 8: the id-prefix replaceAll), so the test and the shipped rewrite cannot drift apart.",
+        "When the copies are already in sync, prove the test can fail with a disclosed mutation and label the cycle mode mutation."
+      ],
+      "tags": ["tests", "sync"],
+      "source": { "date": "2026-09-02", "by": "review", "ref": "batch 8 branch review, uncovered finding 1" },
+      "verify": ["tests/dogfood.test.mjs"]
     }
   ]
 }

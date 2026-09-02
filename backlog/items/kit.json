@@ -439,7 +439,7 @@
         "schemas"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 8
     },
     {
@@ -456,7 +456,7 @@
         "audit"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 8
     },
     {
@@ -472,7 +472,7 @@
         "stamp"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 8
     },
     {
@@ -488,7 +488,7 @@
         "stamp"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 8
     },
     {
@@ -505,7 +505,7 @@
         "template"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 8
     },
     {
@@ -522,7 +522,7 @@
         "agents"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 8
     },
     {
@@ -553,6 +553,38 @@
       "tags": [
         "tests",
         "evals"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-033",
+      "type": "fix",
+      "title": "implementer.md's tdd bullet carries the timing-key example inline",
+      "body": [
+        "Ruling 18's first enforcement cost a Critical, a sanctioned amend, and a fix round: the batch 8 task 4 implementer re-ran the RED against checked-out pre-fix code after the fix existed and read the natural label as a statement about code state, not chronology.",
+        "Add the decisive example inline to the template's tdd bullet: a RED re-captured against pre-fix code after the fix exists is reconstructed; natural is chronology, not code state. Changing implementer.md triggers process.evals-rerun; schedule with the next template batch.",
+        "Source: batch 8 branch review, template_defects 2 (2026-09-02)."
+      ],
+      "tags": [
+        "template",
+        "agents"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-034",
+      "type": "fix",
+      "title": "The dispatch protocol states that --ids IS the Knowledge list",
+      "body": [
+        "Task-brief boilerplate carries a hand-filled --ids line nothing pins to the dispatch's Knowledge list; the batch 8 task 5 brief shipped the T3/T4 cli ids into a data-only task and only the implementer's cross-check caught it. The retrieval protocol implies the equality but never states it.",
+        "State it in the orchestrating skill's dispatch section and in the retrieval protocol text in template/tools/kb.mjs: the audit --ids value IS the dispatch's Knowledge list, generated from it, never typed separately. Add one skill sentence requiring a ledger line for every guard-caught controller slip (batch 8 branch review, template_defects 3). The kb.mjs retrieval-protocol change needs a scenario re-run per process.evals-rerun's body; schedule with HR-033.",
+        "Source: batch 8 branch review, template_defects 1 and 3 (2026-09-02)."
+      ],
+      "tags": [
+        "template",
+        "process"
       ],
       "milestone": null,
       "status": "open"
