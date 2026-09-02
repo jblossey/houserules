@@ -321,3 +321,11 @@ Each item records the ruling with its date, or stays marked open.
     a ruling, homed (a spec amendment or a backlog item) in the turn it is
     accepted, before the next dispatch. Applied in `knowledge/process.json`
     and `template/knowledge/process.json`; the summary is unchanged.
+15. **KIT_OWNED-anchored body for houserules.template-is-the-source — ruled
+    2026-09-02: yes.** The entry's body enumerated the installed skills and
+    went stale the moment batch 5 added `migrating-knowledge` to
+    `KIT_OWNED`. The body now names the authority instead of the list: the
+    root copies of every `KIT_OWNED` path — `tools/`, `.claude/agents/`,
+    and the kit skills — are the installed copy. Applied in
+    `knowledge/houserules.json` (root-only topic); the summary is
+    unchanged. Source: batch 5 branch review, stale_entries.
