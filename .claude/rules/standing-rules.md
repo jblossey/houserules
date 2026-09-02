@@ -22,7 +22,7 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 - [quality.principles] YAGNI, KISS, DRY; prefer a well-maintained library to custom code; one responsibility per unit; tests assert behavior; a11y and i18n are part of done.
 - [security-hygiene.dependency-vetting] Verify every new dependency is well-maintained before adding it. Record the check in the task report's `dependency_vetting` field.
 - [security-hygiene.exact-pins] Pin exact versions. Install only with a CLI (`pnpm add --save-exact`, `cargo add <crate>@=<version>`). Never write a version number by hand.
-- [security-hygiene.no-coauthor] Never add a co-author line to any commit.
+- [security-hygiene.no-coauthor] Never add a co-author or session trailer line to any commit.
 - [security-hygiene.no-focused-tests] Never commit a focused test (`.only(`).
 - [security-hygiene.verify-current-docs] Verify every library, tool, and framework API against current docs before use. Internal knowledge is stale.
 - [writing-style.code-comments] Write a code comment only for a constraint the code cannot show.

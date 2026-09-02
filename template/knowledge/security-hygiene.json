@@ -52,11 +52,11 @@
       "kind": "rule",
       "area": "global",
       "standing": true,
-      "summary": "Never add a co-author line to any commit.",
+      "summary": "Never add a co-author or session trailer line to any commit.",
       "body": [],
       "tags": ["git"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
-      "check": { "type": "commits", "level": "fail", "body_absent": "co-authored-by", "flags": "i" }
+      "check": { "type": "commits", "level": "fail", "body_absent": "^(co-authored-by|claude-session):", "flags": "i" }
     },
     {
       "id": "security-hygiene.no-focused-tests",
