@@ -140,7 +140,8 @@
         "A new test for behavior that is already correct proves it can fail through a deliberate, disclosed mutation, not a natural RED.",
         "Never fabricate a cycle: an empty `tdd` with named gates is honest evidence; a manufactured RED is not.",
         "A fix round that narrows or widens matching behavior carries its own RED or counter-example test. A cycle captured after the commit says so in the report's tdd entry and presents the runs in the order they really happened.",
-        "When no assertion can change (an output-noise or report-only fix), disclosed before/after captures of the observable difference are the honest evidence, presented in the order they ran."
+        "When no assertion can change (an output-noise or report-only fix), disclosed before/after captures of the observable difference are the honest evidence, presented in the order they ran.",
+        "The `mode` label follows when the shown run happened, not the failure's flavor: `natural` only when the shown RED ran pre-commit; a post-hoc recapture is `reconstructed` and the tdd entry says so; a disclosed-mutation proof is `mutation`."
       ],
       "tags": ["testing"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
