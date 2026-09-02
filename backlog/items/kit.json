@@ -531,7 +531,7 @@
       "title": "One idPrefix predicate serves the flag and the stamp",
       "body": [
         "install validates the --id-prefix flag with /^[A-Z][A-Z0-9]{0,7}$/ but the stamp guard (HR-027) accepts any non-empty string, so a hand-edited .houserules.json can carry a prefix init would refuse (' ', 'wi', 'TOOLONGPREFIX') and the next line writes it back. Two validators for one concept in one function.",
-        "Owner-candidate: unify on the flag's regex as one shared predicate with one message, or rule that the stamp's looser contract is intended and record why. The batch 8 spec scoped HR-027 to the non-empty-string check, so the divergence is a choice to make, not an accident to patch.",
+        "RULED by the owner 2026-09-02: unify on the flag's regex (/^[A-Z][A-Z0-9]{0,7}$/) as one shared predicate with one message, in the flag check and the stamp guard both. RED first; the HR-027 tests move to the shared message where applicable.",
         "Source: batch 8 task 3 review, minor 4 (2026-09-02)."
       ],
       "tags": [
