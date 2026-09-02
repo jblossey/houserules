@@ -93,6 +93,57 @@ export function loadBase(root) {
   return { root, schema, areas, topics, entries };
 }
 
+/** Escapes every RegExp metacharacter in `text`, so it matches only itself literally. */
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+/**
+ * Compiles `glob` into a `RegExp` that matches a whole repo-relative path,
+ * covering only `**` (any number of complete path segments, including none)
+ * and `*` (any characters within one segment) with dot-segments included.
+ * Every other glob metacharacter (`?`, bracket classes, brace lists) is left
+ * to `matchesGlob` itself in `globMatch` below and is escaped here as a
+ * plain literal: this is a fallback for the one case `matchesGlob` gets
+ * wrong, not a full glob engine.
+ */
+function globToRegExp(glob) {
+  let source = '';
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i];
+    if (c === '*' && glob[i + 1] === '*') {
+      if (glob[i + 2] === '/') {
+        source += '(?:.*/)?';
+        i += 2;
+      } else {
+        source += '.*';
+        i += 1;
+      }
+      continue;
+    }
+    if (c === '*') {
+      source += '[^/]*';
+      continue;
+    }
+    source += escapeRegExp(c);
+  }
+  return new RegExp(`^${source}$`);
+}
+/**
+ * Matches `path` against `glob`; the one matcher `areaFiles` and `matchAny`
+ * both call. `matchesGlob` covers the full glob vocabulary (`?`, bracket
+ * classes, brace lists, `**`, `*`) but excludes a path segment that starts
+ * with `.` under `**` — undocumented as of Node 24.18.1 (verified live:
+ * `matchesGlob('a/.b/c', 'a/**')` is `false`) — which silently dropped this
+ * repository's own `template` area, and any `co-change`/`diff-append-only`/
+ * file-scoped check whose glob crosses a dot-segment, from every audit
+ * package. globMatch tries `matchesGlob` first and falls back to
+ * `globToRegExp` only when it returns false, so every glob `matchesGlob`
+ * already matched still matches, and dot-segment globs now match too.
+ */
+function globMatch(path, glob) {
+  return matchesGlob(path, glob) || globToRegExp(glob).test(path);
+}
+
 /**
  * Groups `paths` by every area whose globs they match, each area mapped to
  * the paths that matched it. `global` always appears, mapped to `[]`: it
@@ -103,7 +154,7 @@ export function areaFiles(paths, areas) {
   for (const path of paths) {
     const rel = stripDot(path);
     for (const [area, def] of Object.entries(areas)) {
-      if (def.paths.some((glob) => matchesGlob(rel, glob)))
+      if (def.paths.some((glob) => globMatch(rel, glob)))
         (found[area] ??= []).push(path);
     }
   }
@@ -432,7 +483,7 @@ const removedLines = (root, base, head, files) =>
     .split('\n')
     .filter((l) => l.startsWith('-') && !l.startsWith('---'));
 const matchAny = (path, globs) =>
-  list(globs).some((glob) => matchesGlob(path, glob));
+  list(globs).some((glob) => globMatch(path, glob));
 
 /** Reads a JSON deliverable file; a missing or malformed file is a usage error. */
 function readDeliverable(path) {
@@ -543,7 +594,10 @@ function runCheck(entry, ctx) {
       }
       const satisfying = ctx.changed.find((p) => matchAny(p, c.then));
       if (satisfying) {
-        row.evidence = `${trigger[0]} changed with ${satisfying}`;
+        const realTrigger = trigger.find((p) => !matchAny(p, c.then));
+        row.evidence = realTrigger
+          ? `${realTrigger} changed with ${satisfying}`
+          : `only ${trigger.join(', ')} changed; the co-change is satisfied by definition`;
         return row;
       }
       return violate(

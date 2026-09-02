@@ -199,6 +199,30 @@ describe('areasFor', () => {
     expect(areasFor(['docs/x.md'], AREAS)).toEqual(['docs', 'global']);
     expect(areasFor([], AREAS)).toEqual(['global']);
   });
+  // HR-019: `template/**` must cross the `.claude` dot-segment, using this
+  // repository's own real areas.json (the seed's AREAS fixture has no
+  // `template` area to match against).
+  it('includes template for a path under template/.claude, crossing the dot-segment', () => {
+    const root = fileURLToPath(new URL('../', import.meta.url));
+    const { areas } = loadBase(root);
+    expect(
+      areasFor(['template/.claude/agents/implementer.md'], areas),
+    ).toContain('template');
+  });
+  // Review fix round 1 (task 1): the dot-segment matcher must not narrow the
+  // rest of matchesGlob's vocabulary -- `?`, bracket classes, and brace
+  // lists all still have to match, the same as before HR-019.
+  it('still matches ?, bracket-class, and brace-list globs, not only ** and *', () => {
+    const VOCAB_AREAS = {
+      global: { paths: [] },
+      question: { paths: ['crates/?.rs'] },
+      bracket: { paths: ['src/*.[jt]s'] },
+      brace: { paths: ['src/*.{js,ts}'] },
+    };
+    expect(areasFor(['crates/x.rs'], VOCAB_AREAS)).toContain('question');
+    expect(areasFor(['src/a.ts'], VOCAB_AREAS)).toContain('bracket');
+    expect(areasFor(['src/a.ts'], VOCAB_AREAS)).toContain('brace');
+  });
 });
 
 describe('areaFiles', () => {
@@ -1112,6 +1136,120 @@ describe('audit', () => {
     rows = audit(loadBase(root), { baseRef: base, report: passReport }).result
       .rules;
     expect(rows[0].result).toBe('pass');
+  });
+  // HR-019: a `co-change` `then` glob (matchAny) must cross a dot-segment,
+  // the same defect as areaFiles but at the check-runner call site.
+  it('matches a co-change then glob across a dot-segment', () => {
+    const root = makeRepo(
+      [
+        entry({
+          id: 'process.dotcochange',
+          area: 'global',
+          standing: false,
+          summary: 'trigger.txt co-changes with anything under src/, dot-segments included.',
+          check: {
+            type: 'co-change',
+            level: 'fail',
+            if: 'trigger.txt',
+            then: 'src/**',
+          },
+        }),
+      ],
+      { 'trigger.txt': 'a\n' },
+    );
+    const base = commit(root, 'chore: base');
+    write(root, 'trigger.txt', 'b\n');
+    write(root, 'src/.config/x.json', '{}\n');
+    commit(root, 'feat: change');
+    const rows = audit(loadBase(root), { baseRef: base }).result.rules;
+    expect(rows.find((r) => r.id === 'process.dotcochange').evidence).toBe(
+      'trigger.txt changed with src/.config/x.json',
+    );
+  });
+  // HR-018: when the only `if` match is the `then` path itself, naming it as
+  // both the trigger and the record reads as circular ("record.json changed
+  // with record.json"); the evidence names the case plainly instead.
+  it('names a record-only co-change satisfied by definition', () => {
+    const root = makeRepo(
+      [
+        entry({
+          id: 'process.recordonly',
+          area: 'global',
+          standing: false,
+          summary: 'trigger.txt or record.json co-changes with record.json.',
+          check: {
+            type: 'co-change',
+            level: 'fail',
+            if: ['trigger.txt', 'record.json'],
+            then: 'record.json',
+          },
+        }),
+      ],
+      { 'trigger.txt': 'a\n', 'record.json': '{}\n' },
+    );
+    const base = commit(root, 'chore: base');
+    write(root, 'record.json', '{"n":1}\n');
+    commit(root, 'feat: append a run');
+    const rows = audit(loadBase(root), { baseRef: base }).result.rules;
+    expect(rows.find((r) => r.id === 'process.recordonly').evidence).toBe(
+      'only record.json changed; the co-change is satisfied by definition',
+    );
+  });
+  it('names the real trigger, not the record, in a mixed co-change', () => {
+    const root = makeRepo(
+      [
+        entry({
+          id: 'process.recordmixed',
+          area: 'global',
+          standing: false,
+          summary: 'trigger.txt or record.json co-changes with record.json.',
+          check: {
+            type: 'co-change',
+            level: 'fail',
+            if: ['trigger.txt', 'record.json'],
+            then: 'record.json',
+          },
+        }),
+      ],
+      { 'trigger.txt': 'a\n', 'record.json': '{}\n' },
+    );
+    const base = commit(root, 'chore: base');
+    write(root, 'trigger.txt', 'b\n');
+    write(root, 'record.json', '{"n":1}\n');
+    commit(root, 'feat: change trigger and record');
+    const rows = audit(loadBase(root), { baseRef: base }).result.rules;
+    expect(rows.find((r) => r.id === 'process.recordmixed').evidence).toBe(
+      'trigger.txt changed with record.json',
+    );
+  });
+  // Review finding (task 2, round 1): a `then` glob that matches several changed files, with
+  // nothing else matching `if`, must not name any of them as the trigger either.
+  it('names no then-matching file as the trigger when several then files changed', () => {
+    const root = makeRepo(
+      [
+        entry({
+          id: 'process.recordmulti',
+          area: 'global',
+          standing: false,
+          summary: 'Any recs/*.json co-changes with any recs/*.json.',
+          check: {
+            type: 'co-change',
+            level: 'fail',
+            if: 'recs/*.json',
+            then: 'recs/*.json',
+          },
+        }),
+      ],
+      { 'recs/a.json': '{}\n', 'recs/record.json': '{}\n' },
+    );
+    const base = commit(root, 'chore: base');
+    write(root, 'recs/a.json', '{"n":1}\n');
+    write(root, 'recs/record.json', '{"n":1}\n');
+    commit(root, 'feat: append two runs');
+    const rows = audit(loadBase(root), { baseRef: base }).result.rules;
+    expect(rows.find((r) => r.id === 'process.recordmulti').evidence).toBe(
+      'only recs/a.json, recs/record.json changed; the co-change is satisfied by definition',
+    );
   });
   it('reports untriggered checks and a bad subject', () => {
     const root = makeRepo(auditEntries());
