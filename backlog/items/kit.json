@@ -221,7 +221,7 @@
       "id": "HR-013",
       "type": "feat",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "title": "A migration skill: move a pre-existing codebase’s knowledge into the houserules style",
       "body": [
         "Owner request of 2026-09-01: when houserules is installed into a codebase that already has knowledge (CLAUDE.md prose, docs, wikis, comments, ad-hoc rules files), a skill in the payload explains how to migrate it: inventory the sources, split rule/invariant/gotcha/procedure/decision/history, write entries per the schema (summary is the rule, ≤160; body why/how/exceptions; source with date and by; verify paths; check where deterministic), extend areas, park the leftovers, delete the migrated originals, and gate with tools/kb.sh check plus render.",
@@ -240,7 +240,7 @@
       "id": "HR-014",
       "type": "fix",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "title": "Read settings.json through readJson in the bin",
       "body": [
         "`mergeSettings` in `bin/houserules.mjs` still parses `.claude/settings.json` by hand and wraps the failure as `not readable JSON (...)`, a second wording for the failure class the stamp path now reports as `invalid JSON` through `readJson`.",
@@ -311,6 +311,57 @@
       "tags": [
         "tools",
         "audit"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-019",
+      "type": "bug",
+      "title": "Area glob matching misses dot-segments under **",
+      "body": [
+        "node:path matchesGlob excludes dot-segments under **: matchesGlob('template/.claude/skills/migrating-knowledge/SKILL.md', 'template/**') returns false (verified live in the batch 5 branch review). Every batch 5 audit ran without the template area: houserules.payload-runs-on-builtins dropped out of the audit package, and the rules loader never serves .claude/rules/template.md for template/.claude/** files.",
+        "Fix in template/tools/kb.mjs areaFiles (matchesGlob, ~line 106): wrap matchesGlob with a dot-inclusive variant, or a small globToRegExp with dot semantics. RED first: areasFor(['template/.claude/agents/implementer.md'], areas) must include 'template'. The fix ships in the payload; target repositories inherit it via update.",
+        "Source: batch 5 branch review, template_defects 1 (2026-09-02)."
+      ],
+      "tags": [
+        "tools",
+        "audit",
+        "areas"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-020",
+      "type": "bug",
+      "title": "mergeSettings crashes on valid non-object JSON in settings.json",
+      "body": [
+        "A .claude/settings.json containing null, a string, or a number passes readJson and then crashes with a plain TypeError stack at settings.hooks ??= {}. Pre-existing behavior, not regressed by batch 5 task 2.",
+        "Cover it with the CLI's one-line UsageError convention. RED first: a scratch settings.json containing null.",
+        "Source: batch 5 branch review, recommendation 2 (2026-09-02)."
+      ],
+      "tags": [
+        "cli",
+        "settings"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-021",
+      "type": "feat",
+      "title": "A verdict.text field for re-review prose; open lists only prior findings",
+      "body": [
+        "verdict.open is a bare textList; batch 5 task-1-review-r1.json used it for a status sentence plus restatements of both new_breakage items, so state 'findings-remain' read as prior findings open when all eight were addressed and only new breakage remained.",
+        "Add an optional verdict.text for prose to $defs.reReview in .claude/schemas/deliverables.json (root and template). State in task-reviewer.md that open lists only prior findings still unaddressed and that new breakage lives only in new_breakage.",
+        "Changing task-reviewer.md triggers process.evals-rerun: re-run every scenario and append the run set to .claude/evals/record.json.",
+        "Source: batch 5 branch review, template_defects 2 (2026-09-02)."
+      ],
+      "tags": [
+        "template",
+        "schema",
+        "reviews"
       ],
       "milestone": null,
       "status": "open"

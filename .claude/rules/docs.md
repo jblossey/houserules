@@ -13,9 +13,11 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 
 ## Rules
 
+- [houserules.readme-mirrors-kit-owned] When `KIT_OWNED` gains or loses a path, update README's agent-layer bullet and ownership table in the same commit.
 - [knowledge-base.ids-are-permanent] Never rename a merged entry id. Add a new entry and link the old one with `see`.
-- [knowledge-base.state-only-the-source] An entry states only what its source states; verify polarity and numbers against the code before filing it; never add an instruction the source did not give.
-- [knowledge-base.summary-is-the-rule] An entry's `summary` states the rule or fact in one sentence; `body` states why, how, and the exceptions. No time-sensitive phrasing in a summary.
+- [knowledge-base.rules-need-a-loading-path] Give every rule or invariant entry a loading path: `standing: true`, or an area whose globs match the files the rule governs.
+- [knowledge-base.state-only-the-source] State only what the source states; verify polarity, counts, and mechanisms against the code before filing an entry or shipping teaching prose.
+- [knowledge-base.summary-is-the-rule] The `summary` states the rule in one sentence; `body` carries why, how, exceptions; examples in docs and skills model this split. No time-sensitive phrasing.
 - [process.evals-rerun] Re-run every `.claude/evals/` scenario when the implementer or task-reviewer template or a scenario changes; append the run to `.claude/evals/record.json`.
 
 Detail: tools/kb.sh get <id>
