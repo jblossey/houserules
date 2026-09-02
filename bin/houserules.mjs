@@ -97,9 +97,10 @@ function writeInto(target, file, content) {
 /**
  * Merges the template's SessionStart hooks into an existing settings.json,
  * appending only entries whose `matcher` is not already present. Returns
- * true when the merge changed the file. Invalid JSON in the target's
- * settings.json throws `UsageError`; a settings.json that cannot be read
- * propagates as a plain `Error`.
+ * true when the merge changed the file. The target's settings.json throws
+ * `UsageError` for invalid JSON or for JSON that is not a plain object
+ * (`null`, a string, a number, a boolean, an array); a settings.json that
+ * cannot be read propagates as a plain `Error`.
  */
 function mergeSettings(target) {
   const path = join(target, '.claude/settings.json');
@@ -107,6 +108,8 @@ function mergeSettings(target) {
     readFileSync(join(TEMPLATE_DIR, '.claude/settings.json'), 'utf8'),
   );
   const settings = readJson(path);
+  if (settings === null || typeof settings !== 'object' || Array.isArray(settings))
+    throw new UsageError(`${path}: not a JSON object`);
   settings.hooks ??= {};
   settings.hooks.SessionStart ??= [];
   const matchers = new Set(settings.hooks.SessionStart.map((e) => e.matcher));
