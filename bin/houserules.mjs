@@ -97,19 +97,16 @@ function writeInto(target, file, content) {
 /**
  * Merges the template's SessionStart hooks into an existing settings.json,
  * appending only entries whose `matcher` is not already present. Returns
- * true when the merge changed the file.
+ * true when the merge changed the file. Invalid JSON in the target's
+ * settings.json throws `UsageError`; a settings.json that cannot be read
+ * propagates as a plain `Error`.
  */
 function mergeSettings(target) {
   const path = join(target, '.claude/settings.json');
   const template = JSON.parse(
     readFileSync(join(TEMPLATE_DIR, '.claude/settings.json'), 'utf8'),
   );
-  let settings;
-  try {
-    settings = JSON.parse(readFileSync(path, 'utf8'));
-  } catch (error) {
-    throw new UsageError(`.claude/settings.json: not readable JSON (${error.message})`);
-  }
+  const settings = readJson(path);
   settings.hooks ??= {};
   settings.hooks.SessionStart ??= [];
   const matchers = new Set(settings.hooks.SessionStart.map((e) => e.matcher));
