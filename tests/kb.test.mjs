@@ -1167,6 +1167,43 @@ describe('audit', () => {
       .rules;
     expect(rows[0].result).toBe('pass');
   });
+  // HR-016: houserules.live-run-recipe (knowledge/houserules.json) carries
+  // this exact check shape (`if: '**'`, `field: 'live_run'`) so an implementer
+  // report missing a live-run recipe warns instead of a full-text search. The
+  // report-field mechanism above already covers the generic case, so this is
+  // a disclosed-mutation proof, not a natural RED (process.tdd): with `if`
+  // set to a glob that never matches, the missing-report assertion below
+  // fails ('pass', not 'warn', because the check never triggers); restoring
+  // `if: '**'` makes it pass again.
+  it('warns a report-field row when live_run is missing and passes when present, even empty', () => {
+    const root = makeRepo([
+      entry({
+        id: 'houserules.livesample',
+        summary: 'Every report carries live_run.',
+        check: {
+          type: 'report-field',
+          level: 'warn',
+          if: '**',
+          field: 'live_run',
+        },
+      }),
+    ]);
+    const base = git(root, 'rev-parse', 'HEAD').trim();
+    write(root, 'a.txt', 'x\n');
+    commit(root, 'feat: change');
+    const missingReport = join(root, 'report-missing.json');
+    writeFileSync(missingReport, JSON.stringify({}));
+    let rows = audit(loadBase(root), {
+      baseRef: base,
+      report: missingReport,
+    }).result.rules;
+    expect(rows[0].result).toBe('warn');
+    const emptyReport = join(root, 'report-empty.json');
+    writeFileSync(emptyReport, JSON.stringify({ live_run: [] }));
+    rows = audit(loadBase(root), { baseRef: base, report: emptyReport }).result
+      .rules;
+    expect(rows[0].result).toBe('pass');
+  });
   // HR-019: a `co-change` `then` glob (matchAny) must cross a dot-segment,
   // the same defect as areaFiles but at the check-runner call site.
   it('matches a co-change then glob across a dot-segment', () => {
@@ -1980,9 +2017,11 @@ const REPORT = {
   implemented: 'x',
   commits: [{ sha: 'abc1234', subject: 'feat: x' }],
   tests: [{ command: 'vitest', output: 'ok' }],
+  live_run: [{ command: 'houserules init --dir scratch', output: 'ok', exit: 0 }],
   tdd: [
     {
       test: 't',
+      mode: 'natural',
       red: { command: 'c', output: 'FAIL' },
       green: { command: 'c', output: 'PASS' },
     },
@@ -1997,6 +2036,26 @@ const REPORT = {
   knowledge_used: ['process.sequential'],
 };
 
+// HR-021: verdict.text carries re-review prose (a status sentence, a
+// scheduled-elsewhere note) that `open` cannot hold without misreading as
+// an unaddressed prior finding (spec T5).
+const RE_REVIEW = {
+  kind: 're-review',
+  task: 1,
+  round: 1,
+  fix_base: 'abc1234',
+  head: 'abc1235',
+  finding_verdicts: [
+    { finding: 'f', verdict: 'addressed', evidence: 'a.mjs:1' },
+  ],
+  rule_adherence: [
+    { id: 'process.sequential', mode: 'judged', result: 'pass', evidence: 'x' },
+  ],
+  new_breakage: [],
+  out_of_scope: [],
+  verdict: { state: 'all-addressed', open: [] },
+};
+
 describe('validate', () => {
   it('validates a well-formed task report with no errors', () => {
     const root = makeRepo();
@@ -2007,6 +2066,64 @@ describe('validate', () => {
       kind: 'task-report',
       errors: [],
     });
+  });
+  // HR-016: live_run is required so a missing scratch recipe is a schema
+  // error, not a fact buried in prose (spec T3).
+  it('rejects a task report without live_run', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    const { live_run, ...withoutLiveRun } = REPORT;
+    writeFileSync(file, JSON.stringify(withoutLiveRun));
+    expect(validateDeliverable(root, file).errors).toEqual([
+      `${file}: missing "live_run"`,
+    ]);
+  });
+  it('rejects a live_run that is not an array', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    writeFileSync(file, JSON.stringify({ ...REPORT, live_run: 'nope' }));
+    expect(validateDeliverable(root, file).errors).toEqual([
+      `${file}.live_run: must be array`,
+    ]);
+  });
+  it('rejects a live_run entry without a command', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    writeFileSync(
+      file,
+      JSON.stringify({ ...REPORT, live_run: [{ output: 'ok' }] }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([
+      `${file}.live_run[0]: missing "command"`,
+    ]);
+  });
+  // HR-017: mode is required so a tdd cycle names its provenance
+  // explicitly (spec T4).
+  it('rejects a tdd cycle without mode', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    const { mode, ...cycleWithoutMode } = REPORT.tdd[0];
+    writeFileSync(
+      file,
+      JSON.stringify({ ...REPORT, tdd: [cycleWithoutMode] }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([
+      `${file}.tdd[0]: missing "mode"`,
+    ]);
+  });
+  it('rejects a tdd cycle with an unknown mode', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...REPORT,
+        tdd: [{ ...REPORT.tdd[0], mode: 'guessed' }],
+      }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([
+      `${file}.tdd[0].mode: must be one of "natural", "mutation", "reconstructed"`,
+    ]);
   });
   // HR-024: self_audit.summary is a verbatim copy of the audit tool's own
   // summary output, so the schema must accept the field the tool now
@@ -2140,6 +2257,40 @@ describe('validate', () => {
     expect(errors[0]).toMatch(
       /rule_adherence\[0\]\.result: must be one of "pass", "fail", "warn", "skipped"$/,
     );
+  });
+  // HR-021: text carries the status sentences and scheduled-elsewhere notes
+  // that used to misuse `open` (spec T5).
+  it('accepts a re-review verdict with text', () => {
+    const root = makeRepo();
+    const file = join(root, 're-review.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...RE_REVIEW,
+        verdict: { ...RE_REVIEW.verdict, text: 'scheduled for task 7' },
+      }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([]);
+  });
+  it('accepts a re-review verdict without text', () => {
+    const root = makeRepo();
+    const file = join(root, 're-review.json');
+    writeFileSync(file, JSON.stringify(RE_REVIEW));
+    expect(validateDeliverable(root, file).errors).toEqual([]);
+  });
+  it('rejects a re-review verdict.text of the wrong type', () => {
+    const root = makeRepo();
+    const file = join(root, 're-review.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...RE_REVIEW,
+        verdict: { ...RE_REVIEW.verdict, text: 42 },
+      }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([
+      `${file}.verdict.text: must be string`,
+    ]);
   });
   it('rejects an unknown kind, a missing file, and invalid JSON as usage errors', () => {
     const root = makeRepo();
