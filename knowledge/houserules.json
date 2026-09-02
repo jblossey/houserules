@@ -59,7 +59,8 @@
         "Scratch repositories live under the session scratchpad, never inside this repository and never in tag-pilot. Run `tools/kb.sh check` and `tools/backlog.sh check` there and record each command’s verbatim output as its own report tests entry (batch 3 task 3 recorded only one of a chained pair).",
         "`pnpm dlx git+file://<this clone> files` exercises the published path (pnpm's bin shim execs the real file); `node <scratch>/node_modules/houserules/bin/houserules.mjs files` after `pnpm add --save-exact git+file://<this clone>` exercises the symlinked path (HR-001).",
         "For a change to `update`, run `init` and then `update` in the same scratch repository and confirm that only kit-owned files changed.",
-        "The report names the scratch path (a `cd` entry or the path in the command) and records the init and both check gates as their own entries; a live run without them fails the recipe."
+        "The report names the scratch path (a `cd` entry or the path in the command) and records the init and both check gates as their own entries; a live run without them fails the recipe.",
+        "A fix round that changes no CLI behavior (test-only, report-only, evidence wording) may stand on the task's original live run when the report discloses the scoping for the re-reviewer to judge (batch 6)."
       ],
       "tags": [
         "live-run",
@@ -123,7 +124,9 @@
       "summary": "The payload in `template/` runs on Node built-ins and POSIX shell only: no dependency, no build step; the CLIs work in a fresh clone before any install.",
       "body": [
         "The SessionStart hook and the CI gates run where nothing is installed; a runtime dependency would break both (docs/design.md §2, option B).",
-        "This repository's devDependencies (vitest, commitlint) serve its own tests and commit hook only and never enter `template/`."
+        "This repository's devDependencies (vitest, commitlint) serve its own tests and commit hook only and never enter `template/`.",
+        "A template script may exec an optional tool only behind a probe of that tool itself, with a working fallback; probing mise or pnpm is not probing the tool (batch 6 task 4).",
+        "The shipped `.githooks/commit-msg` execs commitlint only behind a probe of `node_modules/.bin/commitlint` and degrades to the trailer gate alone; commitlint stays optional and never becomes a payload dependency."
       ],
       "tags": [
         "payload",
@@ -206,6 +209,30 @@
       "verify": [
         "README.md",
         "bin/houserules.mjs"
+      ]
+    },
+    {
+      "id": "houserules.glob-union-matcher",
+      "kind": "gotcha",
+      "area": "template",
+      "summary": "globMatch in tools/kb.mjs is a union: matchesGlob for the full vocabulary, globToRegExp only for `**`/`*` with dot-segments; combining both matches neither.",
+      "body": [
+        "node:path matchesGlob excludes a path segment that starts with `.` under `**` (undocumented; verified live on Node 24.18.1). globToRegExp restores dot-segments but translates only `**` and `*`, escaping every other metacharacter as a literal.",
+        "Write area and check globs with `**`, `*`, and literals only. Extend globToRegExp first if a glob ever needs `?`, `[ ]`, or `{ }` to cross a dot-segment; a mismatch is silent — the file simply drops out of the audit package.",
+        "When replacing a matching engine, pin the old engine's full vocabulary with counterexample tests before switching call sites (batch 6 task 1 round 1)."
+      ],
+      "tags": [
+        "globs",
+        "audit",
+        "areas"
+      ],
+      "source": {
+        "date": "2026-09-02",
+        "by": "review",
+        "ref": "batch 6 branch review; task 1 review round 0"
+      },
+      "verify": [
+        "tools/kb.mjs"
       ]
     }
   ]
