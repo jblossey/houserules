@@ -267,7 +267,8 @@
         "template"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 6
     },
     {
       "id": "HR-016",
@@ -313,7 +314,8 @@
         "audit"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 6
     },
     {
       "id": "HR-019",
@@ -330,7 +332,8 @@
         "areas"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 6
     },
     {
       "id": "HR-020",
@@ -346,7 +349,8 @@
         "settings"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 6
     },
     {
       "id": "HR-021",
