@@ -346,3 +346,13 @@ Each item records the ruling with its date, or stays marked open.
     difference, presented in the order they ran. Applied in
     `knowledge/process.json` and `template/knowledge/process.json`; the
     summary is unchanged. Source: batch 6 branch review, violated_rules.
+18. **The timing key in process.tdd — ruled 2026-09-02: yes.** Batch 7
+    shipped the required `mode` enum, and three reviewers spent rounds
+    converging on what `natural` means before the rule said it. The body
+    of `process.tdd` now states the timing key: the label follows when
+    the shown run happened, not the failure's flavor — `natural` only
+    when the shown RED ran pre-commit; a post-hoc recapture is
+    `reconstructed` and says so; a disclosed-mutation proof is
+    `mutation`. Applied in `knowledge/process.json` and
+    `template/knowledge/process.json`; the summary is unchanged. Source:
+    batch 7 branch review, violated_rules.
