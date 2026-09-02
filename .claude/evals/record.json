@@ -31,5 +31,38 @@
         "notes": "Both seeded rules fail deterministic and filed critical with rule set; the omitted self_audit exact-pins row called out with the understated summary; review validates, every row judged; extras: lockfile gap, DONE over a fail row."
       }
     ]
+  },
+  {
+    "date": "2026-09-02",
+    "templates": {
+      ".claude/agents/implementer.md": "4550f4f768f26d5e9978e54cbfe17befbe436a42",
+      ".claude/agents/task-reviewer.md": "b6747399f8c3fd6760ea436b562139f6e81d77ad"
+    },
+    "runs": [
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 3,
+        "of": 3,
+        "notes": "ASD-STE100 runbook (record-a-ruling); every documented command run live; report validates on the new contract (live_run 3 entries, tdd empty per data-only clause), self_audit 10/10."
+      },
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 5,
+        "of": 5,
+        "notes": "yaml pinned 2.9.0 via pnpm add -E; vetting recorded with evidence and manifests; docs_verified; natural RED then GREEN with mode natural; pins and vetting rows pass; payload-runs-on-builtins deviation disclosed and correctly placed the dep in repo devDependencies."
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 5,
+        "of": 5,
+        "notes": "Both seeded rules fail deterministic, filed critical with rule set; the doctored self_audit proven edited-after-run by row arithmetic; extras: slugify absent from the lockfile (never installed), DONE over a fail row, backlog mismatch; audit run with --ids per the new refusal clause; review validates, 27 rows judged."
+      }
+    ]
   }
 ]
