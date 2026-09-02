@@ -90,8 +90,8 @@
       "summary": "Audit and hook hardening: dot-inclusive glob matching, honest co-change evidence, a non-object settings.json as a usage error, and the commit-msg trailer gate shipped in the payload.",
       "kickoff": "docs/specs/2026-09-02-batch-6-audit-and-hooks.md",
       "status": {
-        "state": "planned",
-        "text": "Spec approved on 2026-09-02 as written (T4 gates both harness trailers); on branch batch-6 — implementer on sonnet, task review on opus, branch review on fable."
+        "state": "done",
+        "text": "Done 2026-09-02: merged into main fast-forward after the branch review (fable: with-fixes; the critical was a check false positive cleared by rewording the spec commit body at aggregation; three minors fixed in-branch at 56821fd). HR-019, HR-018, HR-020, HR-015 delivered: the dot-inclusive union matcher, honest co-change evidence, the non-object settings guard, and the trailer-gated commit-msg hook in the payload. Thirteen task findings over nine review rounds plus four branch findings fixed; one reasoned deferral (HR-022). Retrospective: HR-023, HR-024 filed; two standing-rule proposals await the owner (rulings 16-17)."
       }
     }
   ]

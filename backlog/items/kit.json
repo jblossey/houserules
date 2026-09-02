@@ -267,7 +267,7 @@
         "template"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 6
     },
     {
@@ -314,7 +314,7 @@
         "audit"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 6
     },
     {
@@ -332,7 +332,7 @@
         "areas"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 6
     },
     {
@@ -349,7 +349,7 @@
         "settings"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 6
     },
     {
@@ -366,6 +366,55 @@
         "template",
         "schema",
         "reviews"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-022",
+      "type": "bug",
+      "title": "The stamp read crashes on a non-object .houserules.json",
+      "body": [
+        "install reads the marker with 'existsSync(markerPath) ? readJson(markerPath) : { idPrefix: prefix }' and then touches marker.idPrefix; a .houserules.json holding null (or a string, a number, a boolean, an array) passes readJson and crashes with a raw stack at bin/houserules.mjs:185. Verified live at batch 6 HEAD 8175928: first init exit 0, 'printf null > .houserules.json', second init exit 1 with the stack.",
+        "Fix as HR-020's sibling: reject a non-object marker with the one-line UsageError convention ('<path>: not a JSON object'), RED first; the existing HR-010 stamp tests stay green.",
+        "Source: batch 6 task 3 review, minor 2 (2026-09-02)."
+      ],
+      "tags": [
+        "cli",
+        "stamp"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-023",
+      "type": "fix",
+      "title": "Re-review dispatches carry the round-0 block; audits refuse a missing --ids",
+      "body": [
+        "The batch 6 task 1 round-1 re-review dispatch omitted the Backlog: line and the --ids list, so task-1-audit-r1.json ran a narrowed package (27 rows; houserules.live-run-recipe and houserules.node-under-mise dropped). The reviewer caught it; round 2 was dispatched correctly, but nothing forces the block.",
+        "Fix: the orchestrating skill's re-review dispatch bullet requires the identical Knowledge:/Backlog:/--ids block as the round-0 dispatch; the task-reviewer template refuses to run an audit without --ids when the task's id list is non-empty.",
+        "Changing task-reviewer.md triggers process.evals-rerun: re-run every scenario and append the run set to .claude/evals/record.json.",
+        "Source: batch 6 branch review, template_defects 1 (2026-09-02)."
+      ],
+      "tags": [
+        "template",
+        "agents"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-024",
+      "type": "fix",
+      "title": "Stamp an empty-range audit as vacuous",
+      "body": [
+        "An audit with base == head (batch 6 task 1's report-only round 2) succeeds with vacuous deterministic rows ('0 commits checked', '0 files checked', 'not triggered') that read as positive evidence; the round-2 reviewer had to annotate them as vacuous by hand.",
+        "Fix in template/tools/kb.mjs: when the range holds no commits, set \"empty_range\": true in the audit summary and prefix the deterministic evidence strings with 'empty range:'. RED first.",
+        "Source: batch 6 branch review, template_defects 2 (2026-09-02)."
+      ],
+      "tags": [
+        "tools",
+        "audit"
       ],
       "milestone": null,
       "status": "open"
