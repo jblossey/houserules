@@ -540,6 +540,22 @@
       ],
       "milestone": null,
       "status": "open"
+    },
+    {
+      "id": "HR-032",
+      "type": "test",
+      "title": "Pin the seeded eval scenario copies to their template sources",
+      "body": [
+        "No gate pins .claude/evals/{dependency-add,docs-edit,seeded-violations}.json to their template/.claude/evals/ sources: dogfood parity covers KIT_OWNED only, and HR-025's batch 8 pin covers the deliverables schema pair. Batch 8 T5 made the dependency-add pair carry a judged criterion that must not drift; a one-sided edit would ship a seeded scenario that grades differently from the one this repository runs on itself.",
+        "Add a sync test beside the deliverables-schema pin for the three scenario copies. Exclude record.json: the root copy holds run sets and the template copy ships empty, so they differ by design.",
+        "Source: batch 8 task 5 review, minor 2 (2026-09-02)."
+      ],
+      "tags": [
+        "tests",
+        "evals"
+      ],
+      "milestone": null,
+      "status": "open"
     }
   ]
 }
