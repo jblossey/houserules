@@ -32,6 +32,7 @@ export const KIT_OWNED = [
   'tools/kb.sh',
   'tools/backlog.sh',
   'tools/claude-session-start.sh',
+  '.githooks/commit-msg',
   'tools/lib/cli.mjs',
   'tools/lib/json-store.mjs',
   '.claude/agents/implementer.md',
@@ -86,12 +87,12 @@ function templateContent(file, prefix) {
   return text.replaceAll('WI-', `${prefix}-`);
 }
 
-/** Writes `content` to `file` under `target`, keeping shell scripts executable. */
+/** Writes `content` to `file` under `target`, keeping shell scripts and git hooks executable. */
 function writeInto(target, file, content) {
   const path = join(target, file);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, content);
-  if (file.endsWith('.sh')) chmodSync(path, 0o755);
+  if (file.endsWith('.sh') || file.startsWith('.githooks/')) chmodSync(path, 0o755);
 }
 
 /**

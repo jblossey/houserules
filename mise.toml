@@ -14,7 +14,7 @@ run = "pnpm test"
 [tasks.lint]
 description = "shellcheck, then the knowledge and backlog gates"
 run = [
-  "shellcheck tools/*.sh template/tools/*.sh .githooks/commit-msg",
+  "shellcheck tools/*.sh template/tools/*.sh .githooks/commit-msg template/.githooks/commit-msg",
   "tools/kb.sh check",
   "tools/backlog.sh check",
 ]

@@ -23,7 +23,8 @@ houserules installs, into your project's own repository:
   `branch-reviewer`) with rule-adherence audits and a JSON deliverables
   contract (`.claude/schemas/deliverables.json`), an `orchestrating` skill,
   a `finishing-a-feature` skill, a `migrating-knowledge` skill, a
-  SessionStart hook, and eval scenarios.
+  SessionStart hook, a commit-msg hook that gates harness trailers, and
+  eval scenarios.
 - **Seed rules**: a generic standing-rule set (TDD, conventional commits,
   ff-only merges, sequential agents, no tech debt, dependency vetting, exact
   pins, doc comments, ASD-STE100 writing style, and more). Your project adds
@@ -43,7 +44,8 @@ git add -A && git commit -m 'chore: install houserules knowledge setup'
 
 `init` seeds everything, runs `render`, and stamps `.houserules.json`. Restart
 Claude Code once after the first install (the first `.claude/agents/` file
-and the new hook need a fresh session).
+and the new hook need a fresh session). Set `git config core.hooksPath
+.githooks` to activate the commit-msg trailer gate.
 
 ## Apply to an existing project
 
@@ -60,6 +62,9 @@ node ~/projects/houserules/bin/houserules.mjs init --id-prefix ABC
   entries (`startup|resume|clear|fork` for the session ritual, `compact` for
   the standing rules) are appended only if their matchers are absent.
   Nothing else in your settings is touched.
+- `.githooks/commit-msg` is kit-owned: `init` replaces any hook of that name
+  your project already has. Set `git config core.hooksPath .githooks` to
+  activate its commit-msg trailer gate.
 - Existing files under `knowledge/`, `backlog/`, evals, or the workflow are
   kept as they are.
 
@@ -83,7 +88,11 @@ project data. `node bin/houserules.mjs files` prints the ownership manifest:
 | `tools/` CLIs, wrappers, session hook | `knowledge/` schema, areas, topics |
 | `.claude/agents/*.md` | `backlog/` schema and data |
 | `.claude/skills/orchestrating`, `finishing-a-feature`, `migrating-knowledge` | `.claude/schemas/deliverables.json`, evals |
-| | `.github/workflows/knowledge.yml`, `CLAUDE.md`, settings |
+| `.githooks/commit-msg` | `.github/workflows/knowledge.yml`, `CLAUDE.md`, settings |
+
+`update` replaces `.githooks/commit-msg` unconditionally, since it is
+kit-owned; set `git config core.hooksPath .githooks` once (if you have not
+already) to activate its commit-msg trailer gate.
 
 Do not hand-edit kit-owned files or the generated `.claude/rules/*.md` and
 `.claude/skills/project-knowledge/SKILL.md` — edits are lost on the next
@@ -100,7 +109,7 @@ tools/backlog.sh list --open | get WI-001 | batch 1 | set WI-001 status=done bat
 ## Development (this repository)
 
 ```sh
-mise run setup    # pnpm install, commit-msg hook (commitlint)
+mise run setup    # pnpm install, activates the commit-msg hook (trailer gate + commitlint)
 mise run test     # vitest with coverage
 mise run lint     # shellcheck, kb check, backlog check
 ```

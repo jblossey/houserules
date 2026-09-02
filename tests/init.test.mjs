@@ -5,6 +5,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -63,6 +64,7 @@ describe('manifest', () => {
     expect(KIT_OWNED).toContain('.claude/agents/implementer.md');
     expect(KIT_OWNED).toContain('.claude/skills/orchestrating/SKILL.md');
     expect(KIT_OWNED).toContain('.claude/skills/migrating-knowledge/SKILL.md');
+    expect(KIT_OWNED).toContain('.githooks/commit-msg');
     expect(SEED_ONCE).toContain('knowledge/schema.json');
     expect(SEED_ONCE).toContain('backlog/schema.json');
     expect(SEED_ONCE).toContain('.claude/schemas/deliverables.json');
@@ -100,6 +102,12 @@ describe('init', () => {
     expect(marker.idPrefix).toBe('WI');
     expect(marker.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(io.stdout).toContain('wrote tools/kb.mjs\n');
+  });
+  it('copies the commit-msg hook with the execute bit set', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    const mode = statSync(join(dir, '.githooks/commit-msg')).mode;
+    expect(mode & 0o111).toBe(0o111);
   });
   it('rewrites the backlog id prefix in the seeded schemas and items', () => {
     const dir = makeTarget();
