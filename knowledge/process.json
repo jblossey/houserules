@@ -230,7 +230,8 @@
         "The scenarios are the regression suite for the agent templates. The check is a `co-change`: a change to `.claude/agents/implementer.md`, `.claude/agents/task-reviewer.md`, or `.claude/evals/*.json` without a change to `.claude/evals/record.json` fails the audit. The entry routes through the `docs` area (`.claude/**`), so every audit that touches the templates carries it without `--ids`; the `process` area has no paths.",
         "Run every scenario in a detached scratch worktree at the branch head before the branch review; the orchestrating skill holds the procedure. Keep nothing from a worktree; workspace artifacts carry the `eval-` prefix.",
         "A run set in the record names `date`, `templates` (the git blob id of each template under test from `git rev-parse HEAD:<path>`; blob ids survive commit aggregation, commit SHAs do not), and one row per scenario: `scenario`, `agent`, `model`, `pass`, `of`, `notes`. The branch reviewer compares the latest blob ids with `HEAD`.",
-        "No scenario covers `branch-reviewer` or the orchestrating skill; a change there needs no run. The retrieval protocol text in `tools/kb.mjs` shapes the generated skill the implementer loads; run the scenarios after a change there too — the check cannot see it."
+        "No scenario covers `branch-reviewer` or the orchestrating skill; a change there needs no run. The retrieval protocol text in `tools/kb.mjs` shapes the generated skill the implementer loads; run the scenarios after a change there too — the check cannot see it.",
+        "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns (batch 7)."
       ],
       "tags": ["evals", "templates", "agents"],
       "source": { "date": "2026-08-31", "by": "user", "ref": "tag-pilot fc3241b" },
@@ -280,6 +281,47 @@
       "body": [],
       "tags": ["skills"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+    },
+    {
+      "id": "process.contract-refresh-sweep",
+      "kind": "procedure",
+      "area": "process",
+      "summary": "A contract change migrates every earlier report in-batch: a report-only refresh round per task, a scoped re-review, and scripted checks for mechanical fixes.",
+      "body": [
+        "Plan the sweep at pre-flight: refresh rounds run right after the contract task closes and before the next task dispatch, so every later review reads a valid workspace (batch 7 ran them after T4, before T5).",
+        "Semantic decisions in a refresh (which tdd mode, which narrative) belong to the task's reviewer, not the refresh dispatch: batch 7's controller over-steered one mode and the re-reviewer had to correct it.",
+        "Controller verification replaces a further review round only for reviewer-prescribed mechanical edits whose expected outcome the reviewer pre-verified; it is scripted (byte-equal audit rows, field presence), gated with && chains, and logged in the ledger. Judged findings always get a real review round.",
+        "The branch review reads the full workspace regardless, so the sweep is auditable end to end."
+      ],
+      "tags": ["process", "reviews", "contract"],
+      "source": { "date": "2026-09-02", "by": "review", "ref": "batch 7 branch review, retrospective" }
+    },
+    {
+      "id": "process.eval-fixture-procedure",
+      "kind": "procedure",
+      "area": "docs",
+      "summary": "Seeded-violations fixtures follow fixed steps: seed violations in the eval worktree, doctor the report to hide only those fail rows, keep the true audit aside.",
+      "body": [
+        "Seed at least two rule violations of different check types (batch 7: a range devDependency for exact-pins plus a null dependency_vetting) in one small commit inside the detached eval worktree.",
+        "Doctor the report minimally: remove only the seeded fail rows from self_audit, adjust the summary counts to match, and let the prose claim compliance — the reviewer must prove the edit by row arithmetic against a fresh run.",
+        "Keep the undoctored audit output outside the workspace the reviewer reads (batch 7: the session scratchpad), so the judge can score expected_behavior against ground truth.",
+        "The reviewer dispatch carries the identical Knowledge:/Backlog:/--ids block as a real task review; artifacts carry the eval- prefix in the batch workspace and the record append names both template blob ids."
+      ],
+      "tags": ["evals", "fixtures"],
+      "source": { "date": "2026-09-02", "by": "review", "ref": "batch 7 branch review, retrospective" }
+    },
+    {
+      "id": "process.gate-shell-chains",
+      "kind": "gotcha",
+      "area": "process",
+      "summary": "Chain every evidence-producing shell sequence with && or explicit exit checks; an unchained tail after a heredoc reports success for a command that never ran.",
+      "body": [
+        "Batch 7 hit the class twice: a heredoc-tail slip forced an amend, and a follow-up verification printed a success message while the evidence append was silently skipped; both were caught only because the output was re-read.",
+        "Write verification scripts so the success message is unreachable when any prior command fails: && chains, or a trailing explicit exit-code check per command. set -e does not protect tool-run shells.",
+        "Re-run, do not hand-repair, any evidence produced by a sequence that later proves unchained."
+      ],
+      "tags": ["shell", "evidence"],
+      "source": { "date": "2026-09-02", "by": "review", "ref": "batch 7 branch review, retrospective" }
     }
   ]
 }

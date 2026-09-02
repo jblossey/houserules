@@ -23,7 +23,8 @@
       "summary": "State only what the source states; verify polarity, counts, and mechanisms against the code before filing an entry or shipping teaching prose.",
       "body": [
         "Invented claims read plausibly; that is what makes them dangerous.",
-        "When two sources disagree, read the code and record which one the entry follows."
+        "When two sources disagree, read the code and record which one the entry follows.",
+        "A shipped template or seed names no root-only id, path, or command; verify every reference resolves in a fresh install before syncing the root copy (batch 7 task 3)."
       ],
       "tags": ["knowledge", "authoring", "fidelity"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
@@ -46,7 +47,8 @@
       "summary": "Give every rule or invariant entry a loading path: `standing: true`, or an area whose globs match the files the rule governs.",
       "body": [
         "A non-standing entry in an area with empty globs (`global` and `process` in the seed) never loads with a file, renders into no rules file, and joins no audit package.",
-        "After filing, run `tools/kb.sh for <a file the rule governs>` and confirm the entry appears."
+        "After filing, run `tools/kb.sh for <a file the rule governs>` and confirm the entry appears.",
+        "A `check` needs an audit loading path too: the package builder admits standing entries and area-matched rule or invariant kinds only, so a check on a procedure entry fires only via `--ids` until HR-026 widens the builder (batch 7 branch review)."
       ],
       "tags": ["knowledge", "authoring", "areas", "standing"],
       "source": { "date": "2026-09-02", "by": "review", "ref": "batch 5 branch review, issue 1" },

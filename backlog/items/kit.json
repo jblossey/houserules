@@ -284,7 +284,7 @@
         "audit"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 7
     },
     {
@@ -300,7 +300,7 @@
         "template"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 7
     },
     {
@@ -370,7 +370,7 @@
         "reviews"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 7
     },
     {
@@ -387,7 +387,7 @@
         "stamp"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 7
     },
     {
@@ -405,7 +405,7 @@
         "agents"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 7
     },
     {
@@ -422,7 +422,7 @@
         "audit"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 7
     },
     {
@@ -437,6 +437,84 @@
       "tags": [
         "tests",
         "schemas"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-026",
+      "type": "fix",
+      "title": "The audit package admits area-matched entries that carry a check",
+      "body": [
+        "The package builder (template/tools/kb.mjs:709) admits only standing entries and area-matched rule/invariant kinds, so the report-field check on houserules.live-run-recipe (kind procedure, area cli) never joins a range-derived package: the batch 7 branch audit carried no live_run row though the plan promised it. Task audits carried it only via --ids.",
+        "Fix: admit any area-matched entry that carries a check (e.g. e.check && areas.includes(e.area)), RED first with a regression test that a checked procedure joins the package; template first, root synced. Damage is minor today because the schema makes live_run required, which fails validate harder than the warn row.",
+        "Deferred out of batch 7 by the controller: audit-machinery semantics deserve full review rounds, not a post-branch-review patch. Source: batch 7 branch review, minor 1 + template_defects 1 (2026-09-02)."
+      ],
+      "tags": [
+        "tools",
+        "audit"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-027",
+      "type": "fix",
+      "title": "The stamp guard validates idPrefix as a string",
+      "body": [
+        "readJsonObject accepts any plain object, so a .houserules.json holding an idPrefix that is a number passes the guard and the number flows into id generation. Owner-candidate: decide whether the stamp is fully validated or the object guard suffices.",
+        "Source: batch 7 task 1 review, reviewer note (2026-09-02)."
+      ],
+      "tags": [
+        "cli",
+        "stamp"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-028",
+      "type": "fix",
+      "title": "install validates the stamp before writing kit-owned files",
+      "body": [
+        "install rewrites every KIT_OWNED file before it reads the stamp, so a corrupt .houserules.json exits 2 with the target already updated. Pre-existing since batch 4; same order as the invalid-JSON path. Owner-candidate: decide whether the stamp read moves ahead of the writes.",
+        "Source: batch 7 task 1 review, reviewer note (2026-09-02)."
+      ],
+      "tags": [
+        "cli",
+        "stamp"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-029",
+      "type": "chore",
+      "title": "The dependency-add eval query names its payload collision",
+      "body": [
+        "The query names the project's tooling package, which collides with houserules.payload-runs-on-builtins when run in this repository, forcing a deviation disclosure every run; the judge cannot tell a designed trap from an accidental ambiguity.",
+        "Fix: name the repository's own devDependencies in the query, or add the collision to expected_behavior as an explicit judged criterion. Changing a scenario triggers process.evals-rerun.",
+        "Source: batch 7 branch review, template_defects 2 (2026-09-02)."
+      ],
+      "tags": [
+        "evals",
+        "template"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-030",
+      "type": "chore",
+      "title": "implementer.md's Report section lists one field per line",
+      "body": [
+        "After live_run and mode landed, the Report field list is one long single sentence; each contract change re-inflates it and makes template diffs hard to review. Restructure as one line per field, wording unchanged.",
+        "Changing implementer.md triggers process.evals-rerun; schedule with the next template batch.",
+        "Source: batch 7 branch review, template_defects 4 (2026-09-02)."
+      ],
+      "tags": [
+        "template",
+        "agents"
       ],
       "milestone": null,
       "status": "open"

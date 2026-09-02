@@ -107,8 +107,8 @@
       "summary": "The report contract and template tightenings: the shared plain-object guard for the stamp, empty-range audit stamping, required live_run and tdd mode fields, verdict.text with open-list semantics, the re-review dispatch block, and one shared evaluation run.",
       "kickoff": "docs/specs/2026-09-02-batch-7-report-contract-and-templates.md",
       "status": {
-        "state": "planned",
-        "text": "Spec approved on 2026-09-02 with one amendment (live_run and mode are required, not optional); on branch batch-7 — implementer on sonnet, task review on opus, branch review on fable; one shared evals run after T6."
+        "state": "done",
+        "text": "Done 2026-09-02: merged into main fast-forward after the branch review (fable: with-fixes; the one minor deferred as HR-026 with the reviewer's allowance; the aggregation merge gate honored). HR-022, HR-024, HR-016, HR-017, HR-021, HR-023 delivered plus the second evaluation record (docs-edit 3/3, dependency-add 5/5, seeded-violations 5/5 at the final template blobs). The owner filed quality.no-compat-softening standing mid-batch; the required-fields transition ran the first contract refresh sweep. Twenty findings over thirteen review rounds fixed in-branch; deferrals HR-025 to HR-030 all reasoned and filed. One standing proposal awaits the owner (ruling 18)."
       }
     }
   ]

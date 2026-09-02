@@ -23,7 +23,8 @@
       "summary": "State only what the source states; verify polarity, counts, and mechanisms against the code before filing an entry or shipping teaching prose.",
       "body": [
         "Invented claims read plausibly; that is what makes them dangerous.",
-        "When two sources disagree, read the code and record which one the entry follows."
+        "When two sources disagree, read the code and record which one the entry follows.",
+        "A shipped template or seed names no root-only id, path, or command; verify every reference resolves in a fresh install before syncing the root copy (batch 7 task 3)."
       ],
       "tags": ["knowledge", "authoring", "fidelity"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
