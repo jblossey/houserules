@@ -745,6 +745,23 @@
       ],
       "milestone": null,
       "status": "open"
+    },
+    {
+      "id": "HR-044",
+      "type": "bug",
+      "title": "The release version bump breaks CI: stale dogfood stamp and a pre-release-blind test regex",
+      "body": [
+        "The 0.2.0-alpha release commit turned main red: tests/dogfood.test.mjs expects the repo stamp to equal the running VERSION, but .houserules.json still says 0.1.0 (nobody ran update after the bump); tests/init.test.mjs asserts the stamped version matches /^\\d+\\.\\d+\\.\\d+$/, which rejects every pre-release version although the owner ruled pre-release alpha versions the norm (design.md 5.19).",
+        "Fix: run node bin/houserules.mjs update --dir . so the stamp follows the bump (the drift line prints kit 0.1.0 -> 0.2.0-alpha, its first production use) and commit the restamp; widen the init test regex to accept a semver pre-release suffix. Consider: every future release PR merge needs the restamp — either document it in the release runbook or make CI tolerant of the one-commit lag; decide in the spec.",
+        "Source: first release cycle, CI runs 33789904843 and 33782255156 (2026-09-03)."
+      ],
+      "tags": [
+        "release",
+        "tests",
+        "dogfood"
+      ],
+      "milestone": null,
+      "status": "open"
     }
   ]
 }
