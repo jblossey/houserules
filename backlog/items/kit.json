@@ -761,6 +761,23 @@
         "dogfood"
       ],
       "milestone": null,
+      "status": "open",
+      "batch": 12
+    },
+    {
+      "id": "HR-045",
+      "type": "feat",
+      "title": "A proper README and the open-source repository files",
+      "body": [
+        "Owner request 2026-09-03 (after the alpha release went public): write a proper README and add all necessary files and settings for an open-source repository.",
+        "Shape: the README presents the kit to a first-time visitor (what it is, why, install, quick start, the ownership model, the agent workflow, badges once CI is public); CONTRIBUTING.md carries the development workflow (mise/pnpm setup, the batch process, conventional commits, the no-trailer rule); SECURITY.md, a code of conduct, issue and PR templates under .github/; repository settings (description, topics); LICENSE already exists (MIT). Details to the batch spec when scheduled.",
+        "Source: owner, 2026-09-03; scheduled after the HR-044 hotfix per the owner's instruction."
+      ],
+      "tags": [
+        "docs",
+        "oss"
+      ],
+      "milestone": null,
       "status": "open"
     }
   ]

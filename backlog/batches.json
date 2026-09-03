@@ -170,6 +170,18 @@
         "state": "done",
         "text": "Done 2026-09-03: merged into main fast-forward after the branch review (fable: ready with-fixes; both Minors prose-side, applied in the finishing pass with the retrospective). ALPHA STATE reached per the owner's gate; upstream creation staged as the owner-attended next step. Sixth evaluation record 14/14 at blobs 381149d1/b6747399 — the reworded collision line judged decidably for the first time. Two double-529 escalations handled per the standing rule; a session restart mid-T3 recovered on resume. Owner rulings this batch: release-please groundwork shape (spec T3) and the changelog base (bootstrap-sha fc445a6, first alpha covers batch 11, expected 0.2.0-alpha). Retrospective: evals-rerun branch-range clause, rules-need-a-loading-path corrected for the global area, quality.absence-is-designed (first cli rules file); HR-041..043 filed (HR-042 pends the owner's standing-check ruling)."
       }
+    },
+    {
+      "number": 12,
+      "items": [
+        "HR-044"
+      ],
+      "summary": "Hotfix: the release version bump broke CI — restamp the dogfood install, widen the pre-release-blind test regex, and document the post-release restamp step (HR-044).",
+      "kickoff": "docs/specs/2026-09-03-batch-12-release-hotfix.md",
+      "status": {
+        "state": "planned",
+        "text": "Gated 2026-09-03 at the hotfix gate: HR-044 alone, full pipeline over one task; spec approved in outline at the gate (restamp + regex widening + the release-runbook decision in the spec)."
+      }
     }
   ]
 }
