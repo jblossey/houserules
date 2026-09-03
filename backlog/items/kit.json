@@ -659,7 +659,7 @@
         "adoption"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 11
     },
     {
@@ -677,7 +677,7 @@
         "semver"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 11
     },
     {
@@ -694,8 +694,57 @@
         "evals"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 11
+    },
+    {
+      "id": "HR-041",
+      "type": "fix",
+      "title": "validate rejects a terminal-status report with a null self_audit",
+      "body": [
+        "A task report with status DONE or DONE_WITH_CONCERNS and self_audit null passes tools/kb.sh validate. Batch 11 task 3's implementer was interrupted mid-finalization by a session restart; the on-disk report looked schema-complete and only the controller's null probe caught the gap.",
+        "Fix: validate fails when a task-report's status is terminal and self_audit is null. The retrieval protocol's write-then-fill flow keeps working: the pre-fill report carries no terminal claim the validator trusts. Template tools/kb.mjs + root sync; deliverables schema unchanged unless the check fits there better.",
+        "Source: batch 11 branch review, template_defects 1 (2026-09-03)."
+      ],
+      "tags": [
+        "tools",
+        "validate"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-042",
+      "type": "fix",
+      "title": "The dependency-vetting check triggers on workflow action references",
+      "body": [
+        "The security-hygiene.dependency-vetting deterministic trigger keys on package manifests only, so a diff adding googleapis/release-please-action@v5.0.0 — third-party code running with contents:write — showed 'not triggered' and the batch 11 T3 reviewer had to file the missing vetting record by hand.",
+        "Fix: extend the trigger — a diff that adds or changes a `uses:` reference under .github/workflows/ requires dependency_vetting with the workflow file in manifests and the action reference in dependencies. Requires the owner's ruling first: the check lives on a STANDING entry (both knowledge copies) and the runner change lives in template/tools/kb.mjs.",
+        "Source: batch 11 branch review, violated_rules 2 and template_defects 2 (2026-09-03). Standing-entry change: OWNER RULING PENDING, listed in the batch 11 report."
+      ],
+      "tags": [
+        "tools",
+        "audit",
+        "standing"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-043",
+      "type": "fix",
+      "title": "Reviewer prescriptions state the invariant plus the observed instance",
+      "body": [
+        "Batch 11 T2 r0's prescription named only the observed instance ('present but not a string raises UsageError'), so the empty-string case survived one fix round; the r1 ruling charged the residual scope to the prescription's literal wording, not the implementer.",
+        "Fix: one sentence in .claude/agents/task-reviewer.md's findings guidance — state each fix as the invariant to hold plus the observed instance, so an implementer who fixes to the letter also fixes the intent. Changing task-reviewer.md triggers process.evals-rerun; schedule with the next template batch.",
+        "Source: batch 11 branch review, template_defects 3 (2026-09-03)."
+      ],
+      "tags": [
+        "template",
+        "process"
+      ],
+      "milestone": null,
+      "status": "open"
     }
   ]
 }
