@@ -798,6 +798,41 @@
       "milestone": null,
       "status": "open",
       "batch": 13
+    },
+    {
+      "id": "HR-047",
+      "type": "feat",
+      "title": "Rewrite the toolchain as one static binary (Tier 2)",
+      "body": [
+        "RULED by the owner 2026-09-03: go straight to Tier 2 — no Tier 0 (version-manager-provided Node) and no Tier 1 (bundled-JS binaries) interim steps. The kit becomes runs-anywhere: one compiled, statically linked houserules binary replaces the Node toolchain end to end.",
+        "Scope: rewrite bin/houserules.mjs, template/tools/kb.mjs, and template/tools/backlog.mjs in a compiled language (Go or Rust — the language choice is the first spec decision); the vendored tools/kb.sh and tools/backlog.sh become thin POSIX shims that exec the houserules binary on PATH; every existing behavior carries over under the current suite's contracts (init/update, KIT_OWNED sync and the stamp with its drift line, render, check, audit, validate, the backlog commands). The payload invariant houserules.payload-runs-on-builtins redefines to one static binary plus POSIX shell — a docs/design.md amendment and an owner ruling at spec time.",
+        "Migration: the JS suite pins today's behavior; port tests alongside the rewrite; parity gates (byte-identical render output, identical audit JSON on the same range) hold before the JS path retires. Multi-batch work; the spec decides the slicing.",
+        "Source: owner, 2026-09-03 (Tier 2 direct, superseding the tiered distribution proposal)."
+      ],
+      "tags": [
+        "rewrite",
+        "binary",
+        "release"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-048",
+      "type": "feat",
+      "title": "Binary delivery channels for the rewritten kit (Tier 2)",
+      "body": [
+        "RULED with HR-047: distribution targets the compiled binary, not npm-first. Deliverables: per-platform release binaries (linux and macOS on x64 and arm64, Windows) built and attached by CI at each release-please release, with checksums and a signing/notarization decision for macOS; mise via the ubi backend; an asdf plugin consuming the release binaries; a Homebrew tap; Scoop or winget; a curl-to-sh installer. Whether the npm package stays as one channel among many or retires is an owner ruling at spec time.",
+        "Prerequisite folded in: the tag-format ruling — plain v<version> against the current houserules-v<version> component tag — before any plugin or ubi consumer hard-codes the tag grammar.",
+        "External acts (the plugin repository, registry PRs, the tap) are owner-attended per the decision 3 precedent. Blocked by HR-047 producing the binary; the spec may land the tag-format ruling and the CI scaffolding earlier.",
+        "Source: owner, 2026-09-03 (Tier 2 direct, no Tier 0 or Tier 1 channels)."
+      ],
+      "tags": [
+        "release",
+        "distribution"
+      ],
+      "milestone": null,
+      "status": "open"
     }
   ]
 }
