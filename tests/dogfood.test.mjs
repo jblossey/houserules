@@ -4,7 +4,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { KIT_OWNED } from '../bin/houserules.mjs';
+import { KIT_OWNED, SEED_ONCE } from '../bin/houserules.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (path) => readFileSync(`${ROOT}${path}`, 'utf8');
@@ -37,5 +37,23 @@ describe('the deliverables schema copies', () => {
     expect(read(SCHEMA_PATH)).toBe(
       read(`template/${SCHEMA_PATH}`).replaceAll('WI-', `${idPrefix}-`),
     );
+  });
+});
+
+describe('the seeded eval scenario copies', () => {
+  // .claude/evals/*.json entries in SEED_ONCE are not PREFIXED: init copies them
+  // unchanged, so the pin is plain byte equality, no transform. record.json is
+  // excluded by design: the root copy accumulates run sets across evaluations
+  // while the template ships only the seed record.
+  const SCENARIOS = SEED_ONCE.filter(
+    (file) => file.startsWith('.claude/evals/') && file !== '.claude/evals/record.json',
+  );
+
+  it('derives at least one seeded scenario from SEED_ONCE', () => {
+    expect(SCENARIOS).not.toHaveLength(0);
+  });
+
+  it.each(SCENARIOS)('%s at the root equals its template source', (file) => {
+    expect(read(file)).toBe(read(`template/${file}`));
   });
 });
