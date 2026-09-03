@@ -779,7 +779,7 @@
         "oss"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 13
     },
     {
@@ -796,7 +796,7 @@
         "release"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 13
     },
     {
@@ -830,6 +830,38 @@
       "tags": [
         "release",
         "distribution"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-049",
+      "type": "fix",
+      "title": "The README's pinned install tag follows each release",
+      "body": [
+        "README.md pins the install form to houserules-v0.2.0-alpha in three places (the r0 unpinned form was the worse defect); nothing in the release flow updates them, so the next release leaves the README installing an old kit — a knowledge-base.state-only-the-source decay at the first post-merge release.",
+        "Fix: wire the pins into the release flow — release-please extra-files annotations if they support the shape, else one line in the restamp step of docs/runbook.md and the finishing-a-feature skill (update the README pins with the restamp commit). Decide the mechanism in the batch spec. Interlock: HR-048's tag-format ruling may rename the tag grammar these pins use — schedule together or after it.",
+        "Source: batch 13 branch review, issue 2 (2026-09-03)."
+      ],
+      "tags": [
+        "docs",
+        "release"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-050",
+      "type": "fix",
+      "title": "One evals rerun pays the verbatim-output rule and the findings-list check",
+      "body": [
+        "Two agent-template defects from the batch 13 branch review pair for one evals rerun: (a) implementer.md's live_run guidance gains one sentence — output carries the command's stdout/stderr verbatim and nothing else; the exit field alone carries the exit status (T2's captures appended a synthetic exit=0 line inside output); (b) task-reviewer.md's re-review checklist gains one sentence — confirm the fix round's findings list matches the review's findings one for one before ruling all-addressed (T2's fix_rounds[0] listed four of five, caught only in prose).",
+        "Riding free (skill-only, no rerun): the orchestrating skill's rebuild guidance gains a step — on a mid-batch branch rebuild, write the old-to-new sha map to its own workspace file, cite it in the batch report, never edit closed-task deliverables (the batch 13 rebuild left the map ledger-only until the branch review flagged it).",
+        "Source: batch 13 branch review, template_defects 1-3 (2026-09-03)."
+      ],
+      "tags": [
+        "template",
+        "evals"
       ],
       "milestone": null,
       "status": "open"

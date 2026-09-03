@@ -192,8 +192,8 @@
       "summary": "The open-source batch: the finishing-a-feature restamp step (HR-046), then the proper README and the OSS repository files and settings (HR-045).",
       "kickoff": "docs/specs/2026-09-03-batch-13-oss.md",
       "status": {
-        "state": "planned",
-        "text": "Gated 2026-09-03: HR-045 + HR-046; spec pending owner approval."
+        "state": "done",
+        "text": "Done 2026-09-03: merged into main fast-forward after the branch review (fable: ready with-fixes; the skill clause fixed in-branch with the pnpm verifyDepsBeforeRun mask discovered and proven by tarball; the release-pin decay filed as HR-049; the two agent-template defects paired as HR-050). Mid-batch: the branch rebuilt on main after the owner's Tier-2 ruling merged as HR-047/048 under ids the branch had candidate-filed — main won, the analysis parked as PP-13-01, the sha map persisted to the workspace. The repository now presents itself: visitor README with a quick start that runs as printed and a pinned install, CONTRIBUTING, SECURITY (private reporting enabled), Covenant 3.0, issue forms, PR template, description and topics set. Retrospective: three body extensions and process.main-wins-backlog-collisions."
       }
     }
   ]
