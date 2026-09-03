@@ -354,7 +354,9 @@ describe('update marker', () => {
     );
     const io = capture();
     expect(main(['update', '--dir', dir], io)).toBe(2);
-    expect(io.stderr).toMatch(/\.houserules\.json: invalid idPrefix/);
+    expect(io.stderr).toMatch(
+      /\.houserules\.json: idPrefix must be 1-8 characters, A-Z then A-Z0-9/,
+    );
     expect(io.stderr).not.toContain('    at ');
     expect(io.stderr.trim().split('\n')).toHaveLength(1);
   });
@@ -367,7 +369,39 @@ describe('update marker', () => {
     );
     const io = capture();
     expect(main(['update', '--dir', dir], io)).toBe(2);
-    expect(io.stderr).toMatch(/\.houserules\.json: invalid idPrefix/);
+    expect(io.stderr).toMatch(
+      /\.houserules\.json: idPrefix must be 1-8 characters, A-Z then A-Z0-9/,
+    );
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
+  it('reports a lowercase idPrefix in the stamp as one usage error', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    writeFileSync(
+      join(dir, '.houserules.json'),
+      '{"version":"0.0.1","idPrefix":"wi"}',
+    );
+    const io = capture();
+    expect(main(['update', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toMatch(
+      /\.houserules\.json: idPrefix must be 1-8 characters, A-Z then A-Z0-9/,
+    );
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
+  it('reports an idPrefix over 8 characters in the stamp as one usage error', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    writeFileSync(
+      join(dir, '.houserules.json'),
+      '{"version":"0.0.1","idPrefix":"TOOLONGPREFIX"}',
+    );
+    const io = capture();
+    expect(main(['update', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toMatch(
+      /\.houserules\.json: idPrefix must be 1-8 characters, A-Z then A-Z0-9/,
+    );
     expect(io.stderr).not.toContain('    at ');
     expect(io.stderr.trim().split('\n')).toHaveLength(1);
   });
