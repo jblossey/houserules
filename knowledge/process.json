@@ -326,6 +326,19 @@
       ],
       "tags": ["shell", "evidence"],
       "source": { "date": "2026-09-02", "by": "review", "ref": "batch 7 branch review, retrospective" }
+    },
+    {
+      "id": "process.main-wins-backlog-collisions",
+      "kind": "procedure",
+      "area": "process",
+      "summary": "On a backlog collision with main, main wins: rebuild the branch on it by cherry-pick, drop the never-merged branch filings, and park superseded analysis.",
+      "body": [
+        "Batch 13: an owner-side agent merged HR-047/048 to main while the branch carried candidate filings under the same ids. Never-merged branch-local filings can be dropped without breaching knowledge-base.ids-are-permanent.",
+        "Verify overlap yourself with git diff --name-only on both sides; another agent's no-overlap claim is a claim, not evidence.",
+        "Record the old-to-new sha map in a workspace file and the batch report: closed tasks' deliverables keep pre-rebuild shas, and gc can prune those objects."
+      ],
+      "tags": ["backlog", "collision", "rebuild"],
+      "source": { "date": "2026-09-03", "by": "review", "ref": "batch 13 branch review; the HR-047/048 collision" }
     }
   ]
 }
