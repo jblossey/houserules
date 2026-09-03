@@ -156,6 +156,20 @@
         "state": "done",
         "text": "Done 2026-09-03: merged into main fast-forward after the branch review (fable: ready yes). Implementers on sonnet, task reviews on opus. Every finding fixed in-branch except the scenario decidability defect, deferred with the live_run capture form as HR-040 (one future evals rerun pays both). Fifth evaluation record: 14/14 at blobs ef620fd8/b6747399, the collision line passed on an alternate disclosed path noted verbatim. Mid-batch owner ruling (release-please, alpha pre-release, upstream after alpha state) filed at design.md 5.19, decisions.json, HR-038/HR-039. Retrospective: gate-shell-chains evidence-bracket line, evals-rerun citation 7-10, root-only rule writing-style.instructions-cover-the-state-space."
       }
+    },
+    {
+      "number": 11,
+      "items": [
+        "HR-040",
+        "HR-038",
+        "HR-039"
+      ],
+      "summary": "The alpha batch: the paired template/eval fixes with their evals rerun (HR-040), the adopter update path (HR-038), and the release-please local groundwork (HR-039). Merging this batch constitutes alpha state; the upstream creation follows immediately per design.md 5.19.",
+      "kickoff": "docs/specs/2026-09-03-batch-11-alpha.md",
+      "status": {
+        "state": "planned",
+        "text": "Gated 2026-09-03: all three open items; the owner ruled completing this batch constitutes alpha state. Spec pending owner approval."
+      }
     }
   ]
 }
