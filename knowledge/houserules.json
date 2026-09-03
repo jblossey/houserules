@@ -287,6 +287,31 @@
       "verify": [
         "tests/scratch-dir.mjs"
       ]
+    },
+    {
+      "id": "houserules.post-release-restamp",
+      "kind": "procedure",
+      "area": "docs",
+      "summary": "After a release-please PR merge, run update --dir ., commit the restamp, and push; see docs/runbook.md.",
+      "body": [
+        "release-please bumps package.json's version in its PR. Merging that PR does not update .houserules.json. The stale stamp fails tests/dogfood.test.mjs's exact-equality pin on main (HR-044).",
+        "After you merge a release-please PR: run `mise exec -- node bin/houserules.mjs update --dir .` (it prints the drift line, for example `kit 0.1.0 -> 0.2.0-alpha`); commit the restamped `.houserules.json` as `chore(release): restamp the kit version`; push to main.",
+        "Full steps and rationale: docs/runbook.md."
+      ],
+      "tags": [
+        "release",
+        "restamp",
+        "runbook"
+      ],
+      "source": {
+        "date": "2026-09-03",
+        "by": "review",
+        "ref": "batch 12 task 1 review, issue 1"
+      },
+      "verify": [
+        "docs/runbook.md",
+        "tests/dogfood.test.mjs"
+      ]
     }
   ]
 }
