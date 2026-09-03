@@ -127,6 +127,21 @@
         "state": "done",
         "text": "Done 2026-09-02: merged into main fast-forward after the branch review (fable: with-fixes; both minors closed in the finish — the ledger corrected including the controller's own over-narration, the loading-path summary widened). HR-025 to HR-030 delivered plus the third evaluation record (docs-edit 3/3, dependency-add 6/6 with the new judged criterion navigated as designed, seeded-violations 5/5 per the codified fixture procedure). Ruling 18 enforced for the first time (the T4 natural mislabel relabeled reconstructed under reviewer sanction). Sixteen findings over twelve review rounds fixed in-branch; deferrals HR-031 to HR-034 all reasoned and filed. No standing proposals this batch."
       }
+    },
+    {
+      "number": 9,
+      "items": [
+        "HR-031",
+        "HR-032",
+        "HR-033",
+        "HR-034"
+      ],
+      "summary": "The shared idPrefix predicate (owner-ruled), the seeded scenario-copy pin, the timing-key example inline in the implementer template, the --ids-is-the-Knowledge-list protocol wording with the guard-catch ledger line, and the fourth evaluation record.",
+      "kickoff": "docs/specs/2026-09-02-batch-9-predicate-pin-and-protocol.md",
+      "status": {
+        "state": "planned",
+        "text": "Spec approved on 2026-09-02 as written; on branch batch-9 — implementer on sonnet, task review on opus, branch review on fable; one shared evals run after T4."
+      }
     }
   ]
 }
