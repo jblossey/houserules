@@ -80,6 +80,20 @@ const PREFIXED = new Set([
 
 const USAGE = 'usage: houserules <init|update|files> [--dir <target>] [--id-prefix <PREFIX>]';
 
+/** The shared constraint text for both `idPrefix` rejection messages. */
+const ID_PREFIX_HINT = 'must be 1-8 characters, A-Z then A-Z0-9';
+
+/**
+ * True when `value` is a valid backlog id prefix: one uppercase letter
+ * followed by up to seven more uppercase letters or digits (1-8 characters
+ * total). Shared by the `--id-prefix` flag and the `.houserules.json`
+ * stamp's `idPrefix`, so a hand-edited stamp can never carry a prefix the
+ * flag would refuse.
+ */
+function isIdPrefix(value) {
+  return typeof value === 'string' && /^[A-Z][A-Z0-9]{0,7}$/.test(value);
+}
+
 /** Reads one template file, rewriting the backlog id prefix where it applies. */
 function templateContent(file, prefix) {
   const text = readFileSync(join(TEMPLATE_DIR, file), 'utf8');
@@ -158,25 +172,21 @@ function renderIn(target) {
  * Installs the setup into `target`. Reads and validates the existing
  * `.houserules.json` stamp before writing anything, so a corrupt stamp
  * leaves `target` untouched: raises `UsageError` when the stamp is not a
- * JSON object, or when its `idPrefix` is present but is not a non-empty
- * string. Then writes kit-owned files always, seed-once files only when
- * `seed` is set and the file is absent, restamps `.houserules.json`, and
- * renders the generated markdown.
+ * JSON object, or when its `idPrefix` is present but fails `isIdPrefix`.
+ * Then writes kit-owned files always, seed-once files only when `seed` is
+ * set and the file is absent, restamps `.houserules.json`, and renders the
+ * generated markdown.
  */
 function install(io, opts, { seed }, cwd) {
   const target = resolve(cwd, typeof opts.dir === 'string' ? opts.dir : '.');
   if (!existsSync(join(target, '.git')))
     throw new UsageError(`${target} is not a git repository (run git init first)`);
   const prefix = typeof opts['id-prefix'] === 'string' ? opts['id-prefix'] : 'WI';
-  if (!/^[A-Z][A-Z0-9]{0,7}$/.test(prefix))
-    throw new UsageError('id-prefix must be 1-8 characters, A-Z then A-Z0-9');
+  if (!isIdPrefix(prefix)) throw new UsageError(`id-prefix ${ID_PREFIX_HINT}`);
   const markerPath = join(target, '.houserules.json');
   const marker = existsSync(markerPath) ? readJsonObject(markerPath) : { idPrefix: prefix };
-  if (
-    marker.idPrefix !== undefined &&
-    (typeof marker.idPrefix !== 'string' || marker.idPrefix === '')
-  )
-    throw new UsageError(`${markerPath}: invalid idPrefix`);
+  if (marker.idPrefix !== undefined && !isIdPrefix(marker.idPrefix))
+    throw new UsageError(`${markerPath}: idPrefix ${ID_PREFIX_HINT}`);
   for (const file of KIT_OWNED) {
     writeInto(target, file, templateContent(file, prefix));
     io.out(`wrote ${file}\n`);
