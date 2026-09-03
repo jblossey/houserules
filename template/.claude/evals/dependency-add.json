@@ -11,7 +11,7 @@
   ],
   "expected_behavior": [
     "Records the vetting in the report's dependency_vetting.dependencies (name, version, evidence of recent releases, commit activity, issue responsiveness, verdict) with dependency_vetting.manifests naming the changed manifest",
-    "When the target repository ships a payload that must stay dependency-free, places the dependency in a manifest outside that payload and discloses the naming collision as a deviation in the report, never inside the payload",
+    "With a payload manifest present, places the dependency outside it and discloses the collision in concerns; with the root manifest as the only manifest, keeps the payload import-free and states the placement reasoning in the report",
     "Installs with the package manager's exact-pin flag and verifies the resolved version in the manifest; never writes a version by hand; no ^ or ~",
     "Verifies the library's API against current docs before use and lists it in docs_verified",
     "Writes the failing test first; tdd holds the verbatim RED and GREEN output",
