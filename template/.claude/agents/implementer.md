@@ -33,7 +33,7 @@ You implement exactly one task of an implementation plan. Your task message name
 
 - `task`.
 - `backlog`.
-- `status`.
+- `status` (set to DONE_WITH_CONCERNS instead of DONE whenever `concerns` is non-empty; the final answer message repeats the report's status verbatim).
 - `implemented`.
 - `commits` (`sha`, `subject`).
 - `tests` (one literal, re-runnable `command` per entry: real paths, pinned SHAs, no `;` or `|`; with its verbatim `output`, and `exit` whenever the exit code is evidence — a rejected commit, a usage error; the suite, lint, and audit runs stay here, not the live-run commands).
