@@ -1,7 +1,6 @@
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -9,12 +8,12 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { KIT_OWNED, SEED_ONCE, main } from '../bin/houserules.mjs';
 import { UsageError } from '../template/tools/lib/cli.mjs';
+import { scratchDir } from './scratch-dir.mjs';
 
 // `init` and `update` write the render child's script themselves, so no
 // fixture can make that child fail without a message. Wrapping execFileSync
@@ -32,7 +31,7 @@ afterEach(() => {
 
 /** A fresh temporary git repository to initialize into. */
 function makeTarget() {
-  const dir = mkdtempSync(join(tmpdir(), 'houserules-target-'));
+  const dir = scratchDir('houserules-target-');
   execFileSync('git', ['init', '-q', '-b', 'main', dir]);
   return dir;
 }
@@ -165,7 +164,7 @@ describe('init', () => {
     ]);
   });
   it('refuses a target that is not a git repository', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'houserules-nogit-'));
+    const dir = scratchDir('houserules-nogit-');
     const io = capture();
     expect(main(['init', '--dir', dir], io)).toBe(2);
     expect(io.stderr).toContain('not a git repository');

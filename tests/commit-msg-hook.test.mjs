@@ -1,9 +1,9 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { scratchDir } from './scratch-dir.mjs';
 
 const HOOK = fileURLToPath(new URL('../template/.githooks/commit-msg', import.meta.url));
 
@@ -13,7 +13,7 @@ const HOOK = fileURLToPath(new URL('../template/.githooks/commit-msg', import.me
  * the trailer gate is under test. Returns the exit status and stderr.
  */
 function runHook(message) {
-  const dir = mkdtempSync(join(tmpdir(), 'commit-msg-hook-'));
+  const dir = scratchDir('commit-msg-hook-');
   const msgFile = join(dir, 'MSG');
   writeFileSync(msgFile, message);
   try {

@@ -1,5 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
@@ -12,9 +11,10 @@ import {
   validate,
 } from '../template/tools/lib/json-store.mjs';
 import { UsageError } from '../template/tools/lib/cli.mjs';
+import { scratchDir } from './scratch-dir.mjs';
 
 function tmp() {
-  return mkdtempSync(join(tmpdir(), 'json-store-'));
+  return scratchDir('json-store-');
 }
 
 describe('emit', () => {

@@ -4,11 +4,11 @@
 // as the process entry point when launched through a symlink, the shape a
 // package manager's bin shim or a symlinked package directory produces.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, symlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { scratchDir } from './scratch-dir.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
@@ -18,7 +18,7 @@ const ROOT = fileURLToPath(new URL('../', import.meta.url));
  * CLI. Returns the parsed JSON the process wrote to stdout.
  */
 function runThroughSymlink(file, args) {
-  const dir = mkdtempSync(join(tmpdir(), 'entry-symlink-'));
+  const dir = scratchDir('entry-symlink-');
   const link = join(dir, 'entry-link.mjs');
   symlinkSync(fileURLToPath(new URL(file, import.meta.url)), link);
   const stdout = execFileSync(process.execPath, [link, ...args], {
