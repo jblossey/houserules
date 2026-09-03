@@ -659,7 +659,8 @@
         "adoption"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 11
     },
     {
       "id": "HR-039",
@@ -668,7 +669,7 @@
       "body": [
         "RULED by the owner 2026-09-03 (docs/design.md §5.19): versioning is semver; changelogs are generated from the conventional commits; the tool is release-please; the first release is a pre-release under the alpha dist-tag; the GitHub upstream is created right after the alpha-state tasks are done. Until the upstream exists, decision 3's constraint stands: no remote, no gh repo create, no npm publish.",
         "Shape: local groundwork can land before the upstream (release-please config and manifest, prerelease alpha versioning strategy, the release-type choice for a single-package pnpm repo, CHANGELOG bootstrap); the automation itself runs on GitHub and activates when the upstream is created. Publishing to npm under the alpha dist-tag follows as the first release.",
-        "Open input for the owner: the alpha-state task list — which backlog items must be done before the upstream is created. Propose candidates in the next batch report.",
+        "RULED by the owner 2026-09-03 (batch 11 gate): alpha state = HR-040 + HR-038 + this item's local groundwork, gated as batch 11; completing that batch constitutes alpha state, and the upstream creation follows immediately.",
         "Source: owner, 2026-09-03; release-please chosen over git-cliff and changesets at the ruling."
       ],
       "tags": [
@@ -676,7 +677,8 @@
         "semver"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 11
     },
     {
       "id": "HR-040",
@@ -692,7 +694,8 @@
         "evals"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 11
     }
   ]
 }
