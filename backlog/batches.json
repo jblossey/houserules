@@ -195,6 +195,20 @@
         "state": "done",
         "text": "Done 2026-09-03: merged into main fast-forward after the branch review (fable: ready with-fixes; the skill clause fixed in-branch with the pnpm verifyDepsBeforeRun mask discovered and proven by tarball; the release-pin decay filed as HR-049; the two agent-template defects paired as HR-050). Mid-batch: the branch rebuilt on main after the owner's Tier-2 ruling merged as HR-047/048 under ids the branch had candidate-filed — main won, the analysis parked as PP-13-01, the sha map persisted to the workspace. The repository now presents itself: visitor README with a quick start that runs as printed and a pinned install, CONTRIBUTING, SECURITY (private reporting enabled), Covenant 3.0, issue forms, PR template, description and topics set. Retrospective: three body extensions and process.main-wins-backlog-collisions."
       }
+    },
+    {
+      "number": 14,
+      "items": [
+        "HR-041",
+        "HR-043",
+        "HR-050"
+      ],
+      "summary": "The hygiene sweep: validate hardening (HR-041), the reviewer-prescription and template-sentence fixes with one shared evals rerun (HR-043, HR-050). HR-049 stays open on its HR-048 tag-format interlock.",
+      "kickoff": "docs/specs/2026-09-04-batch-14-hygiene.md",
+      "status": {
+        "state": "planned",
+        "text": "Gated 2026-09-04: the three hygiene items; spec pending owner approval."
+      }
     }
   ]
 }
