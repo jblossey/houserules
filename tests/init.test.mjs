@@ -404,6 +404,36 @@ describe('update marker', () => {
     expect(io.stderr).not.toContain('    at ');
     expect(io.stderr.trim().split('\n')).toHaveLength(1);
   });
+  it('reports a non-string version in the stamp as one usage error', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    writeFileSync(
+      join(dir, '.houserules.json'),
+      '{"version":3,"idPrefix":"WI"}',
+    );
+    const io = capture();
+    expect(main(['update', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toMatch(
+      /\.houserules\.json: version must be a non-empty string/,
+    );
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
+  it('reports an empty-string version in the stamp as one usage error', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    writeFileSync(
+      join(dir, '.houserules.json'),
+      '{"version":"","idPrefix":"WI"}',
+    );
+    const io = capture();
+    expect(main(['update', '--dir', dir], io)).toBe(2);
+    expect(io.stderr).toMatch(
+      /\.houserules\.json: version must be a non-empty string/,
+    );
+    expect(io.stderr).not.toContain('    at ');
+    expect(io.stderr.trim().split('\n')).toHaveLength(1);
+  });
   it('leaves kit-owned files untouched when update fails on invalid JSON in the stamp', () => {
     const dir = makeTarget();
     expect(main(['init', '--dir', dir], capture())).toBe(0);
@@ -426,6 +456,42 @@ describe('update marker', () => {
     expect(readFileSync(join(dir, 'tools/kb.mjs'), 'utf8').slice(0, 32)).toBe(
       '// clobbered\n',
     );
+  });
+});
+
+describe('update drift line', () => {
+  it('prints the stamped version and the running version it syncs to', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    const markerPath = join(dir, '.houserules.json');
+    const { version: running, idPrefix } = JSON.parse(
+      readFileSync(markerPath, 'utf8'),
+    );
+    writeFileSync(markerPath, JSON.stringify({ version: '0.0.1', idPrefix }));
+    const io = capture();
+    expect(main(['update', '--dir', dir], io)).toBe(0);
+    expect(io.stdout).toContain(`kit 0.0.1 -> ${running}\n`);
+  });
+  it('prints the same-shape line when the stamped version already matches', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    const { version: running } = JSON.parse(
+      readFileSync(join(dir, '.houserules.json'), 'utf8'),
+    );
+    const io = capture();
+    expect(main(['update', '--dir', dir], io)).toBe(0);
+    expect(io.stdout).toContain(`kit ${running} -> ${running}\n`);
+  });
+  it('prints the designed none token when the stamp predates the version field', () => {
+    const dir = makeTarget();
+    expect(main(['init', '--dir', dir], capture())).toBe(0);
+    const { idPrefix } = JSON.parse(
+      readFileSync(join(dir, '.houserules.json'), 'utf8'),
+    );
+    writeFileSync(join(dir, '.houserules.json'), JSON.stringify({ idPrefix }));
+    const io = capture();
+    expect(main(['update', '--dir', dir], io)).toBe(0);
+    expect(io.stdout).toContain('kit none -> ');
   });
 });
 

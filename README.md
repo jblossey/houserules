@@ -98,6 +98,18 @@ Do not hand-edit kit-owned files or the generated `.claude/rules/*.md` and
 `.claude/skills/project-knowledge/SKILL.md` — edits are lost on the next
 `update` or `render`.
 
+`update` also reports version drift: it prints one line naming the version
+your stamp had and the version the run just synced to, `kit <old> -> <new>`
+(an unchanged version prints the same shape with both sides equal). When
+houserules ships a new release, adopt it this way:
+
+1. Bump the `houserules` dependency to the new release and install it
+   (`pnpm install`, or your package manager's equivalent).
+2. Run `pnpm exec houserules update --dir .` (or your package manager's
+   exec equivalent).
+3. Review the diff (`git diff`). The drift line is your check: it confirms
+   the version you moved from and the version you landed on.
+
 ## Daily commands
 
 ```sh
