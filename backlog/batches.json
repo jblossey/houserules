@@ -182,6 +182,19 @@
         "state": "done",
         "text": "Done 2026-09-03: merged into main fast-forward after the branch review (fable: ready with-fixes — the one Minor was the pre-merge aggregation itself; the fix round's regex churn was folded away into the spec's two clean commits). Main turned green: the restamp with the drift line's first production use (kit 0.1.0 -> 0.2.0-alpha), the value assertion replacing the shape regex, docs/runbook.md with the ruled restamp step and its houserules.post-release-restamp loading path. Retrospective: HR-041 extended with the skipped-rows validate gate; HR-046 filed (finishing-a-feature carries the release restamp step, skill not standing)."
       }
+    },
+    {
+      "number": 13,
+      "items": [
+        "HR-046",
+        "HR-045"
+      ],
+      "summary": "The open-source batch: the finishing-a-feature restamp step (HR-046), then the proper README and the OSS repository files and settings (HR-045).",
+      "kickoff": "docs/specs/2026-09-03-batch-13-oss.md",
+      "status": {
+        "state": "planned",
+        "text": "Gated 2026-09-03: HR-045 + HR-046; spec pending owner approval."
+      }
     }
   ]
 }

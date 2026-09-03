@@ -779,7 +779,8 @@
         "oss"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 13
     },
     {
       "id": "HR-046",
@@ -795,7 +796,8 @@
         "release"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 13
     }
   ]
 }
