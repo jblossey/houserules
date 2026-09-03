@@ -153,8 +153,8 @@
       "summary": "Test-suite scratch-dir hygiene with its knowledge entry (HR-035), the report status tied to a non-empty concerns list (HR-036), the widened controller-slip ledger bullet (HR-037), and the fifth evaluation record.",
       "kickoff": "docs/specs/2026-09-03-batch-10-hygiene-and-status.md",
       "status": {
-        "state": "planned",
-        "text": "Spec approved on 2026-09-03 as written; on branch batch-10 — implementer on sonnet, task review on opus, branch review on fable; one shared evals run after T3."
+        "state": "done",
+        "text": "Done 2026-09-03: merged into main fast-forward after the branch review (fable: ready yes). Implementers on sonnet, task reviews on opus. Every finding fixed in-branch except the scenario decidability defect, deferred with the live_run capture form as HR-040 (one future evals rerun pays both). Fifth evaluation record: 14/14 at blobs ef620fd8/b6747399, the collision line passed on an alternate disclosed path noted verbatim. Mid-batch owner ruling (release-please, alpha pre-release, upstream after alpha state) filed at design.md 5.19, decisions.json, HR-038/HR-039. Retrospective: gate-shell-chains evidence-bracket line, evals-rerun citation 7-10, root-only rule writing-style.instructions-cover-the-state-space."
       }
     }
   ]

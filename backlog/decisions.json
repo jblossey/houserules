@@ -64,6 +64,10 @@
     {
       "date": "2026-09-02",
       "text": "process.rulings-to-file body gains the accepted-deviation clause (home it in the turn it is accepted, before the next dispatch); applied in knowledge/process.json and template/knowledge/process.json. docs/design.md §5.14."
+    },
+    {
+      "date": "2026-09-03",
+      "text": "Releases: semver via release-please, changelogs generated from the conventional commits; the first release is a pre-release under the alpha dist-tag; the GitHub upstream is created right after the alpha-state tasks are done — until then decision 3's no-remote constraint stands. docs/design.md §5.19."
     }
   ],
   "notes": []

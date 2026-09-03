@@ -356,3 +356,13 @@ Each item records the ruling with its date, or stays marked open.
     `mutation`. Applied in `knowledge/process.json` and
     `template/knowledge/process.json`; the summary is unchanged. Source:
     batch 7 branch review, violated_rules.
+19. **Releases — ruled 2026-09-03: semver via release-please; alpha
+    pre-release first; upstream after alpha state.** Versioning follows
+    semver and changelogs are generated from the conventional commits;
+    the tool is release-please. The first release is a pre-release
+    under the `alpha` dist-tag. The GitHub upstream is created right
+    after all tasks needed to reach alpha state are done; until then
+    decision 3's constraint stands (no remote, no `gh repo create`, no
+    `npm publish`). Adopters get releases through the update path.
+    Backlog: HR-039 (release machinery), HR-038 (adopter update path).
+    Source: owner, 2026-09-03.

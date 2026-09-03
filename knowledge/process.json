@@ -232,7 +232,7 @@
         "Run every scenario in a detached scratch worktree at the branch head before the branch review; the orchestrating skill holds the procedure. Keep nothing from a worktree; workspace artifacts carry the `eval-` prefix.",
         "A run set in the record names `date`, `templates` (the git blob id of each template under test from `git rev-parse HEAD:<path>`; blob ids survive commit aggregation, commit SHAs do not), and one row per scenario: `scenario`, `agent`, `model`, `pass`, `of`, `notes`. The branch reviewer compares the latest blob ids with `HEAD`.",
         "No scenario covers `branch-reviewer` or the orchestrating skill; a change there needs no run. The retrieval protocol text in `tools/kb.mjs` shapes the generated skill the implementer loads; run the scenarios after a change there too — the check cannot see it.",
-        "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns; the branch does not merge before the record commit lands (batches 7-9)."
+        "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns; the branch does not merge before the record commit lands (batches 7-10)."
       ],
       "tags": ["evals", "templates", "agents"],
       "source": { "date": "2026-08-31", "by": "user", "ref": "tag-pilot fc3241b" },
@@ -321,7 +321,8 @@
         "Write verification scripts so the success message is unreachable when any prior command fails: && chains, or a trailing explicit exit-code check per command. set -e does not protect tool-run shells.",
         "Re-run, do not hand-repair, any evidence produced by a sequence that later proves unchained.",
         "Output redirection placed after an && chain binds only the last command; wrap the chain in a subshell, or redirect per command, when the whole sequence is the evidence (batch 9).",
-        "A zero-count probe (grep -c) exits nonzero on zero matches and breaks the chain even when zero is the expected answer; gate count probes on their output, not their exit (batch 9)."
+        "A zero-count probe (grep -c) exits nonzero on zero matches and breaks the chain even when zero is the expected answer; gate count probes on their output, not their exit (batch 9).",
+        "A before/after evidence bracket (snapshot, action, snapshot, diff) is one && chain in one call; snapshots captured across separate calls prove nothing about order. Re-run the whole bracket, never splice it, and check the artifact mtimes increase in chain order (batch 10)."
       ],
       "tags": ["shell", "evidence"],
       "source": { "date": "2026-09-02", "by": "review", "ref": "batch 7 branch review, retrospective" }
