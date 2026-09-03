@@ -592,6 +592,22 @@
       "milestone": null,
       "status": "open",
       "batch": 9
+    },
+    {
+      "id": "HR-035",
+      "type": "fix",
+      "title": "The test suite cleans its mkdtemp scratch directories",
+      "body": [
+        "tests/ has 21 mkdtempSync call sites across seven files and none removes its directory; every pnpm test run adds a full seeded project tree per init target. At the batch 9 task 2 review /tmp held 1714 orphaned houserules-target-* directories plus 89 kb-* and 15 ws-*, and a transient inode exhaustion had already broken one suite attempt (disclosed in the task 2 report).",
+        "Fix: give the mkdtemp sites cleanup — onTestFinished/afterEach with rmSync(dir, { recursive: true, force: true }), or one fixture helper that mints and registers scratch dirs. Behavior of the tests unchanged; the suite leaves /tmp as it found it.",
+        "Source: batch 9 task 2 review, controller escalation resolved (2026-09-03)."
+      ],
+      "tags": [
+        "tests",
+        "hygiene"
+      ],
+      "milestone": null,
+      "status": "open"
     }
   ]
 }
