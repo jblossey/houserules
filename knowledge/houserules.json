@@ -242,6 +242,30 @@
       ]
     },
     {
+      "id": "houserules.release-please-schema-gap",
+      "kind": "gotcha",
+      "area": "global",
+      "summary": "release-please's config JSON schema omits prerelease-type and skip-snapshot from its root; keep those settings under packages['.'].",
+      "body": [
+        "https://raw.githubusercontent.com/googleapis/release-please/v17.11.2/schemas/config.json sets `additionalProperties: false` on the config root, but the root's own `properties` list omits `prerelease-type` and `skip-snapshot`. `src/manifest.ts` reads both at the top level identically to `versioning` and `release-type`, and the project's own docs show a top-level example that includes `prerelease-type` — the omission is a gap in the schema, not the runtime.",
+        "Verified with `ajv-cli validate`: a root-level `prerelease-type` key fails against that schema with `params.additionalProperty: 'prerelease-type'` (`must NOT have additional properties`); the identical key nested under `packages['.']` validates cleanly, because that path's value schema (`ReleaserConfigOptions`, reached through `allOf`, not merged into the root's own `properties`) carries no such restriction.",
+        "Put `prerelease-type` and `skip-snapshot` (and, for consistency, any other release setting) under `packages['.']` in `release-please-config.json`, not at the config root. `src/manifest.ts` merges each package's config over the root default per key, so a single-package repository behaves identically either way, and only the nested placement passes the schema the file's own `$schema` points at."
+      ],
+      "tags": [
+        "release-please",
+        "schema",
+        "config"
+      ],
+      "source": {
+        "date": "2026-09-03",
+        "by": "review",
+        "ref": "batch 11 task 3 review, finding 3"
+      },
+      "verify": [
+        "release-please-config.json"
+      ]
+    },
+    {
       "id": "houserules.tests-clean-scratch-dirs",
       "kind": "rule",
       "area": "tests",
