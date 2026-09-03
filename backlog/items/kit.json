@@ -539,7 +539,7 @@
         "stamp"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 9
     },
     {
@@ -556,7 +556,7 @@
         "evals"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 9
     },
     {
@@ -573,7 +573,7 @@
         "agents"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 9
     },
     {
@@ -590,7 +590,7 @@
         "process"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 9
     },
     {
@@ -600,11 +600,44 @@
       "body": [
         "tests/ has 21 mkdtempSync call sites across seven files and none removes its directory; every pnpm test run adds a full seeded project tree per init target. At the batch 9 task 2 review /tmp held 1714 orphaned houserules-target-* directories plus 89 kb-* and 15 ws-*, and a transient inode exhaustion had already broken one suite attempt (disclosed in the task 2 report).",
         "Fix: give the mkdtemp sites cleanup — onTestFinished/afterEach with rmSync(dir, { recursive: true, force: true }), or one fixture helper that mints and registers scratch dirs. Behavior of the tests unchanged; the suite leaves /tmp as it found it.",
-        "Source: batch 9 task 2 review, controller escalation resolved (2026-09-03)."
+        "Source: batch 9 task 2 review, controller escalation resolved (2026-09-03).",
+        "Rider (batch 9 branch review): land the knowledge entry houserules.tests-clean-scratch-dirs with the retrofit, so the rule has a loading path the moment the call sites are fixed. Summary: 'Every test that mints a scratch directory registers its removal at the mkdtemp site: onTestFinished/afterEach with rmSync(dir, { recursive: true, force: true }), or the shared fixture helper.' Area tests; the body names the 1714-orphan census and states the suite leaves /tmp as it found it."
       ],
       "tags": [
         "tests",
         "hygiene"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-036",
+      "type": "fix",
+      "title": "The report status field ties to a non-empty concerns list",
+      "body": [
+        "implementer.md defines DONE_WITH_CONCERNS only for the final chat message; nothing ties the report's status field to a non-empty concerns list. Batch 9 produced two reports whose file says DONE while the agent's answer and the ledger say DONE_WITH_CONCERNS (task 3; the dependency-add eval scenario). The report file is the artifact of record, so the divergence leaves the returned status ambiguous.",
+        "Fix: one sentence at the status bullet — set status to DONE_WITH_CONCERNS whenever concerns is non-empty; the answer message repeats the report's status verbatim. Changing implementer.md triggers process.evals-rerun.",
+        "Source: batch 9 branch review, template_defects 1 (2026-09-03)."
+      ],
+      "tags": [
+        "template",
+        "process"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-037",
+      "type": "fix",
+      "title": "The ledger bullet covers every controller slip, gate-caught or not",
+      "body": [
+        "The orchestrating skill's ledger bullet binds only slips that a gate or && chain catches; a slip caught by inspection carries no logging duty. The gap showed the day the sentence shipped: the record-commit indent amend, caught by re-reading the diff stat and not by a gate, went unlogged, and a second formatting slip in the batch 9 finish repeated the class.",
+        "Fix: widen the bullet to every controller slip that forces a re-run, an amend, or a correction — gate-caught or not — logged when it happens. Skill-only change; no scenario covers the orchestrating skill, so no re-run is due.",
+        "Source: batch 9 branch review, template_defects 2 (2026-09-03)."
+      ],
+      "tags": [
+        "template",
+        "process"
       ],
       "milestone": null,
       "status": "open"

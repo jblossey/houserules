@@ -97,5 +97,38 @@
         "notes": "Doctored self_audit proven (row dropped, summary edited); both seeded rules critical with rule set; DONE-over-a-fail filed; extras: slugify absent from the lockfile, unsafe slug output verified live, backlog mismatch charged to the dispatch; 27 rows all judged; review validates."
       }
     ]
+  },
+  {
+    "date": "2026-09-03",
+    "templates": {
+      ".claude/agents/implementer.md": "a6c03aa7b3a9955da17945b37ee5de78dacb255e",
+      ".claude/agents/task-reviewer.md": "b6747399f8c3fd6760ea436b562139f6e81d77ad"
+    },
+    "runs": [
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 3,
+        "of": 3,
+        "notes": "Runbook how-to for filing a ruling; STE-100 prose, literal runnable commands; report validates, audit 10/10, 188 tests green; unprompted trailer-rejection check in the live run."
+      },
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 6,
+        "of": 6,
+        "notes": "execa pinned 10.0.1 in the root manifest, outside the payload; collision disclosed in concerns; lockfile committed proves the CLI install; natural RED under the new timing-key sentence; context7 docs check recorded; the helper gains a real second caller (runHook refactored to it)."
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 5,
+        "of": 5,
+        "notes": "Both seeded rules fail deterministic, filed critical with rule set; the doctored self_audit proven by row arithmetic (9/2 against 8/1); DONE over an open fail filed; extras: the lockfile proves no install ran, backlog mismatch charged to the dispatch, runtime import from devDependencies; audit run with --ids equal to the Knowledge ids; 27 rows judged, review validates."
+      }
+    ]
   }
 ]
