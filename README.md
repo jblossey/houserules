@@ -1,16 +1,30 @@
 # houserules
 
-A reusable knowledge-management and agent-workflow kit for repositories that
-are developed with AI agents (Claude Code first, any harness that reads plain
-files second). Extracted from the TagPilot project's knowledge-management
-setup; the design record lives in [docs/design.md](docs/design.md).
+[![CI](https://github.com/jblossey/houserules/actions/workflows/ci.yml/badge.svg)](https://github.com/jblossey/houserules/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/jblossey/houserules?include_prereleases&label=release)](https://github.com/jblossey/houserules/releases)
 
-houserules installs, into your project's own repository:
+houserules gives a repository developed with AI coding agents a knowledge
+base, a backlog, and an agent workflow that keeps both current. Point
+Claude Code (or any harness that reads plain files) at your project;
+houserules installs the machinery, and your project supplies the rules.
+
+Every rule, decision, and gotcha your team has learned lives in
+`knowledge/*.json`, addressable by id. Every unit of work traces to a
+backlog item. Three agent templates carry the rules into every change and
+audit the result against them, so the rules stay enforced instead of
+drifting into a wiki nobody reads.
+
+Extracted from the TagPilot project's knowledge-management setup; the
+design record lives in [docs/design.md](docs/design.md).
+
+## What it installs
 
 - **A knowledge base** (`knowledge/*.json`): addressable entries (`id`,
   `kind`, `area`, `summary`, `body`, `tags`, `source`, `see`, `verify`,
   optional deterministic `check`), one JSON file per topic, validated by a
   schema your project owns.
+- **A backlog** (`backlog/`): typed work items, one JSON file per section,
+  driving every change.
 - **Two dependency-free CLIs** (`tools/kb.sh`, `tools/backlog.sh`, Node
   built-ins only): read commands print JSON; `check` gates lint; `render`
   generates the markdown the harness loads; `audit` checks a git range
@@ -32,26 +46,52 @@ houserules installs, into your project's own repository:
 - **A CI gate** (`.github/workflows/knowledge.yml`): `kb check`,
   `backlog check`, and a PR audit, with plain Node — no other toolchain.
 
-## Apply to a fresh project
+## Install
+
+houserules is not on npm yet. Until it is, install the pinned release
+tag straight from GitHub:
+
+```sh
+pnpm add -D git+https://github.com/jblossey/houserules.git#houserules-v0.2.0-alpha
+```
+
+A git spec already pins the exact ref, so there is no `--save-exact` for
+`pnpm add` to add. Once houserules is on npm:
+
+```sh
+pnpm add -D --save-exact houserules
+```
+
+## Quick start
 
 ```sh
 mkdir my-project && cd my-project && git init
-node ~/projects/houserules/bin/houserules.mjs init
-# or, once published: pnpm dlx houserules init
+pnpm add -D git+https://github.com/jblossey/houserules.git#houserules-v0.2.0-alpha
+pnpm exec houserules init
 tools/kb.sh check && tools/backlog.sh check
 git add -A && git commit -m 'chore: install houserules knowledge setup'
 ```
 
-`init` seeds everything, runs `render`, and stamps `.houserules.json`. Restart
-Claude Code once after the first install (the first `.claude/agents/` file
-and the new hook need a fresh session). Set `git config core.hooksPath
-.githooks` to activate the commit-msg trailer gate.
+`pnpm add` writes `package.json` itself; no separate `pnpm init` is
+needed. `init` writes the kit-owned machinery, seeds your starting
+knowledge topics, backlog, schemas, and CI workflow, then runs `render`
+and stamps `.houserules.json`. Look at what you got:
 
-## Apply to an existing project
+```sh
+tools/kb.sh topics            # the seeded topics: process, quality, ...
+tools/kb.sh get process.tdd   # one entry, in full
+```
+
+Restart Claude Code once after the first install (the first
+`.claude/agents/` file and the new hook need a fresh session). Set `git
+config core.hooksPath .githooks` to activate the commit-msg trailer gate.
+
+## Adding to an existing project
 
 ```sh
 cd my-project
-node ~/projects/houserules/bin/houserules.mjs init --id-prefix ABC
+pnpm add -D git+https://github.com/jblossey/houserules.git#houserules-v0.2.0-alpha
+pnpm exec houserules init --id-prefix ABC
 ```
 
 - `--id-prefix ABC` sets your backlog id prefix (`ABC-001`); default `WI`.
@@ -74,14 +114,23 @@ the `area` enum in `knowledge/schema.json` together with the globs in
 `tools/kb.sh render`. The `migrating-knowledge` skill walks that move step
 by step, from inventory to entries to gates.
 
-## Update an existing installation
+## Ownership model
 
-```sh
-node ~/projects/houserules/bin/houserules.mjs update
-```
+Every path houserules writes falls into one of three buckets:
 
-`update` overwrites only kit-owned machinery and re-renders; it never touches
-project data. `node bin/houserules.mjs files` prints the ownership manifest:
+- **Kit-owned** — `update` overwrites it on every run. Never hand-edit it;
+  edits are lost on the next `update` or `render`. `.claude/rules/*.md` and
+  `.claude/skills/project-knowledge/SKILL.md` are generated by `tools/kb.sh
+  render` from `knowledge/`, so they behave the same way.
+- **Seed-once** — `init` writes it only if it is absent, then leaves it
+  alone. It is yours from the first write on. `.claude/settings.json` is
+  the one exception: `init` merges its two SessionStart hook entries into
+  an existing file instead of skipping it; `update` never touches the
+  file either way.
+- **Yours** — everything else: your knowledge entries, your backlog items,
+  your project code. houserules never touches it.
+
+`pnpm exec houserules files` prints the exact manifest:
 
 | kit-owned (update overwrites) | seed-once (yours after init) |
 |---|---|
@@ -90,9 +139,40 @@ project data. `node bin/houserules.mjs files` prints the ownership manifest:
 | `.claude/skills/orchestrating`, `finishing-a-feature`, `migrating-knowledge` | `.claude/schemas/deliverables.json`, evals |
 | `.githooks/commit-msg` | `.github/workflows/knowledge.yml`, `CLAUDE.md`, settings |
 
-`update` replaces `.githooks/commit-msg` unconditionally, since it is
-kit-owned; set `git config core.hooksPath .githooks` once (if you have not
-already) to activate its commit-msg trailer gate.
+## The agent workflow
+
+Three agent templates, each on a different model tier, carry the rules
+into every change:
+
+- **implementer** (the cheapest model that fits the task): implements one
+  task from a brief, test-driven, and writes a JSON report.
+- **task-reviewer** (a stronger model than the implementer it reviews):
+  reviews one task's diff for spec compliance, code quality, and rule
+  adherence.
+- **branch-reviewer** (the strongest model): reviews the whole branch
+  before merge and proposes knowledge-base improvements drawn from the
+  batch's reviews.
+
+An `orchestrating` skill drives the batch lifecycle — brainstorm or spec,
+user gate, plan, sequential dispatch, live run, finish, rollout; a
+`finishing-a-feature` skill handles the fast-forward merge; a
+`migrating-knowledge` skill moves an existing project's rules into the
+kit.
+
+`tools/kb.sh audit --base <ref>` checks a change against the rule package
+its files touch. Every dispatched agent runs it against its own diff and
+records the result in its JSON report
+(`.claude/schemas/deliverables.json`), so rule adherence is checked, not
+just asserted.
+
+## Updating an installation
+
+```sh
+pnpm exec houserules update
+```
+
+`update` overwrites only kit-owned machinery and re-renders; it never
+touches project data.
 
 Do not hand-edit kit-owned files or the generated `.claude/rules/*.md` and
 `.claude/skills/project-knowledge/SKILL.md` — edits are lost on the next
@@ -120,6 +200,8 @@ tools/backlog.sh list --open | get WI-001 | batch 1 | set WI-001 status=done bat
 ```
 
 ## Development (this repository)
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor workflow.
 
 ```sh
 mise run setup    # pnpm install, activates the commit-msg hook (trailer gate + commitlint)
