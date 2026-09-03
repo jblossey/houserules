@@ -154,7 +154,7 @@
       "kickoff": "docs/specs/2026-09-03-batch-10-hygiene-and-status.md",
       "status": {
         "state": "planned",
-        "text": "Gated 2026-09-03: all three open items into batch 10; spec pending owner approval."
+        "text": "Spec approved on 2026-09-03 as written; on branch batch-10 — implementer on sonnet, task review on opus, branch review on fable; one shared evals run after T3."
       }
     }
   ]
