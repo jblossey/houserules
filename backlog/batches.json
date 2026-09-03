@@ -168,7 +168,7 @@
       "kickoff": "docs/specs/2026-09-03-batch-11-alpha.md",
       "status": {
         "state": "planned",
-        "text": "Gated 2026-09-03: all three open items; the owner ruled completing this batch constitutes alpha state. Spec pending owner approval."
+        "text": "Spec approved on 2026-09-03 as written; on branch batch-11 — implementer on sonnet, task review on opus, branch review on fable; one evals run after T3; merging constitutes alpha state, upstream creation follows as an owner-attended step."
       }
     }
   ]
