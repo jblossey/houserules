@@ -142,6 +142,20 @@
         "state": "done",
         "text": "Done 2026-09-03: merged into main fast-forward after the branch review (fable: ready with-fixes; both Minor findings were ledger-side and closed in the finish). Implementers on sonnet, task reviews on opus. All 11 task findings fixed in-branch or filed with a reason (HR-035). Fourth evaluation record: 14/14 expected lines across the three scenarios at the branch head. Retrospective: evals-rerun merge-block clause, two gate-shell-chains body additions, HR-035 rider (tests-clean-scratch-dirs entry), template defects filed as HR-036 and HR-037."
       }
+    },
+    {
+      "number": 10,
+      "items": [
+        "HR-035",
+        "HR-036",
+        "HR-037"
+      ],
+      "summary": "Test-suite scratch-dir hygiene with its knowledge entry (HR-035), the report status tied to a non-empty concerns list (HR-036), the widened controller-slip ledger bullet (HR-037), and the fifth evaluation record.",
+      "kickoff": "docs/specs/2026-09-03-batch-10-hygiene-and-status.md",
+      "status": {
+        "state": "planned",
+        "text": "Gated 2026-09-03: all three open items into batch 10; spec pending owner approval."
+      }
     }
   ]
 }

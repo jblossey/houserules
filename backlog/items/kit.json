@@ -608,7 +608,8 @@
         "hygiene"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 10
     },
     {
       "id": "HR-036",
@@ -624,7 +625,8 @@
         "process"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 10
     },
     {
       "id": "HR-037",
@@ -640,7 +642,8 @@
         "process"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 10
     }
   ]
 }
