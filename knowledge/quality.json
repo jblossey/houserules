@@ -51,6 +51,20 @@
       "tags": ["tests", "sync"],
       "source": { "date": "2026-09-02", "by": "review", "ref": "batch 8 branch review, uncovered finding 1" },
       "verify": ["tests/dogfood.test.mjs"]
+    },
+    {
+      "id": "quality.absence-is-designed",
+      "kind": "rule",
+      "area": "cli",
+      "summary": "Render an absent value in user-facing output as a designed token; never let a raw undefined, null, or empty slot reach the user.",
+      "body": [
+        "Batch 11 task 2: a stamp without a version field made update print `kit undefined -> 0.1.0`, and a test pinned the artifact as contract. The guard's real guarantee was that version may be absent, so absence needed a designed rendering: `kit none -> <running>`.",
+        "Decide each field's absent case at design time. Absence that is legitimate gets a named token. A value that is present but invalid is not absence: reject it before any write, the way idPrefix and version raise UsageError.",
+        "A leaked `undefined` or `NaN` in output is always a finding, even when disclosed and tested; the test moves to the designed output, never pins the leak.",
+        "Root-only entry: the seed ships no cli area, so this loads here through area cli and is not seeded."
+      ],
+      "tags": ["output", "absence", "cli"],
+      "source": { "date": "2026-09-03", "by": "review", "ref": "batch 11 branch review, uncovered finding; task 2 review r0" }
     }
   ]
 }

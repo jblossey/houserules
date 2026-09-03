@@ -100,8 +100,9 @@ Do not hand-edit kit-owned files or the generated `.claude/rules/*.md` and
 
 `update` also reports version drift: it prints one line naming the version
 your stamp had and the version the run just synced to, `kit <old> -> <new>`
-(an unchanged version prints the same shape with both sides equal). When
-houserules ships a new release, adopt it this way:
+(an unchanged version prints the same shape with both sides equal). A stamp
+from before the version field prints `kit none -> <new>`. When houserules
+ships a new release, adopt it this way:
 
 1. Bump the `houserules` dependency to the new release and install it
    (`pnpm install`, or your package manager's equivalent).

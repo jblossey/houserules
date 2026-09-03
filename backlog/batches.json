@@ -167,8 +167,8 @@
       "summary": "The alpha batch: the paired template/eval fixes with their evals rerun (HR-040), the adopter update path (HR-038), and the release-please local groundwork (HR-039). Merging this batch constitutes alpha state; the upstream creation follows immediately per design.md 5.19.",
       "kickoff": "docs/specs/2026-09-03-batch-11-alpha.md",
       "status": {
-        "state": "planned",
-        "text": "Spec approved on 2026-09-03 as written; on branch batch-11 — implementer on sonnet, task review on opus, branch review on fable; one evals run after T3; merging constitutes alpha state, upstream creation follows as an owner-attended step."
+        "state": "done",
+        "text": "Done 2026-09-03: merged into main fast-forward after the branch review (fable: ready with-fixes; both Minors prose-side, applied in the finishing pass with the retrospective). ALPHA STATE reached per the owner's gate; upstream creation staged as the owner-attended next step. Sixth evaluation record 14/14 at blobs 381149d1/b6747399 — the reworded collision line judged decidably for the first time. Two double-529 escalations handled per the standing rule; a session restart mid-T3 recovered on resume. Owner rulings this batch: release-please groundwork shape (spec T3) and the changelog base (bootstrap-sha fc445a6, first alpha covers batch 11, expected 0.2.0-alpha). Retrospective: evals-rerun branch-range clause, rules-need-a-loading-path corrected for the global area, quality.absence-is-designed (first cli rules file); HR-041..043 filed (HR-042 pends the owner's standing-check ruling)."
       }
     }
   ]
