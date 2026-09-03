@@ -8,6 +8,13 @@
         { "id": "PP-1-02", "text": "Adoption path for tag-pilot. Trigger: the first houserules release or publish (raise with decision 3; re-deferred 2026-09-01 after PR #42 merged). Until then tag-pilot stays the upstream of the kit-owned files; diff tools/, .claude/agents/, .claude/skills/ against template/ before every release and port the drift." },
         { "id": "PP-1-03", "text": "A Claude Code plugin as a complement for the static agent templates and the orchestrating skill (docs/design.md §3). Trigger: a second adopter that wants central updates." }
       ]
+    },
+    {
+      "batch": 13,
+      "intro": "Parked by the owner's Tier 2 ruling of 2026-09-03 (HR-047/HR-048: the compiled-binary rewrite, no interim tiers).",
+      "items": [
+        { "id": "PP-13-01", "text": "Tier 0/1 distribution alternatives from the owner-launched analysis: version managers carrying Node (asdf plugin with a Node prerequisite, mise npm: backend post-publish, a mise registry entry), and the tier 1 path (fold kb.mjs/backlog.mjs into CLI subcommands with thin POSIX shims, then Node SEA / deno / bun compiled binaries from the JS codebase). Superseded: the owner ruled Tier 2 direct. Kept for the record; the tag-format prerequisite moved into HR-048. Trigger: only a reversal of the Tier 2 ruling." }
+      ]
     }
   ]
 }
