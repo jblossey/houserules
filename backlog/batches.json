@@ -179,8 +179,8 @@
       "summary": "Hotfix: the release version bump broke CI — restamp the dogfood install, widen the pre-release-blind test regex, and document the post-release restamp step (HR-044).",
       "kickoff": "docs/specs/2026-09-03-batch-12-release-hotfix.md",
       "status": {
-        "state": "planned",
-        "text": "Gated 2026-09-03 at the hotfix gate: HR-044 alone, full pipeline over one task; spec approved in outline at the gate (restamp + regex widening + the release-runbook decision in the spec)."
+        "state": "done",
+        "text": "Done 2026-09-03: merged into main fast-forward after the branch review (fable: ready with-fixes — the one Minor was the pre-merge aggregation itself; the fix round's regex churn was folded away into the spec's two clean commits). Main turned green: the restamp with the drift line's first production use (kit 0.1.0 -> 0.2.0-alpha), the value assertion replacing the shape regex, docs/runbook.md with the ruled restamp step and its houserules.post-release-restamp loading path. Retrospective: HR-041 extended with the skipped-rows validate gate; HR-046 filed (finishing-a-feature carries the release restamp step, skill not standing)."
       }
     }
   ]

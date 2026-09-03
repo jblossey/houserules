@@ -704,7 +704,8 @@
       "body": [
         "A task report with status DONE or DONE_WITH_CONCERNS and self_audit null passes tools/kb.sh validate. Batch 11 task 3's implementer was interrupted mid-finalization by a session restart; the on-disk report looked schema-complete and only the controller's null probe caught the gap.",
         "Fix: validate fails when a task-report's status is terminal and self_audit is null. The retrieval protocol's write-then-fill flow keeps working: the pre-fill report carries no terminal claim the validator trusts. Template tools/kb.mjs + root sync; deliverables schema unchanged unless the check fits there better.",
-        "Source: batch 11 branch review, template_defects 1 (2026-09-03)."
+        "Extension (batch 12 branch review, template_defects 2): the same validate change also rejects a task-report whose self_audit.summary.skipped is greater than 0, naming the --report flag in the message — a fix-round audit recorded without --report validated cleanly and cost a follow-up round.",
+        "Source: batch 11 branch review, template_defects 1 (2026-09-03); batch 12 branch review, template_defects 2 (2026-09-03)."
       ],
       "tags": [
         "tools",
@@ -761,7 +762,7 @@
         "dogfood"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 12
     },
     {
@@ -776,6 +777,22 @@
       "tags": [
         "docs",
         "oss"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-046",
+      "type": "fix",
+      "title": "The finishing-a-feature skill carries the release-please restamp step",
+      "body": [
+        "The post-release restamp procedure loads for docs/runbook.md (area docs), but the agent doing a release merge edits .houserules.json and package.json, which sit in the global area — tools/kb.sh for on those paths does not surface the step, and the skill that drives every merge says nothing about release-please PRs. That is exactly how HR-044 happened.",
+        "Fix per the batch 12 branch review's recommendation (skill, not standing — a rare-event procedure as a standing rule would dilute the list every agent loads): add one step to template/.claude/skills/finishing-a-feature/SKILL.md — after merging a release-please PR, run mise exec -- node bin/houserules.mjs update --dir ., commit chore(release): restamp the kit version, push (houserules.post-release-restamp, docs/runbook.md). Root sync via update --dir .; no scenario covers the skill, so no evals rerun.",
+        "Source: batch 12 branch review, template_defects 1 (2026-09-03)."
+      ],
+      "tags": [
+        "template",
+        "release"
       ],
       "milestone": null,
       "status": "open"
