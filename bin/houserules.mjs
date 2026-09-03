@@ -172,10 +172,15 @@ function renderIn(target) {
  * Installs the setup into `target`. Reads and validates the existing
  * `.houserules.json` stamp before writing anything, so a corrupt stamp
  * leaves `target` untouched: raises `UsageError` when the stamp is not a
- * JSON object, or when its `idPrefix` is present but fails `isIdPrefix`.
+ * JSON object, when its `idPrefix` is present but fails `isIdPrefix`, or
+ * when its `version` is present but is not a non-empty string.
  * Then writes kit-owned files always, seed-once files only when `seed` is
  * set and the file is absent, restamps `.houserules.json`, and renders the
- * generated markdown.
+ * generated markdown. An `update` call (`seed` false) also prints the
+ * stamped-to-running version drift as one `kit <stamped> -> <running>`
+ * line, reusing the stamp already read above; an unchanged version prints
+ * the same shape with both sides equal, and an absent `version` prints the
+ * designed token `none` rather than a fabricated version.
  */
 function install(io, opts, { seed }, cwd) {
   const target = resolve(cwd, typeof opts.dir === 'string' ? opts.dir : '.');
@@ -187,6 +192,8 @@ function install(io, opts, { seed }, cwd) {
   const marker = existsSync(markerPath) ? readJsonObject(markerPath) : { idPrefix: prefix };
   if (marker.idPrefix !== undefined && !isIdPrefix(marker.idPrefix))
     throw new UsageError(`${markerPath}: idPrefix ${ID_PREFIX_HINT}`);
+  if (marker.version !== undefined && (typeof marker.version !== 'string' || marker.version === ''))
+    throw new UsageError(`${markerPath}: version must be a non-empty string`);
   for (const file of KIT_OWNED) {
     writeInto(target, file, templateContent(file, prefix));
     io.out(`wrote ${file}\n`);
@@ -211,8 +218,10 @@ function install(io, opts, { seed }, cwd) {
       io.out('wrote .claude/settings.json\n');
     }
   }
+  const stampedVersion = marker.version ?? 'none';
   writeFileSync(markerPath, emit({ version: VERSION, idPrefix: marker.idPrefix ?? prefix }));
   io.out(renderIn(target));
+  if (!seed) io.out(`kit ${stampedVersion} -> ${VERSION}\n`);
   io.out(`houserules: ${seed ? 'initialized' : 'updated'} ${target}\n`);
   io.out('next: tools/kb.sh check && tools/backlog.sh check\n');
   return 0;
