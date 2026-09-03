@@ -296,7 +296,8 @@
       "body": [
         "release-please bumps package.json's version in its PR. Merging that PR does not update .houserules.json. The stale stamp fails tests/dogfood.test.mjs's exact-equality pin on main (HR-044).",
         "After you merge a release-please PR: run `mise exec -- node bin/houserules.mjs update --dir .` (it prints the drift line, for example `kit 0.1.0 -> 0.2.0-alpha`); commit the restamped `.houserules.json` as `chore(release): restamp the kit version`; push to main.",
-        "Full steps and rationale: docs/runbook.md."
+        "Full steps and rationale: docs/runbook.md.",
+        "In a project that installs the kit: run the package manager's install first (the exec otherwise runs the still-installed old copy and reads no drift), then `pnpm exec houserules update --dir .`, and commit `.houserules.json` only when the drift line's sides differ. The finishing-a-feature skill ships this form; pnpm 11's verifyDepsBeforeRun=install default can mask the stale-copy state in reproductions (batch 13 task 1)."
       ],
       "tags": [
         "release",
@@ -310,7 +311,8 @@
       },
       "verify": [
         "docs/runbook.md",
-        "tests/dogfood.test.mjs"
+        "tests/dogfood.test.mjs",
+        ".claude/skills/finishing-a-feature/SKILL.md"
       ]
     }
   ]

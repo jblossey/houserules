@@ -24,7 +24,8 @@
       "body": [
         "Invented claims read plausibly; that is what makes them dangerous.",
         "When two sources disagree, read the code and record which one the entry follows.",
-        "A shipped template or seed names no root-only id, path, or command; verify every reference resolves in a fresh install before syncing the root copy (batch 7 task 3)."
+        "A shipped template or seed names no root-only id, path, or command; verify every reference resolves in a fresh install before syncing the root copy (batch 7 task 3).",
+        "Run every command block you ship exactly as printed, top to bottom, in the environment the reader will have (a fresh directory for a quick start). A block that needs unstated context, or that resolves differently than printed (an unpinned git spec), fails this rule (batch 13: a quick start that exited 1 as printed, an install form floating to the default branch, a kit-only mechanism shipped as generic)."
       ],
       "tags": ["knowledge", "authoring", "fidelity"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }

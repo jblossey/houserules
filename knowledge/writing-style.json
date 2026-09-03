@@ -55,7 +55,8 @@
       "body": [
         "Batch 10 T2 shipped 'set status to DONE_WITH_CONCERNS whenever concerns is non-empty'. The status enum has four values; as written the sentence also captured BLOCKED and NEEDS_CONTEXT reports, which legitimately carry concerns. The fix was three words: 'instead of DONE'.",
         "Before shipping a conditional instruction into a template or skill, enumerate the conditioned field's full value set and read the sentence once per value it must not change.",
-        "Root-only entry: the seed ships no template area, so this loads here through area template (template/**) and is not seeded."
+        "Root-only entry: the seed ships no template area, so this loads here through area template (template/**) and is not seeded.",
+        "After enumerating the conditioned field's values, enumerate each population's hidden environmental state too, and treat a command output the instruction interprets as itself a conditioned field: read the sentence once per output the command can print in each population. Batch 13's residual: an installed copy older than the merged declaration made the drift line read equal, so the equal-sides reassurance misled in exactly the fired-trigger case."
       ],
       "tags": ["templates", "instructions", "enums"],
       "source": { "date": "2026-09-03", "by": "review", "ref": "batch 10 task 2 review, round 0 Important; HR-036" }
