@@ -37,6 +37,7 @@ You are the controller. Subagents get knowledge through their templates; you get
   - `Knowledge: <ids>` — `tools/kb.sh for <the brief's files>` plus the procedure ids the task needs. Five to ten ids.
   - `REPORT_FILE: <workspace>/task-<N>-report.json`
 - A reviewer dispatch adds `BASE`, `HEAD`, the same `Backlog:` and `Knowledge:` lines, `REPORT_FILE`, `REVIEW_FILE: <workspace>/task-<N>-review.json` (re-review: `task-<N>-review-r<R>.json`), `AUDIT_JSON: <workspace>/task-<N>-audit.json` (re-review: `-r<R>`), and the audit command's `--ids <the Knowledge ids>`.
+- The audit `--ids` value is the dispatch's `Knowledge:` list, generated from it, never typed separately — true for round 0 and every re-review alike.
 - A re-review dispatch carries the identical `Knowledge:`/`Backlog:`/`--ids` block as the round-0 dispatch. A narrowed block narrows the audit package silently.
 - A fix-round dispatch names `FIX_BASE`; the fix-diff audit goes into the report's `fix_rounds` entry, and `self_audit` stays the `BASE..HEAD` audit (`process.deliverables-json`).
 - The branch review dispatch names `WORKSPACE`, `BASE` (the merge base), `HEAD`, the plan and spec paths, and `REVIEW_FILE: <workspace>/branch-review.json`, through `branch-reviewer`; its audit runs `--workspace <WORKSPACE>` in place of `--report`.
@@ -51,6 +52,7 @@ You are the controller. Subagents get knowledge through their templates; you get
 - Severity of an adherence failure: standing rule is Critical; area rule is Important; `warn` is Minor.
 - Every finding is fixed (`process.no-tech-debt`). A deferral is a backlog item with a reason, named in the finding.
 - Ledger line per task: `Adherence: <pass>/<fail>/<warn>; judged fails: <ids or none>`.
+- Log every controller slip that a gate or && chain catches to the batch workspace ledger when it happens (`process.gate-shell-chains`).
 - Retrospective proposals from the branch review: apply every proposal that does not change a `standing` entry in one `docs(knowledge): ...` commit before finishing; list standing-rule proposals in the batch report for the user's ruling.
 
 ## Template evaluation
