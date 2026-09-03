@@ -15,6 +15,11 @@ import { KIT_OWNED, SEED_ONCE, main } from '../bin/houserules.mjs';
 import { UsageError } from '../template/tools/lib/cli.mjs';
 import { scratchDir } from './scratch-dir.mjs';
 
+/** The running kit's own version, the value `init` stamps into a fresh install. */
+const PACKAGE_VERSION = JSON.parse(
+  readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
+).version;
+
 // `init` and `update` write the render child's script themselves, so no
 // fixture can make that child fail without a message. Wrapping execFileSync
 // simulates what only the real world reaches: a child killed by a signal, and
@@ -99,7 +104,7 @@ describe('init', () => {
     expect(runTool(dir, 'backlog.mjs', 'check')).toBe(0);
     const marker = JSON.parse(readFileSync(join(dir, '.houserules.json'), 'utf8'));
     expect(marker.idPrefix).toBe('WI');
-    expect(marker.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(marker.version).toBe(PACKAGE_VERSION);
     expect(io.stdout).toContain('wrote tools/kb.mjs\n');
   });
   it('copies the commit-msg hook with the execute bit set', () => {
