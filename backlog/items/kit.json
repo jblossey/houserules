@@ -712,7 +712,8 @@
         "validate"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 14
     },
     {
       "id": "HR-042",
@@ -745,7 +746,8 @@
         "process"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 14
     },
     {
       "id": "HR-044",
@@ -864,7 +866,8 @@
         "evals"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 14
     }
   ]
 }
