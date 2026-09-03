@@ -1,11 +1,4 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  unlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
@@ -19,6 +12,7 @@ import {
   main,
 } from '../template/tools/backlog.mjs';
 import { UsageError } from '../template/tools/lib/cli.mjs';
+import { scratchDir } from './scratch-dir.mjs';
 
 const SCHEMA = readFileSync(
   new URL('../template/backlog/schema.json', import.meta.url),
@@ -90,7 +84,7 @@ function makeRepo({
   ],
   extra = {},
 } = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'backlog-'));
+  const root = scratchDir('backlog-');
   execFileSync('git', ['init', '-q', root]);
   write(root, 'backlog/schema.json', SCHEMA);
   write(root, 'backlog/amendments.json', {

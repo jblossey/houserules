@@ -9,6 +9,7 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 
 ## Rules
 
+- [houserules.tests-clean-scratch-dirs] Every test that mints a scratch directory registers its removal at the mkdtemp site: the shared helper, or onTestFinished/afterEach with recursive rmSync.
 - [quality.pin-copies-byte-exact] Pin a hand-synced copy byte-exact modulo its one designed difference, expressed as the production transform; never normalize by deleting the differing field.
 
 ## Gotchas

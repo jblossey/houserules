@@ -1,9 +1,10 @@
-import { mkdtempSync, symlinkSync } from 'node:fs';
+import { symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { UsageError, isMainModule, parseArgs } from '../template/tools/lib/cli.mjs';
+import { scratchDir } from './scratch-dir.mjs';
 
 const CLI_URL = new URL('../template/tools/lib/cli.mjs', import.meta.url).href;
 const CLI_PATH = fileURLToPath(CLI_URL);
@@ -61,7 +62,7 @@ describe('isMainModule', () => {
   });
 
   it('is true when argv[1] is a symlink to the module', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cli-entry-'));
+    const dir = scratchDir('cli-entry-');
     const link = join(dir, 'cli-link.mjs');
     symlinkSync(CLI_PATH, link);
     process.argv[1] = link;

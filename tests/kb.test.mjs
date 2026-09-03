@@ -1,13 +1,11 @@
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   readdirSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +36,7 @@ import {
   validateDeliverable,
 } from '../template/tools/kb.mjs';
 import { UsageError } from '../template/tools/lib/cli.mjs';
+import { scratchDir } from './scratch-dir.mjs';
 
 // The seed area enum is a starter; projects extend it. The fixtures run on a
 // project-extended enum, which also proves the extension path works.
@@ -146,7 +145,7 @@ export function writeTopics(root, entries) {
 }
 /** A git repo with a schema, areas, the given entries, a CLAUDE.md, and one commit. */
 export function makeRepo(entries = [entry()], files = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'kb-'));
+  const root = scratchDir('kb-');
   git(root, 'init', '-q', '-b', 'main');
   write(root, 'knowledge/schema.json', SCHEMA);
   write(root, 'knowledge/areas.json', JSON.stringify(AREAS));
@@ -954,7 +953,7 @@ function reportFieldEntry() {
 }
 /** Writes a temp workspace directory holding one JSON file per `reports` entry (name -> body). */
 function writeWorkspace(reports) {
-  const dir = mkdtempSync(join(tmpdir(), 'ws-'));
+  const dir = scratchDir('ws-');
   for (const [name, body] of Object.entries(reports))
     writeFileSync(join(dir, name), JSON.stringify(body));
   return dir;
@@ -1718,7 +1717,7 @@ describe('audit', () => {
   it('rejects a missing --workspace directory as a usage error, not a stack trace', () => {
     const root = makeRepo(auditEntries());
     const base = commit(root, 'chore: base');
-    const missing = join(mkdtempSync(join(tmpdir(), 'ws-')), 'missing');
+    const missing = join(scratchDir('ws-'), 'missing');
     expect(() =>
       audit(loadBase(root), { baseRef: base, workspace: missing }),
     ).toThrow(UsageError);
@@ -1733,7 +1732,7 @@ describe('audit', () => {
     const base = commit(root, 'chore: base');
     const reportPath = join(root, 'report.json');
     writeFileSync(reportPath, JSON.stringify({}));
-    const dir = mkdtempSync(join(tmpdir(), 'ws-'));
+    const dir = scratchDir('ws-');
     expect(() =>
       audit(loadBase(root), {
         baseRef: base,
@@ -1764,7 +1763,7 @@ const statsRules = (result) => [
 
 describe('stats', () => {
   it('aggregates violations, unused ids, and file counts from a workspace of JSON deliverables', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'ws-'));
+    const dir = scratchDir('ws-');
     writeFileSync(
       join(dir, 'task-1-audit.json'),
       JSON.stringify({ ids: ['a.rule', 'c.d'], rules: statsRules('fail') }),
@@ -1810,7 +1809,7 @@ describe('stats', () => {
       audits: { files: 2, tasks: 2 },
       reviews: { files: 1 },
     });
-    expect(stats(mkdtempSync(join(tmpdir(), 'ws-')))).toEqual({
+    expect(stats(scratchDir('ws-'))).toEqual({
       violations: [],
       unused_ids: [],
       audits: { files: 0, tasks: 0 },
@@ -1820,7 +1819,7 @@ describe('stats', () => {
   // Not in the brief: covers the `?? []` fallback for an audit file that
   // carries neither `ids` nor `rules` (a stats file, or a hand-written one).
   it('tolerates an audit file with no ids or rules', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'ws-'));
+    const dir = scratchDir('ws-');
     writeFileSync(join(dir, 'task-9-audit.json'), JSON.stringify({}));
     expect(stats(dir)).toEqual({
       violations: [],
@@ -1832,7 +1831,7 @@ describe('stats', () => {
   // Not in the brief: covers the `?? []` fallback for a review with no
   // rule_adherence and a report with no knowledge_used.
   it('tolerates a review with no rule_adherence and a report with no knowledge_used', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'ws-'));
+    const dir = scratchDir('ws-');
     writeFileSync(
       join(dir, 'task-1-review.json'),
       JSON.stringify({ kind: 'task-review' }),
@@ -1849,7 +1848,7 @@ describe('stats', () => {
     });
   });
   it('raises a UsageError naming a malformed deliverable file, instead of crashing', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'ws-'));
+    const dir = scratchDir('ws-');
     writeFileSync(join(dir, 'task-3-audit.json'), '{"ids": [');
     expect(() => stats(dir)).toThrow(UsageError);
     expect(() => stats(dir)).toThrow(/task-3-audit\.json/);
@@ -1876,11 +1875,9 @@ describe('main (audit, stats)', () => {
     io = capture();
     expect(main(['stats'], io, root)).toBe(2);
     io = capture();
-    expect(main(['stats', mkdtempSync(join(tmpdir(), 'ws-'))], io, root)).toBe(
-      0,
-    );
+    expect(main(['stats', scratchDir('ws-')], io, root)).toBe(0);
     expect(JSON.parse(io.stdout).audits).toEqual({ files: 0, tasks: 0 });
-    const badWorkspace = mkdtempSync(join(tmpdir(), 'ws-'));
+    const badWorkspace = scratchDir('ws-');
     writeFileSync(join(badWorkspace, 'task-3-audit.json'), '{"ids": [');
     io = capture();
     expect(main(['stats', badWorkspace], io, root)).toBe(2);
@@ -2003,7 +2000,7 @@ describe('main (audit, stats)', () => {
     );
   });
   it('falls back to the caught error\'s own message when git never runs and leaves no stderr', () => {
-    const missingRoot = join(mkdtempSync(join(tmpdir(), 'kb-')), 'missing');
+    const missingRoot = join(scratchDir('kb-'), 'missing');
     expect(() =>
       gitDiff(missingRoot, 'main', 'main', ['--name-only']),
     ).toThrow(UsageError);
@@ -2040,7 +2037,7 @@ describe('main (audit, stats)', () => {
     const base = commit(root, 'chore: base');
     const reportPath = join(root, 'report.json');
     writeFileSync(reportPath, JSON.stringify({}));
-    const dir = mkdtempSync(join(tmpdir(), 'ws-'));
+    const dir = scratchDir('ws-');
     const io = capture();
     expect(
       main(
@@ -2396,7 +2393,7 @@ describe('the repository knowledge base', () => {
   const TEMPLATE_ROOT = fileURLToPath(new URL('../template', import.meta.url));
   /** A temp git repo seeded with the real `template/knowledge` content and starter CLAUDE.md. */
   function makeSeedRepo() {
-    const root = mkdtempSync(join(tmpdir(), 'kb-seed-'));
+    const root = scratchDir('kb-seed-');
     git(root, 'init', '-q', '-b', 'main');
     const knowledgeFiles = readdirSync(join(TEMPLATE_ROOT, 'knowledge'))
       .filter((name) => name.endsWith('.json'))
