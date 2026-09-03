@@ -68,6 +68,10 @@
     {
       "date": "2026-09-03",
       "text": "Releases: semver via release-please, changelogs generated from the conventional commits; the first release is a pre-release under the alpha dist-tag; the GitHub upstream is created right after the alpha-state tasks are done — until then decision 3's no-remote constraint stands. docs/design.md §5.19."
+    },
+    {
+      "date": "2026-09-03",
+      "text": "Upstream go (alpha state reached at batch 11): a public GitHub repository named houserules under the owner's account; main pushed; release-please activates on the push. The npm publish under the alpha dist-tag stays pending decision 3's publish part. docs/design.md §5.19."
     }
   ],
   "notes": []
