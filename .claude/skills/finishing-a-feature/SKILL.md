@@ -59,7 +59,28 @@ and lint first.
    ```
    GitHub marks the PR merged once the commits reach main.
 
-7. **Delete the branch.**
+7. **After merging a release-please PR, or any merge that changes the
+   houserules version, restamp the kit version.** Skip this step for
+   every other merge. `.houserules.json` records the houserules version
+   this project runs. That stamp goes stale when the version changes: a
+   release does this in the kit repository itself; a houserules
+   dependency bump does it elsewhere. In a project that installs the
+   kit, install first — otherwise the command below still runs the old
+   copy and reads no drift.
+   ```sh
+   pnpm install                                           # a project that installs the kit
+   pnpm exec houserules update --dir .                    # a project that installs the kit
+   mise exec -- node bin/houserules.mjs update --dir .    # the kit repository itself
+   ```
+   Read the drift line the command prints, `kit <old> -> <new>`. Equal
+   sides mean nothing to commit. Different sides mean the stamp changed:
+   ```sh
+   git add .houserules.json
+   git commit -m "chore(release): restamp the kit version"
+   git push
+   ```
+
+8. **Delete the branch.**
    ```sh
    git push origin --delete <branch>
    git branch -d <branch>
