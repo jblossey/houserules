@@ -46,6 +46,19 @@
       "tags": ["docs", "comments", "naming"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "see": ["writing-style.code-comments", "writing-style.principles"]
+    },
+    {
+      "id": "writing-style.instructions-cover-the-state-space",
+      "kind": "rule",
+      "area": "template",
+      "summary": "An instruction keyed to one value of an enumerated field names the value it displaces; test the sentence against every other value before shipping.",
+      "body": [
+        "Batch 10 T2 shipped 'set status to DONE_WITH_CONCERNS whenever concerns is non-empty'. The status enum has four values; as written the sentence also captured BLOCKED and NEEDS_CONTEXT reports, which legitimately carry concerns. The fix was three words: 'instead of DONE'.",
+        "Before shipping a conditional instruction into a template or skill, enumerate the conditioned field's full value set and read the sentence once per value it must not change.",
+        "Root-only entry: the seed ships no template area, so this loads here through area template (template/**) and is not seeded."
+      ],
+      "tags": ["templates", "instructions", "enums"],
+      "source": { "date": "2026-09-03", "by": "review", "ref": "batch 10 task 2 review, round 0 Important; HR-036" }
     }
   ]
 }

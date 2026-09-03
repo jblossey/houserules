@@ -608,7 +608,7 @@
         "hygiene"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 10
     },
     {
@@ -625,7 +625,7 @@
         "process"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 10
     },
     {
@@ -642,8 +642,57 @@
         "process"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 10
+    },
+    {
+      "id": "HR-038",
+      "type": "feat",
+      "title": "Adopters can update their vendored kit when houserules releases changes",
+      "body": [
+        "A project that adopted the kit has no defined path to newer kit versions. init and update stamp the running CLI's version into .houserules.json (bin/houserules.mjs writes { version, idPrefix }), but nothing reads the stamp back for comparison: an adopter learns of a new release nowhere, and no doc states the flow (bump the houserules dependency, run update, review the diff).",
+        "Shape: the CLI reports stamped-versus-running drift (update prints what version it upgrades from and to; files or a status command surfaces it read-only); README documents the adopter flow end to end. Details to the batch spec when scheduled.",
+        "Source: owner, 2026-09-03 (docs/design.md §5.19). Pairs with HR-039 — the release machinery makes a new version a real, announced event."
+      ],
+      "tags": [
+        "cli",
+        "adoption"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-039",
+      "type": "feat",
+      "title": "Semver releases via release-please with an alpha pre-release",
+      "body": [
+        "RULED by the owner 2026-09-03 (docs/design.md §5.19): versioning is semver; changelogs are generated from the conventional commits; the tool is release-please; the first release is a pre-release under the alpha dist-tag; the GitHub upstream is created right after the alpha-state tasks are done. Until the upstream exists, decision 3's constraint stands: no remote, no gh repo create, no npm publish.",
+        "Shape: local groundwork can land before the upstream (release-please config and manifest, prerelease alpha versioning strategy, the release-type choice for a single-package pnpm repo, CHANGELOG bootstrap); the automation itself runs on GitHub and activates when the upstream is created. Publishing to npm under the alpha dist-tag follows as the first release.",
+        "Open input for the owner: the alpha-state task list — which backlog items must be done before the upstream is created. Propose candidates in the next batch report.",
+        "Source: owner, 2026-09-03; release-please chosen over git-cliff and changesets at the ruling."
+      ],
+      "tags": [
+        "release",
+        "semver"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-040",
+      "type": "fix",
+      "title": "One evals rerun pays the live_run capture form and the collision-line reword",
+      "body": [
+        "Batch 10 produced three evidence-capture findings of one class (stderr redirected after the target, a command with no per-command capture, a `; cat` tail owning the recorded exit) and one undecidable eval line: dependency-add expected_behavior[1] presumes a separate dependency-free payload manifest, so a single-manifest repository passes it only by judgment — the fifth record notes the call verbatim.",
+        "Fix, one batch, one evals rerun for both: (a) the implementer.md live_run bullet states the canonical capture form — one command per entry, captured as `<command> > <file> 2>&1`, the recorded exit is that command's own, no `;` or `|` tails; (b) dependency-add expected_behavior[1] in both scenario copies rewords to two decidable outcomes — with a payload manifest present, place the dependency outside it and disclose the collision in concerns; with the root manifest as the only manifest, keep the payload import-free and state the placement reasoning in the report.",
+        "Source: batch 10 branch review, template_defects 1 and 2 (2026-09-03)."
+      ],
+      "tags": [
+        "template",
+        "evals"
+      ],
+      "milestone": null,
+      "status": "open"
     }
   ]
 }
