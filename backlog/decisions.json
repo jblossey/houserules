@@ -72,6 +72,10 @@
     {
       "date": "2026-09-03",
       "text": "Upstream go (alpha state reached at batch 11): a public GitHub repository named houserules under the owner's account; main pushed; release-please activates on the push. The npm publish under the alpha dist-tag stays pending decision 3's publish part. docs/design.md §5.19."
+    },
+    {
+      "date": "2026-09-04",
+      "text": "Release tag format (Tier-2 spec ruling 1): plain v<version> — include-component-in-tag goes false in the release-please config at the next config-touching task; an alias tag v0.2.0-alpha points at the existing release commit so the grammar is uniform from the first release; houserules-v0.2.0-alpha stays as history. Unblocks HR-048's channels and HR-049. docs/design.md §5.20."
     }
   ],
   "notes": []

@@ -366,3 +366,13 @@ Each item records the ruling with its date, or stays marked open.
     `npm publish`). Adopters get releases through the update path.
     Backlog: HR-039 (release machinery), HR-038 (adopter update path).
     Source: owner, 2026-09-03.
+20. **Release tag format — ruled 2026-09-04: plain `v<version>`.**
+    Tier-2 spec ruling 1. Every binary-delivery channel (mise ubi,
+    asdf, taps) defaults to the `v*` grammar; ruled at the cheapest
+    moment (one release, zero external consumers).
+    `include-component-in-tag` goes false in the release-please config
+    at the next config-touching task; the alias tag `v0.2.0-alpha`
+    points at the existing release commit (bd2b754) so the grammar is
+    uniform from the first release, and `houserules-v0.2.0-alpha`
+    stays as history. Unblocks HR-048's channels and HR-049. Source:
+    owner, 2026-09-04.
