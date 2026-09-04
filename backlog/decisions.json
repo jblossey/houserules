@@ -76,6 +76,10 @@
     {
       "date": "2026-09-04",
       "text": "Release tag format (Tier-2 spec ruling 1): plain v<version> — include-component-in-tag goes false in the release-please config at the next config-touching task; an alias tag v0.2.0-alpha points at the existing release commit so the grammar is uniform from the first release; houserules-v0.2.0-alpha stays as history. Unblocks HR-048's channels and HR-049. docs/design.md §5.20."
+    },
+    {
+      "date": "2026-09-04",
+      "text": "Implementation language (Tier-2 spec ruling 2): Rust — type-level correctness with serde modeling the schemas exactly, smaller binaries, no GC; cross-compilation and the release matrix (cargo-dist or cross/zig) are spec decisions. Chosen over Go with the trade-offs on the table. docs/design.md §5.21."
     }
   ],
   "notes": []
