@@ -111,7 +111,8 @@
         "Home files: scope or product rulings go to a backlog entry; process rulings to a knowledge entry (`standing: true` when non-negotiable); design rulings to the batch spec.",
         "A ledger note may accompany a ruling; it never substitutes for the tracked write.",
         "A dispatch deviation from the spec's process line (model, order, gate) is a ruling: amend that spec line in the same turn. The batch report at the tick repeats it; it does not replace it.",
-        "An accepted implementer deviation is a ruling. Home it (a spec amendment or a backlog item) in the turn it is accepted, before the next dispatch."
+        "An accepted implementer deviation is a ruling. Home it (a spec amendment or a backlog item) in the turn it is accepted, before the next dispatch.",
+        "A code comment is not a home file: a sanctioned deviation homes in the spec's deviations section or the design record the turn it is accepted; the comment may cite that home, never substitute for it (batch 16 task 4)."
       ],
       "tags": ["rulings", "compaction"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
@@ -352,6 +353,34 @@
       ],
       "tags": ["owner-content", "ledger", "aggregation"],
       "source": { "date": "2026-09-04", "by": "review", "ref": "batch 14 branch review" }
+    },
+    {
+      "id": "process.evidence-outlives-the-session",
+      "kind": "rule",
+      "area": "process",
+      "standing": true,
+      "summary": "Cite evidence only at paths that outlive the session: the batch workspace or the tracked tree, never a session scratchpad.",
+      "body": [
+        "A report or workspace doc that cites a capture must name a file under the batch workspace (or the repository) that a later reader can open. A session scratchpad path is dead the moment the session ends; a citation into it is a claim nobody can collect on.",
+        "Copy small captures into the workspace beside the doc that cites them (batch 16 task 5: 59 files under t5-evidence/). An artifact too large to retain is disclosed as not retained, with its decisive excerpt quoted inline - never cited at a path that no longer exists.",
+        "Truncation markers count as citations: a marker naming a full log must point at a durable file whose content is a byte-prefix match of the retained excerpt."
+      ],
+      "tags": ["evidence", "reports", "workspace"],
+      "source": { "date": "2026-09-04", "by": "review", "ref": "batch 16 task 5 review finding 5; owner ruling at the batch 16 report" }
+    },
+    {
+      "id": "process.claims-match-artifacts",
+      "kind": "rule",
+      "area": "process",
+      "standing": true,
+      "summary": "Before submitting a report, re-open every artifact a claim cites and confirm the artifact shows what the sentence says.",
+      "body": [
+        "The recurring failure is not fabrication but drift: the work is right while the sentence describing it cites a capture that is not there, quotes a line the capture lost, or keeps a rationale a later verification overturned (batch 16 tasks 2 and 5).",
+        "The check is mechanical: for each named file, open it; for each quoted line, grep it; for each number, recompute it from the artifact. A reviewer does exactly this, so a report that skips it converts Minor findings into review rounds.",
+        "A reversed trend is worth recording too: name the pattern in the review when it appears, and name its reversal when a later round demonstrates it (batch 16 task 2 round 2)."
+      ],
+      "tags": ["reports", "evidence", "review"],
+      "source": { "date": "2026-09-04", "by": "review", "ref": "batch 16 task 2 re-review r1 trend note; owner ruling at the batch 16 report" }
     }
   ]
 }

@@ -8,9 +8,11 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 - [process.ask-when-missing] Ask the user when information is missing. Do not assume.
 - [process.backlog-drives-work] The backlog drives all work. Select backlog items before you start; every requirement traces to an item.
 - [process.brainstorm-first] Start each batch with a brainstorming session or a written spec; get the user's approval before implementing.
+- [process.claims-match-artifacts] Before submitting a report, re-open every artifact a claim cites and confirm the artifact shows what the sentence says.
 - [process.code-health-scan] Every plan carries a code-health scan of the files the batch touches: name the smells and antipatterns found, and fold targeted fixes into the tasks.
 - [process.conventional-commits] Commits use Conventional Commits (feat, fix, chore, test, ci, docs, refactor). Header at most 100 characters, body lines at most 100.
 - [process.deliverables-json] Task reports, reviews, and branch reviews are JSON files that pass `tools/kb.sh validate` against `.claude/schemas/deliverables.json`.
+- [process.evidence-outlives-the-session] Cite evidence only at paths that outlive the session: the batch workspace or the tracked tree, never a session scratchpad.
 - [process.ff-only-merges] Merge fast-forward only, from the CLI, after aggregating the branch into clean logical commits. No merge commits, no GitHub squash merges.
 - [process.knowledge-first] Before you change a file, read its knowledge: the ids in your task and `tools/kb.sh for <path>`. Cite the ids you relied on in your report.
 - [process.live-run-before-ci] Verify a change live (run the app, service, or tool for real; capture evidence) before any PR, merge, or deploy spend.
