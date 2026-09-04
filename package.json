@@ -15,7 +15,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "vitest run --coverage"
+    "test": "vitest run --coverage && vitest run --coverage --config vitest.kb-coverage.config.mts"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.2",
