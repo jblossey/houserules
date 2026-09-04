@@ -997,6 +997,20 @@
       ],
       "milestone": null,
       "status": "open"
+    },
+    {
+      "id": "HR-059",
+      "type": "feat",
+      "title": "Tier-2 phase 2: audit, validate, stats, and the backlog commands in Rust",
+      "body": [
+        "Phase 2 of the approved Tier-2 spec (docs/specs/2026-09-04-batch-15-tier2-spec.md §5.2), under HR-047: the deterministic check runners and serde schema models — `audit` (field-identical JSON against the corpus), `validate`, `stats`, and the backlog commands (`list`, `get`, `set`, `batch`, `check-backlog`) — with their vitest cases ported per the coverage-ratchet pattern (houserules.vitest-coverage-floor-tracks-the-rust-port) and per-surface live behavioral gates.",
+        "Carries from batch 16: wire glob_match/area_files/areas_for into audit and for, dropping the #[allow(dead_code)] attributes in the same commit; HR-056's bare-invocation pin; freeze the skipped>0 validate message the T4 r1 re-review parked; the knowledge read commands (get, for, index, topics, standing) land here or the plan states where — the spec's phasing leaves them unassigned and the phase-3 reference rewrite needs every command shipped.",
+        "Source: owner gate 2026-09-04 (batch 17: phase 2)."
+      ],
+      "tags": ["cli", "rust"],
+      "milestone": null,
+      "status": "open",
+      "batch": 17
     }
   ]
 }
