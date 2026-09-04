@@ -712,7 +712,7 @@
         "validate"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 14
     },
     {
@@ -746,7 +746,7 @@
         "process"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 14
     },
     {
@@ -866,8 +866,24 @@
         "evals"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 14
+    },
+    {
+      "id": "HR-051",
+      "type": "fix",
+      "title": "One evals rerun pays the nested-audit gate and the verbatim-clause lift",
+      "body": [
+        "Two template defects from the batch 14 branch review pair for the next template-touching batch: (a) the hardened validate inspects only the top-level self_audit, so a fix-round audit recorded without --report — the batch 12 shape — still validates; it recurred inside batch 14 itself (T1 fix round 0, skipped 3) and only the task reviewer caught it. Decide in the spec: extend checkTaskReportAudit to scan fix_rounds[].tests[].output for an audit summary carrying a nonzero skipped, or keep it judged by adding the check to the task-reviewer's numbered list. (b) implementer.md's verbatim-output invariant governs tests, live_run, and fix_rounds[].tests but sits inside live_run's parenthetical — lift it onto its own line above the field list, wording unchanged.",
+        "Optional rider if the owner wants it: recompress task-reviewer.md item 6 to one sentence (it grew a second, disposition sentence in the batch 14 fix round; the two-sentence form is correct, so this is polish only).",
+        "Source: batch 14 branch review, template_defects 1-2 and recommendation 1 (2026-09-04)."
+      ],
+      "tags": [
+        "template",
+        "evals"
+      ],
+      "milestone": null,
+      "status": "open"
     }
   ]
 }
