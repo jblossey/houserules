@@ -884,6 +884,23 @@
       ],
       "milestone": null,
       "status": "open"
+    },
+    {
+      "id": "HR-052",
+      "type": "process",
+      "title": "Write and gate the Tier-2 rewrite spec",
+      "body": [
+        "Batch 15 delivers the spec for the owner-ruled Tier-2 rewrite (HR-047: one static binary replaces bin/houserules.mjs and the vendored kb/backlog tools; HR-048: binary delivery channels). The build itself spans later batches; HR-047/048 stay open through the spec.",
+        "The spec gate carries the owner rulings, one at a time: the release tag format (plain v<version> against houserules-v<version> — the HR-048 prerequisite, also unblocking HR-049); the implementation language (Go against Rust); the payload-contract redefinition for docs/design.md (one static binary + POSIX shell replaces Node-builtins-only); the role npm keeps after the rewrite; the parity gates (byte-identical render, identical audit JSON) and the phasing.",
+        "Source: owner gate 2026-09-04 (batch 15: begin the Tier-2 spec)."
+      ],
+      "tags": [
+        "design",
+        "release"
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 15
     }
   ]
 }
