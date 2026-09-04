@@ -2,7 +2,7 @@
   "global": { "paths": [] },
   "process": { "paths": [] },
   "docs": { "paths": ["docs/**", "README.md", "CLAUDE.md", "knowledge/**", "backlog/**", ".claude/**"] },
-  "tools": { "paths": ["tools/**", ".github/**"] },
+  "tools": { "paths": ["tools/**", ".github/**", "mise.toml"] },
   "cli": { "paths": ["bin/**"] },
   "template": { "paths": ["template/**"] },
   "tests": { "paths": ["tests/**", "vitest.config.mts", "vitest.shared.mts", "vitest.kb-coverage.config.mts"] }

@@ -100,6 +100,10 @@
     {
       "date": "2026-09-04",
       "text": "The five batch-16 parity deviations confirmed as a set at the batch report: named-line exit-2 failure paths; eager glob validation; engine-decided regex verdicts with only V8 reason wording diverging; per-ported-file coverage ratchets with global floors intact; named findings where the JS crashed. docs/design.md §5.26; spec §6 carries the detail."
+    },
+    {
+      "date": "2026-09-04",
+      "text": "Rust toolchain pin form: stable, freshest — bumps track stable's newest immediately, the quarantine bypass deliberate; the version is CLI-resolved and pinned exactly (moved to 1.98.1 at the ruling). Procedure houserules.rust-toolchain-bumps-use-stable. docs/design.md §5.27."
     }
   ],
   "notes": []

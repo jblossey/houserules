@@ -451,3 +451,14 @@ Each item records the ruling with its date, or stays marked open.
     batch 16 review, homed as a spec §6 bullet when accepted, and
     is now owner-ruled; the spec's §6 carries the detail. Source:
     owner, 2026-09-04, batch 16 report.
+27. **Rust toolchain pin form — ruled 2026-09-04: stable,
+    freshest.** Raised at the batch 16 report from T2's disclosed
+    choice (latest at 1.98.0, respecting mise's minimum_release_age
+    quarantine, over the day-old stable 1.98.1). The owner rules
+    the other way: bumps track stable's newest immediately; the
+    quarantine bypass for the rust toolchain is deliberate. The
+    exact-pins rule stands — the version is resolved by the CLI
+    (`mise latest rust`) and pinned exactly; the pin moved to
+    1.98.1 the same turn, components preserved, cargo gates green.
+    Procedure: houserules.rust-toolchain-bumps-use-stable. Source:
+    owner, 2026-09-04, batch 16 report.
