@@ -88,6 +88,10 @@
     {
       "date": "2026-09-04",
       "text": "Tier-2 surface and runtime (spec-gate rulings 4-7): no shims — tools/kb.sh and tools/backlog.sh are deleted and update gains KIT_OWNED deletion; flat commands with per-module checks (check-knowledge, check-backlog) plus a built-in check-commit replacing the hook's commitlint probe; houserules becomes modular (adopters choose feature sets — HR-053, after the port); the dev tooling migrates too — cargo test replaces vitest phase by phase, and pnpm, package.json, and node_modules leave the tree at retirement. Nothing JS survives phase 5. docs/design.md §5.23."
+    },
+    {
+      "date": "2026-09-04",
+      "text": "Post-port repository sweep (Tier-2 spec ruling 8): the migration closes with a full-repository scan that corrects every rule, knowledge entry, backlog item, and doc (README included) to the new setup; standing entries that encode the old world amend or retire under recorded rulings; historical records keep their wording; mechanical grep gate as phase 5's closing task. docs/design.md §5.24."
     }
   ],
   "notes": []
