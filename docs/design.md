@@ -462,3 +462,15 @@ Each item records the ruling with its date, or stays marked open.
     1.98.1 the same turn, components preserved, cargo gates green.
     Procedure: houserules.rust-toolchain-bumps-use-stable. Source:
     owner, 2026-09-04, batch 16 report.
+28. **Batch 16 retrospective standing changes — ruled 2026-09-04.**
+    All four approved at the batch report: process.rulings-to-file
+    gains the code-comment-is-not-a-home-file bullet;
+    quality.principles gains the language-engine bullet (validity
+    verdicts come from an engine of that language, never a
+    hand-rolled scan); two new standing rules land —
+    process.evidence-outlives-the-session (cite evidence only at
+    paths that outlive the session) and
+    process.claims-match-artifacts (re-open every cited artifact
+    before submitting a report). Applied in knowledge/ and
+    template/knowledge/ (process.json, quality.json). Source:
+    owner, 2026-09-04, batch 16 report.

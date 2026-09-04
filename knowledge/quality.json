@@ -17,7 +17,8 @@
         "One responsibility per file and per function. Each unit boundary is one a reader can understand without its internals.",
         "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test.",
         "A dedicated compliance pass over the existing codebase is its own backlog item; new code complies immediately.",
-        "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test; an auto-restore setting covers only spies, so a mock created in a module-mock factory gets its own explicit afterEach reset."
+        "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test; an auto-restore setting covers only spies, so a mock created in a module-mock factory gets its own explicit afterEach reset.",
+        "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided (batch 16: the glob translator missed nested braces and panicked; the regex scan flipped four verdicts against V8)."
       ],
       "tags": ["quality"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
