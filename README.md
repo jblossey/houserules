@@ -14,8 +14,24 @@ backlog item. Three agent templates carry the rules into every change and
 audit the result against them, so the rules stay enforced instead of
 drifting into a wiki nobody reads.
 
-Extracted from the TagPilot project's knowledge-management setup; the
-design record lives in [docs/design.md](docs/design.md).
+houserules is set up in a way that makes your codebase incrementally
+collect the rules and knowledge agents need in order to achieve a high
+level of quality while at the same time minimizing token usage required
+in each step.
+
+The repo harness is based on the assumption that each repository has a
+distinct and finite set of inherent knowledge required to achieve zero-
+shot or close to zero-shot precision in iterations. With each targeted
+and audited rule added, work throughout your code will inferentially
+converge toward an almost optimally performing ai-native implementation
+ground.
+
+After a few iterations, claude will have accumulated enough rules
+to not run into the same old pitfalls over and over again which will save
+time and tokens throughout reviews and planning phases. After the
+convergence phase (or already during the convergence), you'll be able
+to add your own rules which claude will then iteratively enforce, shaping
+the codebase in the exact style which you deem perfect.
 
 ## What it installs
 
