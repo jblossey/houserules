@@ -435,3 +435,19 @@ Each item records the ruling with its date, or stays marked open.
     in this repository or the corpus uses the affected vocabulary
     (all 59 are `**`, `*`, or literals). Source: owner, 2026-09-04,
     mid batch 16.
+26. **The five batch-16 parity deviations — ruled 2026-09-04.**
+    Confirmed as a set at the batch 16 report: (a) CLI failure
+    paths print one named error line and exit 2 where the JS dumped
+    a node stack trace with exit 1; (b) areas.json globs validate
+    eagerly at load with a named error where the JS silently
+    mismatched until match time; (c) regex validity verdicts match
+    the JS exactly through a real ECMAScript engine (regress), with
+    only the untestable V8 reason wording diverging; (d) coverage
+    floors ratchet per ported file in a second vitest run while the
+    global floors keep their pre-port values; (e) where the JS
+    crashed with uncaught errors on malformed data (non-string
+    verify, uncompilable schema pattern, unsupported $ref), the
+    binary reports named findings with exit 1. Each was raised by a
+    batch 16 review, homed as a spec §6 bullet when accepted, and
+    is now owner-ruled; the spec's §6 carries the detail. Source:
+    owner, 2026-09-04, batch 16 report.

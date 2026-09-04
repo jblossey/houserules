@@ -96,6 +96,10 @@
     {
       "date": "2026-09-04",
       "text": "Glob vocabulary for the Rust port (mid batch 16): globset becomes the single matching engine; every divergence from the frozen JS union is pinned by a counterexample test asserting the chosen answer; malformed globs are named errors, never panics; extglob leaves the vocabulary. The one further sanctioned parity exception beside the flat surface. docs/design.md §5.25."
+    },
+    {
+      "date": "2026-09-04",
+      "text": "The five batch-16 parity deviations confirmed as a set at the batch report: named-line exit-2 failure paths; eager glob validation; engine-decided regex verdicts with only V8 reason wording diverging; per-ported-file coverage ratchets with global floors intact; named findings where the JS crashed. docs/design.md §5.26; spec §6 carries the detail."
     }
   ],
   "notes": []
