@@ -225,7 +225,9 @@
       "body": [
         "node:path matchesGlob excludes a path segment that starts with `.` under `**` (undocumented; verified live on Node 24.18.1). globToRegExp restores dot-segments but translates only `**` and `*`, escaping every other metacharacter as a literal.",
         "Write area and check globs with `**`, `*`, and literals only. Extend globToRegExp first if a glob ever needs `?`, `[ ]`, or `{ }` to cross a dot-segment; a mismatch is silent — the file simply drops out of the audit package.",
-        "When replacing a matching engine, pin the old engine's full vocabulary with counterexample tests before switching call sites (batch 6 task 1 round 1)."
+        "When replacing a matching engine, pin the old engine's full vocabulary with counterexample tests before switching call sites (batch 6 task 1 round 1).",
+        "Ruled 2026-09-04 (design.md §5.25): the Rust port's engine is the globset crate; divergences from the union are pinned by counterexample tests, malformed globs are named errors, and extglob leaves the vocabulary.",
+        "Pinning a review's named divergence instances does not close an engine swap. Closure is a full cross-engine matrix over every declared glob plus the vocabulary cases, with the cell count and result in the fix-round report (batch 16 T3: named instances left 2 of 7 divergences unpinned; the reviewer's 1853-cell matrix found them)."
       ],
       "tags": [
         "globs",
@@ -314,6 +316,99 @@
         "tests/dogfood.test.mjs",
         ".claude/skills/finishing-a-feature/SKILL.md"
       ]
+    },
+    {
+      "id": "houserules.corpus-batch14-fixtures-are-committed",
+      "kind": "gotcha",
+      "area": "tests",
+      "summary": "tests/corpus/fixtures/batch14-workspace/ commits gitignored .superpowers/ batch-14 deliverables verbatim, host paths included.",
+      "body": [
+        ".gitignore excludes .superpowers/, so CI never checks it out; the frozen corpus's validate slice needs the twelve batch-14 deliverables' real content, not scalar values, so they are committed copies under tests/corpus/fixtures/, not live reads of the gitignored workspace.",
+        "The batch 16 task 1 review checked all twelve files for public-tree fitness: no credential, token, API key, email address, session URL, or third-party data.",
+        "Their embedded absolute host paths (the generating machine's /home/... prefixes) stay verbatim: the corpus freezes inputs unchanged, byte for byte, so redacting them would misrepresent the frozen behavior."
+      ],
+      "tags": [
+        "corpus",
+        "fixtures",
+        "tier2"
+      ],
+      "source": {
+        "date": "2026-09-04",
+        "by": "review",
+        "ref": "batch 16 task 1 review, finding 6 (fix round 1)"
+      },
+      "verify": [
+        "tests/corpus/fixtures/batch14-workspace"
+      ]
+    },
+    {
+      "id": "houserules.vitest-coverage-floor-tracks-the-rust-port",
+      "kind": "gotcha",
+      "area": "tests",
+      "summary": "A ported file's coverage floor moves to its own excluded, separately-ratcheted vitest run; the still-JS-owned files' global floor never drops.",
+      "body": [
+        "HR-054 task 4 ported checkBase/checkShape/checkBudget to Rust; kb.mjs itself is unchanged, but its measured branch coverage fell from 99.36% to 67.08% (no vitest caller left for that code). The first fix round's answer -- one global branches drop, 99 to 80 -- was rejected in review: a single global number also weakens the gate over bin/houserules.mjs, backlog.mjs, json-store.mjs, and cli.mjs, none of which this task touched (task-4-review.json, fix round 1, finding 4).",
+        "The held mechanism instead: vitest.config.mts keeps the pre-port global floor (branches 99, lines 80) over the four still-fully-JS-owned files; kb.mjs is excluded from that run's coverage.include and measured in its own second run, vitest.kb-coverage.config.mts, ratcheted at its measured post-removal numbers (branches 67, lines 72) so it cannot slide further without a gate firing. `package.json`'s `test` script runs both. A single config cannot hold both floors: vitest counts every included file, glob-keyed threshold or not, into the same global aggregate (verified live; vitest.dev/config/coverage: 'Vitest counts all files, including those covered by glob-patterns, into the global coverage thresholds. This is different from Jest behavior') -- kb.mjs's low number drags the aggregate below 99% regardless of its own override sitting beside it.",
+        "tests/kb.test.mjs also gained a live behavioral gate (describe('the live check command over the frozen corpus')): the shipped template/tools/kb.mjs, not a frozen-sha worktree copy, driven over the corpus check fixtures, so a future regression in the still-shipped check path fails a real test, not only the corpus-regeneration self-consistency check.",
+        "Each later Tier-2 phase (audit/validate/stats/backlog, then init/update/files) gets the same treatment on porting: its own excluded, separately-ratcheted coverage run and its own live behavioral gate, never a lowered global floor. The JS path retires fully at spec phase 5; every per-file coverage config, the shared vitest.shared.mts, and the live behavioral gates retire with it."
+      ],
+      "tags": [
+        "vitest",
+        "coverage",
+        "tier2",
+        "rust"
+      ],
+      "source": {
+        "date": "2026-09-04",
+        "by": "docs",
+        "ref": "HR-054 task 4 fix round 1 (batch 16); task-4-review.json finding 4; mise exec -- pnpm test measured before and after"
+      },
+      "verify": [
+        "vitest.config.mts",
+        "vitest.kb-coverage.config.mts"
+      ]
+    },
+    {
+      "id": "houserules.pinned-shas-live-on-mains-ancestry",
+      "kind": "gotcha",
+      "area": "tests",
+      "summary": "A committed test or fixture that pins a git sha must pin one on main's ancestry, proven reachable in a fresh clone.",
+      "body": [
+        "This repository merges fast-forward from aggregated commits, so pre-aggregation branch shas are discarded and become unreachable from every ref; a workspace archive's base/head values name exactly such shas (batch 16 task 1, finding 1: four of them, resolvable locally, unresolvable in any fresh clone).",
+        "Prove reachability the way the fix did: `git merge-base --is-ancestor <sha> origin/main` inside a `git clone --no-local` of the repository, and run the RED/GREEN of the pinning test in that clone.",
+        "A CI job that checks out a pinned sha as a worktree needs `fetch-depth: 0` on its checkout (batch 16: T2 removed it as unused, T3 had to restore it for the frozen-worktree parity tests)."
+      ],
+      "tags": [
+        "git",
+        "fixtures",
+        "ci",
+        "corpus"
+      ],
+      "source": {
+        "date": "2026-09-04",
+        "by": "review",
+        "ref": "batch 16 task 1 review finding 1; branch review retrospective"
+      }
+    },
+    {
+      "id": "houserules.default-token-tags-start-no-workflows",
+      "kind": "gotcha",
+      "area": "tools",
+      "summary": "A tag or commit pushed with the default GITHUB_TOKEN triggers no workflow; a release hand-off needs a PAT/App token or an explicit workflow_dispatch hop.",
+      "body": [
+        "GitHub suppresses workflow runs for events created with the default GITHUB_TOKEN to prevent recursion; workflow_dispatch and repository_dispatch are the documented exceptions that always create runs (batch 16 T5 review finding 1, verified against live docs in the fix round).",
+        "Consequence for the Tier-2 phase-4 wiring: release-please tagging with the default token will never start a tag-triggered dist workflow. Options recorded in the T5 doc: a PAT or GitHub App token on the tagging step, or a workflow_dispatch call gated on release_created output. The choice is an open phase-4 question for the owner."
+      ],
+      "tags": [
+        "github-actions",
+        "release",
+        "tier2"
+      ],
+      "source": {
+        "date": "2026-09-04",
+        "by": "review",
+        "ref": "batch 16 task 5 review finding 1; t5-cross-compilation.md trigger section"
+      }
     }
   ]
 }
