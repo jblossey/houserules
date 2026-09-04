@@ -1,6 +1,7 @@
 [tools]
 node = "24.18.1"
 pnpm = "11.18.0"
+rust = { version = "1.98.0", components = ["clippy", "rustfmt"] }
 shellcheck = "0.11.0"
 
 [tasks.setup]

@@ -1,25 +1,19 @@
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   readFileSync,
-  readdirSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
-  BUDGETS,
-  GENERATED,
-  SKILL_PATH,
   STANDING_COMMAND,
-  areaFiles,
-  areasFor,
   audit,
   byId,
-  checkBase,
   cmdFor,
   cmdGet,
   cmdIndex,
@@ -29,10 +23,7 @@ import {
   list,
   loadBase,
   main,
-  render,
-  renderAll,
   stats,
-  topicLines,
   validateDeliverable,
 } from '../template/tools/kb.mjs';
 import { UsageError } from '../template/tools/lib/cli.mjs';
@@ -186,263 +177,6 @@ describe('loadBase', () => {
   });
 });
 
-describe('areasFor', () => {
-  it('maps paths to areas through the globs, always including global, sorted and deduplicated', () => {
-    expect(
-      areasFor(
-        ['./crates/x/src/a.rs', 'Cargo.toml', 'docs/a.md', 'README.md'],
-        AREAS,
-      ),
-    ).toEqual(['docs', 'global', 'rust']);
-    expect(areasFor(['README.md'], AREAS)).toEqual(['global']);
-    expect(areasFor(['docs/x.md'], AREAS)).toEqual(['docs', 'global']);
-    expect(areasFor([], AREAS)).toEqual(['global']);
-  });
-  // HR-019: `template/**` must cross the `.claude` dot-segment, using this
-  // repository's own real areas.json (the seed's AREAS fixture has no
-  // `template` area to match against).
-  it('includes template for a path under template/.claude, crossing the dot-segment', () => {
-    const root = fileURLToPath(new URL('../', import.meta.url));
-    const { areas } = loadBase(root);
-    expect(
-      areasFor(['template/.claude/agents/implementer.md'], areas),
-    ).toContain('template');
-  });
-  // Review fix round 1 (task 1): the dot-segment matcher must not narrow the
-  // rest of matchesGlob's vocabulary -- `?`, bracket classes, and brace
-  // lists all still have to match, the same as before HR-019.
-  it('still matches ?, bracket-class, and brace-list globs, not only ** and *', () => {
-    const VOCAB_AREAS = {
-      global: { paths: [] },
-      question: { paths: ['crates/?.rs'] },
-      bracket: { paths: ['src/*.[jt]s'] },
-      brace: { paths: ['src/*.{js,ts}'] },
-    };
-    expect(areasFor(['crates/x.rs'], VOCAB_AREAS)).toContain('question');
-    expect(areasFor(['src/a.ts'], VOCAB_AREAS)).toContain('bracket');
-    expect(areasFor(['src/a.ts'], VOCAB_AREAS)).toContain('brace');
-  });
-});
-
-describe('areaFiles', () => {
-  it('groups changed files by every area their globs match, plus global always empty', () => {
-    expect(areaFiles(['docs/x.md', 'tools/a.mjs'], AREAS)).toEqual({
-      docs: ['docs/x.md'],
-      global: [],
-      infra: ['tools/a.mjs'],
-    });
-    expect(areaFiles([], AREAS)).toEqual({ global: [] });
-  });
-});
-
-describe('checkBase', () => {
-  it('passes a valid base', () => {
-    const root = makeRepo();
-    render(loadBase(root));
-    expect(checkBase(loadBase(root))).toEqual([]);
-  });
-  it('reports schema, id, area, standing, see, verify, and check-shape errors', () => {
-    const root = makeRepo([
-      entry({ id: 'process.dup', see: ['nope.x'], verify: ['missing.txt'] }),
-      entry({ id: 'process.dup', summary: 'x'.repeat(161) }),
-      entry({ id: 'process.bad-standing', kind: 'gotcha' }),
-      entry({
-        id: 'process.bad-check',
-        standing: false,
-        check: { type: 'grep-absent', level: 'fail', pattern: '(' },
-      }),
-      entry({
-        id: 'process.bad-commits',
-        standing: false,
-        check: { type: 'commits', level: 'warn' },
-      }),
-    ]);
-    // `writeTopics` files an entry under its own id prefix, so `other.x`
-    // would land in its own (matching) `other.json` and never violate the
-    // "wrong topic" check below. Splice it into `process.json` directly so
-    // the check has something to catch.
-    const topic = JSON.parse(
-      readFileSync(join(root, 'knowledge/process.json'), 'utf8'),
-    );
-    topic.entries.unshift(entry({ id: 'other.x' }));
-    write(root, 'knowledge/process.json', JSON.stringify(topic));
-    const areas = { ...AREAS };
-    delete areas.docs; // simulate a missing area in the file only
-    write(
-      root,
-      'knowledge/areas.json',
-      JSON.stringify({ ...areas, extra: { paths: [] }, rust: { nope: 1 } }),
-    );
-    const errors = checkBase(loadBase(root));
-    expect(errors).toEqual(
-      expect.arrayContaining([
-        'knowledge/areas.json: area "docs" is missing',
-        'knowledge/areas.json: unknown area "extra"',
-        'knowledge/areas.json.rust: missing "paths"',
-        'knowledge/areas.json.rust: unknown field "nope"',
-        'knowledge/process.json other.x: id must start with "process."',
-        'knowledge/process.json process.dup: duplicate id (also in knowledge/process.json)',
-        'knowledge/process.json.entries[2].summary: longer than 160 characters',
-        'knowledge/process.json process.bad-standing: standing needs kind rule or invariant and area global or process',
-        'knowledge/process.json process.dup: see "nope.x" does not exist',
-        'knowledge/process.json process.dup: verify path "missing.txt" does not exist',
-        'knowledge/process.json process.bad-check: check "grep-absent" needs "files"',
-        'knowledge/process.json process.bad-check: check "grep-absent" needs "scope"',
-        'knowledge/process.json process.bad-commits: check "commits" needs "subject", "body_absent", or "body_line_max"',
-      ]),
-    );
-    expect(
-      errors.some((e) =>
-        /process\.bad-check: check pattern is not a valid regex/.test(e),
-      ),
-    ).toBe(true);
-  });
-  it('reports a topic whose name differs from its file name', () => {
-    const root = makeRepo();
-    write(
-      root,
-      'knowledge/process.json',
-      JSON.stringify({
-        $schema: './schema.json',
-        topic: 'other',
-        title: 't',
-        entries: [],
-      }),
-    );
-    expect(checkBase(loadBase(root))).toContain(
-      'knowledge/process.json: topic "other" must equal the file name "process"',
-    );
-  });
-  it('accepts a commits check that has only body_line_max', () => {
-    const root = makeRepo([
-      entry({
-        check: { type: 'commits', level: 'warn', body_line_max: 80 },
-      }),
-    ]);
-    render(loadBase(root));
-    expect(checkBase(loadBase(root))).toEqual([]);
-  });
-  it('rejects a commits check with body_line_max below 1', () => {
-    const root = makeRepo([
-      entry({
-        check: { type: 'commits', level: 'warn', body_line_max: 0 },
-      }),
-    ]);
-    expect(
-      checkBase(loadBase(root)).some((e) =>
-        e.endsWith('check.body_line_max: below 1'),
-      ),
-    ).toBe(true);
-  });
-  it('exports the constants later tasks render with', () => {
-    expect(GENERATED).toBe(
-      'Generated from knowledge/ by tools/kb.sh render. Do not edit.',
-    );
-    expect(BUDGETS).toEqual({
-      claudeMdLines: 200,
-      claudeMdBytes: 12288,
-      standingLines: 60,
-      areaLines: 160,
-      skillLines: 120,
-    });
-    expect(STANDING_COMMAND).toBe('tools/kb.sh standing');
-    expect(new UsageError('x')).toBeInstanceOf(Error);
-  });
-  it('skips the unreadable entries the schema already reported', () => {
-    const root = makeRepo();
-    write(
-      root,
-      'knowledge/process.json',
-      JSON.stringify({
-        $schema: './schema.json',
-        topic: 'process',
-        title: 't',
-        entries: [{ kind: 'rule' }, null],
-      }),
-    );
-    const errors = checkBase(loadBase(root));
-    expect(errors).toContain('knowledge/process.json.entries[0]: missing "id"');
-    expect(errors).toContain(
-      'knowledge/process.json.entries[1]: must be object',
-    );
-  });
-  it('does not crash on a topic with no entries array', () => {
-    const root = makeRepo();
-    write(
-      root,
-      'knowledge/rust.json',
-      JSON.stringify({ $schema: './schema.json', topic: 'rust', title: 't' }),
-    );
-    expect(checkBase(loadBase(root))).toContain(
-      'knowledge/rust.json: missing "entries"',
-    );
-    // Covers topicLines' false branch: a topic with no entries array counts
-    // as zero entries, independent of the schema error checkBase reports.
-    expect(topicLines(loadBase(root))).toEqual([
-      'process  1  process title',
-      'rust  0  t',
-    ]);
-  });
-  it('accepts a see reference to an existing entry and a verify path that exists', () => {
-    const root = makeRepo([
-      entry({ id: 'process.a' }),
-      entry({
-        id: 'process.b',
-        standing: false,
-        see: ['process.a'],
-        verify: ['CLAUDE.md'],
-      }),
-    ]);
-    render(loadBase(root));
-    expect(checkBase(loadBase(root))).toEqual([]);
-  });
-  it('ignores a check whose type the schema already rejected, without crashing', () => {
-    const root = makeRepo([
-      entry({
-        id: 'process.a',
-        standing: false,
-        check: { type: 'unknown-type', level: 'fail' },
-      }),
-    ]);
-    const errors = checkBase(loadBase(root));
-    expect(errors.some((e) => e.includes('check "unknown-type"'))).toBe(false);
-  });
-  it('flags a missing CLAUDE.md', () => {
-    const root = makeRepo();
-    unlinkSync(join(root, 'CLAUDE.md'));
-    expect(checkBase(loadBase(root))).toContain('CLAUDE.md: missing');
-  });
-  it('accepts a CLAUDE.md with no trailing newline', () => {
-    const root = makeRepo(undefined, { 'CLAUDE.md': '# Test' });
-    render(loadBase(root));
-    expect(checkBase(loadBase(root))).toEqual([]);
-  });
-  it('flags CLAUDE.md over the line budget', () => {
-    const root = makeRepo(undefined, { 'CLAUDE.md': 'x\n'.repeat(201) });
-    const errors = checkBase(loadBase(root));
-    expect(
-      errors.some((e) => /^CLAUDE\.md: \d+ lines, budget 200$/.test(e)),
-    ).toBe(true);
-  });
-  it('flags CLAUDE.md over the byte budget', () => {
-    const root = makeRepo(undefined, { 'CLAUDE.md': 'x'.repeat(12289) });
-    const errors = checkBase(loadBase(root));
-    expect(
-      errors.some((e) => /^CLAUDE\.md: \d+ bytes, budget 12288$/.test(e)),
-    ).toBe(true);
-  });
-  it('flags a stray file in .claude/rules and ignores non-markdown files there', () => {
-    const root = makeRepo();
-    write(root, '.claude/rules/extra.md', '# extra\n');
-    write(root, '.claude/rules/notes.txt', 'ignore me\n');
-    const errors = checkBase(loadBase(root));
-    expect(errors).toContain(
-      '.claude/rules/extra.md: not generated by kb; remove it',
-    );
-    expect(errors.some((e) => e.includes('notes.txt'))).toBe(false);
-  });
-});
-
 describe('byId', () => {
   it('orders entries by id', () => {
     expect(byId({ id: 'a' }, { id: 'b' })).toBe(-1);
@@ -576,7 +310,10 @@ describe('read commands', () => {
           summary: 'Clean before retry.',
         },
       ],
-      standing: STANDING_COMMAND,
+      // The literal, not the STANDING_COMMAND reference, so a change to
+      // the constant's own value still fails this test (fix round 1,
+      // finding 7: task-4-review.json).
+      standing: 'tools/kb.sh standing',
     });
     expect(cmdFor(base, ['README.md'])).toEqual({
       paths: ['README.md'],
@@ -708,137 +445,6 @@ describe('main (read commands)', () => {
     unlinkSync(join(root, 'knowledge/schema.json'));
     expect(() => main(['topics'], capture(), root)).toThrow(/schema\.json/);
     expect(() => main(['topics'], capture(), root)).not.toThrow(UsageError);
-  });
-});
-
-describe('render', () => {
-  const entries = [
-    entry(),
-    entry({
-      id: 'process.ask',
-      kind: 'invariant',
-      summary: 'Ask when unsure.',
-    }),
-    entry({
-      id: 'rust.clean',
-      area: 'rust',
-      standing: false,
-      kind: 'gotcha',
-      summary: 'Clean before retry.',
-    }),
-    entry({
-      id: 'rust.floor',
-      area: 'rust',
-      standing: false,
-      summary: 'Never lower a floor.',
-    }),
-    entry({
-      id: 'rust.old',
-      area: 'rust',
-      standing: false,
-      kind: 'history',
-      summary: 'Old.',
-    }),
-  ];
-  it('renders standing rules, one file per area with entries, and the knowledge skill', () => {
-    const files = renderAll(loadBase(makeRepo(entries)));
-    expect([...files.keys()]).toEqual([
-      '.claude/rules/standing-rules.md',
-      '.claude/rules/rust.md',
-      SKILL_PATH,
-    ]);
-    expect(files.get('.claude/rules/standing-rules.md')).toBe(
-      `${GENERATED}\n\n# Standing rules\n\n- [process.sequential] Run agents sequentially.\n- [process.ask] Ask when unsure.\n`,
-    );
-    expect(files.get('.claude/rules/rust.md')).toBe(
-      `---\npaths:\n  - "crates/**"\n  - "Cargo.toml"\n---\n${GENERATED}\n\n# Rust rules\n\n## Rules\n\n- [rust.floor] Never lower a floor.\n\n## Gotchas\n\n- [rust.clean] Clean before retry.\n\nDetail: tools/kb.sh get <id>\n`,
-    );
-    const skill = files.get(SKILL_PATH);
-    expect(
-      skill.startsWith(
-        `---\nname: project-knowledge\ndescription: Use when working on this repository as a dispatched subagent, before reading or changing any file\nuser-invocable: false\n---\n${GENERATED}\n\n# Project knowledge\n`,
-      ),
-    ).toBe(true);
-    expect(skill).toContain(
-      '## Standing rules\n\n- [process.sequential] Run agents sequentially.\n- [process.ask] Ask when unsure.\n\n## Retrieval protocol\n\n1. Resolve every id under `Knowledge:`',
-    );
-    expect(skill).toContain(
-      "\n3. Write `REPORT_FILE` as a `task-report` (schema `.claude/schemas/deliverables.json`, `self_audit: null`), then run `tools/kb.sh audit --base <BASE> --head HEAD --ids <ids, comma-separated> --report <REPORT_FILE>`. The `--ids` value is the task's `Knowledge:` list, generated from it, never typed separately. Copy the audit `summary` and its `deterministic` rows into `self_audit` — never hand-written rows; the judged rows are the reviewer's. Fix every `fail`, re-run until clean, then run `tools/kb.sh validate <REPORT_FILE>` and fix every error. List the ids you relied on in `knowledge_used`.\n",
-    );
-    expect(
-      skill.endsWith(
-        '## Topics\n\nprocess  2  process title\nrust  3  rust title\n',
-      ),
-    ).toBe(true);
-  });
-  it('render writes stale files; --check only lists them', () => {
-    const root = makeRepo(entries);
-    const base = loadBase(root);
-    expect(render(base, { check: true }).toSorted()).toEqual(
-      [
-        SKILL_PATH,
-        '.claude/rules/rust.md',
-        '.claude/rules/standing-rules.md',
-      ].toSorted(),
-    );
-    expect(existsSync(join(root, SKILL_PATH))).toBe(false);
-    expect(render(base)).toHaveLength(3);
-    expect(readFileSync(join(root, '.claude/rules/rust.md'), 'utf8')).toContain(
-      '# Rust rules',
-    );
-    expect(render(base)).toEqual([]);
-  });
-  it('checkBase reports drift, stray rule files, and budget overruns', () => {
-    const root = makeRepo(entries);
-    const base = loadBase(root);
-    expect(checkBase(base)).toContain(
-      '.claude/rules/standing-rules.md: generated file is out of date (run tools/kb.sh render)',
-    );
-    render(base);
-    write(root, '.claude/rules/stray.md', 'x');
-    write(root, 'CLAUDE.md', 'x\n'.repeat(201));
-    expect(checkBase(base)).toEqual([
-      '.claude/rules/stray.md: not generated by kb; remove it',
-      'CLAUDE.md: 201 lines, budget 200',
-    ]);
-    write(root, 'CLAUDE.md', `${'x'.repeat(12300)}\n`);
-    expect(checkBase(base)).toContain('CLAUDE.md: 12301 bytes, budget 12288');
-  });
-  it('checkBase reports a generated file over its line budget', () => {
-    const many = Array.from({ length: 61 }, (_, i) =>
-      entry({ id: `process.r${String(i).padStart(2, '0')}` }),
-    );
-    const base = loadBase(makeRepo(many));
-    render(base);
-    expect(checkBase(base)).toContain(
-      '.claude/rules/standing-rules.md: 65 lines, budget 60',
-    );
-  });
-});
-
-describe('main (render, check)', () => {
-  it('render --check exits 1 while stale, render writes, check reports and passes', () => {
-    const root = makeRepo();
-    let io = capture();
-    expect(main(['render', '--check'], io, root)).toBe(1);
-    expect(io.stderr).toContain(
-      '.claude/rules/standing-rules.md: would change\n',
-    );
-    io = capture();
-    expect(main(['check'], io, root)).toBe(1);
-    expect(io.stderr).toContain('generated file is out of date');
-    io = capture();
-    expect(main(['render'], io, root)).toBe(0);
-    expect(io.stdout).toContain('.claude/rules/standing-rules.md: written\n');
-    io = capture();
-    expect(main(['render'], io, root)).toBe(0);
-    expect(io.stdout).toBe('render: up to date\n');
-    io = capture();
-    expect(main(['render', '--check'], io, root)).toBe(0);
-    expect(io.stdout).toBe('render: up to date\n');
-    io = capture();
-    expect(main(['check'], io, root)).toBe(0);
-    expect(io.stdout).toBe('knowledge: ok\n');
   });
 });
 
@@ -2498,63 +2104,6 @@ describe('main (validate)', () => {
 
 describe('the repository knowledge base', () => {
   const TEMPLATE_ROOT = fileURLToPath(new URL('../template', import.meta.url));
-  /** A temp git repo seeded with the real `template/knowledge` content and starter CLAUDE.md. */
-  function makeSeedRepo() {
-    const root = scratchDir('kb-seed-');
-    git(root, 'init', '-q', '-b', 'main');
-    const knowledgeFiles = readdirSync(join(TEMPLATE_ROOT, 'knowledge'))
-      .filter((name) => name.endsWith('.json'))
-      .toSorted();
-    for (const name of knowledgeFiles) {
-      write(
-        root,
-        `knowledge/${name}`,
-        readFileSync(join(TEMPLATE_ROOT, 'knowledge', name), 'utf8'),
-      );
-    }
-    write(root, '.claude/schemas/deliverables.json', DELIVERABLES_SCHEMA_CONTENT);
-    write(root, 'CLAUDE.md', readFileSync(join(TEMPLATE_ROOT, 'CLAUDE.md'), 'utf8'));
-    // Other entries' `verify` paths (process.backlog-drives-work,
-    // process.ff-only-merges, process.evals-rerun) name files a real `init`
-    // would seed too.
-    for (const path of [
-      '.claude/evals/record.json',
-      'backlog/schema.json',
-      '.claude/skills/finishing-a-feature/SKILL.md',
-      '.claude/skills/orchestrating/SKILL.md',
-    ]) {
-      write(root, path, readFileSync(join(TEMPLATE_ROOT, path), 'utf8'));
-    }
-    commit(root, 'chore: seed');
-    return root;
-  }
-
-  // Spec §4 T3's third test. This is a regression check over data that is
-  // already correct, not new behavior, so it has no natural RED (process.tdd);
-  // the next test proves it is not vacuous by breaking the same seed on purpose.
-  it('renders and passes checkBase against the real template/knowledge seed', () => {
-    const root = makeSeedRepo();
-    render(loadBase(root));
-    expect(checkBase(loadBase(root))).toEqual([]);
-  });
-  // Disclosed-mutation proof for the test above: a copy of the seed with
-  // process.conventional-commits' new body_line_max set to 0 (the schema's
-  // minimum is 1) must fail checkBase, showing the check above is not vacuous.
-  it('fails checkBase when the seeded process.json is deliberately broken', () => {
-    const root = makeSeedRepo();
-    render(loadBase(root));
-    const processPath = join(root, 'knowledge/process.json');
-    const broken = JSON.parse(readFileSync(processPath, 'utf8'));
-    broken.entries.find(
-      (e) => e.id === 'process.conventional-commits',
-    ).check.body_line_max = 0;
-    write(root, 'knowledge/process.json', JSON.stringify(broken));
-    expect(
-      checkBase(loadBase(root)).some((e) =>
-        e.endsWith('check.body_line_max: below 1'),
-      ),
-    ).toBe(true);
-  });
   // A manifest holds glob strings as well as version requirements, so the
   // `exact-pins` pattern has to read a version context, not a bare `*`.
   it('matches a range requirement with the exact-pins pattern, and no glob', () => {
@@ -2587,5 +2136,59 @@ describe('the repository knowledge base', () => {
       '{"engines": {"node": "22.x"}}',
     ])
       expect([line, pattern.test(line)]).toEqual([line, false]);
+  });
+});
+
+describe('the live check command over the frozen corpus', () => {
+  const KB_MJS = fileURLToPath(new URL('../template/tools/kb.mjs', import.meta.url));
+  const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
+
+  /** Reads one frozen `tests/corpus/check/<slice>.json` capture. */
+  function readCorpusCheck(slice) {
+    return JSON.parse(
+      readFileSync(new URL(`./corpus/check/${slice}.json`, import.meta.url), 'utf8'),
+    );
+  }
+  /** Runs the live `template/tools/kb.mjs check` in `cwd`, without throwing on a non-zero exit. */
+  function runKbCheck(cwd) {
+    const result = spawnSync(process.execPath, [KB_MJS, 'check'], {
+      cwd,
+      encoding: 'utf8',
+    });
+    return { stdout: result.stdout, stderr: result.stderr, exit: result.status };
+  }
+
+  // Fix round 1, finding 4 (task-4-review.json): tests/corpus.test.mjs's
+  // regeneration test only ever runs kb.mjs from a detached worktree at
+  // the frozen sha, never the live template/tools/kb.mjs this tree ships
+  // -- so a regression in the still-shipped check path (BUDGETS,
+  // checkShape, checkBase's own logic) would pass every existing vitest
+  // gate silently. This drives the live copy instead, over the three
+  // portable fixture slices (root is this repository's own live tree,
+  // exercised the same way `tools/kb.sh check` already gates every
+  // commit) and asserts byte parity with the frozen captures the Rust
+  // port's corpus tests also pin.
+  it.each(['mini', 'mini-bad', 'mini-stale'])('matches the frozen %s slice', (slice) => {
+    const root = scratchDir('kb-live-check-');
+    cpSync(fileURLToPath(new URL(`./corpus/fixtures/${slice}`, import.meta.url)), root, {
+      recursive: true,
+    });
+    git(root, 'init', '-q', '-b', 'main');
+    commit(root, 'chore: init');
+    const expected = readCorpusCheck(slice);
+    expect(runKbCheck(root)).toEqual({
+      stdout: expected.stdout,
+      stderr: expected.stderr,
+      exit: expected.exit,
+    });
+  });
+
+  it("matches the frozen root slice's expectation against this repository's own live tree", () => {
+    const expected = readCorpusCheck('root');
+    expect(runKbCheck(REPO_ROOT)).toEqual({
+      stdout: expected.stdout,
+      stderr: expected.stderr,
+      exit: expected.exit,
+    });
   });
 });

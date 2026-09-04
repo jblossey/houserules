@@ -1,0 +1,20 @@
+[package]
+name = "houserules"
+# 0.1.0 is cargo's default, and intentional: this binary's version tracks its
+# own release cadence, not the kit's 0.2.0-alpha line. The two converge at the
+# release-please wiring in Tier-2 phase 4 (docs/specs/2026-09-04-batch-15-tier2-spec.md §5).
+# Do not "fix" this to match package.json before then.
+version = "0.1.0"
+edition = "2024"
+description = "A reusable knowledge-management and agent-workflow kit for AI-assisted repositories."
+license = "MIT"
+
+[dependencies]
+clap = { version = "=4.6.6", features = ["derive"] }
+globset = "=0.4.20"
+regress = "=0.12.0"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = { version = "=1.0.151", features = ["preserve_order"] }
+
+[dev-dependencies]
+tempfile = "=3.27.0"

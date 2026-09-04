@@ -1,0 +1,8 @@
+# Workspace root for the houserules Tier-2 rewrite (Rust).
+#
+# One binary crate today (crates/houserules); the workspace shape leaves
+# room for the modular-install crates the spec anticipates without a
+# restructure (docs/specs/2026-09-04-batch-15-tier2-spec.md §3, §7).
+[workspace]
+resolver = "3"
+members = ["crates/houserules"]
