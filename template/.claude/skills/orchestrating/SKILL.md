@@ -53,6 +53,7 @@ You are the controller. Subagents get knowledge through their templates; you get
 - Every finding is fixed (`process.no-tech-debt`). A deferral is a backlog item with a reason, named in the finding.
 - Ledger line per task: `Adherence: <pass>/<fail>/<warn>; judged fails: <ids or none>`.
 - Log every controller slip that forces a re-run, an amend, or a correction — gate-caught or not — to the batch workspace ledger when it happens (`process.gate-shell-chains`).
+- On a mid-batch branch rebuild, write the old-to-new sha map to its own workspace file, cite it in the batch report, and never edit closed-task deliverables (`process.main-wins-backlog-collisions`).
 - Retrospective proposals from the branch review: apply every proposal that does not change a `standing` entry in one `docs(knowledge): ...` commit before finishing; list standing-rule proposals in the batch report for the user's ruling.
 
 ## Template evaluation
