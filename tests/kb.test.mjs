@@ -763,7 +763,7 @@ describe('render', () => {
       '## Standing rules\n\n- [process.sequential] Run agents sequentially.\n- [process.ask] Ask when unsure.\n\n## Retrieval protocol\n\n1. Resolve every id under `Knowledge:`',
     );
     expect(skill).toContain(
-      "\n3. Write `REPORT_FILE` as a `task-report` (schema `.claude/schemas/deliverables.json`, `self_audit: null`), run `tools/kb.sh validate <REPORT_FILE>`, then `tools/kb.sh audit --base <BASE> --head HEAD --ids <ids, comma-separated> --report <REPORT_FILE>`. The `--ids` value is the task's `Knowledge:` list, generated from it, never typed separately. Copy the audit `summary` and its `deterministic` rows into `self_audit` — never hand-written rows; the judged rows are the reviewer's. Fix every `fail`, re-run until clean, validate again. List the ids you relied on in `knowledge_used`.\n",
+      "\n3. Write `REPORT_FILE` as a `task-report` (schema `.claude/schemas/deliverables.json`, `self_audit: null`), then run `tools/kb.sh audit --base <BASE> --head HEAD --ids <ids, comma-separated> --report <REPORT_FILE>`. The `--ids` value is the task's `Knowledge:` list, generated from it, never typed separately. Copy the audit `summary` and its `deterministic` rows into `self_audit` — never hand-written rows; the judged rows are the reviewer's. Fix every `fail`, re-run until clean, then run `tools/kb.sh validate <REPORT_FILE>` and fix every error. List the ids you relied on in `knowledge_used`.\n",
     );
     expect(
       skill.endsWith(
@@ -2073,7 +2073,26 @@ const REPORT = {
   docs_verified: [],
   dependency_vetting: null,
   coverage: null,
-  self_audit: null,
+  self_audit: {
+    summary: {
+      base: 'abc1234',
+      head: 'abc1235',
+      deterministic: 1,
+      pass: 1,
+      fail: 0,
+      warn: 0,
+      skipped: 0,
+      judged: 0,
+    },
+    rows: [
+      {
+        id: 'process.sequential',
+        mode: 'deterministic',
+        result: 'pass',
+        evidence: 'x',
+      },
+    ],
+  },
   self_review: [],
   concerns: [],
   knowledge_used: ['process.sequential'],
@@ -2109,6 +2128,94 @@ describe('validate', () => {
       kind: 'task-report',
       errors: [],
     });
+  });
+  // HR-041: a terminal-status report that skipped the audit step looked
+  // schema-complete and passed validate; the batch 11 task 3 implementer
+  // was interrupted mid-finalization and only a controller's manual null
+  // check caught the gap.
+  it('rejects a DONE report with a null self_audit', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    writeFileSync(
+      file,
+      JSON.stringify({ ...REPORT, status: 'DONE', self_audit: null }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([
+      `${file}: status "DONE" needs a non-null self_audit`,
+    ]);
+  });
+  it('rejects a DONE_WITH_CONCERNS report with a null self_audit', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...REPORT,
+        status: 'DONE_WITH_CONCERNS',
+        self_audit: null,
+      }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([
+      `${file}: status "DONE_WITH_CONCERNS" needs a non-null self_audit`,
+    ]);
+  });
+  // A fix-round audit recorded without --report skips every report-field
+  // check; the resulting self_audit still validated cleanly and cost a
+  // follow-up review round (batch 12 branch review, template_defects 2).
+  it('rejects a DONE report whose self_audit.summary.skipped is greater than 0', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...REPORT,
+        self_audit: {
+          ...REPORT.self_audit,
+          summary: { ...REPORT.self_audit.summary, skipped: 2 },
+        },
+      }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([
+      `${file}: self_audit.summary.skipped is 2; re-run audit with --report`,
+    ]);
+  });
+  it('accepts a BLOCKED report with a null self_audit', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    writeFileSync(
+      file,
+      JSON.stringify({ ...REPORT, status: 'BLOCKED', self_audit: null }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([]);
+  });
+  it('accepts a NEEDS_CONTEXT report with a null self_audit', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    writeFileSync(
+      file,
+      JSON.stringify({ ...REPORT, status: 'NEEDS_CONTEXT', self_audit: null }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([]);
+  });
+  // The status-times-self_audit state space has twelve cells; this pins the
+  // one a later reordering of the two checks inside checkTaskReportAudit
+  // could silently break: a non-terminal report's skipped audit rows are
+  // never inspected, because the terminal filter returns first.
+  it('accepts a BLOCKED report whose self_audit.summary.skipped is greater than 0', () => {
+    const root = makeRepo();
+    const file = join(root, 'report.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...REPORT,
+        status: 'BLOCKED',
+        self_audit: {
+          ...REPORT.self_audit,
+          summary: { ...REPORT.self_audit.summary, skipped: 2 },
+        },
+      }),
+    );
+    expect(validateDeliverable(root, file).errors).toEqual([]);
   });
   // HR-016: live_run is required so a missing scratch recipe is a schema
   // error, not a fact buried in prose (spec T3).

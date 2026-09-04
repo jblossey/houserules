@@ -301,7 +301,7 @@ export function checkBase(base) {
 const PROTOCOL = [
   '1. Resolve every id under `Knowledge:` in your task: `tools/kb.sh get <ids>` (JSON).',
   '2. Before editing, run `tools/kb.sh for <every file you will change>` and `get` any rule you are unsure about.',
-  "3. Write `REPORT_FILE` as a `task-report` (schema `.claude/schemas/deliverables.json`, `self_audit: null`), run `tools/kb.sh validate <REPORT_FILE>`, then `tools/kb.sh audit --base <BASE> --head HEAD --ids <ids, comma-separated> --report <REPORT_FILE>`. The `--ids` value is the task's `Knowledge:` list, generated from it, never typed separately. Copy the audit `summary` and its `deterministic` rows into `self_audit` — never hand-written rows; the judged rows are the reviewer's. Fix every `fail`, re-run until clean, validate again. List the ids you relied on in `knowledge_used`.",
+  "3. Write `REPORT_FILE` as a `task-report` (schema `.claude/schemas/deliverables.json`, `self_audit: null`), then run `tools/kb.sh audit --base <BASE> --head HEAD --ids <ids, comma-separated> --report <REPORT_FILE>`. The `--ids` value is the task's `Knowledge:` list, generated from it, never typed separately. Copy the audit `summary` and its `deterministic` rows into `self_audit` — never hand-written rows; the judged rows are the reviewer's. Fix every `fail`, re-run until clean, then run `tools/kb.sh validate <REPORT_FILE>` and fix every error. List the ids you relied on in `knowledge_used`.",
 ];
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
@@ -782,10 +782,39 @@ export function audit(
   return { result, failed: rows.some((r) => r.result === 'fail') };
 }
 
+/** `task-report` statuses that claim the task is genuinely finished. */
+const TERMINAL_STATUSES = ['DONE', 'DONE_WITH_CONCERNS'];
+
+/**
+ * Checks the two task-report invariants the schema's shape rules cannot
+ * express: a terminal `status` (DONE or DONE_WITH_CONCERNS) needs a filled
+ * `self_audit`, and that audit's `summary.skipped` must be 0 — a nonzero
+ * count means the audit ran without `--report` and skipped every
+ * report-field check, so its rows are not trustworthy. BLOCKED and
+ * NEEDS_CONTEXT reports are exempt: only a terminal status claims the task
+ * is genuinely finished, and the retrieval protocol validates a report
+ * only after `self_audit` is filled, so no in-flow draft ever hits this
+ * check with `self_audit` still null.
+ */
+function checkTaskReportAudit(value, path, errors) {
+  if (!TERMINAL_STATUSES.includes(value.status)) return;
+  if (value.self_audit === null) {
+    errors.add(`${path}: status "${value.status}" needs a non-null self_audit`);
+    return;
+  }
+  const skipped = value.self_audit?.summary?.skipped;
+  if (typeof skipped === 'number' && skipped > 0) {
+    errors.add(
+      `${path}: self_audit.summary.skipped is ${skipped}; re-run audit with --report`,
+    );
+  }
+}
+
 /**
  * Validates one deliverable file against the definition its `kind` names in
- * `.claude/schemas/deliverables.json`. Returns the file, its kind, and the
- * list of schema errors (empty when valid).
+ * `.claude/schemas/deliverables.json`, plus the task-report audit
+ * invariants `checkTaskReportAudit` checks beyond that shape. Returns the
+ * file, its kind, and the list of errors (empty when valid).
  */
 export function validateDeliverable(root, path) {
   const schema = readJson(join(root, DELIVERABLES_SCHEMA));
@@ -797,6 +826,7 @@ export function validateDeliverable(root, path) {
     );
   const errors = new Errors();
   validate(value, { $ref: `#/$defs/${def}` }, path, errors, schema);
+  if (def === 'taskReport') checkTaskReportAudit(value, path, errors);
   return { file: path, kind: value.kind, errors: errors.list };
 }
 
