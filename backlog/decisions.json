@@ -80,6 +80,10 @@
     {
       "date": "2026-09-04",
       "text": "Implementation language (Tier-2 spec ruling 2): Rust — type-level correctness with serde modeling the schemas exactly, smaller binaries, no GC; cross-compilation and the release matrix (cargo-dist or cross/zig) are spec decisions. Chosen over Go with the trade-offs on the table. docs/design.md §5.21."
+    },
+    {
+      "date": "2026-09-04",
+      "text": "npm retires (Tier-2 spec ruling 3): distribution is binary-only (ubi, asdf, taps, curl installer); package.json remains for this repository's own dev tooling; the README's post-publish npm form goes away at the rewrite; an esbuild-style wrapper package stays purely additive later if demand appears. This closes decision 3's npm part — no npm publish, ever, under the current ruling. docs/design.md §5.22."
     }
   ],
   "notes": []
