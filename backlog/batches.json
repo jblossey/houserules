@@ -221,6 +221,18 @@
         "state": "done",
         "text": "Done 2026-09-04: the spec approved as amended after eight owner rulings (plain v-tags with the v0.2.0-alpha alias pushed; Rust; npm retired; no shims — tools/*.sh deleted, update gains KIT_OWNED deletion; flat commands with per-module checks and a built-in check-commit; modularity prepared — HR-053 filed; the dev tooling migrates, nothing JS survives phase 5; the post-port repository sweep with a grep gate). Rulings live in design.md §5.20-5.24 and decisions.json; the spec's five phases become the build batches for HR-047/048. Worked as controller docs commits on main — no branch, no subagent dispatches."
       }
+    },
+    {
+      "number": 16,
+      "items": [
+        "HR-054"
+      ],
+      "summary": "Tier-2 phase 1 (HR-054, under HR-047): the frozen fixture corpus, the cargo workspace with module boundaries and CI matrix, render and check-knowledge in Rust behind the byte-parity gate, the cross-compilation spike.",
+      "kickoff": "docs/specs/2026-09-04-batch-15-tier2-spec.md",
+      "status": {
+        "state": "planned",
+        "text": "Gated 2026-09-04: phase 1 chosen at the batch 15 close; plan pending."
+      }
     }
   ]
 }
