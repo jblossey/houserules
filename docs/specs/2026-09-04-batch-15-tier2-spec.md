@@ -1,6 +1,6 @@
 # The Tier-2 rewrite: houserules as one static binary
 
-Date: 2026-09-04. Status: draft, pending owner approval.
+Date: 2026-09-04. Status: approved by the owner, 2026-09-04.
 Driver: HR-052 (this spec is batch 15's deliverable); HR-047 and
 HR-048 are the build items it governs. Rulings already filed: plain
 `v<version>` tags (design.md §5.20), Rust (§5.21), npm retired —

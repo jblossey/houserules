@@ -218,8 +218,8 @@
       "summary": "The Tier-2 spec batch: write and gate the rewrite spec (HR-052); the gate rulings run one at a time, the release tag format first. HR-047 and HR-048 stay open as the build items the spec governs.",
       "kickoff": "docs/specs/2026-09-04-batch-15-tier2-spec.md",
       "status": {
-        "state": "planned",
-        "text": "Gated 2026-09-04: the spec batch; rulings pending, the tag format first."
+        "state": "done",
+        "text": "Done 2026-09-04: the spec approved as amended after eight owner rulings (plain v-tags with the v0.2.0-alpha alias pushed; Rust; npm retired; no shims — tools/*.sh deleted, update gains KIT_OWNED deletion; flat commands with per-module checks and a built-in check-commit; modularity prepared — HR-053 filed; the dev tooling migrates, nothing JS survives phase 5; the post-port repository sweep with a grep gate). Rulings live in design.md §5.20-5.24 and decisions.json; the spec's five phases become the build batches for HR-047/048. Worked as controller docs commits on main — no branch, no subagent dispatches."
       }
     }
   ]
