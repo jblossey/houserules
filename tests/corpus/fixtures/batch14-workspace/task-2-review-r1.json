@@ -1,0 +1,339 @@
+{
+  "kind": "re-review",
+  "task": 2,
+  "round": 1,
+  "fix_base": "c081df4",
+  "head": "b1bc73971c3cdc76c5f5cffab4d3eb4d000d76fc",
+  "finding_verdicts": [
+    {
+      "finding": "Minor (template/.claude/agents/implementer.md:40): the verbatim-output clause covered `live_run` only, while the batch 13 T2 incident it encodes also appended synthetic exit lines inside fix_rounds[0].tests.",
+      "verdict": "addressed",
+      "evidence": "template/.claude/agents/implementer.md:40 now reads \"in `tests`, `live_run`, and `fix_rounds[].tests`, `output` carries the command's stdout and stderr verbatim and nothing else, the `exit` field alone carries the exit status\", so the invariant reaches every captured-output field. The statement stands once: line 39's `tests` bullet keeps no copy, so there is nothing to drift. It does not contradict line 39 either -- that clause says when an `exit` field is recorded, this one says where the status may appear, and a `tests` entry with no `exit` still complies. The root copy carries the same blob (568f398). The report itself now obeys the widened rule: I scanned every `output` in tests, live_run and fix_rounds[0].tests and found no appended exit line, and fix_rounds[0].tests[4] carries exit 1 in the `exit` field with a clean JSON body."
+    },
+    {
+      "finding": "Minor (template/.claude/agents/task-reviewer.md:27): item 6 mandated the findings-list comparison but named no destination and no ruling for a mismatch.",
+      "verdict": "addressed",
+      "evidence": "template/.claude/agents/task-reviewer.md:27 now adds \"File a mismatch under `new_breakage`; a mismatch alone does not reopen an addressed finding.\" Both halves match the re-review output shape stated later in the same file: `new_breakage` is where a newly introduced issue goes, and `open` holds only prior findings still unaddressed, so the no-reopen half keeps the two arrays meaning what the Output section says. `new_breakage` is in the seeded schema, so the destination resolves in a fresh install. Root copy blob ebcc6a6, identical."
+    },
+    {
+      "finding": "Minor (.superpowers/sdd/2026-09-04-batch-14/task-2-report.json): `tdd` was `[]` with no line disclosing the docs-only reason and the gates standing in for RED and GREEN.",
+      "verdict": "addressed",
+      "evidence": "self_review[0] now states it: \"tdd is [] by disclosure: every changed file is prose ... Gates (full suite, kb check, backlog check, three byte-parity diffs, the range audit, validate) stand in for RED and GREEN, per process.tdd's docs-only case.\" Every gate it names exists in `tests` (tests[0..2], tests[3..5], tests[6], tests[7])."
+    }
+  ],
+  "rule_adherence": [
+    {
+      "id": "houserules.node-under-mise",
+      "kind": "gotcha",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The fix round runs under mise: fix_rounds[0].tests[0] `mise exec -- pnpm test`, tests[3] `mise run lint`; the kb and backlog wrappers resolve node themselves."
+    },
+    {
+      "id": "houserules.payload-runs-on-builtins",
+      "kind": "invariant",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The fix diff touches four Markdown files (git diff c081df4..b1bc739): no dependency, no manifest, no build step."
+    },
+    {
+      "id": "houserules.pnpm-only",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The only package command in the fix round is `mise exec -- pnpm test`; no npm or npx in the range."
+    },
+    {
+      "id": "houserules.readme-mirrors-kit-owned",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "KIT_OWNED is unchanged in the range, so no README update falls due; README.md is out of scope."
+    },
+    {
+      "id": "houserules.tag-pilot-is-read-only",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "No ~/projects/tag-pilot path in the fix diff, the fix-round gates, or my own checks."
+    },
+    {
+      "id": "houserules.template-is-the-source",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "Both edited templates and the untouched skill are byte-identical to their root copies at HEAD by blob id: implementer.md 568f398, task-reviewer.md ebcc6a6, orchestrating/SKILL.md a944598 (unchanged from round 0). No knowledge file changed, so no generated artifact moved."
+    },
+    {
+      "id": "knowledge-base.ids-are-permanent",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "No knowledge file in the range; no id renamed."
+    },
+    {
+      "id": "knowledge-base.rules-need-a-loading-path",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The fix authors no entry; the ids the prose cites already load through their areas."
+    },
+    {
+      "id": "knowledge-base.state-only-the-source",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "Every reference in the new wording resolves in a fresh install: I ran `init` into a new scratch directory at HEAD, found both widened sentences in the installed copies, matched no repo id, batch number or product name with `grep -nEi \"batch [0-9]+|HR-[0-9]+|houserules|tag-pilot|jblossey\"` (exit 1), and confirmed `new_breakage` exists in the seeded schema, so item 6's destination is real for an installed reviewer. `fix_rounds[].tests` likewise names a field the seeded schema defines."
+    },
+    {
+      "id": "knowledge-base.summary-is-the-rule",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "No knowledge entry authored."
+    },
+    {
+      "id": "process.ask-when-missing",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The fix round follows the two prescriptions as written and states its choices in fix_rounds[0].findings; no assumption stands in for a missing value."
+    },
+    {
+      "id": "process.backlog-drives-work",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The range still delivers HR-043 and HR-050 only; both edits sharpen sentences those items name."
+    },
+    {
+      "id": "process.brainstorm-first",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The fix round answers a review of spec T2 work; no new scope entered."
+    },
+    {
+      "id": "process.code-health-scan",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The spec section 6 covers these files; both edits stay one sentence in place, no structure added."
+    },
+    {
+      "id": "process.conventional-commits",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "2 commits checked"
+    },
+    {
+      "id": "process.deliverables-json",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "report field self_audit is set"
+    },
+    {
+      "id": "process.evals-rerun",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "fail",
+      "evidence": ".claude/agents/implementer.md and .claude/agents/task-reviewer.md changed without .claude/evals/record.json. Still the interim state process.evals-rerun's last paragraph allows: the report discloses it in concerns, the status stays DONE_WITH_CONCERNS, and the spec has T3 run every scenario at the branch head. Not a finding against this round; it stays a merge gate for the branch."
+    },
+    {
+      "id": "process.ff-only-merges",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "Two commits on batch-14 (c081df4, b1bc739); no merge commit in the range."
+    },
+    {
+      "id": "process.knowledge-first",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "warn",
+      "result": "pass",
+      "evidence": "report field knowledge_used is set"
+    },
+    {
+      "id": "process.live-run-before-ci",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The round-0 live_run entries still hold at HEAD: each recorded grep pattern is still a substring of the line it proves, so no capture went stale. The fix round adds its gates in fix_rounds[0].tests, and I reproduced its recorded audit myself over c081df4..b1bc739 -- summary, rules and changed_files all equal. I also re-ran `init` into a fresh scratch directory at HEAD and found both widened sentences in the installed copies."
+    },
+    {
+      "id": "process.model-policy",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "Implementer on sonnet, this re-review on opus; controller-side."
+    },
+    {
+      "id": "process.no-tech-debt",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "0 files checked"
+    },
+    {
+      "id": "process.rulings-to-file",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "No new ruling; the evals deferral stays written in the spec (T3) and HR-050, and the report repeats it in concerns."
+    },
+    {
+      "id": "process.sequential-agents",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "One implementer produced the single fix commit b1bc739; controller-side."
+    },
+    {
+      "id": "process.tdd",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "Still a prose-only change, so process.tdd's docs-only clause applies, and the disclosure it wants now stands as self_review[0]: it names the docs-only reason and the gates that replace RED and GREEN (full suite, kb check, backlog check, three byte-parity diffs, the range audit, validate), each of which exists in `tests`."
+    },
+    {
+      "id": "quality.no-compat-softening",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "Both edits widen a constraint; nothing is softened for an older report shape."
+    },
+    {
+      "id": "quality.principles",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "DRY holds the way the fix chose: the verbatim invariant is stated once and names its three fields, with no copy in the `tests` bullet to drift. KISS holds: two sentences edited in place, four changed lines across two files and their root copies."
+    },
+    {
+      "id": "security-hygiene.dependency-vetting",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "not triggered"
+    },
+    {
+      "id": "security-hygiene.exact-pins",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "0 files checked"
+    },
+    {
+      "id": "security-hygiene.no-coauthor",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "2 commits checked"
+    },
+    {
+      "id": "security-hygiene.no-focused-tests",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "0 files checked"
+    },
+    {
+      "id": "security-hygiene.verify-current-docs",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "warn",
+      "result": "pass",
+      "evidence": "not triggered"
+    },
+    {
+      "id": "writing-style.code-comments",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "No code in the range."
+    },
+    {
+      "id": "writing-style.doc-comments",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "No exported symbol in the range."
+    },
+    {
+      "id": "writing-style.instructions-cover-the-state-space",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "I tested both edited sentences myself. The widened clause holds for a `tests` entry that legitimately carries no `exit` field: line 39 alone decides when `exit` is recorded, and the clause only forbids putting the status in `output`, so the two do not collide. It holds for an empty `live_run` and for a report with no `fix_rounds`, because neither has an entry to violate it. Item 6's new sentence is unconditioned within a re-review, its destination `new_breakage` exists in that output shape, and the no-reopen half keeps `open` meaning what the Output section says it means. The gap is in the report, not the text: self_review[2] still enumerates the round-0 wording, which I file under new_breakage."
+    },
+    {
+      "id": "writing-style.principles",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "Both edits stay active and end on their emphasis (\"the `exit` field alone carries the exit status\", \"does not reopen an addressed finding\"). Item 6's addition is two short sentences, one instruction each. The widened clause fronts its scope (\"in `tests`, `live_run`, and `fix_rounds[].tests`\") before the instruction, which puts the old information first."
+    }
+  ],
+  "new_breakage": [
+    {
+      "severity": "minor",
+      "file": ".superpowers/sdd/2026-09-04-batch-14/task-2-report.json",
+      "what": "`self_audit` is refreshed to 2fde017..b1bc739 (summary head b1bc739, \"2 commits checked\" rows), but no recorded run produces it. tests[6] still holds the round-0 range audit `--head c081df4330df586db6688c51c8806625156a1126`, and tests[7]'s validate ran against the round-0 report state; fix_rounds[0].tests holds the fix-diff audit (c081df4..b1bc739) and no validate at all.",
+      "why": "The implementer's closing contract re-runs the task audit over BASE..HEAD, refreshes self_audit from it, then validates the report. As recorded, the refreshed numbers trace to no command in the report, and the only range audit a reader can re-run disagrees with the self_audit head. My round-0 review could compare self_audit against a recorded run; this round a reader cannot.",
+      "fix": "Invariant to hold: every value in a report traces to a run the report records, and the last validate covers the report's final state. Observed instance: self_audit's summary says head b1bc739 while tests[6] records the audit at head c081df4 and tests[7]'s validate predates the refresh. Replace tests[6] with the BASE..HEAD audit at b1bc739 (whose values I reproduced exactly: 10 deterministic, 9 pass, 1 fail, 0 skipped, 26 judged) and re-record the validate that runs after the refresh."
+    },
+    {
+      "severity": "minor",
+      "file": ".superpowers/sdd/2026-09-04-batch-14/task-2-report.json",
+      "what": "self_review[2], the per-sentence state-space check, still describes the round-0 wording. Item (1) says the split \"holds for every live_run entry\" although the clause now spans `tests`, `live_run` and `fix_rounds[].tests`, and the `tests` bullet makes `exit` optional. Item (3) describes item 6 as scoped to `all-addressed` and says nothing about the new destination and no-reopen sentence.",
+      "why": "The brief requires each sentence checked against its state space and the check said in the report. Two sentences changed and their stated checks did not, so the report's evidence now describes text that no longer exists. I ran both checks myself and both sentences hold, but the report does not show that work, and the next reader inherits a stale claim.",
+      "fix": "Invariant to hold: the report's state-space statement describes the sentence as shipped at HEAD, one statement per shipped sentence. Observed instance: self_review[2] items (1) and (3) describe the round-0 wording of implementer.md:40 and task-reviewer.md:27. Refresh both: for (1), say that the clause spans the three capture fields and that a `tests` entry with no `exit` field still complies because line 39 alone governs when `exit` is recorded; for (3), say that the mismatch disposition is unconditioned within a re-review and that `new_breakage` and `open` keep their Output-section meanings."
+    }
+  ],
+  "out_of_scope": [
+    "README.md, excluded by the dispatch.",
+    ".claude/evals/record.json: the seventh evaluation record is spec task T3, not this round."
+  ],
+  "verdict": {
+    "state": "findings-remain",
+    "open": [],
+    "text": "All three Minors are addressed and the two template edits are right. I ran the audit over the dispatch's range (--base 2fde017 --head b1bc739) with the nine Knowledge ids verbatim: 10 deterministic rows, 9 pass, 1 fail, 0 skipped, 26 judged, and the report's refreshed self_audit matches it row for row and summary for summary. Applying item 6 as it now reads: my round-0 review filed four issues, and fix_rounds[0].findings carries four entries, one per issue, including the plan-mandated evals row recorded as no action with T3 named. The lists match one for one, so there is no mismatch to file. I re-ran the report's fix-diff audit myself and it reproduces the recorded transcript exactly (summary, rules and changed_files all equal), and no `output` anywhere in the report carries an appended exit line, so the report obeys the rule it ships. All three template/root pairs are byte-identical at HEAD (568f398, ebcc6a6, a944598), the report validates, and a fresh `init` at HEAD ships both widened sentences with no repo token and with `new_breakage` present in the seeded schema. The process.evals-rerun row stays red as the spec-scheduled interim state, disclosed in concerns with status DONE_WITH_CONCERNS; T3 must pay it before the branch merges. That is a branch gate, not a finding against this round. Two new Minors remain, both in the report rather than the templates: the refreshed self_audit traces to no recorded run, and the state-space statements still describe the round-0 wording. One thing I considered and cleared: the widened clause lives inside the `live_run` bullet's parenthetical, so a reader of line 39 alone does not see it. I judged that acceptable because the two bullets are adjacent in one field list, the clause names its three fields explicitly, and the alternative -- a copy in the `tests` bullet -- is the duplication the fix rightly avoided. The trailing \"`[]` only for a docs-only task\" clause still reads as live_run's own, since `tests` and `fix_rounds[].tests` are required by the schema."
+  }
+}

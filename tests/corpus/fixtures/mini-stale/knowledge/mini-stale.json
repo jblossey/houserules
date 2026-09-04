@@ -1,0 +1,18 @@
+{
+  "$schema": "./schema.json",
+  "topic": "mini-stale",
+  "title": "Mini-stale fixture knowledge",
+  "entries": [
+    {
+      "id": "mini-stale.build-cache",
+      "kind": "rule",
+      "area": "tools",
+      "summary": "Clear the mini-stale-tools build cache before every fixture regeneration run.",
+      "body": [
+        "Synthetic rule for the mini-stale fixture; it exercises checkBase's post-early-return checks: a stale generated file, a stray rules file, a missing rendered file, and both budget shapes."
+      ],
+      "tags": ["fixture", "tools"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-stale fixture" }
+    }
+  ]
+}

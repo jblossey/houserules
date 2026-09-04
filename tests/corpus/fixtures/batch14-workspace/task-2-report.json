@@ -1,0 +1,284 @@
+{
+  "kind": "task-report",
+  "task": 2,
+  "backlog": [
+    "HR-043",
+    "HR-050"
+  ],
+  "status": "DONE_WITH_CONCERNS",
+  "implemented": "Four sentences from two retrospectives (HR-043, HR-050) land in template/.claude/agents/task-reviewer.md, template/.claude/agents/implementer.md, and template/.claude/skills/orchestrating/SKILL.md, each generic and checked against its state space; root copies synced byte-identical via update --dir .",
+  "commits": [
+    {
+      "sha": "c081df4330df586db6688c51c8806625156a1126",
+      "subject": "fix(template): the template sentences from two retrospectives"
+    }
+  ],
+  "tests": [
+    {
+      "command": "mise exec -- pnpm test",
+      "output": "$ vitest run --coverage\n\n RUN  v4.1.11 /home/jblossey/projects/houserules\n      Coverage enabled with v8\n\n \u2713 |houserules| tests/scratch-dir.test.mjs (1 test) 5ms\n \u2713 |houserules| tests/cli.test.mjs (9 tests) 13ms\n \u2713 |houserules| tests/dogfood.test.mjs (20 tests) 11ms\n \u2713 |houserules| tests/commit-msg-hook.test.mjs (3 tests) 39ms\n \u2713 |houserules| tests/json-store.test.mjs (11 tests) 31ms\n \u2713 |houserules| tests/entry.test.mjs (3 tests) 139ms\n \u2713 |houserules| tests/backlog.test.mjs (10 tests) 132ms\n \u2713 |houserules| tests/init.test.mjs (36 tests) 1705ms\n \u2713 |houserules| tests/kb.test.mjs (107 tests) 5729ms\n\n Test Files  9 passed (9)\n      Tests  200 passed (200)\n   Start at  01:40:35\n   Duration  6.26s (transform 761ms, setup 0ms, import 1.31s, tests 7.80s, environment 1ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\nAll files          |   98.94 |    99.28 |   96.64 |    98.8 |                   \n bin               |    96.7 |     98.5 |   81.81 |   96.42 |                   \n  houserules.mjs   |    96.7 |     98.5 |   81.81 |   96.42 | 256-258           \n template/tools    |   99.11 |    99.26 |   97.31 |   98.97 |                   \n  backlog.mjs      |   98.22 |    98.92 |   92.85 |   97.91 | 258-262           \n  kb.mjs           |    99.4 |    99.36 |   98.34 |   99.32 | 1052-1056         \n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 98.94% ( 848/857 )\nBranches     : 99.28% ( 554/558 )\nFunctions    : 96.64% ( 173/179 )\nLines        : 98.8% ( 744/753 )\n================================================================================\n",
+      "exit": 0
+    },
+    {
+      "command": "tools/kb.sh check",
+      "output": "knowledge: ok\n",
+      "exit": 0
+    },
+    {
+      "command": "tools/backlog.sh check",
+      "output": "backlog: ok\n",
+      "exit": 0
+    },
+    {
+      "command": "diff /home/jblossey/projects/houserules/template/.claude/agents/implementer.md /home/jblossey/projects/houserules/.claude/agents/implementer.md",
+      "output": "",
+      "exit": 0
+    },
+    {
+      "command": "diff /home/jblossey/projects/houserules/template/.claude/agents/task-reviewer.md /home/jblossey/projects/houserules/.claude/agents/task-reviewer.md",
+      "output": "",
+      "exit": 0
+    },
+    {
+      "command": "diff /home/jblossey/projects/houserules/template/.claude/skills/orchestrating/SKILL.md /home/jblossey/projects/houserules/.claude/skills/orchestrating/SKILL.md",
+      "output": "",
+      "exit": 0
+    },
+    {
+      "command": "tools/kb.sh audit --base 2fde017 --head b1bc739 --ids houserules.template-is-the-source,process.evals-rerun,process.deliverables-json,process.tdd,writing-style.principles,writing-style.instructions-cover-the-state-space,quality.principles,houserules.node-under-mise,knowledge-base.state-only-the-source --report /home/jblossey/projects/houserules/.superpowers/sdd/2026-09-04-batch-14/task-2-report.json",
+      "output": "{\n  \"base\": \"2fde017\",\n  \"head\": \"b1bc739\",\n  \"ids\": [\n    \"houserules.template-is-the-source\",\n    \"process.evals-rerun\",\n    \"process.deliverables-json\",\n    \"process.tdd\",\n    \"writing-style.principles\",\n    \"writing-style.instructions-cover-the-state-space\",\n    \"quality.principles\",\n    \"houserules.node-under-mise\",\n    \"knowledge-base.state-only-the-source\"\n  ],\n  \"changed_files\": [\n    \".claude/agents/implementer.md\",\n    \".claude/agents/task-reviewer.md\",\n    \".claude/skills/orchestrating/SKILL.md\",\n    \"template/.claude/agents/implementer.md\",\n    \"template/.claude/agents/task-reviewer.md\",\n    \"template/.claude/skills/orchestrating/SKILL.md\"\n  ],\n  \"areas\": [\n    \"docs\",\n    \"global\",\n    \"template\"\n  ],\n  \"area_files\": {\n    \"global\": [],\n    \"docs\": [\n      \".claude/agents/implementer.md\",\n      \".claude/agents/task-reviewer.md\",\n      \".claude/skills/orchestrating/SKILL.md\"\n    ],\n    \"template\": [\n      \"template/.claude/agents/implementer.md\",\n      \"template/.claude/agents/task-reviewer.md\",\n      \"template/.claude/skills/orchestrating/SKILL.md\"\n    ]\n  },\n  \"rules\": [\n    {\n      \"id\": \"houserules.node-under-mise\",\n      \"kind\": \"gotcha\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.payload-runs-on-builtins\",\n      \"kind\": \"invariant\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.pnpm-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.readme-mirrors-kit-owned\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.tag-pilot-is-read-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.template-is-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.ids-are-permanent\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.rules-need-a-loading-path\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.state-only-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.summary-is-the-rule\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.ask-when-missing\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.backlog-drives-work\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.brainstorm-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.code-health-scan\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.conventional-commits\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"2 commits checked\"\n    },\n    {\n      \"id\": \"process.deliverables-json\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field self_audit is set\"\n    },\n    {\n      \"id\": \"process.evals-rerun\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"fail\",\n      \"evidence\": \".claude/agents/implementer.md changed without .claude/evals/record.json\"\n    },\n    {\n      \"id\": \"process.ff-only-merges\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.knowledge-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field knowledge_used is set\"\n    },\n    {\n      \"id\": \"process.live-run-before-ci\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.model-policy\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.no-tech-debt\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"process.rulings-to-file\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.sequential-agents\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.tdd\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.no-compat-softening\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"security-hygiene.dependency-vetting\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"not triggered\"\n    },\n    {\n      \"id\": \"security-hygiene.exact-pins\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-coauthor\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"2 commits checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-focused-tests\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.verify-current-docs\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"not triggered\"\n    },\n    {\n      \"id\": \"writing-style.code-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.doc-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.instructions-cover-the-state-space\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    }\n  ],\n  \"summary\": {\n    \"base\": \"2fde017\",\n    \"head\": \"b1bc739\",\n    \"deterministic\": 10,\n    \"pass\": 9,\n    \"fail\": 1,\n    \"warn\": 0,\n    \"skipped\": 0,\n    \"judged\": 26\n  }\n}\n",
+      "exit": 1
+    },
+    {
+      "command": "tools/kb.sh validate .superpowers/sdd/2026-09-04-batch-14/task-2-report.json",
+      "output": "[\n  {\n    \"file\": \"/home/jblossey/projects/houserules/.superpowers/sdd/2026-09-04-batch-14/task-2-report.json\",\n    \"kind\": \"task-report\",\n    \"errors\": []\n  }\n]\n",
+      "exit": 0
+    }
+  ],
+  "live_run": [
+    {
+      "command": "mise exec -- node /home/jblossey/projects/houserules/bin/houserules.mjs init --dir /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/init-target > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/run-1-init.txt 2>&1",
+      "output": "wrote tools/kb.mjs\nwrote tools/backlog.mjs\nwrote tools/kb.sh\nwrote tools/backlog.sh\nwrote tools/claude-session-start.sh\nwrote .githooks/commit-msg\nwrote tools/lib/cli.mjs\nwrote tools/lib/json-store.mjs\nwrote .claude/agents/implementer.md\nwrote .claude/agents/task-reviewer.md\nwrote .claude/agents/branch-reviewer.md\nwrote .claude/skills/orchestrating/SKILL.md\nwrote .claude/skills/finishing-a-feature/SKILL.md\nwrote .claude/skills/migrating-knowledge/SKILL.md\nwrote knowledge/schema.json\nwrote knowledge/areas.json\nwrote knowledge/process.json\nwrote knowledge/quality.json\nwrote knowledge/security-hygiene.json\nwrote knowledge/writing-style.json\nwrote knowledge/knowledge-base.json\nwrote backlog/schema.json\nwrote backlog/amendments.json\nwrote backlog/batches.json\nwrote backlog/decisions.json\nwrote backlog/parked.json\nwrote backlog/items/general.json\nwrote .claude/schemas/deliverables.json\nwrote .claude/evals/dependency-add.json\nwrote .claude/evals/docs-edit.json\nwrote .claude/evals/record.json\nwrote .claude/evals/seeded-violations.json\nwrote .github/workflows/knowledge.yml\nwrote CLAUDE.md\nwrote .claude/settings.json\n.claude/rules/standing-rules.md: written\n.claude/rules/docs.md: written\n.claude/skills/project-knowledge/SKILL.md: written\nhouserules: initialized /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/init-target\nnext: tools/kb.sh check && tools/backlog.sh check\n",
+      "exit": 0
+    },
+    {
+      "command": "grep -n \"output. carries the command.s stdout and stderr verbatim and nothing else, the .exit. field alone carries the exit status\" /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/init-target/.claude/agents/implementer.md > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/run-2a-grep-live-run-sentence.txt 2>&1",
+      "output": "40:- `live_run` (the commands that ran the change for real, each its own entry with `exit`: the app, service, or tool exercised the way a user runs it, following the project's live-run procedure from your `Knowledge:` ids; one command per entry, captured as `<command> > <file> 2>&1`, the recorded exit is that command's own, no `;` or `|` tails; `output` carries the command's stdout and stderr verbatim and nothing else, the `exit` field alone carries the exit status; `[]` only for a docs-only task whose live evidence is the gates).\n",
+      "exit": 0
+    },
+    {
+      "command": "grep -n \"State each .fix. as the invariant to hold plus the observed instance, so an implementer who fixes to the letter also fixes the intent\" /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/init-target/.claude/agents/task-reviewer.md > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/run-2b-grep-findings-sentence.txt 2>&1",
+      "output": "31:Important means the task cannot be trusted until fixed: incorrect or fragile behavior, a missed requirement, maintainability damage you would block a merge over. Polish is Minor \u2014 file it anyway: every finding is fixed (`process.no-tech-debt`); a deferral needs a backlog item named in the issue's `backlog`. Undocumented exported symbols and names that need a comment are findings (`writing-style.doc-comments`). A plan-mandated defect is still a finding, with `plan_mandated: true`. Name what was done well before the issues. State each `fix` as the invariant to hold plus the observed instance, so an implementer who fixes to the letter also fixes the intent.\n",
+      "exit": 0
+    },
+    {
+      "command": "grep -n \"In a re-review, before ruling .all-addressed., confirm the report.s .fix_rounds. findings list matches the findings under verification one for one\" /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/init-target/.claude/agents/task-reviewer.md > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/run-2c-grep-rereview-sentence.txt 2>&1",
+      "output": "27:6. In a re-review, before ruling `all-addressed`, confirm the report's `fix_rounds` findings list matches the findings under verification one for one.\n",
+      "exit": 0
+    },
+    {
+      "command": "grep -n \"On a mid-batch branch rebuild, write the old-to-new sha map to its own workspace file, cite it in the batch report, and never edit closed-task deliverables\" /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/init-target/.claude/skills/orchestrating/SKILL.md > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/run-2d-grep-rebuild-sentence.txt 2>&1",
+      "output": "56:- On a mid-batch branch rebuild, write the old-to-new sha map to its own workspace file, cite it in the batch report, and never edit closed-task deliverables (`process.main-wins-backlog-collisions`).\n",
+      "exit": 0
+    },
+    {
+      "command": "grep -nEi \"batch [0-9]+|HR-0[0-9]+|houserules|tag-pilot\" /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/init-target/.claude/agents/implementer.md /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/init-target/.claude/agents/task-reviewer.md /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/init-target/.claude/skills/orchestrating/SKILL.md > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/run-3-negative-grep.txt 2>&1",
+      "output": "",
+      "exit": 1
+    },
+    {
+      "command": "cd /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/init-target && tools/kb.sh check > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/run-4-kb-check.txt 2>&1",
+      "output": "knowledge: ok\n",
+      "exit": 0
+    },
+    {
+      "command": "cd /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/init-target && tools/backlog.sh check > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-043-050-live-run/run-5-backlog-check.txt 2>&1",
+      "output": "backlog: ok\n",
+      "exit": 0
+    }
+  ],
+  "tdd": [],
+  "files_changed": [
+    "template/.claude/agents/task-reviewer.md",
+    "template/.claude/agents/implementer.md",
+    "template/.claude/skills/orchestrating/SKILL.md",
+    ".claude/agents/task-reviewer.md",
+    ".claude/agents/implementer.md",
+    ".claude/skills/orchestrating/SKILL.md"
+  ],
+  "docs_verified": [],
+  "dependency_vetting": null,
+  "coverage": [
+    {
+      "target": "template/tools + bin (repo coverage gate)",
+      "metric": "lines",
+      "measured": 98.8,
+      "floor": 80
+    },
+    {
+      "target": "template/tools + bin (repo coverage gate)",
+      "metric": "branches",
+      "measured": 99.28,
+      "floor": 99
+    }
+  ],
+  "self_audit": {
+    "summary": {
+      "base": "2fde017",
+      "head": "b1bc739",
+      "deterministic": 10,
+      "pass": 9,
+      "fail": 1,
+      "warn": 0,
+      "skipped": 0,
+      "judged": 26
+    },
+    "rows": [
+      {
+        "id": "process.conventional-commits",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "2 commits checked"
+      },
+      {
+        "id": "process.deliverables-json",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "report field self_audit is set"
+      },
+      {
+        "id": "process.evals-rerun",
+        "mode": "deterministic",
+        "result": "fail",
+        "evidence": ".claude/agents/implementer.md changed without .claude/evals/record.json"
+      },
+      {
+        "id": "process.knowledge-first",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "report field knowledge_used is set"
+      },
+      {
+        "id": "process.no-tech-debt",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "0 files checked"
+      },
+      {
+        "id": "security-hygiene.dependency-vetting",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "not triggered"
+      },
+      {
+        "id": "security-hygiene.exact-pins",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "0 files checked"
+      },
+      {
+        "id": "security-hygiene.no-coauthor",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "2 commits checked"
+      },
+      {
+        "id": "security-hygiene.no-focused-tests",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "0 files checked"
+      },
+      {
+        "id": "security-hygiene.verify-current-docs",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "not triggered"
+      }
+    ]
+  },
+  "self_review": [
+    "tdd is [] by disclosure: every changed file is prose (four template sentences round 0, two extended-in-place round 1, plus their root-synced copies) with no executable consumer. Gates (full suite, kb check, backlog check, three byte-parity diffs, the range audit, validate) stand in for RED and GREEN, per process.tdd's docs-only case.",
+    "All four sentences land exactly as scoped: no section renamed, no bullet reordered, no other line touched; git diff shows eight insertions across three files, nothing else.",
+    "State-space check (writing-style.instructions-cover-the-state-space) per sentence, refreshed to the shipped (round-1) wording for the two sentences the fix round changed: (1) the verbatim-output clause (round 1: extended in place, implementer.md:40) has no conditioned field to narrow -- it now names `tests`, `live_run`, and `fix_rounds[].tests` together and holds for every entry in any of the three: docs-only `live_run: []`, an empty `fix_rounds`, and a `tests` entry with no `exit` field all comply, since line 39's `tests` bullet alone governs when `exit` is recorded and the widened clause only constrains where the status may appear once it is. (2) the Calibration sentence on stating each fix as invariant-plus-instance is unconditioned across severity (Important/Minor) and plan_mandated -- it holds for every issue with a fix field. (3) the re-review checklist item 6's findings-list check is deliberately scoped to 'before ruling all-addressed', the one of the two verdict values (all-addressed/findings-remain) where an undercounted findings list does real harm (a false all-addressed ruling); findings-remain does not need the same gate since it already declares work outstanding. Item 6's second sentence (the mismatch disposition, added round 1) is unconditioned within a re-review -- it applies whichever verdict follows -- and its two nouns keep their Output-section meanings: `new_breakage` is where a newly introduced issue goes, `open` holds only prior findings still unaddressed, so filing a mismatch under `new_breakage` does not by itself move an already-addressed finding back into `open`. (4) the rebuild step is scoped to 'on a mid-batch branch rebuild' only, so it cannot be read as a blanket ban on editing closed-task deliverables outside that event.",
+    "No repo id, batch number, or command a fresh install lacks: verified live by grepping the four sentences and a batch/HR-id/product-name pattern in a freshly `init`-ed scratch project (zero matches on the negative grep); the two knowledge ids the new sentences cite (process.main-wins-backlog-collisions in the rebuild step; the existing process.no-tech-debt etc. already in file) all resolve in that same fresh install since knowledge/*.json is SEED_ONCE.",
+    "Placement follows each file's existing structure: the findings-invariant sentence extends the Calibration paragraph where issue severity and content are already discussed; the re-review check becomes item 6 of the existing numbered 'Rule adherence (mandatory)' checklist, alongside the structurally similar item 5 (compare two lists before trusting a claim); the live_run sentence extends the live_run bullet in place; the rebuild step joins 'Handling reviews' next to the existing controller-slip logging bullet, the closest existing precedent for 'record this in-flight batch event to a durable artifact'.",
+    "No exported symbols, doc comments, or code touched -- all four edits are prose in agent/skill templates, so writing-style.doc-comments does not apply; writing-style.principles (ASD-STE100) checked by hand: each sentence is one instruction, active voice, old-to-new information order.",
+    "Root and template copies verified byte-identical (3 diff commands, empty output) and by the dogfood suite (tests/dogfood.test.mjs, 20/20 green) after `update --dir .`; render was a no-op since no knowledge/*.json changed.",
+    "Full suite 200/200 green, coverage above both configured floors, kb/backlog check gates clean at repo root and inside the fresh scratch install.",
+    "Follow-up (report-only, no commit, HEAD stays b1bc739): task-2-review-r1.json ruled all three round-1 Minors addressed and filed two new report-only Minors in new_breakage -- tests[6] traced self_audit's refreshed 2fde017..b1bc739 numbers to no recorded run (it still held the round-0 audit at head c081df4, and the last validate predated the refresh), and self_review[2] still described the round-0 wording of the two sentences the fix round changed. Fixed both: tests[6] is now the actual BASE..HEAD audit at b1bc739 (10 deterministic, 9 pass, 1 fail, 0 skipped, 26 judged -- matching the reviewer's own reproduction), and self_review[2] items (1) and (3) now state the shipped wording. tests[7]'s validate is re-recorded after every other edit in this follow-up, so it is the last validate and covers the report's final state."
+  ],
+  "concerns": [
+    "process.evals-rerun's deterministic audit row stays a disclosed fail: this task's range (2fde017..HEAD) changes implementer.md and task-reviewer.md without a matching .claude/evals/record.json update. T1 already tripped this same check; this task's diff extends the un-rerun range. Per the batch spec (docs/specs/2026-09-04-batch-14-hygiene.md, T2/T3), the rerun is scheduled once for both changed templates as T3's `docs(evals): seventh evaluation record`, which pays this row for the whole implementer.md/task-reviewer.md range before the branch review."
+  ],
+  "knowledge_used": [
+    "houserules.template-is-the-source",
+    "process.evals-rerun",
+    "process.deliverables-json",
+    "process.tdd",
+    "writing-style.principles",
+    "writing-style.instructions-cover-the-state-space",
+    "quality.principles",
+    "houserules.node-under-mise",
+    "knowledge-base.state-only-the-source"
+  ],
+  "fix_rounds": [
+    {
+      "round": 1,
+      "findings": [
+        {
+          "finding": "process.evals-rerun's deterministic row fails at HEAD: implementer.md and task-reviewer.md changed without a matching .claude/evals/record.json update (Important, plan_mandated, HR-050).",
+          "fix": "No action taken: plan-mandated per the batch spec's T3 (docs(evals): seventh evaluation record), which runs every scenario at the branch head, keys the record by both template blob ids, and pays this row before the merge.",
+          "file": ".claude/evals/record.json"
+        },
+        {
+          "finding": "The verbatim-output invariant (round 0) named `live_run` only; batch 13 T2's synthetic exit=0 lines sat mostly in fix_rounds[0].tests, a field the sentence never covered (Minor, plan_mandated).",
+          "fix": "Extended the live_run bullet's existing sentence to name `tests`, `live_run`, and `fix_rounds[].tests` together, stated once, in place; no duplicate clause added to the tests bullet.",
+          "file": "template/.claude/agents/implementer.md:40"
+        },
+        {
+          "finding": "Item 6's findings-list check named no destination or ruling for a mismatch, so the batch 13 T2 defect it targets could still end in an unenforced prose note (Minor, plan_mandated).",
+          "fix": "Added a second sentence to item 6: a mismatch is filed under `new_breakage`, and a mismatch alone does not reopen a finding already addressed.",
+          "file": "template/.claude/agents/task-reviewer.md:27"
+        },
+        {
+          "finding": "The report's `tdd: []` carried no line disclosing the docs-only reason and the gates that stand in for RED and GREEN, contrary to the brief and the house pattern (Minor).",
+          "fix": "Inserted the disclosure line as self_review[0], naming the gates in `tests` (full suite, kb check, backlog check, three byte-parity diffs, the range audit, validate).",
+          "file": ".superpowers/sdd/2026-09-04-batch-14/task-2-report.json"
+        }
+      ],
+      "commits": [
+        {
+          "sha": "b1bc73971c3cdc76c5f5cffab4d3eb4d000d76fc",
+          "subject": "fix(template): the verbatim invariant covers every capture field"
+        }
+      ],
+      "tests": [
+        {
+          "command": "mise exec -- pnpm test",
+          "output": "$ vitest run --coverage\n\n RUN  v4.1.11 /home/jblossey/projects/houserules\n      Coverage enabled with v8\n\n \u2713 |houserules| tests/scratch-dir.test.mjs (1 test) 7ms\n \u2713 |houserules| tests/cli.test.mjs (9 tests) 13ms\n \u2713 |houserules| tests/dogfood.test.mjs (20 tests) 13ms\n \u2713 |houserules| tests/commit-msg-hook.test.mjs (3 tests) 42ms\n \u2713 |houserules| tests/json-store.test.mjs (11 tests) 29ms\n \u2713 |houserules| tests/entry.test.mjs (3 tests) 140ms\n \u2713 |houserules| tests/backlog.test.mjs (10 tests) 134ms\n \u2713 |houserules| tests/init.test.mjs (36 tests) 1700ms\n \u2713 |houserules| tests/kb.test.mjs (107 tests) 5318ms\n\n Test Files  9 passed (9)\n      Tests  200 passed (200)\n   Start at  01:58:08\n   Duration  5.92s (transform 1.07s, setup 0ms, import 1.70s, tests 7.40s, environment 1ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\nAll files          |   98.94 |    99.28 |   96.64 |    98.8 |                   \n bin               |    96.7 |     98.5 |   81.81 |   96.42 |                   \n  houserules.mjs   |    96.7 |     98.5 |   81.81 |   96.42 | 256-258           \n template/tools    |   99.11 |    99.26 |   97.31 |   98.97 |                   \n  backlog.mjs      |   98.22 |    98.92 |   92.85 |   97.91 | 258-262           \n  kb.mjs           |    99.4 |    99.36 |   98.34 |   99.32 | 1052-1056         \n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 98.94% ( 848/857 )\nBranches     : 99.28% ( 554/558 )\nFunctions    : 96.64% ( 173/179 )\nLines        : 98.8% ( 744/753 )\n================================================================================\n",
+          "exit": 0
+        },
+        {
+          "command": "tools/kb.sh check",
+          "output": "knowledge: ok\n",
+          "exit": 0
+        },
+        {
+          "command": "tools/backlog.sh check",
+          "output": "backlog: ok\n",
+          "exit": 0
+        },
+        {
+          "command": "mise run lint",
+          "output": "[lint] $ shellcheck tools/*.sh template/tools/*.sh .githooks/commit-msg templat\u2026\n[lint] $ tools/kb.sh check\nknowledge: ok\n[lint] $ tools/backlog.sh check\nbacklog: ok\n",
+          "exit": 0
+        },
+        {
+          "command": "tools/kb.sh audit --base c081df4 --head b1bc73971c3cdc76c5f5cffab4d3eb4d000d76fc --ids houserules.template-is-the-source,process.evals-rerun,process.deliverables-json,process.tdd,writing-style.principles,writing-style.instructions-cover-the-state-space,quality.principles,houserules.node-under-mise,knowledge-base.state-only-the-source --report .superpowers/sdd/2026-09-04-batch-14/task-2-report.json",
+          "output": "{\n  \"base\": \"c081df4\",\n  \"head\": \"b1bc739\",\n  \"ids\": [\n    \"houserules.template-is-the-source\",\n    \"process.evals-rerun\",\n    \"process.deliverables-json\",\n    \"process.tdd\",\n    \"writing-style.principles\",\n    \"writing-style.instructions-cover-the-state-space\",\n    \"quality.principles\",\n    \"houserules.node-under-mise\",\n    \"knowledge-base.state-only-the-source\"\n  ],\n  \"changed_files\": [\n    \".claude/agents/implementer.md\",\n    \".claude/agents/task-reviewer.md\",\n    \"template/.claude/agents/implementer.md\",\n    \"template/.claude/agents/task-reviewer.md\"\n  ],\n  \"areas\": [\n    \"docs\",\n    \"global\",\n    \"template\"\n  ],\n  \"area_files\": {\n    \"global\": [],\n    \"docs\": [\n      \".claude/agents/implementer.md\",\n      \".claude/agents/task-reviewer.md\"\n    ],\n    \"template\": [\n      \"template/.claude/agents/implementer.md\",\n      \"template/.claude/agents/task-reviewer.md\"\n    ]\n  },\n  \"rules\": [\n    {\n      \"id\": \"houserules.node-under-mise\",\n      \"kind\": \"gotcha\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.payload-runs-on-builtins\",\n      \"kind\": \"invariant\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.pnpm-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.readme-mirrors-kit-owned\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.tag-pilot-is-read-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.template-is-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.ids-are-permanent\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.rules-need-a-loading-path\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.state-only-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.summary-is-the-rule\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.ask-when-missing\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.backlog-drives-work\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.brainstorm-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.code-health-scan\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.conventional-commits\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"1 commits checked\"\n    },\n    {\n      \"id\": \"process.deliverables-json\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field self_audit is set\"\n    },\n    {\n      \"id\": \"process.evals-rerun\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"fail\",\n      \"evidence\": \".claude/agents/implementer.md changed without .claude/evals/record.json\"\n    },\n    {\n      \"id\": \"process.ff-only-merges\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.knowledge-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field knowledge_used is set\"\n    },\n    {\n      \"id\": \"process.live-run-before-ci\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.model-policy\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.no-tech-debt\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"process.rulings-to-file\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.sequential-agents\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.tdd\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.no-compat-softening\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"security-hygiene.dependency-vetting\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"not triggered\"\n    },\n    {\n      \"id\": \"security-hygiene.exact-pins\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-coauthor\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"1 commits checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-focused-tests\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.verify-current-docs\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"not triggered\"\n    },\n    {\n      \"id\": \"writing-style.code-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.doc-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.instructions-cover-the-state-space\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    }\n  ],\n  \"summary\": {\n    \"base\": \"c081df4\",\n    \"head\": \"b1bc739\",\n    \"deterministic\": 10,\n    \"pass\": 9,\n    \"fail\": 1,\n    \"warn\": 0,\n    \"skipped\": 0,\n    \"judged\": 26\n  }\n}\n",
+          "exit": 1
+        }
+      ]
+    }
+  ]
+}

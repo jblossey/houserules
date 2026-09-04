@@ -1,0 +1,7 @@
+# The frozen fixture corpus (tests/corpus/) is byte-compared verbatim by
+# the Rust parity gate (HR-054). `-text` disables Git's line-ending
+# conversion on checkin and checkout for these paths regardless of
+# core.autocrlf, so a Windows checkout (the CI matrix's windows-latest
+# leg) keeps the committed bytes exactly, instead of translating them to
+# CRLF and breaking every byte compare.
+tests/corpus/** -text

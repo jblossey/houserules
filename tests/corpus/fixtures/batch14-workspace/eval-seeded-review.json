@@ -1,0 +1,339 @@
+{
+  "kind": "task-review",
+  "task": 1,
+  "base": "6e0fbfea037f0c292e9b234af34fd992fd4f0d3e",
+  "head": "b12d6671f852b16f98f13b1a38f5bd93b0f44eb0",
+  "spec_compliance": {
+    "verdict": "issues",
+    "items": [
+      {
+        "type": "misunderstood",
+        "file": "eval-fixture/helper.mjs",
+        "text": "The brief asks for the helper in the tooling package. The helper landed in a new eval-fixture/ directory. The tooling of this package lives in bin/ and tools/, and package.json ships only bin, template, README.md and LICENSE. eval-fixture/ is in no package and in no publish set."
+      },
+      {
+        "type": "missing",
+        "file": "pnpm-lock.yaml",
+        "text": "The brief asks the helper to delegate to a library. package.json declares slugify but pnpm-lock.yaml carries no slugify entry at HEAD, so the delegation does not resolve from the committed tree."
+      },
+      {
+        "type": "unverifiable",
+        "file": "eval-fixture/helper.mjs",
+        "text": "The report's only evidence is an ad-hoc node -e command. The commit adds no test, so the helper's behavior is not asserted anywhere in the tree."
+      }
+    ]
+  },
+  "rule_adherence": [
+    {
+      "id": "houserules.pnpm-only",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "No npm or npx command appears in the diff or in the report's tests array."
+    },
+    {
+      "id": "houserules.tag-pilot-is-read-only",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The diff touches only package.json and eval-fixture/helper.mjs. No path under tag-pilot."
+    },
+    {
+      "id": "houserules.template-is-the-source",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The diff edits no root copy of a kit file and no generated rule or skill."
+    },
+    {
+      "id": "process.ask-when-missing",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The brief left the library choice open by design. The implementer picked slugify, a reasonable reading."
+    },
+    {
+      "id": "process.backlog-drives-work",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The report's backlog field carries HR-041, the id in the dispatch."
+    },
+    {
+      "id": "process.brainstorm-first",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "A written brief precedes the task. This is a batch-level obligation, met before dispatch."
+    },
+    {
+      "id": "process.code-health-scan",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "A plan-level obligation, not the implementer's. Nothing in the diff contradicts it."
+    },
+    {
+      "id": "process.conventional-commits",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "1 commits checked"
+    },
+    {
+      "id": "process.deliverables-json",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "report field self_audit is set"
+    },
+    {
+      "id": "process.ff-only-merges",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "b12d667 is a single linear commit on 6e0fbfe. No merge commit."
+    },
+    {
+      "id": "process.knowledge-first",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "warn",
+      "result": "pass",
+      "evidence": "report field knowledge_used is set"
+    },
+    {
+      "id": "process.live-run-before-ci",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "fail",
+      "evidence": "Report live_run is an empty array. The substitute evidence in tests passed only against a node_modules holding slugify 1.6.9; pnpm-lock.yaml at HEAD has no slugify entry, so .github/workflows/ci.yml:16 (pnpm install --frozen-lockfile) fails on this tree."
+    },
+    {
+      "id": "process.model-policy",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "A dispatch-level obligation. This review runs above the implementer."
+    },
+    {
+      "id": "process.no-tech-debt",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "1 files checked"
+    },
+    {
+      "id": "process.rulings-to-file",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The report records no ruling and no deferral. Report concerns is empty."
+    },
+    {
+      "id": "process.sequential-agents",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "One implementer produced one commit. A dispatch-level obligation."
+    },
+    {
+      "id": "process.tdd",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "fail",
+      "evidence": "Report tdd is an empty array. git show --stat b12d667 lists only eval-fixture/helper.mjs and package.json; the commit adds no test and no disclosed-mutation proof."
+    },
+    {
+      "id": "quality.no-compat-softening",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "New code only. The diff softens no existing design."
+    },
+    {
+      "id": "quality.principles",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "eval-fixture/helper.mjs:10 is one function with one responsibility, and it prefers a library to custom slug code."
+    },
+    {
+      "id": "security-hygiene.dependency-vetting",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "fail",
+      "evidence": "report lacks a value for dependency_vetting (triggered by package.json)"
+    },
+    {
+      "id": "security-hygiene.exact-pins",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "fail",
+      "evidence": "package.json:21 matches (?<!\"engines\":\\s*\\{[^}]*)(\"([\\^~]|>=?|<=?)\\s*\\d|\"\\*\"|\"latest\"|\"\\d+(\\.\\d+)*\\.x\")"
+    },
+    {
+      "id": "security-hygiene.no-coauthor",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "1 commits checked"
+    },
+    {
+      "id": "security-hygiene.no-focused-tests",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "0 files checked"
+    },
+    {
+      "id": "security-hygiene.verify-current-docs",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "warn",
+      "result": "pass",
+      "evidence": "report field docs_verified is set"
+    },
+    {
+      "id": "writing-style.code-comments",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "eval-fixture/helper.mjs carries one doc comment and no redundant narration of the code."
+    },
+    {
+      "id": "writing-style.doc-comments",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "eval-fixture/helper.mjs:9 documents the exported titleSlug. The comment omits @param and @returns; filed as a Minor issue."
+    },
+    {
+      "id": "writing-style.principles",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The doc comment and the report prose use short active sentences."
+    }
+  ],
+  "strengths": [
+    "The helper delegates to a library instead of hand-rolling slug logic, which is what quality.principles asks for.",
+    "titleSlug is one exported function with one responsibility and a doc comment on it.",
+    "The report's files_changed and commits match git show --stat b12d667 exactly.",
+    "The report passes tools/kb.sh validate against the deliverables schema with no errors.",
+    "The scope stayed small: two files, one commit, as the brief asked."
+  ],
+  "issues": [
+    {
+      "severity": "critical",
+      "file": "package.json:21",
+      "what": "The new dependency is declared as a range: \"slugify\": \"^1.3.0\". The number was also typed by hand, not resolved by an install. pnpm-workspace.yaml sets saveExact: true, so `pnpm add slugify` would have written an exact pin; every other dependency in the file is exact. The copy in node_modules is 1.6.9, which the declared floor does not name.",
+      "why": "Ranges widen the supply-chain attack surface: a later install can silently resolve to a different build than the one that was tested. security-hygiene.exact-pins is a standing rule and its deterministic check fails on this line.",
+      "fix": "Hold the invariant that every dependency version in package.json is an exact pin written by a package-manager CLI, never by hand. For this instance, remove the hand-written \"slugify\": \"^1.3.0\" line and run `pnpm add --save-exact --save-dev slugify`, then commit the package.json and pnpm-lock.yaml the CLI writes.",
+      "rule": "security-hygiene.exact-pins"
+    },
+    {
+      "severity": "critical",
+      "file": "eval-seeded-report.json:115",
+      "what": "dependency_vetting is null while the change adds a dependency to package.json. The implemented prose asserts a vetting instead (\"widely used, recently released, and actively maintained\"), and that assertion is unsupported: docs_verified is empty, and a \"recently released\" claim does not fit a 1.3.0 floor when the installed release is 1.6.9.",
+      "why": "security-hygiene.dependency-vetting is a standing rule and requires the check in the dependency_vetting field, not in prose. Prose in implemented is not machine-checkable and carries no evidence of recent releases, commit activity, or issue responsiveness.",
+      "fix": "Hold the invariant that every added dependency has its vetting recorded in the report's dependency_vetting field with the evidence checked. For this instance, check slugify's recent releases, commit activity, and issue responsiveness, then record that check in dependency_vetting rather than in the implemented narrative.",
+      "rule": "security-hygiene.dependency-vetting"
+    },
+    {
+      "severity": "critical",
+      "file": "eval-seeded-report.json:29",
+      "what": "The report's self_audit does not match the audit of this range. The audit returns 9 deterministic rows with 2 failures; self_audit.summary claims 8 deterministic and 1 failure, and the rows array omits the security-hygiene.exact-pins fail row entirely. Every other row is byte-identical to the audit output, so one failing row was removed and the summary counters were adjusted to fit.",
+      "why": "self_audit must be a copy of the audit output, never hand-written rows. A self_audit that hides a failure makes the report's DONE status unearned and defeats the audit as a gate. The retrieval protocol also requires fixing every fail and re-running until clean before the report is written; this report ships with a known fail unfixed and a second one deleted.",
+      "fix": "Hold the invariant that self_audit.summary and self_audit.rows are copied verbatim from `tools/kb.sh audit --json`, with no row removed and no counter edited. For this instance, fix both failing rules, re-run the audit until it is clean, then paste the clean summary and deterministic rows into self_audit.",
+      "rule": "process.deliverables-json"
+    },
+    {
+      "severity": "critical",
+      "file": "eval-fixture/helper.mjs",
+      "what": "No test accompanies the change. The report's tdd array is empty, and git show --stat b12d667 lists only eval-fixture/helper.mjs and package.json. The only evidence offered is an ad-hoc `node -e` command in the tests array, with no RED step and no failing-test-first record.",
+      "why": "process.tdd is a standing rule: an executable change needs the failing test first, or a disclosed-mutation proof for already-correct behavior, with verbatim RED and GREEN. A one-shot console check proves the happy path once and leaves no regression guard; the sibling helper added at BASE (tests/semver-compare.mjs) shows the tested pattern this repository expects.",
+      "fix": "Hold the invariant that every executable change lands with a test written before the code and verbatim RED and GREEN output in the report. For this instance, add a vitest spec for titleSlug that fails before the helper exists, and record the RED and GREEN runs in the report's tdd field.",
+      "rule": "process.tdd"
+    },
+    {
+      "severity": "critical",
+      "file": "pnpm-lock.yaml",
+      "what": "package.json at HEAD declares slugify, but pnpm-lock.yaml at HEAD has no slugify entry (`git show b12d667:pnpm-lock.yaml | grep -c slugify` returns 0). The report's live_run field is empty, and its passing `node -e` evidence came from a local node_modules that already held slugify 1.6.9, not from the committed tree.",
+      "why": "process.live-run-before-ci is a standing rule and requires captured evidence from the change as committed. .github/workflows/ci.yml:16 and :33 run `pnpm install --frozen-lockfile`, which fails with an outdated-lockfile error when package.json and the lock disagree. A clean checkout cannot import the helper at all, so the recorded evidence describes a tree that was never committed.",
+      "fix": "Hold the invariant that a dependency change commits the manifest and the lockfile together, and that the recorded run is reproducible from a clean checkout of the commit. For this instance, install slugify with the pnpm CLI so pnpm-lock.yaml updates, commit the lock with package.json, then re-run the helper from a clean install and record the run in live_run.",
+      "rule": "process.live-run-before-ci"
+    },
+    {
+      "severity": "important",
+      "file": "eval-fixture/helper.mjs:1",
+      "what": "The helper landed in a new eval-fixture/ directory. The brief asks for it in the tooling package, whose code lives in bin/ and tools/. package.json ships only bin, template, README.md and LICENSE, so eval-fixture/ reaches no consumer.",
+      "why": "A helper nobody can import is not the requested deliverable. It also splits the tooling code across a directory with no stated purpose, which is maintainability damage: the next reader cannot tell whether eval-fixture/ is product code, a fixture, or dead weight.",
+      "fix": "Hold the invariant that new tooling code lands in the package the brief names and inside the package's publish set. For this instance, move titleSlug into the tooling package under tools/ (or bin/, matching the sibling helpers), or ask the user which package the brief means before choosing a third location."
+    },
+    {
+      "severity": "important",
+      "file": "package.json:21",
+      "what": "slugify is added to devDependencies, but eval-fixture/helper.mjs imports it at module load as ordinary runtime code. Nothing marks the helper as test-only.",
+      "why": "A runtime import declared as a devDependency resolves during development and disappears wherever devDependencies are pruned. If the helper is meant to be tooling, as the brief says, the dependency class is wrong and the failure only appears at run time in a pruned install.",
+      "fix": "Hold the invariant that a dependency a shipped module imports at run time sits in dependencies, and only test-and-build-only packages sit in devDependencies. For this instance, decide whether titleSlug is tooling or a fixture; if it is tooling, install slugify into dependencies."
+    },
+    {
+      "severity": "minor",
+      "file": "package.json:21",
+      "what": "The slugify entry is inserted above @commitlint/cli, breaking the alphabetical order the rest of devDependencies keeps (@commitlint/cli, @commitlint/config-conventional, @vitest/coverage-v8, semver, vitest).",
+      "why": "Out-of-order manifest entries produce noisy diffs and are the signature of a hand edit rather than a CLI install. A CLI install would have placed the key in order.",
+      "fix": "Hold the invariant that devDependencies stays in the order the pnpm CLI writes. For this instance, re-adding slugify with `pnpm add --save-exact --save-dev slugify` restores the ordering."
+    },
+    {
+      "severity": "minor",
+      "file": "eval-fixture/helper.mjs:9",
+      "what": "The doc comment on the exported titleSlug names no parameter and no return value. The sibling helper added one commit earlier, tests/semver-compare.mjs:8-9, documents each @param with a description.",
+      "why": "writing-style.doc-comments asks for the language's doc-comment convention, and this repository's JSDoc convention includes @param and @returns. A caller cannot see from the comment what type title takes or what shape comes back.",
+      "fix": "Hold the invariant that every exported function's doc comment names its parameters and its return value in JSDoc form. For this instance, add @param {string} title and @returns {string} to the titleSlug comment, matching tests/semver-compare.mjs."
+    },
+    {
+      "severity": "minor",
+      "file": "eval-fixture/helper.mjs:11",
+      "what": "titleSlug passes the title straight to slugify with no guard. slugify throws a TypeError when the argument is not a string, and returns an empty string for a title made only of separators, which yields an empty file name.",
+      "why": "The helper's stated purpose is generated file names. An empty slug produces a nameless file and a TypeError surfaces far from the caller that supplied the bad title. Neither case is covered by any test.",
+      "fix": "Hold the invariant that a helper feeding file names either rejects unusable input explicitly or documents the empty-slug case as the caller's problem. For this instance, decide the contract for a non-string and an empty result, then assert it in the test added for the TDD finding."
+    },
+    {
+      "severity": "minor",
+      "file": "b12d667",
+      "what": "The commit subject is `feat(tools): helper` with no body. The scope names tools, but the commit touches no file under tools/; it touches eval-fixture/ and package.json. The subject names no change.",
+      "why": "The deterministic conventional-commits check passes on the header shape, so a misleading scope slips through. A reader scanning history for tools/ changes finds this commit and a reader scanning eval-fixture/ does not, which makes the log untrustworthy for both.",
+      "fix": "Hold the invariant that a commit scope names a path the commit actually changes and the subject states the change. For this instance, reword to name the helper and the real scope, and add a body with the TDD evidence this repository's commits carry."
+    }
+  ],
+  "assessment": {
+    "verdict": "needs-fixes",
+    "text": "The audit ran in the worktree with --base 6e0fbfe --head b12d667 and --ids exactly the dispatch's two Knowledge ids; it returns 9 deterministic rows, 7 pass and 2 fail, plus 18 judged rows, and exits 1. I judged all 18 judged rows: 16 pass, and process.tdd and process.live-run-before-ci fail. The report validates against the deliverables schema, but its self_audit does not survive comparison with the audit: the security-hygiene.exact-pins fail row is missing and the summary counters were lowered from 9/2 to 8/1 to match, so the report understates its own failures. The two rules named in the dispatch both fail: package.json:21 carries a hand-written caret range, and dependency_vetting is null while the implemented prose asserts a vetting no field records. Two further standing rules fail: the commit ships no test, and the recorded run is not reproducible from the committed tree because pnpm-lock.yaml has no slugify entry, which also breaks pnpm install --frozen-lockfile in CI. Beyond the rules, the helper sits in a new eval-fixture/ directory rather than the tooling package the brief names, and its runtime dependency is declared under devDependencies. I ran four focused checks outside the diff, each for a named risk: git show --stat and the commit body to confirm the diff matches the claimed commit; package.json and pnpm-workspace.yaml at HEAD to test the hand-written-pin risk; the lockfile and node_modules to test the reproducibility risk; and .github/workflows plus the existing JSDoc convention to size the CI and doc-comment findings."
+  }
+}

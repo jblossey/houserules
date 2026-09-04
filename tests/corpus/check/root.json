@@ -1,0 +1,7 @@
+{
+  "command": "node tools/kb.mjs check",
+  "cwd": "<frozen-worktree>",
+  "stdout": "knowledge: ok\n",
+  "stderr": "",
+  "exit": 0
+}

@@ -1,0 +1,7 @@
+{
+  "command": "node tools/backlog.mjs check",
+  "cwd": "<frozen-worktree>",
+  "stdout": "backlog: ok\n",
+  "stderr": "",
+  "exit": 0
+}

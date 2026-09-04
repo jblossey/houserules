@@ -1,0 +1,7 @@
+{
+  "command": "node tools/kb.mjs validate <fixtures>/batch14-workspace/task-1-report.json",
+  "cwd": "<frozen-worktree>",
+  "stdout": "[\n  {\n    \"file\": \"<fixtures>/batch14-workspace/task-1-report.json\",\n    \"kind\": \"task-report\",\n    \"errors\": []\n  }\n]\n",
+  "stderr": "",
+  "exit": 0
+}

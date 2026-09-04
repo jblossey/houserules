@@ -1,0 +1,16 @@
+{
+  "$schema": "./schema.json",
+  "topic": "not-mismatch",
+  "title": "Seeded topic-mismatch violation",
+  "entries": [
+    {
+      "id": "mismatch.ok-entry",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "A schema-valid filler entry so the topic-mismatch violation stands alone.",
+      "body": ["This entry carries no violation of its own; only the file's `topic` field does."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" }
+    }
+  ]
+}

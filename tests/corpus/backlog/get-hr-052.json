@@ -1,0 +1,7 @@
+{
+  "command": "node tools/backlog.mjs get HR-052",
+  "cwd": "<frozen-worktree>",
+  "stdout": "[\n  {\n    \"id\": \"HR-052\",\n    \"type\": \"process\",\n    \"title\": \"Write and gate the Tier-2 rewrite spec\",\n    \"body\": [\n      \"Batch 15 delivers the spec for the owner-ruled Tier-2 rewrite (HR-047: one static binary replaces bin/houserules.mjs and the vendored kb/backlog tools; HR-048: binary delivery channels). The build itself spans later batches; HR-047/048 stay open through the spec.\",\n      \"The spec gate carries the owner rulings, one at a time: the release tag format (plain v<version> against houserules-v<version> — the HR-048 prerequisite, also unblocking HR-049); the implementation language (Go against Rust); the payload-contract redefinition for docs/design.md (one static binary + POSIX shell replaces Node-builtins-only); the role npm keeps after the rewrite; the parity gates (byte-identical render, identical audit JSON) and the phasing.\",\n      \"Source: owner gate 2026-09-04 (batch 15: begin the Tier-2 spec).\"\n    ],\n    \"tags\": [\n      \"design\",\n      \"release\"\n    ],\n    \"milestone\": null,\n    \"status\": \"done\",\n    \"batch\": 15,\n    \"section\": \"kit\",\n    \"file\": \"backlog/items/kit.json\"\n  }\n]\n",
+  "stderr": "",
+  "exit": 0
+}

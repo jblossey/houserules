@@ -1,0 +1,7 @@
+{
+  "command": "node tools/backlog.mjs list --open",
+  "cwd": "<frozen-worktree>",
+  "stdout": "[\n  {\n    \"id\": \"HR-042\",\n    \"status\": \"open\",\n    \"milestone\": null,\n    \"batch\": null,\n    \"title\": \"The dependency-vetting check triggers on workflow action references\"\n  },\n  {\n    \"id\": \"HR-047\",\n    \"status\": \"open\",\n    \"milestone\": null,\n    \"batch\": null,\n    \"title\": \"Rewrite the toolchain as one static binary (Tier 2)\"\n  },\n  {\n    \"id\": \"HR-048\",\n    \"status\": \"open\",\n    \"milestone\": null,\n    \"batch\": null,\n    \"title\": \"Binary delivery channels for the rewritten kit (Tier 2)\"\n  },\n  {\n    \"id\": \"HR-049\",\n    \"status\": \"open\",\n    \"milestone\": null,\n    \"batch\": null,\n    \"title\": \"The README's pinned install tag follows each release\"\n  },\n  {\n    \"id\": \"HR-051\",\n    \"status\": \"open\",\n    \"milestone\": null,\n    \"batch\": null,\n    \"title\": \"One evals rerun pays the nested-audit gate and the verbatim-clause lift\"\n  },\n  {\n    \"id\": \"HR-053\",\n    \"status\": \"open\",\n    \"milestone\": null,\n    \"batch\": null,\n    \"title\": \"Modular installs: adopters choose the feature set\"\n  },\n  {\n    \"id\": \"HR-054\",\n    \"status\": \"open\",\n    \"milestone\": null,\n    \"batch\": 16,\n    \"title\": \"Tier-2 phase 1: the frozen corpus and the Rust scaffold\"\n  }\n]\n",
+  "stderr": "",
+  "exit": 0
+}

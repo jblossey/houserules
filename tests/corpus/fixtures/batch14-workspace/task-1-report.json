@@ -1,0 +1,348 @@
+{
+  "kind": "task-report",
+  "task": 1,
+  "backlog": [
+    "HR-041"
+  ],
+  "status": "DONE_WITH_CONCERNS",
+  "implemented": "validateDeliverable in template/tools/kb.mjs runs checkTaskReportAudit beside the existing schema shape checks: a task-report whose status is DONE or DONE_WITH_CONCERNS fails when self_audit is null, and fails when self_audit.summary.skipped is greater than 0 (message names the --report flag). BLOCKED and NEEDS_CONTEXT reports are exempt. Fix round 1 reconciles the write-then-fill flow with the check: the retrieval protocol text in kb.mjs and implementer.md's \"Before answering\" steps now audit first, fill self_audit, then validate once, so no in-flow draft is ever validated while self_audit is still null. Root copies (tools/kb.mjs, .claude/agents/implementer.md, the generated project-knowledge skill) synced via update --dir . Fix round 2: renamed implementer.md's \"Before answering\" heading to the order the steps now run (self-audit, validate, self-review), and re-ran the round-1 fix-diff audit with --report so fix_rounds[0].tests shows the report-field checks actually ran.",
+  "commits": [
+    {
+      "sha": "e7dbc69",
+      "subject": "fix(tools): validate rejects incomplete terminal reports"
+    },
+    {
+      "sha": "f03e43c",
+      "subject": "fix(tools): the report flow validates after the fill"
+    },
+    {
+      "sha": "2fde017",
+      "subject": "fix(template): the closing-sequence heading matches its steps"
+    }
+  ],
+  "tests": [
+    {
+      "command": "mise exec -- pnpm test",
+      "output": "$ vitest run --coverage\n\n RUN  v4.1.11 /home/jblossey/projects/houserules\n      Coverage enabled with v8\n\n \u2713 |houserules| tests/scratch-dir.test.mjs (1 test) 6ms\n \u2713 |houserules| tests/commit-msg-hook.test.mjs (3 tests) 37ms\n \u2713 |houserules| tests/cli.test.mjs (9 tests) 14ms\n \u2713 |houserules| tests/dogfood.test.mjs (20 tests) 16ms\n \u2713 |houserules| tests/json-store.test.mjs (11 tests) 33ms\n \u2713 |houserules| tests/entry.test.mjs (3 tests) 145ms\n \u2713 |houserules| tests/backlog.test.mjs (10 tests) 131ms\n \u2713 |houserules| tests/init.test.mjs (36 tests) 1712ms\n \u2713 |houserules| tests/kb.test.mjs (107 tests) 5634ms\n\n Test Files  9 passed (9)\n      Tests  200 passed (200)\n   Start at  01:23:29\n   Duration  6.17s (transform 992ms, setup 0ms, import 1.57s, tests 7.73s, environment 1ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\nAll files          |   98.94 |    99.28 |   96.64 |    98.8 |                   \n bin               |    96.7 |     98.5 |   81.81 |   96.42 |                   \n  houserules.mjs   |    96.7 |     98.5 |   81.81 |   96.42 | 256-258           \n template/tools    |   99.11 |    99.26 |   97.31 |   98.97 |                   \n  backlog.mjs      |   98.22 |    98.92 |   92.85 |   97.91 | 258-262           \n  kb.mjs           |    99.4 |    99.36 |   98.34 |   99.32 | 1052-1056         \n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 98.94% ( 848/857 )\nBranches     : 99.28% ( 554/558 )\nFunctions    : 96.64% ( 173/179 )\nLines        : 98.8% ( 744/753 )\n================================================================================\n",
+      "exit": 0
+    },
+    {
+      "command": "tools/kb.sh check",
+      "output": "knowledge: ok\n",
+      "exit": 0
+    },
+    {
+      "command": "tools/backlog.sh check",
+      "output": "backlog: ok\n",
+      "exit": 0
+    },
+    {
+      "command": "diff /home/jblossey/projects/houserules/template/tools/kb.mjs /home/jblossey/projects/houserules/tools/kb.mjs",
+      "output": "",
+      "exit": 0
+    },
+    {
+      "command": "diff /home/jblossey/projects/houserules/template/.claude/agents/implementer.md /home/jblossey/projects/houserules/.claude/agents/implementer.md",
+      "output": "",
+      "exit": 0
+    },
+    {
+      "command": "tools/kb.sh audit --base c7db95e --head 2fde017 --ids houserules.template-is-the-source,houserules.node-under-mise,houserules.tests-clean-scratch-dirs,process.tdd,process.deliverables-json,quality.no-compat-softening,writing-style.doc-comments,quality.principles --report .superpowers/sdd/2026-09-04-batch-14/task-1-report.json",
+      "output": "{\n  \"base\": \"c7db95e\",\n  \"head\": \"2fde017\",\n  \"ids\": [\n    \"houserules.template-is-the-source\",\n    \"houserules.node-under-mise\",\n    \"houserules.tests-clean-scratch-dirs\",\n    \"process.tdd\",\n    \"process.deliverables-json\",\n    \"quality.no-compat-softening\",\n    \"writing-style.doc-comments\",\n    \"quality.principles\"\n  ],\n  \"changed_files\": [\n    \".claude/agents/implementer.md\",\n    \".claude/skills/project-knowledge/SKILL.md\",\n    \"README.md\",\n    \"template/.claude/agents/implementer.md\",\n    \"template/tools/kb.mjs\",\n    \"tests/kb.test.mjs\",\n    \"tools/kb.mjs\"\n  ],\n  \"areas\": [\n    \"docs\",\n    \"global\",\n    \"template\",\n    \"tests\",\n    \"tools\"\n  ],\n  \"area_files\": {\n    \"global\": [],\n    \"docs\": [\n      \".claude/agents/implementer.md\",\n      \".claude/skills/project-knowledge/SKILL.md\",\n      \"README.md\"\n    ],\n    \"template\": [\n      \"template/.claude/agents/implementer.md\",\n      \"template/tools/kb.mjs\"\n    ],\n    \"tests\": [\n      \"tests/kb.test.mjs\"\n    ],\n    \"tools\": [\n      \"tools/kb.mjs\"\n    ]\n  },\n  \"rules\": [\n    {\n      \"id\": \"houserules.node-under-mise\",\n      \"kind\": \"gotcha\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.payload-runs-on-builtins\",\n      \"kind\": \"invariant\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.pnpm-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.readme-mirrors-kit-owned\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.tag-pilot-is-read-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.template-is-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.tests-clean-scratch-dirs\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.ids-are-permanent\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.rules-need-a-loading-path\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.state-only-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.summary-is-the-rule\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.ask-when-missing\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.backlog-drives-work\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.brainstorm-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.code-health-scan\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.conventional-commits\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"4 commits checked\"\n    },\n    {\n      \"id\": \"process.deliverables-json\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field self_audit is set\"\n    },\n    {\n      \"id\": \"process.evals-rerun\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"fail\",\n      \"evidence\": \".claude/agents/implementer.md changed without .claude/evals/record.json\"\n    },\n    {\n      \"id\": \"process.ff-only-merges\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.knowledge-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field knowledge_used is set\"\n    },\n    {\n      \"id\": \"process.live-run-before-ci\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.model-policy\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.no-tech-debt\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"3 files checked\"\n    },\n    {\n      \"id\": \"process.rulings-to-file\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.sequential-agents\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.tdd\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.no-compat-softening\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.pin-copies-byte-exact\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"security-hygiene.dependency-vetting\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"not triggered\"\n    },\n    {\n      \"id\": \"security-hygiene.exact-pins\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-coauthor\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"4 commits checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-focused-tests\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"1 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.verify-current-docs\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field docs_verified is set\"\n    },\n    {\n      \"id\": \"writing-style.code-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.doc-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.instructions-cover-the-state-space\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    }\n  ],\n  \"summary\": {\n    \"base\": \"c7db95e\",\n    \"head\": \"2fde017\",\n    \"deterministic\": 10,\n    \"pass\": 9,\n    \"fail\": 1,\n    \"warn\": 0,\n    \"skipped\": 0,\n    \"judged\": 28\n  }\n}\n",
+      "exit": 1
+    },
+    {
+      "command": "tools/kb.sh validate .superpowers/sdd/2026-09-04-batch-14/task-1-report.json",
+      "output": "[\n  {\n    \"file\": \"/home/jblossey/projects/houserules/.superpowers/sdd/2026-09-04-batch-14/task-1-report.json\",\n    \"kind\": \"task-report\",\n    \"errors\": []\n  }\n]\n",
+      "exit": 0
+    }
+  ],
+  "live_run": [
+    {
+      "command": "tools/kb.sh validate /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-live-run/null-self-audit.json > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-live-run/run-1-null.txt 2>&1",
+      "output": "[\n  {\n    \"file\": \"/tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-live-run/null-self-audit.json\",\n    \"kind\": \"task-report\",\n    \"errors\": [\n      \"/tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-live-run/null-self-audit.json: status \\\"DONE_WITH_CONCERNS\\\" needs a non-null self_audit\"\n    ]\n  }\n]\n",
+      "exit": 1
+    },
+    {
+      "command": "tools/kb.sh validate /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-live-run/skipped-self-audit.json > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-live-run/run-2-skipped.txt 2>&1",
+      "output": "[\n  {\n    \"file\": \"/tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-live-run/skipped-self-audit.json\",\n    \"kind\": \"task-report\",\n    \"errors\": [\n      \"/tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-live-run/skipped-self-audit.json: self_audit.summary.skipped is 3; re-run audit with --report\"\n    ]\n  }\n]\n",
+      "exit": 1
+    },
+    {
+      "command": "tools/kb.sh validate /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-live-run/blocked-null-self-audit.json > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-live-run/run-3-blocked.txt 2>&1",
+      "output": "[\n  {\n    \"file\": \"/tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-live-run/blocked-null-self-audit.json\",\n    \"kind\": \"task-report\",\n    \"errors\": []\n  }\n]\n",
+      "exit": 0
+    },
+    {
+      "command": "tools/kb.sh audit --base c7db95e --head f03e43c --ids houserules.template-is-the-source,houserules.node-under-mise,houserules.tests-clean-scratch-dirs,process.tdd,process.deliverables-json,quality.no-compat-softening,writing-style.doc-comments,quality.principles --report /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-fix1/protocol-draft.json > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-fix1/live-1-audit-on-draft.txt 2>&1",
+      "output": "{\n  \"base\": \"c7db95e\",\n  \"head\": \"f03e43c\",\n  \"ids\": [\n    \"houserules.template-is-the-source\",\n    \"houserules.node-under-mise\",\n    \"houserules.tests-clean-scratch-dirs\",\n    \"process.tdd\",\n    \"process.deliverables-json\",\n    \"quality.no-compat-softening\",\n    \"writing-style.doc-comments\",\n    \"quality.principles\"\n  ],\n  \"changed_files\": [\n    \".claude/agents/implementer.md\",\n    \".claude/skills/project-knowledge/SKILL.md\",\n    \"README.md\",\n    \"template/.claude/agents/implementer.md\",\n    \"template/tools/kb.mjs\",\n    \"tests/kb.test.mjs\",\n    \"tools/kb.mjs\"\n  ],\n  \"areas\": [\n    \"docs\",\n    \"global\",\n    \"template\",\n    \"tests\",\n    \"tools\"\n  ],\n  \"area_files\": {\n    \"global\": [],\n    \"docs\": [\n      \".claude/agents/implementer.md\",\n      \".claude/skills/project-knowledge/SKILL.md\",\n      \"README.md\"\n    ],\n    \"template\": [\n      \"template/.claude/agents/implementer.md\",\n      \"template/tools/kb.mjs\"\n    ],\n    \"tests\": [\n      \"tests/kb.test.mjs\"\n    ],\n    \"tools\": [\n      \"tools/kb.mjs\"\n    ]\n  },\n  \"rules\": [\n    {\n      \"id\": \"houserules.node-under-mise\",\n      \"kind\": \"gotcha\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.payload-runs-on-builtins\",\n      \"kind\": \"invariant\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.pnpm-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.readme-mirrors-kit-owned\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.tag-pilot-is-read-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.template-is-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.tests-clean-scratch-dirs\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.ids-are-permanent\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.rules-need-a-loading-path\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.state-only-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.summary-is-the-rule\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.ask-when-missing\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.backlog-drives-work\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.brainstorm-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.code-health-scan\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.conventional-commits\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"3 commits checked\"\n    },\n    {\n      \"id\": \"process.deliverables-json\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"fail\",\n      \"evidence\": \"report lacks a value for self_audit (triggered by .claude/agents/implementer.md)\"\n    },\n    {\n      \"id\": \"process.evals-rerun\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"fail\",\n      \"evidence\": \".claude/agents/implementer.md changed without .claude/evals/record.json\"\n    },\n    {\n      \"id\": \"process.ff-only-merges\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.knowledge-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field knowledge_used is set\"\n    },\n    {\n      \"id\": \"process.live-run-before-ci\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.model-policy\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.no-tech-debt\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"3 files checked\"\n    },\n    {\n      \"id\": \"process.rulings-to-file\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.sequential-agents\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.tdd\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.no-compat-softening\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.pin-copies-byte-exact\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"security-hygiene.dependency-vetting\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"not triggered\"\n    },\n    {\n      \"id\": \"security-hygiene.exact-pins\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-coauthor\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"3 commits checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-focused-tests\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"1 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.verify-current-docs\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field docs_verified is set\"\n    },\n    {\n      \"id\": \"writing-style.code-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.doc-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.instructions-cover-the-state-space\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    }\n  ],\n  \"summary\": {\n    \"base\": \"c7db95e\",\n    \"head\": \"f03e43c\",\n    \"deterministic\": 10,\n    \"pass\": 8,\n    \"fail\": 2,\n    \"warn\": 0,\n    \"skipped\": 0,\n    \"judged\": 28\n  }\n}\n",
+      "exit": 1
+    },
+    {
+      "command": "tools/kb.sh validate /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-fix1/protocol-draft-filled.json > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-fix1/live-2-validate-after-fill.txt 2>&1",
+      "output": "[\n  {\n    \"file\": \"/tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/hr-041-fix1/protocol-draft-filled.json\",\n    \"kind\": \"task-report\",\n    \"errors\": []\n  }\n]\n",
+      "exit": 0
+    }
+  ],
+  "tdd": [
+    {
+      "test": "validate > rejects a DONE report with a null self_audit",
+      "mode": "natural",
+      "red": {
+        "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
+        "output": " FAIL  |houserules| tests/kb.test.mjs > validate > rejects a DONE report with a null self_audit\nAssertionError: expected [] to deeply equal [ Array(1) ]\n\n- Expected\n+ Received\n\n- [\n-   \"/tmp/kb-OGr3B6/report.json: status \\\"DONE\\\" needs a non-null self_audit\",\n- ]\n+ []\n\n \u276f tests/kb.test.mjs:2143:52",
+        "exit": 1
+      },
+      "green": {
+        "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
+        "output": " RUN  v4.1.11 /home/jblossey/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (106 tests | 83 skipped) 696ms\n\n Test Files  1 passed (1)\n      Tests  23 passed | 83 skipped (106)\n"
+      }
+    },
+    {
+      "test": "validate > rejects a DONE_WITH_CONCERNS report with a null self_audit",
+      "mode": "natural",
+      "red": {
+        "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
+        "output": " FAIL  |houserules| tests/kb.test.mjs > validate > rejects a DONE_WITH_CONCERNS report with a null self_audit\nAssertionError: expected [] to deeply equal [ Array(1) ]\n\n- Expected\n+ Received\n\n- [\n-   \"/tmp/kb-c0gRAk/report.json: status \\\"DONE_WITH_CONCERNS\\\" needs a non-null self_audit\",\n- ]\n+ []\n\n \u276f tests/kb.test.mjs:2158:52",
+        "exit": 1
+      },
+      "green": {
+        "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
+        "output": " RUN  v4.1.11 /home/jblossey/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (106 tests | 83 skipped) 696ms\n\n Test Files  1 passed (1)\n      Tests  23 passed | 83 skipped (106)\n"
+      }
+    },
+    {
+      "test": "validate > rejects a DONE report whose self_audit.summary.skipped is greater than 0",
+      "mode": "natural",
+      "red": {
+        "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
+        "output": " FAIL  |houserules| tests/kb.test.mjs > validate > rejects a DONE report whose self_audit.summary.skipped is greater than 0\nAssertionError: expected [] to deeply equal [ Array(1) ]\n\n- Expected\n+ Received\n\n- [\n-   \"/tmp/kb-e1bNGW/report.json: self_audit.summary.skipped is 2; re-run audit with --report\",\n- ]\n+ []\n\n \u276f tests/kb.test.mjs:2178:52",
+        "exit": 1
+      },
+      "green": {
+        "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
+        "output": " RUN  v4.1.11 /home/jblossey/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (106 tests | 83 skipped) 696ms\n\n Test Files  1 passed (1)\n      Tests  23 passed | 83 skipped (106)\n"
+      }
+    },
+    {
+      "test": "validate > accepts a BLOCKED report with a null self_audit",
+      "mode": "mutation",
+      "red": {
+        "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t \"accepts a BLOCKED report with a null self_audit\"",
+        "output": " FAIL  |houserules| tests/kb.test.mjs > validate > accepts a BLOCKED report with a null self_audit\nAssertionError: expected [ Array(1) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"/tmp/kb-W9glDA/report.json: status \\\"BLOCKED\\\" needs a non-null self_audit\",\n+ ]\n\n \u276f tests/kb.test.mjs:2189:52",
+        "exit": 1
+      },
+      "green": {
+        "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
+        "output": "\n RUN  v4.1.11 /home/jblossey/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (107 tests | 83 skipped) 752ms\n\n Test Files  1 passed (1)\n      Tests  24 passed | 83 skipped (107)\n   Start at  01:11:29\n   Duration  1.04s (transform 130ms, setup 0ms, import 163ms, tests 752ms, environment 0ms)\n\n"
+      }
+    },
+    {
+      "test": "validate > accepts a NEEDS_CONTEXT report with a null self_audit",
+      "mode": "mutation",
+      "red": {
+        "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t \"accepts a NEEDS_CONTEXT report with a null self_audit\"",
+        "output": " FAIL  |houserules| tests/kb.test.mjs > validate > accepts a NEEDS_CONTEXT report with a null self_audit\nAssertionError: expected [ Array(1) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"/tmp/kb-KFZM60/report.json: status \\\"NEEDS_CONTEXT\\\" needs a non-null self_audit\",\n+ ]\n\n \u276f tests/kb.test.mjs:2198:52",
+        "exit": 1
+      },
+      "green": {
+        "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
+        "output": "\n RUN  v4.1.11 /home/jblossey/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (107 tests | 83 skipped) 752ms\n\n Test Files  1 passed (1)\n      Tests  24 passed | 83 skipped (107)\n   Start at  01:11:29\n   Duration  1.04s (transform 130ms, setup 0ms, import 163ms, tests 752ms, environment 0ms)\n\n"
+      }
+    },
+    {
+      "test": "validate > accepts a BLOCKED report whose self_audit.summary.skipped is greater than 0",
+      "mode": "mutation",
+      "red": {
+        "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t \"accepts a BLOCKED report whose self_audit.summary.skipped is greater than 0\"",
+        "output": " FAIL  |houserules| tests/kb.test.mjs > validate > accepts a BLOCKED report whose self_audit.summary.skipped is greater than 0\nAssertionError: expected [ Array(1) ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"/tmp/kb-mNBM05/report.json: self_audit.summary.skipped is 2; re-run audit with --report\",\n+ ]\n\n \u276f tests/kb.test.mjs:2218:52",
+        "exit": 1
+      },
+      "green": {
+        "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
+        "output": "\n RUN  v4.1.11 /home/jblossey/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (107 tests | 83 skipped) 752ms\n\n Test Files  1 passed (1)\n      Tests  24 passed | 83 skipped (107)\n   Start at  01:11:29\n   Duration  1.04s (transform 130ms, setup 0ms, import 163ms, tests 752ms, environment 0ms)\n\n"
+      }
+    }
+  ],
+  "files_changed": [
+    ".claude/agents/implementer.md",
+    ".claude/skills/project-knowledge/SKILL.md",
+    "template/.claude/agents/implementer.md",
+    "template/tools/kb.mjs",
+    "tests/kb.test.mjs",
+    "tools/kb.mjs"
+  ],
+  "docs_verified": [],
+  "dependency_vetting": null,
+  "coverage": [
+    {
+      "target": "template/tools/kb.mjs",
+      "metric": "branches",
+      "measured": 99.36,
+      "floor": 99
+    }
+  ],
+  "self_audit": {
+    "summary": {
+      "base": "c7db95e",
+      "head": "2fde017",
+      "deterministic": 10,
+      "pass": 9,
+      "fail": 1,
+      "warn": 0,
+      "skipped": 0,
+      "judged": 28
+    },
+    "rows": [
+      {
+        "id": "process.conventional-commits",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "4 commits checked"
+      },
+      {
+        "id": "process.deliverables-json",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "report field self_audit is set"
+      },
+      {
+        "id": "process.evals-rerun",
+        "mode": "deterministic",
+        "result": "fail",
+        "evidence": ".claude/agents/implementer.md changed without .claude/evals/record.json"
+      },
+      {
+        "id": "process.knowledge-first",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "report field knowledge_used is set"
+      },
+      {
+        "id": "process.no-tech-debt",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "3 files checked"
+      },
+      {
+        "id": "security-hygiene.dependency-vetting",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "not triggered"
+      },
+      {
+        "id": "security-hygiene.exact-pins",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "0 files checked"
+      },
+      {
+        "id": "security-hygiene.no-coauthor",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "4 commits checked"
+      },
+      {
+        "id": "security-hygiene.no-focused-tests",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "1 files checked"
+      },
+      {
+        "id": "security-hygiene.verify-current-docs",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "report field docs_verified is set"
+      }
+    ]
+  },
+  "self_review": [
+    "checkTaskReportAudit sits beside the existing schema-shape checks in validateDeliverable without restructuring the function; the added branches follow the file's existing errors.add('${at}: ...') voice ('needs', short usage-error style).",
+    "The REPORT fixture in tests/kb.test.mjs carried self_audit: null with status DONE before this change; I gave it a genuine, skipped:0 self_audit so every existing spread-based test keeps exercising the field it targets instead of tripping the new rule, and added five dedicated tests (DONE null, DONE_WITH_CONCERNS null, skipped>0, BLOCKED null passes, NEEDS_CONTEXT null passes) for the new behavior itself.",
+    "Live run doctored three copies of a real batch-11 task-3 report (the report HR-041 cites) rather than synthetic fixtures, matching the brief's 'doctored copies of a real report' instruction.",
+    "Verified template/tools/kb.mjs and tools/kb.mjs are byte-identical after update --dir . (dogfood pin); tests/dogfood.test.mjs also covers this and stayed green in the full suite.",
+    "No TODOs left; the two new branches are the whole of HR-041's scope, no deferral needed.",
+    "Fix round 1: the review's Important finding was real \u2014 the retrieval protocol's step 3 and implementer.md's \"Before answering\" steps validated a terminal-status draft while self_audit was still null, which the check I shipped correctly rejects. Picked audit-then-validate-once over keeping two validate calls: a validate call with no state in which it can pass is not a real gate, it is a step agents learn to ignore, so removing the premature call (rather than special-casing the check) is the one that keeps the flow a single coherent sequence and leaves the check itself strict.",
+    "checkTaskReportAudit's doc comment no longer names a hypothetical draft state; it names the real exemption (BLOCKED/NEEDS_CONTEXT) and the actual reason (validate now runs only after the fill).",
+    "Disclosed-mutation proof for the three acceptance tests: removed the `if (!TERMINAL_STATUSES.includes(value.status)) return;` line once, ran each of the three tests individually to capture its failure, restored the line (confirmed byte-identical to the committed file via diff), then reran the whole validate block to confirm GREEN.",
+    "The live-run flow demonstration writes a draft with self_audit null and a terminal status (no validate call), runs the audit --report (which itself shows the expected process.deliverables-json and process.evals-rerun fails on that first pass), fills self_audit from that output, then runs validate once \u2014 clean. This is the exact sequence the corrected protocol text and implementer.md now prescribe, proven end to end, not just asserted.",
+    "self_audit is refreshed over the full task range c7db95e..f03e43c with --report; its one fail row (process.evals-rerun) is the disclosed, spec-scheduled consequence, not a code defect \u2014 validate does not gate on self_audit.summary.fail, only on self_audit being non-null and skipped == 0, so this legitimate fail does not block the report.",
+    "Fix round 2: both new-breakage findings were process residue, not code \u2014 the heading was the one line in implementer.md I did not touch in round 1, and fix_rounds[0].tests[0] was the one audit command in that round I ran without --report (out of habit from round 1's own commit-diff checks, which do not need a report). Re-ran it with --report and replaced the entry rather than appending, since the stale skipped-3 run was misleading evidence, not a separate fact. This round's own fix-diff audit (f03e43c..2fde017) used --report from the first call, so no rerun was needed for it."
+  ],
+  "concerns": [
+    "The kb.mjs retrieval-protocol edit (round 1) and the implementer.md heading edit (round 2) are both process.evals-rerun triggers. .claude/evals/record.json was not updated in this task, so self_audit's process.evals-rerun row is fail (\".claude/agents/implementer.md changed without .claude/evals/record.json\"). This is the expected interim fail process.evals-rerun's own rule documents for a batch that edits templates across several tasks; batch 14's spec already schedules T3 to run every eval scenario at the branch head and append the seventh record, paying this off before the branch review."
+  ],
+  "knowledge_used": [
+    "houserules.template-is-the-source",
+    "houserules.node-under-mise",
+    "houserules.tests-clean-scratch-dirs",
+    "process.tdd",
+    "process.deliverables-json",
+    "quality.no-compat-softening",
+    "writing-style.doc-comments",
+    "quality.principles"
+  ],
+  "fix_rounds": [
+    {
+      "round": 1,
+      "findings": [
+        {
+          "finding": "Important (writing-style.instructions-cover-the-state-space): the retrieval protocol step at template/tools/kb.mjs:304 and implementer.md's \"Before answering\" steps told the agent to write the draft with self_audit null and a terminal status, then run validate \u2014 the exact shape checkTaskReportAudit rejects. The invariant to hold: every step the report flow tells an agent to run must have a state in which validate passes. The doc comment also exempted a \"write-then-fill draft that has not yet claimed a terminal status\" that no documented flow produces.",
+          "fix": "Reordered both texts to write the draft, run the audit and fill self_audit, then validate once \u2014 one coherent sequence with no in-flow state the check rejects. Corrected the doc comment to name the real exemption (BLOCKED/NEEDS_CONTEXT) and the reason no draft hits the null branch. Synced root copies via `node bin/houserules.mjs update --dir .` (tools/kb.mjs, .claude/agents/implementer.md, the regenerated project-knowledge skill).",
+          "file": "template/tools/kb.mjs"
+        },
+        {
+          "finding": "Minor: the two acceptance tests (BLOCKED and NEEDS_CONTEXT with a null self_audit) assert behavior that was already correct, with no cycle recorded in tdd.",
+          "fix": "Dropped the `if (!TERMINAL_STATUSES.includes(value.status)) return;` line once, ran each test individually to capture its failure verbatim, restored the line (diff-confirmed byte-identical), and appended two tdd entries with mode mutation.",
+          "file": "tests/kb.test.mjs"
+        },
+        {
+          "finding": "Minor: no test pinned the twelfth state-space cell \u2014 a non-terminal report whose self_audit.summary.skipped is greater than 0.",
+          "fix": "Added one case for a BLOCKED report with self_audit.summary.skipped = 2, beside the existing acceptance cases, and covered it with the same disclosed-mutation run as the other two acceptance tests.",
+          "file": "tests/kb.test.mjs"
+        }
+      ],
+      "commits": [
+        {
+          "sha": "f03e43c",
+          "subject": "fix(tools): the report flow validates after the fill"
+        }
+      ],
+      "tests": [
+        {
+          "command": "tools/kb.sh audit --base e7dbc69 --head f03e43c --ids houserules.template-is-the-source,houserules.node-under-mise,houserules.tests-clean-scratch-dirs,process.tdd,process.deliverables-json,quality.no-compat-softening,writing-style.doc-comments,quality.principles --report .superpowers/sdd/2026-09-04-batch-14/task-1-report.json",
+          "output": "{\n  \"base\": \"e7dbc69\",\n  \"head\": \"f03e43c\",\n  \"ids\": [\n    \"houserules.template-is-the-source\",\n    \"houserules.node-under-mise\",\n    \"houserules.tests-clean-scratch-dirs\",\n    \"process.tdd\",\n    \"process.deliverables-json\",\n    \"quality.no-compat-softening\",\n    \"writing-style.doc-comments\",\n    \"quality.principles\"\n  ],\n  \"changed_files\": [\n    \".claude/agents/implementer.md\",\n    \".claude/skills/project-knowledge/SKILL.md\",\n    \"README.md\",\n    \"template/.claude/agents/implementer.md\",\n    \"template/tools/kb.mjs\",\n    \"tests/kb.test.mjs\",\n    \"tools/kb.mjs\"\n  ],\n  \"areas\": [\n    \"docs\",\n    \"global\",\n    \"template\",\n    \"tests\",\n    \"tools\"\n  ],\n  \"area_files\": {\n    \"global\": [],\n    \"docs\": [\n      \".claude/agents/implementer.md\",\n      \".claude/skills/project-knowledge/SKILL.md\",\n      \"README.md\"\n    ],\n    \"template\": [\n      \"template/.claude/agents/implementer.md\",\n      \"template/tools/kb.mjs\"\n    ],\n    \"tests\": [\n      \"tests/kb.test.mjs\"\n    ],\n    \"tools\": [\n      \"tools/kb.mjs\"\n    ]\n  },\n  \"rules\": [\n    {\n      \"id\": \"houserules.node-under-mise\",\n      \"kind\": \"gotcha\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.payload-runs-on-builtins\",\n      \"kind\": \"invariant\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.pnpm-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.readme-mirrors-kit-owned\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.tag-pilot-is-read-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.template-is-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.tests-clean-scratch-dirs\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.ids-are-permanent\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.rules-need-a-loading-path\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.state-only-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.summary-is-the-rule\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.ask-when-missing\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.backlog-drives-work\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.brainstorm-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.code-health-scan\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.conventional-commits\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"2 commits checked\"\n    },\n    {\n      \"id\": \"process.deliverables-json\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field self_audit is set\"\n    },\n    {\n      \"id\": \"process.evals-rerun\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"fail\",\n      \"evidence\": \".claude/agents/implementer.md changed without .claude/evals/record.json\"\n    },\n    {\n      \"id\": \"process.ff-only-merges\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.knowledge-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field knowledge_used is set\"\n    },\n    {\n      \"id\": \"process.live-run-before-ci\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.model-policy\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.no-tech-debt\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"3 files checked\"\n    },\n    {\n      \"id\": \"process.rulings-to-file\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.sequential-agents\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.tdd\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.no-compat-softening\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.pin-copies-byte-exact\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"security-hygiene.dependency-vetting\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"not triggered\"\n    },\n    {\n      \"id\": \"security-hygiene.exact-pins\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-coauthor\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"2 commits checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-focused-tests\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"1 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.verify-current-docs\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field docs_verified is set\"\n    },\n    {\n      \"id\": \"writing-style.code-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.doc-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.instructions-cover-the-state-space\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    }\n  ],\n  \"summary\": {\n    \"base\": \"e7dbc69\",\n    \"head\": \"f03e43c\",\n    \"deterministic\": 10,\n    \"pass\": 9,\n    \"fail\": 1,\n    \"warn\": 0,\n    \"skipped\": 0,\n    \"judged\": 28\n  }\n}\n",
+          "exit": 1
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "findings": [
+        {
+          "finding": "Minor: fix_rounds[0].tests held the round-1 fix-diff audit run without --report (skipped 3), the same batch-12 shape HR-041 exists to stop; the new validate check cannot catch it because it inspects only the top-level self_audit, not a fix round's own evidence.",
+          "fix": "Re-ran `tools/kb.sh audit --base e7dbc69 --head f03e43c --ids <the eight ids> --report .superpowers/sdd/2026-09-04-batch-14/task-1-report.json` and replaced fix_rounds[0].tests[0] with the run showing skipped 0. This round's own fix-diff audit (f03e43c..2fde017) used --report from the start.",
+          "file": ".superpowers/sdd/2026-09-04-batch-14/task-1-report.json"
+        },
+        {
+          "finding": "Minor: template/.claude/agents/implementer.md:51's \"Before answering\" heading still read \"validate, self-audit, self-review\", the opposite of the order fix round 1 put the two steps in \u2014 inviting an implementer to validate first, the state the round removed.",
+          "fix": "Renamed the heading to \"self-audit, validate, self-review\", matching the steps beneath it. Synced the root copy via `node bin/houserules.mjs update --dir .`; byte-identical. Docs-only text, no testable consumer; the standard gates are the evidence.",
+          "file": "template/.claude/agents/implementer.md"
+        }
+      ],
+      "commits": [
+        {
+          "sha": "2fde017",
+          "subject": "fix(template): the closing-sequence heading matches its steps"
+        }
+      ],
+      "tests": [
+        {
+          "command": "tools/kb.sh audit --base f03e43c --head 2fde017 --ids houserules.template-is-the-source,houserules.node-under-mise,houserules.tests-clean-scratch-dirs,process.tdd,process.deliverables-json,quality.no-compat-softening,writing-style.doc-comments,quality.principles --report .superpowers/sdd/2026-09-04-batch-14/task-1-report.json",
+          "output": "{\n  \"base\": \"f03e43c\",\n  \"head\": \"2fde017\",\n  \"ids\": [\n    \"houserules.template-is-the-source\",\n    \"houserules.node-under-mise\",\n    \"houserules.tests-clean-scratch-dirs\",\n    \"process.tdd\",\n    \"process.deliverables-json\",\n    \"quality.no-compat-softening\",\n    \"writing-style.doc-comments\",\n    \"quality.principles\"\n  ],\n  \"changed_files\": [\n    \".claude/agents/implementer.md\",\n    \"template/.claude/agents/implementer.md\"\n  ],\n  \"areas\": [\n    \"docs\",\n    \"global\",\n    \"template\"\n  ],\n  \"area_files\": {\n    \"global\": [],\n    \"docs\": [\n      \".claude/agents/implementer.md\"\n    ],\n    \"template\": [\n      \"template/.claude/agents/implementer.md\"\n    ]\n  },\n  \"rules\": [\n    {\n      \"id\": \"houserules.node-under-mise\",\n      \"kind\": \"gotcha\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.payload-runs-on-builtins\",\n      \"kind\": \"invariant\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.pnpm-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.readme-mirrors-kit-owned\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.tag-pilot-is-read-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.template-is-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.tests-clean-scratch-dirs\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.ids-are-permanent\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.rules-need-a-loading-path\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.state-only-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.summary-is-the-rule\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.ask-when-missing\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.backlog-drives-work\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.brainstorm-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.code-health-scan\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.conventional-commits\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"1 commits checked\"\n    },\n    {\n      \"id\": \"process.deliverables-json\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field self_audit is set\"\n    },\n    {\n      \"id\": \"process.evals-rerun\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"fail\",\n      \"evidence\": \".claude/agents/implementer.md changed without .claude/evals/record.json\"\n    },\n    {\n      \"id\": \"process.ff-only-merges\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.knowledge-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field knowledge_used is set\"\n    },\n    {\n      \"id\": \"process.live-run-before-ci\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.model-policy\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.no-tech-debt\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"process.rulings-to-file\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.sequential-agents\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.tdd\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.no-compat-softening\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"security-hygiene.dependency-vetting\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"not triggered\"\n    },\n    {\n      \"id\": \"security-hygiene.exact-pins\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-coauthor\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"1 commits checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-focused-tests\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.verify-current-docs\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"not triggered\"\n    },\n    {\n      \"id\": \"writing-style.code-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.doc-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.instructions-cover-the-state-space\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    }\n  ],\n  \"summary\": {\n    \"base\": \"f03e43c\",\n    \"head\": \"2fde017\",\n    \"deterministic\": 10,\n    \"pass\": 9,\n    \"fail\": 1,\n    \"warn\": 0,\n    \"skipped\": 0,\n    \"judged\": 27\n  }\n}\n",
+          "exit": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,176 @@
+{
+  "$schema": "./schema.json",
+  "topic": "entries",
+  "title": "Seeded per-entry violations",
+  "entries": [
+    {
+      "id": "entries.dup",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "The first of two entries sharing one id, to seed a duplicate-id violation.",
+      "body": ["Baseline entry; the second `entries.dup` below is the violation."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" }
+    },
+    {
+      "id": "entries.dup",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "The second of two entries sharing one id: the seeded duplicate-id violation.",
+      "body": ["Duplicates the id above on purpose."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" }
+    },
+    {
+      "id": "wrongprefix.oops",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Seeds an id-prefix violation: its id does not start with \"entries.\".",
+      "body": ["The topic file is `entries.json`, so every id must start with \"entries.\"."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" }
+    },
+    {
+      "id": "entries.bad-standing",
+      "kind": "gotcha",
+      "area": "docs",
+      "standing": true,
+      "summary": "Seeds a standing violation: a gotcha in area docs cannot be standing.",
+      "body": ["Standing entries need kind rule or invariant and area global or process."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" }
+    },
+    {
+      "id": "entries.bad-see",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Seeds a `see` violation: it points at an id that does not exist.",
+      "body": ["`see` ids must resolve to a real entry."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" },
+      "see": ["entries.nonexistent"]
+    },
+    {
+      "id": "entries.bad-verify",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Seeds a `verify` violation: it points at a path that does not exist.",
+      "body": ["`verify` paths must exist in the repository."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" },
+      "verify": ["nonexistent/path-xyz.txt"]
+    },
+    {
+      "id": "entries.bad-check-fields",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Seeds a check-shape violation: a grep-absent check missing \"files\".",
+      "body": ["`grep-absent` needs \"files\", \"pattern\", and \"scope\"."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" },
+      "check": { "type": "grep-absent", "level": "fail", "pattern": "x", "scope": "changed" }
+    },
+    {
+      "id": "entries.bad-check-commits",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Seeds a check-shape violation: a commits check with none of its three fields.",
+      "body": ["`commits` needs \"subject\", \"body_absent\", or \"body_line_max\"."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" },
+      "check": { "type": "commits", "level": "fail" }
+    },
+    {
+      "id": "entries.bad-regex",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Seeds a check-shape violation: an unbalanced-parenthesis pattern is not a valid regex.",
+      "body": ["`pattern` must compile as a `RegExp`."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" },
+      "check": { "type": "grep-absent", "level": "fail", "files": ["**/*.md"], "pattern": "(", "scope": "changed" }
+    },
+    {
+      "id": "entries.too-long-summary",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Seeds the schema's 160-character summary cap: this sentence is padded past the limit on purpose so the schema's maxLength validator reports it as too long for the summary field xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.",
+      "body": ["The `summary` field's schema caps it at 160 characters."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" }
+    },
+    {
+      "id": "entries.bad-type",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Seeds a schema type-mismatch violation: body is a string, not an array.",
+      "body": "this should be an array of strings, not one string",
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" }
+    },
+    {
+      "id": "entries.bad-source-date",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Seeds a schema pattern-mismatch violation: source.date does not match YYYY-MM-DD.",
+      "body": ["`source.date` must match `^\\d{4}-\\d{2}-\\d{2}$`."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "09-04-2026", "by": "docs", "ref": "HR-054 mini-bad fixture" }
+    },
+    {
+      "id": "entries.bad-empty-summary",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "",
+      "body": ["Seeds a schema minLength violation: summary is empty."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" }
+    },
+    {
+      "id": "entries.bad-check-minimum",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Seeds a schema minimum violation: check.body_line_max is below 1.",
+      "body": ["`body_line_max` has schema minimum 1."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" },
+      "check": { "type": "commits", "level": "fail", "body_line_max": -1 }
+    },
+    {
+      "id": "entries.bad-duplicate-tags",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Seeds a schema uniqueItems violation: tags repeats the same value twice.",
+      "body": ["`tags` has schema uniqueItems true."],
+      "tags": ["fixture", "fixture"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" }
+    },
+    {
+      "id": "entries.bad-missing-field",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Seeds a schema required-field violation: this entry has no tags field at all.",
+      "body": ["`tags` is a required entry field."],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" }
+    },
+    {
+      "id": "entries.bad-unknown-field",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Seeds a schema unknown-field violation: nickname is not an entry property.",
+      "body": ["The entry schema sets additionalProperties false."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" },
+      "nickname": "not a real entry field"
+    },
+    {
+      "id": "entries.bad-kind",
+      "kind": "bogus",
+      "area": "docs",
+      "summary": "Seeds a schema enum violation: bogus is not one of the six entry kinds.",
+      "body": ["`kind` has schema enum rule, invariant, gotcha, procedure, decision, history."],
+      "tags": ["fixture", "mini-bad"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 mini-bad fixture" }
+    }
+  ]
+}
