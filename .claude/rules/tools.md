@@ -2,6 +2,7 @@
 paths:
   - "tools/**"
   - ".github/**"
+  - "mise.toml"
 ---
 Generated from knowledge/ by tools/kb.sh render. Do not edit.
 

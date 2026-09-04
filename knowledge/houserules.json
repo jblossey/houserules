@@ -409,6 +409,30 @@
         "by": "review",
         "ref": "batch 16 task 5 review finding 1; t5-cross-compilation.md trigger section"
       }
+    },
+    {
+      "id": "houserules.rust-toolchain-bumps-use-stable",
+      "kind": "procedure",
+      "area": "tools",
+      "summary": "Bump rust with `V=$(mise latest rust) && mise use --pin rust@$V` — stable's newest, resolved by the CLI, exact in mise.toml; keep the components table.",
+      "body": [
+        "Owner ruling at the batch 16 report (docs/design.md §5.27): the repo standardizes on stable-freshest for toolchain bumps, deliberately bypassing mise's minimum_release_age quarantine for the rust toolchain; the exact-pins rule still holds — the number in mise.toml comes from the CLI, never from memory.",
+        "Gotcha found applying the ruling: when mise.toml already holds a table entry, `mise use --pin rust@stable` writes the literal keyword `stable` instead of a resolved version. Resolve first (`mise latest rust`), then pin the resolved value; confirm `components = [\"clippy\", \"rustfmt\"]` survived — CI's fmt and clippy steps need them on fresh runners.",
+        "After a bump, run the cargo gates (fmt --check, clippy --all-targets -D warnings, cargo test) before committing mise.toml."
+      ],
+      "tags": [
+        "rust",
+        "mise",
+        "toolchain"
+      ],
+      "source": {
+        "date": "2026-09-04",
+        "by": "user",
+        "ref": "batch 16 report ruling; docs/design.md §5.27"
+      },
+      "verify": [
+        "mise.toml"
+      ]
     }
   ]
 }
