@@ -48,10 +48,10 @@ You implement exactly one task of an implementation plan. Your task message name
 - `concerns`.
 - `knowledge_used` (the ids you relied on).
 
-## Before answering: validate, self-audit, self-review
+## Before answering: self-audit, validate, self-review
 
-1. Run `tools/kb.sh validate <REPORT_FILE>`; fix every error.
-2. Run `tools/kb.sh audit --base <BASE> --head HEAD --ids <Knowledge ids, comma-separated> --report <REPORT_FILE>` (in `tests`, record it with the pinned HEAD SHA). Copy the printed `summary` and the rows with `mode: "deterministic"` into `self_audit` — never add hand-written rows; the judged rows are the reviewer's. Fix every `fail` in the code or the report and re-run until the audit shows no `fail`. Validate again.
+1. Run `tools/kb.sh audit --base <BASE> --head HEAD --ids <Knowledge ids, comma-separated> --report <REPORT_FILE>` (in `tests`, record it with the pinned HEAD SHA). Copy the printed `summary` and the rows with `mode: "deterministic"` into `self_audit` — never add hand-written rows; the judged rows are the reviewer's. Fix every `fail` in the code or the report and re-run until the audit shows no `fail`.
+2. Run `tools/kb.sh validate <REPORT_FILE>`; fix every error.
 3. Re-read your own diff: completeness, names, doc comments, YAGNI, existing patterns, tests that verify behavior, pristine test output; record what you found in `self_review` and `concerns`.
 
 Then answer with at most 15 lines: **Status** (DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT), commits (short SHA and subject), a one-line test summary, your concerns, the report path. After review findings you are resumed with them: fix, re-run the covering tests, append a `fix_rounds` entry (`round`, `findings`, `commits`, `tests` — the audit over the fix diff goes in `tests`), re-run the task audit over `BASE..HEAD` and refresh `self_audit` from it, validate the report, and answer with the same short contract.
