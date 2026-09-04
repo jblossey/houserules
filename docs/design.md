@@ -410,3 +410,13 @@ Each item records the ruling with its date, or stays marked open.
     retirement. Nothing JS survives phase 5. The full design lives in
     docs/specs/2026-09-04-batch-15-tier2-spec.md. Source: owner,
     2026-09-04.
+24. **Post-port repository sweep — ruled 2026-09-04.** Tier-2 spec
+    ruling 8: the migration closes with an obligation to scan the
+    full repository and correct every rule, knowledge entry, backlog
+    item, and doc (README included) to the new setup — flat
+    `houserules` commands, Rust/cargo tooling, binary distribution.
+    Standing entries that encode the old world amend or retire under
+    owner rulings recorded here. Historical records (CHANGELOG,
+    decision rows, past specs, eval records) keep their wording. The
+    sweep is the closing task of phase 5 with a mechanical grep gate;
+    the spec's §5 carries the detail. Source: owner, 2026-09-04.

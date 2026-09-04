@@ -4,7 +4,9 @@ Date: 2026-09-04. Status: draft, pending owner approval.
 Driver: HR-052 (this spec is batch 15's deliverable); HR-047 and
 HR-048 are the build items it governs. Rulings already filed: plain
 `v<version>` tags (design.md §5.20), Rust (§5.21), npm retired —
-binary-only distribution (§5.22).
+binary-only distribution (§5.22), the surface and runtime rulings —
+no shims, flat commands, modularity, dev tooling (§5.23), and the
+post-port repository sweep (§5.24).
 
 ## 1. Goal
 
@@ -121,8 +123,25 @@ prose and the invariant entry amend in the first build batch.
    external acts. The JS path retires completely: the remaining
    vitest suite, commitlint, pnpm, package.json, the lockfile, and
    node_modules leave the tree; mise pins the Rust toolchain instead
-   of node/pnpm; CI runs cargo; the invariant amendment completes the
-   arc.
+   of node/pnpm; CI runs cargo; the invariant amendment and the
+   repository sweep below complete the arc.
+
+Post-processing obligation (owner ruling, 2026-09-04; the closing
+task of phase 5): scan the full repository and correct every rule,
+knowledge entry, backlog item, and doc to the new setup — flat
+`houserules` commands, Rust/cargo tooling, binary distribution. The
+sweep covers the README, CLAUDE.md, design.md's live sections, the
+runbook, the skills, the agent templates, knowledge entries' bodies
+and verify commands, and open backlog item bodies. Standing entries
+that encode the old world (`houserules.pnpm-only`,
+`houserules.template-is-the-source`'s Node update command, the
+payload invariant) amend or retire, each recorded in design.md §5.
+Historical records keep their wording: the CHANGELOG, decision rows,
+past specs and plans, eval records, and closed items' histories state
+what was true when written. The gate is mechanical: `git grep` over
+the live files finds no reference to `kb.sh`, `backlog.sh`,
+`houserules.mjs`, pnpm, vitest, or commitlint when the sweep is done,
+with the historical files above as the only allowed matches.
 
 ## 6. What does not change
 
@@ -130,10 +149,12 @@ prose and the invariant entry amend in the first build batch.
   templates and skills in kind; the batch process itself.
 - The commit-msg hook stays POSIX shell — only its commitlint probe
   becomes `houserules check-commit` (phase 3).
-- What DOES change beyond the port (owner ruling, 2026-09-04): the
+- What DOES change beyond the port (owner rulings, 2026-09-04): the
   dev tooling migrates with it — vitest to cargo test phase by phase,
   commitlint to the built-in check, pnpm/package.json/node_modules
-  gone at retirement. Nothing JS survives phase 5.
+  gone at retirement — and the phase-5 repository sweep (§5) corrects
+  every rule, knowledge entry, backlog item, and doc to the new
+  setup. Nothing JS survives phase 5.
 
 ## 7. Out of scope
 
