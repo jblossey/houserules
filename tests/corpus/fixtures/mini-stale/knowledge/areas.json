@@ -1,0 +1,9 @@
+{
+  "global": { "paths": [] },
+  "process": { "paths": [] },
+  "docs": { "paths": [] },
+  "tools": { "paths": ["mini-stale-tools/**"] },
+  "cli": { "paths": [] },
+  "template": { "paths": [] },
+  "tests": { "paths": [] }
+}

@@ -1,0 +1,117 @@
+{
+  "kind": "branch-review",
+  "base": "4a7aeb4f57eccd65be2becc38ca1fe9a8df2a4c3",
+  "head": "508a089d6eaeae9110c3f517095b62f66bb881c9",
+  "strengths": [
+    "The validate hardening is a textbook extension: checkTaskReportAudit sits beside the existing shape checks as one documented single-purpose function (tools/kb.mjs:786-812), its messages keep the usage-error voice, and its doc comment's flow claim was made true before it shipped — the r0 review forced the retrieval protocol to migrate (audit, fill, validate once) instead of special-casing the draft, which is quality.no-compat-softening applied to a process flow.",
+    "Two-sided test evidence: three natural REDs for the new rejections, three disclosed mutation proofs for the acceptance guards, and the twelfth-cell pin whose comment names the exact reordering hazard it guards (tests/kb.test.mjs:2200-2204). All six new tests mint scratch state through makeRepo -> scratchDir (tests/kb.test.mjs:147-148).",
+    "The review loop enforced this batch's own new rules on this batch: both T1 fix-round audits reproduced byte for byte in r2, and the T2 r1 reviewer applied the just-shipped item 6 to its own verdict (four findings, four fix_rounds entries, one for one) and traced every refreshed report value to a recorded run.",
+    "The seventh eval record is honest about what held: the doctored seeded report passes the hardened validate by design, and the record's notes say so, crediting the reviewer's row arithmetic as the gate — no over-claiming, per knowledge-base.state-only-the-source, in the very file that certifies the templates.",
+    "All four changed template/root pairs share one blob id at HEAD (kb.mjs c1dcfc4c, implementer.md 568f398c, task-reviewer.md ebcc6a65, orchestrating SKILL a944598a), render --check is up to date, and T2's live-run greps prove a fresh init ships all four sentences with no repo-local token.",
+    "The interleaved owner commit was contained cleanly: e4e0968 secured verbatim as its own docs(readme) commit, two style notes surfaced to the owner instead of silently edited, and the ledger corrected its own range-containment slip in writing (progress.md line 6).",
+    "Gates all green at HEAD: 200/200 tests with ~99% statement coverage, kb and backlog checks ok, a linear eight-commit range with clean Conventional Commits, and all eleven workspace deliverables validate under the hardened gate they themselves introduced."
+  ],
+  "issues": [],
+  "rule_adherence": [
+    { "id": "process.conventional-commits", "kind": "rule", "mode": "deterministic", "level": "fail", "result": "pass", "evidence": "8 commits checked" },
+    { "id": "process.deliverables-json", "kind": "rule", "mode": "deterministic", "level": "fail", "result": "pass", "evidence": "report field self_audit is set in 2 reports; all 11 workspace deliverables re-validated clean at review time" },
+    { "id": "process.evals-rerun", "kind": "rule", "mode": "deterministic", "level": "fail", "result": "pass", "evidence": ".claude/agents/implementer.md changed with .claude/evals/record.json; latest record keys implementer.md 568f398c and task-reviewer.md ebcc6a65, both equal to git rev-parse 508a089:<path> — the interim fail rows T1/T2 disclosed are paid" },
+    { "id": "process.knowledge-first", "kind": "rule", "mode": "deterministic", "level": "warn", "result": "pass", "evidence": "report field knowledge_used is set in 2 reports" },
+    { "id": "process.no-tech-debt", "kind": "rule", "mode": "deterministic", "level": "fail", "result": "pass", "evidence": "3 files checked; no TODO shipped, every review finding across 5 review files fixed in-batch or closed by the verified follow-up" },
+    { "id": "security-hygiene.dependency-vetting", "kind": "rule", "mode": "deterministic", "level": "fail", "result": "pass", "evidence": "not triggered" },
+    { "id": "security-hygiene.exact-pins", "kind": "rule", "mode": "deterministic", "level": "fail", "result": "pass", "evidence": "0 files checked" },
+    { "id": "security-hygiene.no-coauthor", "kind": "rule", "mode": "deterministic", "level": "fail", "result": "pass", "evidence": "8 commits checked" },
+    { "id": "security-hygiene.no-focused-tests", "kind": "rule", "mode": "deterministic", "level": "fail", "result": "pass", "evidence": "1 files checked" },
+    { "id": "security-hygiene.verify-current-docs", "kind": "rule", "mode": "deterministic", "level": "warn", "result": "pass", "evidence": "report field docs_verified is set in 1 reports; T2's docs_verified is [] for a prose-only change, disclosed" },
+    { "id": "houserules.node-under-mise", "kind": "gotcha", "mode": "judged", "result": "pass", "evidence": "task-2-report live_run[0] runs the CLI as mise exec -- node bin/houserules.mjs init; T1 goes through tools/kb.sh, which self-falls-back to mise exec; T3's eval worktree ran under mise (ledger lines 18-24)" },
+    { "id": "houserules.payload-runs-on-builtins", "kind": "invariant", "mode": "judged", "result": "pass", "evidence": "template/tools/kb.mjs gains one private function on built-ins only; no import added, no package.json change anywhere in the range" },
+    { "id": "houserules.pnpm-only", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "every recorded command in both reports uses pnpm or the tools/ wrappers; no npm or npx in the diff or any workspace deliverable" },
+    { "id": "houserules.readme-mirrors-kit-owned", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "KIT_OWNED unchanged in the range (bin/houserules.mjs untouched); the README change is the owner's intro paragraphs, not the agent-layer bullet or ownership table (area_files docs list)" },
+    { "id": "houserules.tag-pilot-is-read-only", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "changed_files stay inside this repository; no report or capture touches ~/projects/tag-pilot" },
+    { "id": "houserules.template-is-the-source", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "all four changed pairs share one blob id at 508a089 (c1dcfc4c, 568f398c, ebcc6a65, a944598a); the generated project-knowledge skill re-rendered; render --check reports up to date" },
+    { "id": "houserules.tests-clean-scratch-dirs", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "the six new validate tests mint through makeRepo, which calls scratchDir('kb-') (tests/kb.test.mjs:147-148); no new mkdtemp site" },
+    { "id": "knowledge-base.ids-are-permanent", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "no knowledge/*.json file in the range (area_files docs list); no id renamed" },
+    { "id": "knowledge-base.rules-need-a-loading-path", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "no new knowledge entry in the range (area_files docs list)" },
+    { "id": "knowledge-base.state-only-the-source", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "checkTaskReportAudit's doc-comment flow claim matches the shipped PROTOCOL step 3 (verified side by side at HEAD); record.json notes match the eval artifacts (seeded review: 11 issues, 5 critical, row arithmetic named as the gate); the README intro is owner content committed verbatim (ledger line 4), judged as owner-authored, not agent teaching prose" },
+    { "id": "knowledge-base.summary-is-the-rule", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "no knowledge entry changed in the range (area_files docs list)" },
+    { "id": "process.ask-when-missing", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "the two README style observations were surfaced to the owner, not assumed away (ledger line 4); the T2 r1 disposition question went to a controller ruling (ledger line 16)" },
+    { "id": "process.backlog-drives-work", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "T1 traces to HR-041, T2 to HR-043+HR-050, T3 to process.evals-rerun as scheduled in the approved spec; batches.json batch 14 status updated in the range" },
+    { "id": "process.brainstorm-first", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "spec approved by the owner 2026-09-04 as written and committed first (c7db95e), before any implementation commit" },
+    { "id": "process.code-health-scan", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "spec section 6 names the smells per touched file; the tasks honored it (extend-don't-restructure in kb.mjs, one-sentence edits in place, scratch dirs through the shared helper)" },
+    { "id": "process.ff-only-merges", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "git log --merges 4a7aeb4..508a089 is empty, the range is linear; the merge itself is finish work per spec section 5" },
+    { "id": "process.live-run-before-ci", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "T1: five per-command captures against doctored copies of the real batch-11 report; T2: eight fresh-install proofs (init, greps, kb/backlog checks); T3's scenarios are live runs by construction" },
+    { "id": "process.model-policy", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "implementers on sonnet, every task review on opus, branch review on fable (spec process line; ledger dispatch lines 3, 5, 13, 25)" },
+    { "id": "process.rulings-to-file", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "the no-reopen ruling shipped into task-reviewer.md item 6, the rebuild ruling into the orchestrating skill (citing process.main-wins-backlog-collisions, whose body it matches), batch status into batches.json; no ruling lives only in the ledger" },
+    { "id": "process.sequential-agents", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "the ledger shows one dispatch at a time with each close preceding the next dispatch (progress.md lines 3-25)" },
+    { "id": "process.tdd", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "T1: three natural REDs for the new rejections plus three disclosed mutation proofs, verbatim RED/GREEN in the report; T2 is prose-only with tdd [] disclosed at self_review[0] and gates standing in; suite 200/200 at HEAD" },
+    { "id": "quality.no-compat-softening", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "the draft-vs-gate conflict was resolved by migrating the flow (the premature validate removed; audit, fill, validate once) rather than weakening the check with a draft exemption (task-1-review-r1 verdict; kb.mjs PROTOCOL step 3 at HEAD)" },
+    { "id": "quality.pin-copies-byte-exact", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "the render test pins the new PROTOCOL text by exact match against generated output (tests/kb.test.mjs:765-768); the dogfood pins are untouched and green" },
+    { "id": "quality.principles", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "one single-purpose function beside the existing checks, no restructuring, no new dependency, tests assert exact observable error text; the standalone-helper YAGNI concern in the eval was disclosed, not hidden" },
+    { "id": "writing-style.code-comments", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "the three new test comments each state incident provenance the code cannot show (HR-041 at tests/kb.test.mjs:2132, the batch-12 shape at 2163, the twelve-cell reordering hazard at 2200)" },
+    { "id": "writing-style.doc-comments", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "TERMINAL_STATUSES (tools/kb.mjs:785), checkTaskReportAudit (787-798), and the updated validateDeliverable doc all documented; names carry the behavior" },
+    { "id": "writing-style.instructions-cover-the-state-space", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "violated once at T1 r0 (the hardened gate missed the protocol's own write-then-fill draft) and fixed in-batch by the reconciled flow; at HEAD every shipped sentence carries a per-value state-space check in the reports (task-2-report self_review[2], refreshed to shipped wording) and the twelfth cell is pinned by test" },
+    { "id": "writing-style.principles", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "the four template sentences are short, active, one instruction each; commit headers under 100 chars; the record notes match the register of the six prior records" }
+  ],
+  "recommendations": [
+    "Bundle the two deferred template polish items with the next template-touching batch so they share one evals rerun: lift the verbatim-output invariant out of the live_run bullet's parenthetical onto its own line (it governs tests, live_run, and fix_rounds[].tests), and only then, if the owner wants it, recompress item 6 to one sentence.",
+    "Ask the owner whether the README intro should regain a design-record link; docs/design.md is still linked at README line 241 so nothing is orphaned, and the intro paragraphs stay owner-voice unless the owner asks for an STE-100 pass.",
+    "Finish per the standing instruction: fetch, rebase onto main, re-run the suite and both checks on the rebased head, ff-only merge from the CLI, push, then tick HR-041, HR-043, and HR-050 with batch=14.",
+    "If the retrospective's proposal for detecting nested fix-round audits without --report is declined as a deterministic check, file the gap as a backlog item so it stays a decision, not drift."
+  ],
+  "retrospective": {
+    "violated_rules": [
+      {
+        "id": "process.evals-rerun",
+        "count": 2,
+        "tasks": ["1", "2"],
+        "proposal": {
+          "summary": "No rule change: both fails were the documented scheduled-payment pattern (body paragraph 5) and T3's record at HEAD pays them — the record keys blobs 568f398c/ebcc6a65, both equal to HEAD. Ready edit: in that body paragraph, extend the precedent citation '(batches 7-11)' to '(batches 7-11, 14)' so the pattern's record stays current."
+        }
+      },
+      {
+        "id": "writing-style.instructions-cover-the-state-space",
+        "count": 1,
+        "tasks": ["1"],
+        "proposal": {
+          "summary": "Ready edit — append one body paragraph: 'A gate is an instruction too: when a check is added to a tool, the surrounding protocol's own intermediate artifact states are part of the conditioned state space. Batch 14 T1's hardened validate rejected the retrieval protocol's own write-then-fill draft (terminal status, self_audit null); the fix migrated the flow to audit, fill, validate once, instead of special-casing the draft.'"
+        }
+      }
+    ],
+    "uncovered_findings": [
+      {
+        "finding": "Mid-batch, owner-authored README prose sat uncommitted on the shared working tree while T1 ran. No entry covers securing owner content found mid-batch: the controller improvised correctly (verbatim own commit e4e0968, two style notes surfaced instead of edited, kept outside every task range), but the ledger first misstated which task range contained the commit and needed a written correction (progress.md line 6). The procedure currently lives only in batch 14's ledger, which does not survive compaction.",
+        "entry": {
+          "id": "process.owner-content-mid-batch",
+          "kind": "procedure",
+          "area": "process",
+          "summary": "Owner content found uncommitted on the shared tree mid-batch: commit it verbatim as its own commit at once, surface concerns to the owner instead of editing, and record its exact position relative to task ranges in the ledger.",
+          "body": [
+            "Batch 14: the README convergence paragraphs surfaced while T1 ran; secured as their own docs(readme) commit (e4e0968), two notes surfaced to the owner (a dropped link, lowercase product names), nothing silently changed.",
+            "Verify the interleave position with git log before writing the ledger line: state which task commits sit below and above it. A wrong containment claim forces a ledger correction and changes which range the task review must read (batch 14, T1).",
+            "At aggregation the commit stays its own commit; no task diff absorbs it, and the task-review dispatch names it as owner content to be judged as such."
+          ],
+          "tags": ["owner-content", "ledger", "aggregation"],
+          "source": { "date": "2026-09-04", "by": "review", "ref": "batch 14 branch review; e4e0968" }
+        }
+      }
+    ],
+    "stale_entries": [],
+    "unused_ids": [],
+    "template_defects": [
+      {
+        "where": "tools/kb.mjs validateDeliverable / checkTaskReportAudit",
+        "what": "The new gate inspects only the top-level self_audit, so a fix-round audit recorded without --report — the batch 12 shape this batch set out to remove — still validates. It recurred inside this very batch (T1 fix round 0, skipped 3) and cost the r1-to-r2 round; only the task reviewer caught it.",
+        "fix": "Extend checkTaskReportAudit to scan fix_rounds[].tests[].output for an audit summary carrying a nonzero \"skipped\" (the transcript is JSON, the pattern is narrow and did not occur in any legitimate output this batch), or explicitly keep it judged by adding the check to the task-reviewer's numbered list; if neither, file the backlog item."
+      },
+      {
+        "where": ".claude/agents/implementer.md:40 (live_run bullet)",
+        "what": "The verbatim-output invariant governs tests, live_run, and fix_rounds[].tests but sits inside live_run's parenthetical; a reader of the tests bullet alone never sees it, and the T2 r1 reviewer had to spend a considered-and-cleared cycle on the placement.",
+        "fix": "At the next template-touching batch, lift the clause onto its own line above the field list, wording unchanged; bundle it there so it shares that batch's evals rerun instead of costing its own."
+      }
+    ]
+  },
+  "assessment": {
+    "ready": "yes",
+    "text": "The branch delivers the spec exactly: the hardened validate with its twelve-cell state space pinned, the four template sentences plus the rebuild step, and the seventh eval record keyed to both changed template blobs — verified equal to git rev-parse at 508a089, so the evals debt both tasks disclosed is paid. The one wording deviation (item 6 grew a second, disposition sentence) came from a review finding and is justified. The branch audit at HEAD is clean: 10 deterministic rows pass with 0 skipped, and all 28 judged rows pass over the whole diff. The internal loop already enforced this batch's own new rules on this batch — reproduced audits, one-for-one findings lists, traced report values — and all eleven workspace deliverables validate under the gate the batch introduced. 200/200 tests, kb and backlog checks ok, render drift-free, eval worktree removed, linear range with the owner's verbatim README commit correctly contained outside every task diff. No issues to file; the retrospective carries two ready knowledge edits, one new procedure entry, and two template defects for the next template-touching batch. Ready to finish: fetch, rebase onto main, re-run the gates, ff-only merge, tick HR-041/043/050."
+  }
+}

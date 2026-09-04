@@ -1,0 +1,19 @@
+{
+  "kind": "task-report",
+  "task": 1,
+  "backlog": "HR-999",
+  "status": "DONE",
+  "implemented": "Synthetic invalid report fixture: two seeded violations for the frozen validate slice.",
+  "commits": [],
+  "tests": [],
+  "live_run": [],
+  "tdd": [],
+  "files_changed": [],
+  "docs_verified": [],
+  "dependency_vetting": null,
+  "coverage": null,
+  "self_audit": null,
+  "self_review": [],
+  "concerns": [],
+  "knowledge_used": []
+}

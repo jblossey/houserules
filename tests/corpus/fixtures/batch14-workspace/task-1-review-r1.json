@@ -1,0 +1,355 @@
+{
+  "kind": "re-review",
+  "task": 1,
+  "round": 1,
+  "fix_base": "e7dbc69",
+  "head": "f03e43c",
+  "finding_verdicts": [
+    {
+      "finding": "Important (writing-style.instructions-cover-the-state-space): the retrieval protocol and implementer.md told the agent to validate a draft that carries a terminal status with a null self_audit, the exact shape the new check rejects; the doc comment exempted a draft state no documented flow produces.",
+      "verdict": "addressed",
+      "evidence": "template/tools/kb.mjs:304 now reads write, then audit, then fill self_audit, then `run tools/kb.sh validate <REPORT_FILE> and fix every error`; template/.claude/agents/implementer.md:53-54 swaps the two steps to the same order; template/tools/kb.mjs:794-797 replaces the draft clause with the real exemption (BLOCKED and NEEDS_CONTEXT) and states why no in-flow draft reaches the null branch; .claude/skills/project-knowledge/SKILL.md:43 carries the regenerated text and `tools/kb.sh render --check` prints `render: up to date`. I re-walked the sequence over the state space: the draft (terminal status, self_audit null) now meets only the audit, whose deliverables-json row is a self-resolving `fail` inside an explicit re-run-until-clean loop (live_run[3] capture: `report lacks a value for self_audit`), and validate first runs on the filled report (live_run[4], exit 0). No step validates a state the check rejects, in either text."
+    },
+    {
+      "finding": "Minor: the two acceptance tests (BLOCKED and NEEDS_CONTEXT with a null self_audit) assert already-correct behavior with no cycle in tdd; process.tdd wants a disclosed-mutation proof.",
+      "verdict": "addressed",
+      "evidence": "tdd[3] and tdd[4] carry mode `mutation`, and the mutation is disclosed in fix_rounds[0].findings[1].fix (the `if (!TERMINAL_STATUSES.includes(value.status)) return;` line dropped once, then restored). The proofs discriminate: each RED is the per-test run and fails with the message the removed guard prevents (`status \"BLOCKED\" needs a non-null self_audit` at tests/kb.test.mjs:2189, `status \"NEEDS_CONTEXT\" ...` at :2198), and both excerpts appear verbatim inside the on-disk captures mutation-red-blocked-null.txt and mutation-red-needscontext-null.txt."
+    },
+    {
+      "finding": "Minor: no test pinned the twelfth state-space cell, a non-terminal report whose self_audit.summary.skipped is greater than 0.",
+      "verdict": "addressed",
+      "evidence": "tests/kb.test.mjs:2204-2217 asserts a BLOCKED report with summary.skipped 2 validates with no errors, and tdd[5] proves it can fail under the same disclosed mutation (`self_audit.summary.skipped is 2; re-run audit with --report` at tests/kb.test.mjs:2218, verbatim in mutation-red-blocked-skipped.txt). The suite grew 199 to 200."
+    }
+  ],
+  "rule_adherence": [
+    {
+      "id": "houserules.node-under-mise",
+      "kind": "gotcha",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "every fix-round command runs under mise: tests[0..1] `mise exec -- pnpm ...`, the tdd runs likewise; the kb.sh wrapper handles the rest"
+    },
+    {
+      "id": "houserules.payload-runs-on-builtins",
+      "kind": "invariant",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the fix edits a string constant and a doc comment in template/tools/kb.mjs; no import, no dependency, no manifest change"
+    },
+    {
+      "id": "houserules.pnpm-only",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "report tests[0..1] use `mise exec -- pnpm`; no npm or npx in the fix round"
+    },
+    {
+      "id": "houserules.readme-mirrors-kit-owned",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the fix commit f03e43c changes no KIT_OWNED path set, so the README enumerations need no update; the README edit inside the audit range is the owner's commit e4e0968, outside this task's scope"
+    },
+    {
+      "id": "houserules.tag-pilot-is-read-only",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the fix commit touches six paths, all inside this repository; no path under ~/projects/tag-pilot"
+    },
+    {
+      "id": "houserules.template-is-the-source",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "cmp at f03e43c: template/tools/kb.mjs equals tools/kb.mjs, and template/.claude/agents/implementer.md equals .claude/agents/implementer.md; the generated skill was re-rendered and `tools/kb.sh render --check` reports up to date"
+    },
+    {
+      "id": "houserules.tests-clean-scratch-dirs",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the new case at tests/kb.test.mjs:2205 calls makeRepo(), which mints through scratchDir('kb-') at tests/kb.test.mjs:148; no new mkdtempSync site"
+    },
+    {
+      "id": "knowledge-base.ids-are-permanent",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "not triggered: the fix changes no file under knowledge/"
+    },
+    {
+      "id": "knowledge-base.rules-need-a-loading-path",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "not triggered: no new or moved knowledge entry in the fix"
+    },
+    {
+      "id": "knowledge-base.state-only-the-source",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "not triggered: no knowledge entry authored; the flow ruling lives in the approved spec and the template text it governs"
+    },
+    {
+      "id": "knowledge-base.summary-is-the-rule",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "not triggered: no knowledge entry authored in this round"
+    },
+    {
+      "id": "process.ask-when-missing",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the fix follows the review's stated invariant and the spec; no assumption stood in for missing information"
+    },
+    {
+      "id": "process.backlog-drives-work",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "report backlog HR-041; the round fixes review findings against that item and adds no unrelated scope"
+    },
+    {
+      "id": "process.brainstorm-first",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "docs/specs/2026-09-04-batch-14-hygiene.md T1; the reconciliation serves the spec bullet \"the write-then-fill flow stays valid\""
+    },
+    {
+      "id": "process.code-health-scan",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "spec section 6 asks for one sentence in place and no restructuring; the fix moves two numbered steps and rewrites one doc-comment clause"
+    },
+    {
+      "id": "process.conventional-commits",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "3 commits checked"
+    },
+    {
+      "id": "process.deliverables-json",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "report field self_audit is set"
+    },
+    {
+      "id": "process.evals-rerun",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "fail",
+      "evidence": ".claude/agents/implementer.md changed without .claude/evals/record.json. This is the interim state process.evals-rerun's own last paragraph allows for a batch that edits templates across several tasks: the report discloses it in concerns, status is DONE_WITH_CONCERNS, and batch 14's spec schedules T3 to run every scenario at the branch head and append the seventh record. Not a finding against this round; it is a merge gate for the branch."
+    },
+    {
+      "id": "process.ff-only-merges",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "linear history on batch-14; no merge commit in e7dbc69..f03e43c"
+    },
+    {
+      "id": "process.knowledge-first",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "warn",
+      "result": "pass",
+      "evidence": "report field knowledge_used is set"
+    },
+    {
+      "id": "process.live-run-before-ci",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "two new per-command entries prove the reconciled flow end to end; live-1-audit-on-draft.txt and live-2-validate-after-fill.txt on disk byte-match live_run[3] and live_run[4]"
+    },
+    {
+      "id": "process.model-policy",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "implementer on sonnet, this re-review on opus, per the batch ledger"
+    },
+    {
+      "id": "process.no-tech-debt",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "3 files checked"
+    },
+    {
+      "id": "process.rulings-to-file",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the round makes no new ruling; the flow order now lives in the template text itself, not in chat"
+    },
+    {
+      "id": "process.sequential-agents",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "one implementer resumed for the fix, then this re-review; no concurrent dispatch"
+    },
+    {
+      "id": "process.tdd",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "six cycles now: three natural REDs from round 0 and three mutation proofs for the acceptance cells, each RED discriminating and verbatim inside its on-disk capture; the mutation is disclosed in fix_rounds[0].findings[1].fix, which is the only place the tddCycle schema leaves for it"
+    },
+    {
+      "id": "quality.no-compat-softening",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the check keeps its strict shape; the fix migrates the flow text to it instead of relaxing the rejection"
+    },
+    {
+      "id": "quality.pin-copies-byte-exact",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "no copy-pin test added; the existing dogfood pins cover both synced pairs and the suite stayed green (200 passed)"
+    },
+    {
+      "id": "quality.principles",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the fix is the smallest one that holds the invariant: two steps swapped, one comment clause corrected, one test added; no new abstraction"
+    },
+    {
+      "id": "security-hygiene.dependency-vetting",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "not triggered"
+    },
+    {
+      "id": "security-hygiene.exact-pins",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "0 files checked"
+    },
+    {
+      "id": "security-hygiene.no-coauthor",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "3 commits checked"
+    },
+    {
+      "id": "security-hygiene.no-focused-tests",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "1 files checked"
+    },
+    {
+      "id": "security-hygiene.verify-current-docs",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "warn",
+      "result": "pass",
+      "evidence": "report field docs_verified is set"
+    },
+    {
+      "id": "writing-style.code-comments",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the new test's comment at tests/kb.test.mjs:2200-2203 states the reordering risk the assertion cannot show; no restated code"
+    },
+    {
+      "id": "writing-style.doc-comments",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "template/tools/kb.mjs:788-798 now names the true exemption and its reason; the claim matches the shipped flow at template/tools/kb.mjs:304"
+    },
+    {
+      "id": "writing-style.instructions-cover-the-state-space",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "round 0's fail is cleared: the protocol sentence and implementer.md steps 1-2 were re-read against all four status values and all three self_audit states, and no in-flow state now meets a gate that rejects it. The stale section heading is a wording residue, filed as new breakage, not a state-space gap"
+    },
+    {
+      "id": "writing-style.principles",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the reordered steps stay one instruction per sentence and active; the commit body is short and factual"
+    }
+  ],
+  "new_breakage": [
+    {
+      "severity": "minor",
+      "file": ".superpowers/sdd/2026-09-04-batch-14/task-1-report.json",
+      "what": "fix_rounds[0].tests holds one run, the fix-diff audit `tools/kb.sh audit --base e7dbc69 --head f03e43c --ids ...`, and it was executed without `--report`. Its summary reads deterministic 10, pass 6, fail 1, skipped 3.",
+      "why": "That is the batch 12 defect this very task exists to stop: the spec's Facts section names \"batch 12's fix-round audit without --report\" as one of the two shapes that cost a review round. The new validate check cannot catch it, because it only inspects the top-level self_audit, so the fix round's own evidence is the weaker kind the batch is removing. The three skipped rows are the report-field checks, so the fix diff was never checked against process.deliverables-json, process.knowledge-first or security-hygiene.verify-current-docs.",
+      "fix": "Re-run the fix-diff audit as `tools/kb.sh audit --base e7dbc69 --head f03e43c --ids <the eight Knowledge ids> --report .superpowers/sdd/2026-09-04-batch-14/task-1-report.json` and replace fix_rounds[0].tests[0] with the run that shows skipped 0. Keep the top-level audit at tests[6] as it is; it already covers c7db95e..f03e43c with --report."
+    },
+    {
+      "severity": "minor",
+      "file": "template/.claude/agents/implementer.md:51",
+      "what": "The section heading still reads `## Before answering: validate, self-audit, self-review`, but the steps under it now run in the order audit and fill (step 1), validate (step 2), self-review (step 3). The heading named the old order and was correct before this round.",
+      "why": "The heading is the first line an implementer reads for the closing sequence. A heading that lists the steps in the opposite order to the list under it invites the agent to validate first, which is the state the round just removed.",
+      "fix": "Rename the heading to the order the steps now run, for example `## Before answering: self-audit, validate, self-review`, in template/.claude/agents/implementer.md, then sync the root copy with `node bin/houserules.mjs update --dir .`. This is another implementer.md edit, so the process.evals-rerun fail row stays until T3 pays it."
+    }
+  ],
+  "out_of_scope": [
+    "The owner's commit e4e0968 (docs(readme): the owner's convergence paragraphs) sits between e7dbc69 and f03e43c. I did not review it. It is why the c7db95e..f03e43c audit package pulls in the docs-area rules houserules.readme-mirrors-kit-owned and the four knowledge-base entries; the fix commit's own diff excludes README.md.",
+    "The seventh evaluation record stays with T3, per the spec. This round's process.evals-rerun fail is that scheduled debt, not a defect of the fix."
+  ],
+  "verdict": {
+    "state": "all-addressed",
+    "open": [],
+    "text": "All three round 0 findings are addressed, and the fixes hold under their own evidence: both flow texts and the doc comment now agree, the generated skill is re-rendered with no drift, both synced pairs are byte-identical at f03e43c, the three mutation proofs discriminate and appear verbatim in their captures, the twelfth cell is pinned, and the live draft-to-valid proof is two per-command captures that byte-match the report. The report validates and its self_audit reproduces my r1 audit row for row, summary included. Two new Minor findings came in with the round: a fix-diff audit recorded without --report (skipped 3, the batch 12 shape this task removes) and a section heading left in the old step order. Both need a round under process.no-tech-debt before the task closes. The process.evals-rerun fail row is the spec-scheduled interim state, disclosed in concerns with status DONE_WITH_CONCERNS; it stays a merge gate for the branch, not a finding against this round."
+  }
+}

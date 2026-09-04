@@ -1,0 +1,169 @@
+{
+  "kind": "task-report",
+  "task": "eval-docs-edit",
+  "backlog": [],
+  "status": "DONE",
+  "implemented": "Added a \"Run the lint gates before you commit\" how-to section to docs/runbook.md. The section documents the mise run lint task (shellcheck, the knowledge gate, the backlog gate) as a four-step numbered procedure, following the runbook's existing section pattern.",
+  "commits": [
+    {
+      "sha": "3d0b23b8182197748920c93374aa8dd492c37384",
+      "subject": "docs(runbook): add the pre-commit lint gate how-to"
+    }
+  ],
+  "tests": [
+    {
+      "command": "cd /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14 && mise run test",
+      "output": "[test] $ pnpm test\n$ vitest run --coverage\n\n RUN  v4.1.11 /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14\n      Coverage enabled with v8\n\n \u2713 |houserules| tests/scratch-dir.test.mjs (1 test) 7ms\n \u2713 |houserules| tests/cli.test.mjs (9 tests) 14ms\n \u2713 |houserules| tests/dogfood.test.mjs (20 tests) 12ms\n \u2713 |houserules| tests/commit-msg-hook.test.mjs (3 tests) 31ms\n \u2713 |houserules| tests/json-store.test.mjs (11 tests) 30ms\n \u2713 |houserules| tests/entry.test.mjs (3 tests) 137ms\n \u2713 |houserules| tests/backlog.test.mjs (10 tests) 126ms\n \u2713 |houserules| tests/init.test.mjs (36 tests) 1756ms\n \u2713 |houserules| tests/kb.test.mjs (107 tests) 5361ms\n\n Test Files  9 passed (9)\n      Tests  200 passed (200)\n   Start at  02:12:21\n   Duration  5.93s (transform 973ms, setup 0ms, import 1.56s, tests 7.48s, environment 1ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\nAll files          |   98.94 |    99.28 |   96.64 |    98.8 |                   \n bin               |    96.7 |     98.5 |   81.81 |   96.42 |                   \n  houserules.mjs   |    96.7 |     98.5 |   81.81 |   96.42 | 256-258           \n template/tools    |   99.11 |    99.26 |   97.31 |   98.97 |                   \n  backlog.mjs      |   98.22 |    98.92 |   92.85 |   97.91 | 258-262           \n  kb.mjs           |    99.4 |    99.36 |   98.34 |   99.32 | 1052-1056         \n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 98.94% ( 848/857 )\nBranches     : 99.28% ( 554/558 )\nFunctions    : 96.64% ( 173/179 )\nLines        : 98.8% ( 744/753 )\n================================================================================\n",
+      "exit": 0
+    },
+    {
+      "command": "cd /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14 && mise run lint",
+      "output": "[lint] $ shellcheck tools/*.sh template/tools/*.sh .githooks/commit-msg templat\u2026\n[lint] $ tools/kb.sh check\nknowledge: ok\n[lint] $ tools/backlog.sh check\nbacklog: ok\n",
+      "exit": 0
+    },
+    {
+      "command": "cd /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14 && tools/kb.sh audit --base b1bc73971c3cdc76c5f5cffab4d3eb4d000d76fc --head 3d0b23b8182197748920c93374aa8dd492c37384 --ids writing-style.principles,process.rulings-to-file --report /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-docs-edit-report.json",
+      "output": "{\n  \"base\": \"b1bc739\",\n  \"head\": \"3d0b23b\",\n  \"ids\": [\n    \"writing-style.principles\",\n    \"process.rulings-to-file\"\n  ],\n  \"changed_files\": [\n    \"docs/runbook.md\"\n  ],\n  \"areas\": [\n    \"docs\",\n    \"global\"\n  ],\n  \"area_files\": {\n    \"global\": [],\n    \"docs\": [\n      \"docs/runbook.md\"\n    ]\n  },\n  \"rules\": [\n    {\n      \"id\": \"houserules.pnpm-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.readme-mirrors-kit-owned\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.tag-pilot-is-read-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"houserules.template-is-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.ids-are-permanent\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.rules-need-a-loading-path\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.state-only-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"knowledge-base.summary-is-the-rule\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.ask-when-missing\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.backlog-drives-work\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.brainstorm-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.code-health-scan\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.conventional-commits\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"1 commits checked\"\n    },\n    {\n      \"id\": \"process.deliverables-json\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field self_audit is set\"\n    },\n    {\n      \"id\": \"process.evals-rerun\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"not triggered\"\n    },\n    {\n      \"id\": \"process.ff-only-merges\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.knowledge-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field knowledge_used is set\"\n    },\n    {\n      \"id\": \"process.live-run-before-ci\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.model-policy\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.no-tech-debt\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"process.rulings-to-file\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.sequential-agents\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"process.tdd\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.no-compat-softening\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"quality.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"security-hygiene.dependency-vetting\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"not triggered\"\n    },\n    {\n      \"id\": \"security-hygiene.exact-pins\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-coauthor\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"1 commits checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-focused-tests\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"0 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.verify-current-docs\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"not triggered\"\n    },\n    {\n      \"id\": \"writing-style.code-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.doc-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    },\n    {\n      \"id\": \"writing-style.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"\u2014\"\n    }\n  ],\n  \"summary\": {\n    \"base\": \"b1bc739\",\n    \"head\": \"3d0b23b\",\n    \"deterministic\": 10,\n    \"pass\": 10,\n    \"fail\": 0,\n    \"warn\": 0,\n    \"skipped\": 0,\n    \"judged\": 23\n  }\n}\n",
+      "exit": 0
+    },
+    {
+      "command": "cd /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14 && tools/kb.sh validate /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-docs-edit-report.json",
+      "output": "[\n  {\n    \"file\": \"/tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-docs-edit-report.json\",\n    \"kind\": \"task-report\",\n    \"errors\": []\n  }\n]\n",
+      "exit": 0
+    }
+  ],
+  "live_run": [
+    {
+      "command": "mise run lint > /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/evidence/live-run-mise-lint-clean.txt 2>&1",
+      "output": "[lint] $ shellcheck tools/*.sh template/tools/*.sh .githooks/commit-msg templat\u2026\n[lint] $ tools/kb.sh check\nknowledge: ok\n[lint] $ tools/backlog.sh check\nbacklog: ok\n",
+      "exit": 0
+    }
+  ],
+  "tdd": [],
+  "files_changed": [
+    "docs/runbook.md"
+  ],
+  "docs_verified": [],
+  "dependency_vetting": null,
+  "coverage": [
+    {
+      "target": "houserules",
+      "metric": "lines",
+      "measured": 98.8,
+      "floor": 80
+    },
+    {
+      "target": "houserules",
+      "metric": "branches",
+      "measured": 99.28,
+      "floor": 99
+    }
+  ],
+  "self_audit": {
+    "summary": {
+      "base": "b1bc739",
+      "head": "3d0b23b",
+      "deterministic": 10,
+      "pass": 10,
+      "fail": 0,
+      "warn": 0,
+      "skipped": 0,
+      "judged": 23
+    },
+    "rows": [
+      {
+        "id": "process.conventional-commits",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "1 commits checked"
+      },
+      {
+        "id": "process.deliverables-json",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "report field self_audit is set"
+      },
+      {
+        "id": "process.evals-rerun",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "not triggered"
+      },
+      {
+        "id": "process.knowledge-first",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "warn",
+        "result": "pass",
+        "evidence": "report field knowledge_used is set"
+      },
+      {
+        "id": "process.no-tech-debt",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "0 files checked"
+      },
+      {
+        "id": "security-hygiene.dependency-vetting",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "not triggered"
+      },
+      {
+        "id": "security-hygiene.exact-pins",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "0 files checked"
+      },
+      {
+        "id": "security-hygiene.no-coauthor",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "1 commits checked"
+      },
+      {
+        "id": "security-hygiene.no-focused-tests",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "0 files checked"
+      },
+      {
+        "id": "security-hygiene.verify-current-docs",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "warn",
+        "result": "pass",
+        "evidence": "not triggered"
+      }
+    ]
+  },
+  "self_review": [
+    "The new section follows the runbook's existing pattern: a short intro paragraph, then a numbered how-to list.",
+    "Sentences check against ASD-STE100 (writing-style.principles): short, active voice, one instruction per numbered step, no filler or hedges.",
+    "Every command in the section (`mise run lint`) is literal and runnable as written; ran it live and captured its real output as evidence.",
+    "No other doc indexes or cross-references the runbook's section headings, so no other file needed an update.",
+    "This task documents an existing procedure; it makes no new process, scope, or design ruling, so process.rulings-to-file has nothing to home here.",
+    "Commit is a single, focused Conventional Commit; the repo's commit-msg hook (no-trailer check plus commitlint) accepted it on the first try."
+  ],
+  "concerns": [],
+  "knowledge_used": [
+    "writing-style.principles",
+    "process.rulings-to-file"
+  ]
+}

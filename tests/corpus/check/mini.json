@@ -1,0 +1,7 @@
+{
+  "command": "node <frozen-worktree>/tools/kb.mjs check",
+  "cwd": "tests/corpus/fixtures/mini",
+  "stdout": "knowledge: ok\n",
+  "stderr": "",
+  "exit": 0
+}

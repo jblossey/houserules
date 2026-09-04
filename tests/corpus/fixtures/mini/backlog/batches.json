@@ -1,0 +1,14 @@
+{
+  "heading": "Batch planning",
+  "intro": ["Synthetic batch planning for the mini fixture."],
+  "table_header": ["Batch", "Items", "Summary", "Kickoff", "Status"],
+  "batches": [
+    {
+      "number": 1,
+      "items": ["HR-902"],
+      "summary": "Ship the mini-tools smoke test.",
+      "kickoff": "",
+      "status": { "state": "done", "text": "Closed in the mini fixture." }
+    }
+  ]
+}

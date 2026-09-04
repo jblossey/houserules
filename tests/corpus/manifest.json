@@ -1,0 +1,200 @@
+{
+  "frozen_sha": "a73a8c6b1c511217ceafa0bdaf6df8acdaaa1b71",
+  "node_version": "v24.18.1",
+  "generated_by": "tools/make-corpus.mjs",
+  "runs": [
+    {
+      "command": "node tools/kb.mjs audit --base c290a29526aa30c080cc9bfbdd7753b746e6e22d --head 779300045991aa4349c2b6774c181aec36af7cb7 --ids houserules.template-is-the-source,process.deliverables-json,writing-style.principles,quality.principles,knowledge-base.state-only-the-source",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "audit/knowledge-retrospective.json"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs audit --base a13117540cc1480b00d9b57907d3ad4b02767b1c --head 1537d89ad000d7376160c30fb06edc604ce4352c --ids houserules.template-is-the-source,process.tdd,process.deliverables-json,quality.principles,writing-style.doc-comments",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "audit/validate-terminal-report.json"
+      ]
+    },
+    {
+      "command": "node tools/backlog.mjs batch 14",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "backlog/batch-14.json"
+      ]
+    },
+    {
+      "command": "node tools/backlog.mjs check",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "backlog/check.json"
+      ]
+    },
+    {
+      "command": "node tools/backlog.mjs get HR-052",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "backlog/get-hr-052.json"
+      ]
+    },
+    {
+      "command": "node tools/backlog.mjs list --open",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "backlog/list-open.json"
+      ]
+    },
+    {
+      "command": "node <frozen-worktree>/tools/kb.mjs check",
+      "cwd": "tests/corpus/fixtures/mini-bad",
+      "produces": [
+        "check/mini-bad.json"
+      ]
+    },
+    {
+      "command": "node <frozen-worktree>/tools/kb.mjs check",
+      "cwd": "tests/corpus/fixtures/mini-stale",
+      "produces": [
+        "check/mini-stale.json"
+      ]
+    },
+    {
+      "command": "node <frozen-worktree>/tools/kb.mjs check",
+      "cwd": "tests/corpus/fixtures/mini",
+      "produces": [
+        "check/mini.json"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs check",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "check/root.json"
+      ]
+    },
+    {
+      "command": "node <frozen-worktree>/tools/kb.mjs render",
+      "cwd": "tests/corpus/fixtures/mini",
+      "produces": [
+        "render/mini/.claude/rules/standing-rules.md",
+        "render/mini/.claude/rules/tools.md",
+        "render/mini/.claude/skills/project-knowledge/SKILL.md"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs render",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "render/root/.claude/rules/cli.md",
+        "render/root/.claude/rules/docs.md",
+        "render/root/.claude/rules/standing-rules.md",
+        "render/root/.claude/rules/template.md",
+        "render/root/.claude/rules/tests.md",
+        "render/root/.claude/skills/project-knowledge/SKILL.md"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs validate <fixtures>/batch14-workspace/branch-review.json <fixtures>/batch14-workspace/eval-dependency-add-report.json <fixtures>/batch14-workspace/eval-docs-edit-report.json <fixtures>/batch14-workspace/eval-seeded-report.json <fixtures>/batch14-workspace/eval-seeded-review.json <fixtures>/batch14-workspace/task-1-report.json <fixtures>/batch14-workspace/task-1-review-r1.json <fixtures>/batch14-workspace/task-1-review-r2.json <fixtures>/batch14-workspace/task-1-review.json <fixtures>/batch14-workspace/task-2-report.json <fixtures>/batch14-workspace/task-2-review-r1.json <fixtures>/batch14-workspace/task-2-review.json",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "validate/batch14-workspace.json"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs validate <fixtures>/invalid-deliverable/bad-report.json",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "validate/invalid-deliverable.json"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs validate <fixtures>/batch14-workspace/task-1-report.json",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "validate/task-1-report.json"
+      ]
+    }
+  ],
+  "normalizations": [
+    {
+      "slice": "validate/batch14-workspace.json",
+      "field": "stdout/stderr: each result's \"file\"",
+      "substituted": "<fixtures>/batch14-workspace",
+      "reason": "kb.mjs validate echoes the caller's resolved absolute path into each result's \"file\" field; the placeholder keeps the corpus byte-identical across machines and CI."
+    },
+    {
+      "slice": "validate/invalid-deliverable.json",
+      "field": "stdout/stderr: each result's \"file\"",
+      "substituted": "<fixtures>/invalid-deliverable",
+      "reason": "kb.mjs validate echoes the caller's resolved absolute path into each result's \"file\" field; the placeholder keeps the corpus byte-identical across machines and CI."
+    },
+    {
+      "slice": "validate/task-1-report.json",
+      "field": "stdout/stderr: each result's \"file\"",
+      "substituted": "<fixtures>/batch14-workspace",
+      "reason": "kb.mjs validate echoes the caller's resolved absolute path into each result's \"file\" field; the placeholder keeps the corpus byte-identical across machines and CI."
+    }
+  ],
+  "inventory": {
+    "audit/knowledge-retrospective.json": "4312edf9d526bc557492d71951333e759bc27b102804202cec222e4ef346b892",
+    "audit/validate-terminal-report.json": "39c6b6870167917e8a784cdd91c2b3e9565db6380b4d74a68e306e635823d9ca",
+    "backlog/batch-14.json": "65959550de48815b4320ecfb50c8c05fc498c9f61e384854ee91dbd85380dff2",
+    "backlog/check.json": "4de2fe7d12d317accfffd5acb8547415eba8e4a8e5ce82b3b7c44e990aabc658",
+    "backlog/get-hr-052.json": "0b3d4164d9eecaed38a6f3e8cbe7e4511dc7cd62a988059ffb725ebe387572e3",
+    "backlog/list-open.json": "dc02aac2f1b8484d576f2818913852a72ee34c50f91fe3986f3a95adc20eef79",
+    "check/mini-bad.json": "6b19b0296fa23bce97085ea03eb55d59273f4f515f0d7a9a25f46079fd586f50",
+    "check/mini-stale.json": "1ced0780caa00d320cd25b9011b273d5a1886cb8bb1291842628f4001cdfead6",
+    "check/mini.json": "85d84c7f01982d11bea46b388e579dfed439edf38fde9891e7218aee822a7373",
+    "check/root.json": "7e9b0423f497a72881b1f4f8d325c8ff4a7149ad873ef132f02af0581532aee0",
+    "fixtures/batch14-workspace/branch-review.json": "287827ce4557ebbc35f4132a36329001806fe789eaa1e1d89e52937f88c8dacc",
+    "fixtures/batch14-workspace/eval-dependency-add-report.json": "10e1dda9460bda3b5e37f457e84d9083586c044d4f9ac85e9f47ba1e871ecb22",
+    "fixtures/batch14-workspace/eval-docs-edit-report.json": "60581ed2e2dd2c4ef9ebfbecb3313acc770220efe0b37ee5a5b208ac35d63c8b",
+    "fixtures/batch14-workspace/eval-seeded-report.json": "13e44cc886fb26961876f98cbaec80c632a57bd2c7548f9ebcf9978a9b08ab4d",
+    "fixtures/batch14-workspace/eval-seeded-review.json": "8c51e5753676dcfed1c85a0a20e1129a8e5fad27e2b306103384ee99bc2c2594",
+    "fixtures/batch14-workspace/task-1-report.json": "83b7a649040b93d1e70b905f15a258881bd43c1d211e5b4b38d157f3d694df50",
+    "fixtures/batch14-workspace/task-1-review-r1.json": "f1cac1e4d5f240487a85d957f6e1b3022c2849d9f5c4ebfc7f537acff9f95bec",
+    "fixtures/batch14-workspace/task-1-review-r2.json": "e782a0ff9caeae91e892ae6bc177349c7b70187cf372fa815a9aac927b7bf941",
+    "fixtures/batch14-workspace/task-1-review.json": "df23089358f2491e57dcf5cf5ba35e829f3afdaefea4b9ad2c88889b75d286e6",
+    "fixtures/batch14-workspace/task-2-report.json": "5651575ca465b960ac1c14109ee2c63e70682d11fb1c62b30960a23f4ba117b0",
+    "fixtures/batch14-workspace/task-2-review-r1.json": "90701312752968dbfb1847790d9a8ef1d44642eefb4ab0bca041bd450b1de202",
+    "fixtures/batch14-workspace/task-2-review.json": "c7b9e1765e7d56846656f841ebe1f2e47245b1152aa83b27ae10fd1a5f867f22",
+    "fixtures/invalid-deliverable/bad-report.json": "5ee2ac6e90ac2c27c53a97dbbd1b032e381a336960c8ca6e6ddfe185a4a8e3e0",
+    "fixtures/mini/.claude/rules/standing-rules.md": "f048904bb281bb8b8a86ab9c587c9802d56fbae5ffad884068ab8ee2abb03ab0",
+    "fixtures/mini/.claude/rules/tools.md": "6cbc2a1a65f620c26c01a5a09602009f072b8056b6e954896f0e023af1ae4fd6",
+    "fixtures/mini/.claude/skills/project-knowledge/SKILL.md": "917a9655b3817a204c37aefe1dc743eb344362f1da8741cdc332048a5460b6de",
+    "fixtures/mini/CLAUDE.md": "911fc9c3dea7e8fe0ad5962a29bc4453ad86df353eaf7ebb0b334874b9bd11fd",
+    "fixtures/mini/backlog/amendments.json": "6ffad6265b2091ba7e17eb93b4dfc509f4b87008d463e4befb49ae2e7f6d07bf",
+    "fixtures/mini/backlog/batches.json": "8bb8908d14e8a87805fc9d590f0d848ff967e03bdb817e6562b11f9034098460",
+    "fixtures/mini/backlog/decisions.json": "65f43d2dd44d5dbcd11f1947c5e5eefa351914f117a35cca03d6649590c45c40",
+    "fixtures/mini/backlog/items/misc.json": "ff9cc7a1d9995ac7e949a54f24b70c8d55b83fe840a7fd00b51612022e9dc284",
+    "fixtures/mini/backlog/parked.json": "4ea5e45828cc630698c2b6dd78dec2319daead3354f31c205ee1912a8652faf2",
+    "fixtures/mini/backlog/schema.json": "315f67546c47e38eeef687b40bf2238e53d36ba4ff6d63f6c35e28932828dba2",
+    "fixtures/mini/knowledge/areas.json": "308232b952cabe66d664e210f5b221fb4208c3b2d508bb04eff79675afc1ee26",
+    "fixtures/mini/knowledge/mini.json": "5d37923ea69ac6ff74a1282c860bf86f71a163a3db87d18fe89604937dd70615",
+    "fixtures/mini/knowledge/schema.json": "84bc648adc91a50d18ff72eacf3ae0a4ea365e80d49968fad7ae3d8af933889d",
+    "fixtures/mini-bad/knowledge/areas.json": "3ca9b24b059f06dc76f591b675c2257c22455ca1ac14d1c20edad6fc9a5852c5",
+    "fixtures/mini-bad/knowledge/entries.json": "13c31c438aee8179e8f7695a8e8376f9f82dda229e881a2b79adeef48ec1f1ee",
+    "fixtures/mini-bad/knowledge/mismatch.json": "0f47cff8e0431d50832fd12933e392ffcab6415b279d5617abe9476a97ebe18c",
+    "fixtures/mini-bad/knowledge/schema.json": "84bc648adc91a50d18ff72eacf3ae0a4ea365e80d49968fad7ae3d8af933889d",
+    "fixtures/mini-stale/.claude/rules/standing-rules.md": "19f2408b3bc06f790c2b1757e12b816cf20534883afe63be698addddd419f748",
+    "fixtures/mini-stale/.claude/rules/stray.md": "7010d0a5d9e495acc04971faccdaf9c86954f7a41e0847ef316780cd1592dc22",
+    "fixtures/mini-stale/.claude/rules/tools.md": "f84e06e2c2bb3829effe2b58f5be1bf590c48b6d42435d829548dae8fe1bcfaa",
+    "fixtures/mini-stale/CLAUDE.md": "b02bd85e7278008ad6297be24744ad0ea068adce8b613c521971dca107aea0ce",
+    "fixtures/mini-stale/knowledge/areas.json": "21e11c690d10bcb82daf73cdce3d8488327f4a8609689cf3a39878d7929215d7",
+    "fixtures/mini-stale/knowledge/mini-stale.json": "1b3a7df92b487b15b1848ddc47711de896447fe1cd81fcbe17932fdf8265ce76",
+    "fixtures/mini-stale/knowledge/schema.json": "84bc648adc91a50d18ff72eacf3ae0a4ea365e80d49968fad7ae3d8af933889d",
+    "render/mini/.claude/rules/standing-rules.md": "f048904bb281bb8b8a86ab9c587c9802d56fbae5ffad884068ab8ee2abb03ab0",
+    "render/mini/.claude/rules/tools.md": "6cbc2a1a65f620c26c01a5a09602009f072b8056b6e954896f0e023af1ae4fd6",
+    "render/mini/.claude/skills/project-knowledge/SKILL.md": "917a9655b3817a204c37aefe1dc743eb344362f1da8741cdc332048a5460b6de",
+    "render/root/.claude/rules/cli.md": "b1e5e65326be91cbd53d36e865c7c8e79b51b41f2bdb238d557241478e587b71",
+    "render/root/.claude/rules/docs.md": "a440f0071b7bae174cbf7c33af12c2db4fa80936519ad0efa7d660bb8b4582b4",
+    "render/root/.claude/rules/standing-rules.md": "904c194346b6fff43d343485738bdb9b83abd666c5775f70599bf957c266de8f",
+    "render/root/.claude/rules/template.md": "c663bff8702670ec1bd2ded330db362324dfa6a563bfd094597d01668a1c13b4",
+    "render/root/.claude/rules/tests.md": "459812ad24e7ed09d303da019b4f663bc51adfcf8c124357c6841bdeec6cfea9",
+    "render/root/.claude/skills/project-knowledge/SKILL.md": "287581472dcd29a97cd227804814179b911745949c7b7f55652706bc19f843c9",
+    "validate/batch14-workspace.json": "9a2ec836da35ff2da843c0178ef5b3f5ea65c93a282270085287d2f3e9951050",
+    "validate/invalid-deliverable.json": "93a1e5491b9761df7c88dbbe024f20a700991bace6f8afdf12301bf45d6f57be",
+    "validate/task-1-report.json": "a02b439ce7d3470284b63e2226827e594de30216cc76462a824a92e66eb8ddc7"
+  }
+}

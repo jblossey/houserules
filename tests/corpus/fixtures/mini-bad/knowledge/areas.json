@@ -1,0 +1,9 @@
+{
+  "global": { "paths": [] },
+  "process": { "paths": [] },
+  "docs": { "paths": ["mini-bad-docs/**"] },
+  "tools": { "paths": [] },
+  "template": { "paths": [] },
+  "tests": { "paths": [] },
+  "bogus": { "paths": [] }
+}

@@ -1,0 +1,316 @@
+{
+  "kind": "task-review",
+  "task": 1,
+  "base": "c7db95e",
+  "head": "e7dbc69",
+  "spec_compliance": {
+    "verdict": "issues",
+    "items": [
+      {
+        "type": "missing",
+        "file": "template/tools/kb.mjs:304",
+        "text": "Spec T1 requires that BLOCKED/NEEDS_CONTEXT reports and the write-then-fill flow stay valid. The first half holds. The second does not: the retrieval protocol at template/tools/kb.mjs:304 tells the implementer to write the report with self_audit null and then run validate, and implementer.md fills status with DONE or DONE_WITH_CONCERNS at that point. That draft is exactly the shape the new check rejects, as the task's own live-run capture run-1-null.txt shows (exit 1 on a DONE_WITH_CONCERNS report with a null self_audit). The check is right; the flow text was not migrated with it."
+      },
+      {
+        "type": "misunderstood",
+        "file": "template/tools/kb.mjs:794",
+        "text": "The doc comment exempts \"a write-then-fill draft that has not yet claimed a terminal status\". No documented draft has that state: status is required by the schema and implementer.md sets the terminal value before the first validate. The exemption is a hypothetical, not the flow the repository runs."
+      }
+    ]
+  },
+  "rule_adherence": [
+    {
+      "id": "houserules.node-under-mise",
+      "kind": "gotcha",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "report tests[0..1]: every node command runs as `mise exec -- pnpm ...`; no bare node or PATH export"
+    },
+    {
+      "id": "houserules.payload-runs-on-builtins",
+      "kind": "invariant",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "template/tools/kb.mjs:786-809 uses Array.includes and optional chaining only; no import, no dependency, no manifest change"
+    },
+    {
+      "id": "houserules.pnpm-only",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "report tests[0..1]: `mise exec -- pnpm vitest`, `mise exec -- pnpm test`; no npm or npx anywhere in the report"
+    },
+    {
+      "id": "houserules.tag-pilot-is-read-only",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "diff touches template/tools/kb.mjs, tools/kb.mjs, tests/kb.test.mjs only; no path under ~/projects/tag-pilot"
+    },
+    {
+      "id": "houserules.template-is-the-source",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "cmp of the two blobs at e7dbc69 (template/tools/kb.mjs, tools/kb.mjs) is byte-identical; the diff hunks are identical in both copies"
+    },
+    {
+      "id": "houserules.tests-clean-scratch-dirs",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "all five new tests call makeRepo(), which mints through the shared helper at tests/kb.test.mjs:148 (scratchDir('kb-')); no new mkdtempSync site"
+    },
+    {
+      "id": "process.ask-when-missing",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "no information was missing; the spec bullet and the fixtures were all in the repository"
+    },
+    {
+      "id": "process.backlog-drives-work",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "report backlog: [\"HR-041\"]; the dispatch names HR-041 and the spec's T1 bullet"
+    },
+    {
+      "id": "process.brainstorm-first",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "docs/specs/2026-09-04-batch-14-hygiene.md, approved by the owner on 2026-09-04 before the task ran"
+    },
+    {
+      "id": "process.code-health-scan",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "spec section 6 prescribes extend-not-restructure and the existing usage-error voice; template/tools/kb.mjs:797-809 follows both"
+    },
+    {
+      "id": "process.conventional-commits",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "1 commits checked"
+    },
+    {
+      "id": "process.deliverables-json",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "report field self_audit is set"
+    },
+    {
+      "id": "process.ff-only-merges",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "one commit on batch-14; no merge commit in c7db95e..e7dbc69"
+    },
+    {
+      "id": "process.knowledge-first",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "warn",
+      "result": "pass",
+      "evidence": "report field knowledge_used is set"
+    },
+    {
+      "id": "process.live-run-before-ci",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "three per-command captures; run-1-null.txt, run-2-skipped.txt and run-3-blocked.txt on disk byte-match the report's live_run[].output"
+    },
+    {
+      "id": "process.model-policy",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "progress.md: implementer on sonnet, this review on opus"
+    },
+    {
+      "id": "process.no-tech-debt",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "3 files checked"
+    },
+    {
+      "id": "process.rulings-to-file",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the task made no new ruling; the design lives in the approved spec's T1 bullet"
+    },
+    {
+      "id": "process.sequential-agents",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "progress.md records one implementer, then this review; no concurrent dispatch"
+    },
+    {
+      "id": "process.tdd",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "three natural REDs for the three rejection branches; the failure sites tests/kb.test.mjs:2143, 2158 and 2178 match the committed expect lines exactly, so the shown RED ran against the final test text. The two acceptance tests lack the mutation proof the rule asks for; filed as a Minor."
+    },
+    {
+      "id": "quality.no-compat-softening",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the check is strict; no opt-out, no deprecated field, no compatibility flag. The unmigrated flow text is filed under writing-style.instructions-cover-the-state-space."
+    },
+    {
+      "id": "quality.pin-copies-byte-exact",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the task adds no copy-pin test; the existing tests/dogfood.test.mjs pin covers the two kb.mjs copies and stayed green (199 passed)"
+    },
+    {
+      "id": "quality.principles",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "one responsibility in checkTaskReportAudit; TERMINAL_STATUSES states the concept once; no abstraction for a single caller; the five tests assert observable errors"
+    },
+    {
+      "id": "security-hygiene.dependency-vetting",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "not triggered"
+    },
+    {
+      "id": "security-hygiene.exact-pins",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "0 files checked"
+    },
+    {
+      "id": "security-hygiene.no-coauthor",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "1 commits checked"
+    },
+    {
+      "id": "security-hygiene.no-focused-tests",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "1 files checked"
+    },
+    {
+      "id": "security-hygiene.verify-current-docs",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "warn",
+      "result": "pass",
+      "evidence": "report field docs_verified is set"
+    },
+    {
+      "id": "writing-style.code-comments",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "tests/kb.test.mjs:2129-2135 and 2162-2164 record the HR-041 and batch 12 incidents the assertions cannot show; no restated code"
+    },
+    {
+      "id": "writing-style.doc-comments",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "template/tools/kb.mjs:785-796 documents both new symbols and validateDeliverable's doc comment names the added invariants; the comment's inaccurate draft clause is filed under the state-space finding"
+    },
+    {
+      "id": "writing-style.instructions-cover-the-state-space",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "fail",
+      "evidence": "the new branch is keyed to the status enum, but the shipped instruction it governs was not read against the draft population: template/tools/kb.mjs:304 tells the agent to write self_audit null and then validate, which template/tools/kb.mjs:797-801 now rejects for the two terminal statuses"
+    },
+    {
+      "id": "writing-style.principles",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "both messages are short and active: `status \"DONE\" needs a non-null self_audit`, `self_audit.summary.skipped is 2; re-run audit with --report`"
+    }
+  ],
+  "strengths": [
+    "The check lands exactly where the spec's code-health scan asked: one guarded helper beside the existing shape checks, one call site in validateDeliverable, no restructuring, and TERMINAL_STATUSES naming the concept once.",
+    "Both messages hold the file's usage-error voice (compare template/tools/kb.mjs:178 `check \"...\" needs \"...\"`), and the skipped message names the --report flag the spec asked for.",
+    "The RED evidence is genuine, not reconstructed: the reported failure sites tests/kb.test.mjs:2143, 2158 and 2178 match the committed expect lines one for one, so the natural label holds under the timing key.",
+    "The live-run evidence is honest end to end. All three capture files on disk byte-match the report's live_run[].output, and the fixtures are doctored copies of the real batch-11 T3 report HR-041 cites, not synthetic stubs.",
+    "The two kb.mjs copies are byte-identical at HEAD (cmp on both blobs at e7dbc69), and the shared REPORT fixture was migrated to a real self_audit rather than each test being patched, so every existing spread-based case still exercises its own target.",
+    "self_audit reproduces my own audit exactly: the same summary and the same nine deterministic rows, evidence strings included. No row was omitted or altered.",
+    "Regression probe for the hardened validate: every batch 7 to 13 task report and the whole batch 13 review, re-review and branch-review set still validate clean. The only failures in the sweep are batches 2 to 6, and they fail for pre-existing reasons (missing live_run, tdd[].mode), not the new checks."
+  ],
+  "issues": [
+    {
+      "severity": "important",
+      "file": "template/tools/kb.mjs:304",
+      "what": "The new terminal-plus-null rejection fires on the draft report the documented flow itself writes. template/tools/kb.mjs:304 (the retrieval protocol the generated skill ships) says: write REPORT_FILE with self_audit null, run tools/kb.sh validate, then run the audit and copy the summary in. .claude/agents/implementer.md sets status to DONE or DONE_WITH_CONCERNS in that same draft and calls self_audit \"null until the next step\", then step 1 runs validate. From this commit on, that first validate exits 1 with `status \"DONE\" needs a non-null self_audit`. The task's own live-run capture run-1-null.txt is that shape. The doc comment at template/tools/kb.mjs:794 exempts \"a write-then-fill draft that has not yet claimed a terminal status\", but no documented draft is in that state.",
+      "why": "Spec T1 lists \"the write-then-fill flow stays valid\" as a requirement of this task, and it is unmet. The instruction the implementer follows at that step is \"fix every error\", and the error cannot be fixed until the next step runs, so the flow teaches agents to run the gate and ignore its output. That is the opposite of what HR-041 hardens. The invariant to hold: every step the report flow tells an agent to run must have a state in which validate passes.",
+      "fix": "Migrate the flow with the check, in this task. Reconcile template/tools/kb.mjs:304 and the matching step in template/.claude/agents/implementer.md so the draft is never validated in a state the check rejects (for example, run the single validate after the self_audit fill), correct the draft clause in the checkTaskReportAudit doc comment to describe the state that is really exempt, then sync the root copies with `node bin/houserules.mjs update --dir .`. Note two consequences for the controller: a change to .claude/agents/implementer.md trips the process.evals-rerun co-change check, which this batch's spec already schedules onto T3 (disclose the expected fail row in concerns), and process.evals-rerun's rider makes a change to the retrieval protocol text in kb.mjs an eval trigger too, so T3's run must sit at a head that includes this fix.",
+      "rule": "writing-style.instructions-cover-the-state-space"
+    },
+    {
+      "severity": "minor",
+      "file": "tests/kb.test.mjs:2182",
+      "what": "The two acceptance tests (`accepts a BLOCKED report with a null self_audit`, `accepts a NEEDS_CONTEXT report with a null self_audit`) assert behavior that was already correct before the change, and the report records no cycle for them: tdd holds three entries for the three rejection branches only.",
+      "why": "process.tdd requires a disclosed-mutation proof for a new test over already-correct behavior. Without it, nothing shows the two guards can fail, and they are the only tests that pin the terminal filter.",
+      "fix": "Mutate the guard once (drop `if (!TERMINAL_STATUSES.includes(value.status)) return;`), capture the two failures verbatim, restore the code, and append the two tdd entries with mode `mutation` and the mutation disclosed in the entry."
+    },
+    {
+      "severity": "minor",
+      "file": "tests/kb.test.mjs:2165",
+      "what": "The state space is the four status values times the three self_audit states (null, filled with skipped 0, filled with skipped greater than 0): twelve cells. Five have a test. No test covers a non-terminal report whose self_audit.summary.skipped is greater than 0, which is a deliberate exemption.",
+      "why": "Nothing pins that exemption. If the skipped check were later moved above the terminal filter, the suite would stay green and a BLOCKED report carrying a --report-less audit would start failing validate.",
+      "fix": "Add one case asserting that a BLOCKED report with a self_audit whose summary.skipped is 2 validates with no errors, beside the existing acceptance cases."
+    }
+  ],
+  "assessment": {
+    "verdict": "needs-fixes",
+    "text": "The implementation itself is clean and the evidence is trustworthy. I ran the audit with the dispatch's eight Knowledge ids verbatim (--base c7db95e --head e7dbc69 --report the task report): 9 deterministic rows, all pass, 0 skipped; I judged the 23 open rows and one fails. tools/kb.sh validate on the report is clean, and the report's self_audit matches my audit row for row. State-space check, status enum times the three self_audit states: DONE and DONE_WITH_CONCERNS with null reject (template/tools/kb.mjs:798-801), with skipped greater than 0 reject (802-808), with a clean audit pass; BLOCKED and NEEDS_CONTEXT pass in all three states because the terminal filter returns first (797); a status outside the enum returns early and leaves the schema's own enum error alone, which tests/kb.test.mjs:2332 still pins. The two rejection branches therefore fire exactly on the four terminal cells and nowhere else. The gap is not in the code but in the flow the code now governs: the write-then-fill draft the retrieval protocol prescribes carries a terminal status with a null self_audit, so the protocol's own first validate now fails. That is a spec requirement of this task, and it must be migrated here. Two Minors on test evidence follow it. Everything else verified: both kb.mjs copies byte-identical, scratch dirs through the shared helper, natural RED labels sound under the timing key, messages in the existing usage-error voice, and the hardened validate rejects no legitimate in-flight deliverable this repository holds (batch 13's full workspace set and every batch 7 to 13 report still pass)."
+  }
+}

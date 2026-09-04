@@ -1,0 +1,83 @@
+{
+  "$schema": "./schema.json",
+  "topic": "mini",
+  "title": "Mini fixture knowledge",
+  "entries": [
+    {
+      "id": "mini.build-cache",
+      "kind": "rule",
+      "area": "tools",
+      "summary": "Clear the mini-tools build cache before every fixture regeneration run.",
+      "body": [
+        "Synthetic rule for the mini fixture; it exercises the rule kind in a rendered area file."
+      ],
+      "tags": ["fixture", "tools"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 fixture corpus" }
+    },
+    {
+      "id": "mini.tool-timeout",
+      "kind": "invariant",
+      "area": "tools",
+      "summary": "Every mini-tools command times out after five seconds.",
+      "body": [
+        "Synthetic invariant for the mini fixture; it exercises the invariant kind in a rendered area file."
+      ],
+      "tags": ["fixture", "tools"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 fixture corpus" }
+    },
+    {
+      "id": "mini.stale-lockfile",
+      "kind": "gotcha",
+      "area": "tools",
+      "summary": "A stale mini-tools lockfile makes the fixture regenerate with drift.",
+      "body": [
+        "Synthetic gotcha for the mini fixture; it exercises the gotcha kind in a rendered area file."
+      ],
+      "tags": ["fixture", "tools"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 fixture corpus" }
+    },
+    {
+      "id": "mini.standing-example",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Always run the mini fixture's own regeneration before trusting its output.",
+      "body": [
+        "Synthetic standing rule for the mini fixture; it exercises standing-rules.md rendering."
+      ],
+      "tags": ["fixture", "standing"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 fixture corpus" }
+    },
+    {
+      "id": "mini.onboarding",
+      "kind": "procedure",
+      "area": "tools",
+      "summary": "Onboarding steps for a new mini-tools contributor.",
+      "body": [
+        "1. Read mini.build-cache.",
+        "2. Read mini.tool-timeout.",
+        "3. Run the mini-tools smoke test."
+      ],
+      "tags": ["fixture", "procedure"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 fixture corpus" }
+    },
+    {
+      "id": "mini.no-todo",
+      "kind": "rule",
+      "area": "tools",
+      "summary": "Never leave a TODO marker under mini-tools/.",
+      "body": [
+        "Synthetic checked rule for the mini fixture; it exercises a grep-absent check's shape."
+      ],
+      "tags": ["fixture", "check"],
+      "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 fixture corpus" },
+      "check": {
+        "type": "grep-absent",
+        "level": "warn",
+        "files": ["mini-tools/**"],
+        "pattern": "TODO",
+        "scope": "tree"
+      }
+    }
+  ]
+}

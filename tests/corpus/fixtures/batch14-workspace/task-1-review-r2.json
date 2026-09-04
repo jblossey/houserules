@@ -1,0 +1,335 @@
+{
+  "kind": "re-review",
+  "task": 1,
+  "round": 2,
+  "fix_base": "f03e43c",
+  "head": "2fde017",
+  "finding_verdicts": [
+    {
+      "finding": "Minor: fix_rounds[0].tests held the round-1 fix-diff audit run without --report (skipped 3), the batch 12 shape HR-041 exists to stop.",
+      "verdict": "addressed",
+      "evidence": "fix_rounds[0].tests[0] now records `tools/kb.sh audit --base e7dbc69 --head f03e43c --ids <the eight ids> --report .superpowers/sdd/2026-09-04-batch-14/task-1-report.json` with summary deterministic 10, pass 9, fail 1, skipped 0. The transcript is a real run, not an edit: I re-ran the identical command and the output reproduces the recorded `output` byte for byte, all ten rows and evidence strings included. The three previously skipped report-field rows (process.deliverables-json, process.knowledge-first, security-hygiene.verify-current-docs) now read pass."
+    },
+    {
+      "finding": "Minor: template/.claude/agents/implementer.md:51's heading read `validate, self-audit, self-review`, the opposite of the order the steps beneath it run in after round 1.",
+      "verdict": "addressed",
+      "evidence": "2fde017 renames the heading to `## Before answering: self-audit, validate, self-review` in template/.claude/agents/implementer.md:51 and the synced root copy. It now matches the steps beneath it one for one: step 1 audits and fills self_audit, step 2 validates, step 3 self-reviews. cmp at 2fde017 shows the implementer.md pair byte-identical, and the kb.mjs pair is unchanged and still identical."
+    }
+  ],
+  "rule_adherence": [
+    {
+      "id": "houserules.node-under-mise",
+      "kind": "gotcha",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "tests[0] runs `mise exec -- pnpm test`; the kb.sh and backlog.sh wrappers cover the rest; no bare node call in the round"
+    },
+    {
+      "id": "houserules.payload-runs-on-builtins",
+      "kind": "invariant",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "round 2 changes one Markdown heading in two files; no code, no import, no dependency"
+    },
+    {
+      "id": "houserules.pnpm-only",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "tests[0] `mise exec -- pnpm test`; no npm or npx in the round"
+    },
+    {
+      "id": "houserules.readme-mirrors-kit-owned",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "no KIT_OWNED path was added or removed, so the README enumerations stay correct; the README edit inside the audit range is the owner's commit e4e0968, outside this task"
+    },
+    {
+      "id": "houserules.tag-pilot-is-read-only",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "2fde017 touches two paths, both in this repository; no path under ~/projects/tag-pilot"
+    },
+    {
+      "id": "houserules.template-is-the-source",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the template file carries the edit and the root copy is the synced result: cmp at 2fde017 shows both implementer.md copies and both kb.mjs copies byte-identical, `tools/kb.sh render --check` prints `render: up to date`, and tests/dogfood.test.mjs (20 tests) is green in the fresh suite run"
+    },
+    {
+      "id": "houserules.tests-clean-scratch-dirs",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "round 2 adds no test and no mkdtemp site; the round 1 case still mints through makeRepo() at tests/kb.test.mjs:148"
+    },
+    {
+      "id": "knowledge-base.ids-are-permanent",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "not triggered: no file under knowledge/ changed in the round"
+    },
+    {
+      "id": "knowledge-base.rules-need-a-loading-path",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "not triggered: no knowledge entry added or moved"
+    },
+    {
+      "id": "knowledge-base.state-only-the-source",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "not triggered: no knowledge entry authored; the heading ruling lives in the template text it changes"
+    },
+    {
+      "id": "knowledge-base.summary-is-the-rule",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "not triggered: no knowledge entry authored in the round"
+    },
+    {
+      "id": "process.ask-when-missing",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "both fixes follow the r1 findings as written; nothing was assumed in place of missing information"
+    },
+    {
+      "id": "process.backlog-drives-work",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "report backlog HR-041; the round closes the two r1 findings and adds no unrelated scope"
+    },
+    {
+      "id": "process.brainstorm-first",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the approved spec's T1 governs; the heading fix serves the same bullet the flow reconciliation served"
+    },
+    {
+      "id": "process.code-health-scan",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "spec section 6 asks for text in place with no restructuring; the round changes exactly one heading line per copy"
+    },
+    {
+      "id": "process.conventional-commits",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "4 commits checked"
+    },
+    {
+      "id": "process.deliverables-json",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "report field self_audit is set; both fix rounds now carry their own --report audit with skipped 0 (fix_rounds[0] over e7dbc69..f03e43c, fix_rounds[1] over f03e43c..2fde017), and both transcripts reproduce byte for byte on a fresh run"
+    },
+    {
+      "id": "process.evals-rerun",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "fail",
+      "evidence": ".claude/agents/implementer.md changed without .claude/evals/record.json. Still the interim state the rule's own last paragraph allows: the report discloses both template edits in concerns, status stays DONE_WITH_CONCERNS, and batch 14's spec has T3 run every scenario at the branch head and append the seventh record. Not a finding against this round; it stays a merge gate for the branch."
+    },
+    {
+      "id": "process.ff-only-merges",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "linear history on batch-14; no merge commit in f03e43c..2fde017"
+    },
+    {
+      "id": "process.knowledge-first",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "warn",
+      "result": "pass",
+      "evidence": "report field knowledge_used is set"
+    },
+    {
+      "id": "process.live-run-before-ci",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the round changes no runtime behavior, so the round 1 live proof still stands: live_run holds the same five per-command entries, whose captures byte-match the report"
+    },
+    {
+      "id": "process.model-policy",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "implementer on sonnet, this re-review on opus"
+    },
+    {
+      "id": "process.no-tech-debt",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "3 files checked; both r1 Minors were fixed in this round, none deferred to a backlog item"
+    },
+    {
+      "id": "process.rulings-to-file",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the round makes no new ruling; the closing-sequence order now reads the same in the heading and the steps of the shipped template"
+    },
+    {
+      "id": "process.sequential-agents",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "one implementer resumed, then this re-review; no concurrent dispatch"
+    },
+    {
+      "id": "process.tdd",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "round 2 is a docs-only heading change, which process.tdd exempts from RED and GREEN; the report names the gates instead (full suite 200 passed, kb check, backlog check, both copy diffs, the audit, validate). The six cycles from the earlier rounds are unchanged: three natural, three mutation"
+    },
+    {
+      "id": "quality.no-compat-softening",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "no contract was relaxed; the heading was migrated to the order the steps already run in"
+    },
+    {
+      "id": "quality.pin-copies-byte-exact",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "no copy-pin test added; the existing dogfood pins cover both synced pairs and stayed green (20 tests) in the fresh suite run"
+    },
+    {
+      "id": "quality.principles",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the smallest fix that holds: one heading line per copy, no other text moved"
+    },
+    {
+      "id": "security-hygiene.dependency-vetting",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "not triggered"
+    },
+    {
+      "id": "security-hygiene.exact-pins",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "0 files checked"
+    },
+    {
+      "id": "security-hygiene.no-coauthor",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "4 commits checked"
+    },
+    {
+      "id": "security-hygiene.no-focused-tests",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "1 files checked"
+    },
+    {
+      "id": "security-hygiene.verify-current-docs",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "warn",
+      "result": "pass",
+      "evidence": "report field docs_verified is set"
+    },
+    {
+      "id": "writing-style.code-comments",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the round adds no comment; the round 1 test comment at tests/kb.test.mjs:2200-2203 stands unchanged"
+    },
+    {
+      "id": "writing-style.doc-comments",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "checkTaskReportAudit's corrected doc comment at template/tools/kb.mjs:788-798 is untouched by this round and still matches the shipped flow"
+    },
+    {
+      "id": "writing-style.instructions-cover-the-state-space",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the closing sequence now reads the same in every place that states it: the heading at template/.claude/agents/implementer.md:51, the three steps beneath it, the fix-round contract in the same file, and the protocol at template/tools/kb.mjs:304. No step meets a gate that rejects its state"
+    },
+    {
+      "id": "writing-style.principles",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "the heading is three words in the order they happen; the commit body is short, active and factual"
+    }
+  ],
+  "new_breakage": [],
+  "out_of_scope": [
+    "The owner's commit e4e0968 (docs(readme): the owner's convergence paragraphs) still sits inside the c7db95e..2fde017 audit range. I did not review it; it is why the package carries houserules.readme-mirrors-kit-owned and the four knowledge-base rules. The fix commit 2fde017 touches only the two implementer.md copies.",
+    "The seventh evaluation record stays with T3, per the spec. The process.evals-rerun fail row is that scheduled debt."
+  ],
+  "verdict": {
+    "state": "all-addressed",
+    "open": [],
+    "text": "Both r1 Minors are closed and nothing regressed. The heading now matches its steps in both copies, and every pair is byte-identical at 2fde017 (implementer.md and kb.mjs), with render --check up to date and dogfood green. The evidence repair is genuine: I re-ran both fix-round audits myself and each reproduces the recorded transcript byte for byte, so fix_rounds[0].tests[0] is a real --report re-run (skipped 0), not an edit of the old skipped-3 output, and fix_rounds[1] carries its own --report audit over f03e43c..2fde017. The report validates, its self_audit matches my r2 audit row for row and summary for summary, tdd still holds the same six cycles (three natural, three mutation), and live_run still holds the same five per-command entries. Two observations, neither a finding: the round-0 targeted run `pnpm vitest run tests/kb.test.mjs -t validate` no longer appears in the report's tests, but its information survives in the fresh full-suite run (200 passed) and in the tdd cycles, so nothing verifiable was lost; and the process.evals-rerun row stays red as the spec-scheduled interim state, disclosed in concerns with status DONE_WITH_CONCERNS, which T3 must pay before the branch merges."
+  }
+}

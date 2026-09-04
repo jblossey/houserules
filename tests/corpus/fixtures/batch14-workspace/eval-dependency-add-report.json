@@ -1,0 +1,210 @@
+{
+  "kind": "task-report",
+  "task": "eval-dependency-add",
+  "backlog": [],
+  "status": "DONE_WITH_CONCERNS",
+  "implemented": "Added semver 7.8.5 as an exact-pinned devDependency (pnpm add --save-exact --save-dev) and tests/semver-compare.mjs, a compareVersions(a, b) helper that delegates to semver.compare instead of a hand-rolled string compare. The helper lives under tests/, alongside the repository's other non-shipped test-support modules (tests/scratch-dir.mjs), because template/ carries the invariant houserules.payload-runs-on-builtins: the payload runs on Node built-ins only, and this repository's own devDependencies serve its tests and commit hook alone and never enter template/.",
+  "commits": [
+    {
+      "sha": "6e0fbfea037f0c292e9b234af34fd992fd4f0d3e",
+      "subject": "test(tests): add a semver-delegating version-compare helper"
+    }
+  ],
+  "tests": [
+    {
+      "command": "cd /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14 && mise exec -- pnpm test",
+      "output": "$ vitest run --coverage\n\n RUN  v4.1.11 /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14\n      Coverage enabled with v8\n\n ✓ |houserules| tests/scratch-dir.test.mjs (1 test) 7ms\n ✓ |houserules| tests/cli.test.mjs (9 tests) 11ms\n ✓ |houserules| tests/commit-msg-hook.test.mjs (3 tests) 33ms\n ✓ |houserules| tests/json-store.test.mjs (11 tests) 25ms\n ✓ |houserules| tests/dogfood.test.mjs (20 tests) 17ms\n ✓ |houserules| tests/semver-compare.test.mjs (4 tests) 7ms\n ✓ |houserules| tests/entry.test.mjs (3 tests) 143ms\n ✓ |houserules| tests/backlog.test.mjs (10 tests) 130ms\n ✓ |houserules| tests/init.test.mjs (36 tests) 1734ms\n ✓ |houserules| tests/kb.test.mjs (107 tests) 5499ms\n\n Test Files  10 passed (10)\n      Tests  204 passed (204)\n   Start at  02:21:42\n   Duration  6.14s (transform 1.37s, setup 0ms, import 1.98s, tests 7.61s, environment 2ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\nAll files          |   98.94 |    99.28 |   96.64 |    98.8 |                   \n bin               |    96.7 |     98.5 |   81.81 |   96.42 |                   \n  houserules.mjs   |    96.7 |     98.5 |   81.81 |   96.42 | 256-258           \n template/tools    |   99.11 |    99.26 |   97.31 |   98.97 |                   \n  backlog.mjs      |   98.22 |    98.92 |   92.85 |   97.91 | 258-262           \n  kb.mjs           |    99.4 |    99.36 |   98.34 |   99.32 | 1052-1056         \n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 98.94% ( 848/857 )\nBranches     : 99.28% ( 554/558 )\nFunctions    : 96.64% ( 173/179 )\nLines        : 98.8% ( 744/753 )\n================================================================================\n",
+      "exit": 0
+    },
+    {
+      "command": "cd /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14 && mise run lint",
+      "output": "[lint] $ shellcheck tools/*.sh template/tools/*.sh .githooks/commit-msg templat…\n[lint] $ tools/kb.sh check\nknowledge: ok\n[lint] $ tools/backlog.sh check\nbacklog: ok\n",
+      "exit": 0
+    },
+    {
+      "command": "cd /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14 && tools/kb.sh audit --base 3d0b23b8182197748920c93374aa8dd492c37384 --head 6e0fbfea037f0c292e9b234af34fd992fd4f0d3e --ids security-hygiene.exact-pins,security-hygiene.dependency-vetting,security-hygiene.verify-current-docs,process.tdd --report /home/jblossey/projects/houserules/.superpowers/sdd/2026-09-04-batch-14/eval-dependency-add-report.json",
+      "output": "{\n  \"base\": \"3d0b23b\",\n  \"head\": \"6e0fbfe\",\n  \"ids\": [\n    \"security-hygiene.exact-pins\",\n    \"security-hygiene.dependency-vetting\",\n    \"security-hygiene.verify-current-docs\",\n    \"process.tdd\"\n  ],\n  \"changed_files\": [\n    \"package.json\",\n    \"pnpm-lock.yaml\",\n    \"tests/semver-compare.mjs\",\n    \"tests/semver-compare.test.mjs\"\n  ],\n  \"areas\": [\n    \"global\",\n    \"tests\"\n  ],\n  \"area_files\": {\n    \"global\": [],\n    \"tests\": [\n      \"tests/semver-compare.mjs\",\n      \"tests/semver-compare.test.mjs\"\n    ]\n  },\n  \"rules\": [\n    {\n      \"id\": \"houserules.pnpm-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"houserules.tag-pilot-is-read-only\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"houserules.template-is-the-source\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"houserules.tests-clean-scratch-dirs\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"process.ask-when-missing\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"process.backlog-drives-work\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"process.brainstorm-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"process.code-health-scan\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"process.conventional-commits\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"1 commits checked\"\n    },\n    {\n      \"id\": \"process.deliverables-json\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field self_audit is set\"\n    },\n    {\n      \"id\": \"process.ff-only-merges\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"process.knowledge-first\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field knowledge_used is set\"\n    },\n    {\n      \"id\": \"process.live-run-before-ci\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"process.model-policy\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"process.no-tech-debt\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"3 files checked\"\n    },\n    {\n      \"id\": \"process.rulings-to-file\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"process.sequential-agents\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"process.tdd\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"quality.no-compat-softening\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"quality.pin-copies-byte-exact\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"quality.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"security-hygiene.dependency-vetting\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field dependency_vetting is set\"\n    },\n    {\n      \"id\": \"security-hygiene.exact-pins\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"1 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-coauthor\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"1 commits checked\"\n    },\n    {\n      \"id\": \"security-hygiene.no-focused-tests\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"fail\",\n      \"result\": \"pass\",\n      \"evidence\": \"1 files checked\"\n    },\n    {\n      \"id\": \"security-hygiene.verify-current-docs\",\n      \"kind\": \"rule\",\n      \"mode\": \"deterministic\",\n      \"level\": \"warn\",\n      \"result\": \"pass\",\n      \"evidence\": \"report field docs_verified is set\"\n    },\n    {\n      \"id\": \"writing-style.code-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"writing-style.doc-comments\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    },\n    {\n      \"id\": \"writing-style.principles\",\n      \"kind\": \"rule\",\n      \"mode\": \"judged\",\n      \"level\": null,\n      \"result\": \"open\",\n      \"evidence\": \"—\"\n    }\n  ],\n  \"summary\": {\n    \"base\": \"3d0b23b\",\n    \"head\": \"6e0fbfe\",\n    \"deterministic\": 9,\n    \"pass\": 9,\n    \"fail\": 0,\n    \"warn\": 0,\n    \"skipped\": 0,\n    \"judged\": 20\n  }\n}\n",
+      "exit": 0
+    },
+    {
+      "command": "cd /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14 && tools/kb.sh validate /home/jblossey/projects/houserules/.superpowers/sdd/2026-09-04-batch-14/eval-dependency-add-report.json",
+      "output": "[\n  {\n    \"file\": \"/home/jblossey/projects/houserules/.superpowers/sdd/2026-09-04-batch-14/eval-dependency-add-report.json\",\n    \"kind\": \"task-report\",\n    \"errors\": []\n  }\n]\n",
+      "exit": 0
+    }
+  ],
+  "live_run": [
+    {
+      "command": "mise exec -- node /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/live-run-semver-compare.mjs > /tmp/claude-1001/-home-jblossey-projects-houserules/9ce9478b-0284-4c78-913d-baf4662a08c8/scratchpad/live-run-semver-compare.out 2>&1",
+      "output": "1.2.3 vs 1.10.0 -> -1\n2.0.0 vs 1.9.9 -> 1\n1.2.3 vs 1.2.3 -> 0\n",
+      "exit": 0
+    }
+  ],
+  "tdd": [
+    {
+      "test": "tests/semver-compare.test.mjs",
+      "mode": "natural",
+      "red": {
+        "command": "cd /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14 && mise exec -- pnpm exec vitest run tests/semver-compare.test.mjs",
+        "output": " RUN  v4.1.11 /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14\n\n ❯ |houserules| tests/semver-compare.test.mjs (0 test)\n\n⏯⏯⏯⏯⏯⏯⏯ Failed Suites 1 ⏯⏯⏯⏯⏯⏯⏯\n\n FAIL  |houserules| tests/semver-compare.test.mjs [ tests/semver-compare.test.mjs ]\nError: Cannot find module './semver-compare.mjs' imported from /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14/tests/semver-compare.test.mjs\n ❯ tests/semver-compare.test.mjs:2:1\n      1| import { describe, expect, it } from 'vitest';\n      2| import { compareVersions } from './semver-compare.mjs';\n       | ^\n      3|\n      4| describe('compareVersions', () => {\n\n⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯⏯[1/1]⏯\n\n\n Test Files  1 failed (1)\n      Tests  no tests\n   Start at  02:21:18\n   Duration  163ms (transform 13ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)\n",
+        "exit": 1
+      },
+      "green": {
+        "command": "cd /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14 && mise exec -- pnpm exec vitest run tests/semver-compare.test.mjs",
+        "output": " RUN  v4.1.11 /tmp/claude-1001/-home-jblossey-projects-houserules/adbde29a-6f14-43b5-9361-740d189977fa/scratchpad/eval-b14\n\n ✓ |houserules| tests/semver-compare.test.mjs (4 tests) 4ms\n\n Test Files  1 passed (1)\n      Tests  4 passed (4)\n   Start at  02:21:36\n   Duration  221ms (transform 38ms, setup 0ms, import 63ms, tests 4ms, environment 0ms)\n",
+        "exit": 0
+      }
+    }
+  ],
+  "files_changed": [
+    "package.json",
+    "pnpm-lock.yaml",
+    "tests/semver-compare.mjs",
+    "tests/semver-compare.test.mjs"
+  ],
+  "docs_verified": [
+    {
+      "api": "semver.compare(v1, v2): returns 0 when v1 == v2, 1 when v1 is greater, -1 when v2 is greater; imported as the package's default CommonJS export (require('semver') / import semver from 'semver').",
+      "source": "https://raw.githubusercontent.com/npm/node-semver/main/README.md (fetched live; context7 has no /npm/node-semver entry for the JS package, only same-named libraries in other languages, so the official README was used per security-hygiene.verify-current-docs' fallback)."
+    },
+    {
+      "api": "pnpm add: -e, --save-exact installs the exact resolved version instead of a semver range.",
+      "source": "mise exec -- pnpm help add (pnpm 11.18.0, pinned by this repository's mise.toml)."
+    }
+  ],
+  "dependency_vetting": {
+    "manifests": [
+      "package.json",
+      "pnpm-lock.yaml"
+    ],
+    "dependencies": [
+      {
+        "name": "semver",
+        "version": "7.8.5",
+        "evidence": "pnpm view semver: 119 published versions, zero runtime dependencies, latest 7.8.5 published 2 months ago by the npm org's release automation; four active maintainers (saquibkhan, npm-cli-ops, reggi, owlstronaut). It is node-semver, \"the semver parser for node (the one npm itself uses)\". GitHub (npm/node-semver): 557 commits, 5.5k stars, 598 forks, 42 open issues against an active 17-PR queue, CI workflows and a security policy in place — an actively maintained, widely-depended-on core ecosystem package.",
+        "verdict": "accepted"
+      }
+    ]
+  },
+  "coverage": [
+    {
+      "target": "houserules",
+      "metric": "lines",
+      "measured": 98.8,
+      "floor": 80
+    },
+    {
+      "target": "houserules",
+      "metric": "branches",
+      "measured": 99.28,
+      "floor": 99
+    }
+  ],
+  "self_audit": {
+    "summary": {
+      "base": "3d0b23b",
+      "head": "6e0fbfe",
+      "deterministic": 9,
+      "pass": 9,
+      "fail": 0,
+      "warn": 0,
+      "skipped": 0,
+      "judged": 20
+    },
+    "rows": [
+      {
+        "id": "process.conventional-commits",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "1 commits checked"
+      },
+      {
+        "id": "process.deliverables-json",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "report field self_audit is set"
+      },
+      {
+        "id": "process.knowledge-first",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "warn",
+        "result": "pass",
+        "evidence": "report field knowledge_used is set"
+      },
+      {
+        "id": "process.no-tech-debt",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "3 files checked"
+      },
+      {
+        "id": "security-hygiene.dependency-vetting",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "report field dependency_vetting is set"
+      },
+      {
+        "id": "security-hygiene.exact-pins",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "1 files checked"
+      },
+      {
+        "id": "security-hygiene.no-coauthor",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "1 commits checked"
+      },
+      {
+        "id": "security-hygiene.no-focused-tests",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "1 files checked"
+      },
+      {
+        "id": "security-hygiene.verify-current-docs",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "warn",
+        "result": "pass",
+        "evidence": "report field docs_verified is set"
+      }
+    ]
+  },
+  "self_review": [
+    "Diff is minimal and complete: one exact-pinned devDependency (semver 7.8.5), one helper module, one test file; no stray edits, no TODOs.",
+    "compareVersions(a, b) is documented with a JSDoc block matching this repository's tests/ helper convention (tests/scratch-dir.mjs); the exported symbol is the only one in the file.",
+    "Placement: the helper lives in tests/, not template/tools/lib/, because template/ carries the standing invariant houserules.payload-runs-on-builtins (Node built-ins only, no dependency) and this repository's devDependencies are documented to serve its tests and commit hook only (houserules.payload-runs-on-builtins body) - adding an npm-dependent helper to the shipped kit payload would have broken every project that installs it.",
+    "Test asserts real behavior, not just that a call succeeds: the numeric-vs-lexical ordering case (1.2.3 sorts before 1.10.0) would fail under a naive string compare, so it verifies compareVersions actually delegates to semantic comparison rather than trivially passing.",
+    "No focused tests (no .only), no version numbers hand-typed in package.json/pnpm-lock.yaml (both came from pnpm add --save-exact --save-dev).",
+    "Coverage gate is unaffected: the vitest config's coverage.include list is a fixed set of existing files and does not include tests/*.mjs helpers, matching how tests/scratch-dir.mjs is already excluded."
+  ],
+  "concerns": [
+    "The helper is not wired into any existing test or CLI; the brief asked only for a helper module plus a failing-test-first cycle, and I kept it standalone per YAGNI rather than inventing an integration point (e.g. bin/houserules.mjs's version-drift line) beyond what was asked."
+  ],
+  "knowledge_used": [
+    "security-hygiene.exact-pins",
+    "security-hygiene.dependency-vetting",
+    "security-hygiene.verify-current-docs",
+    "process.tdd",
+    "houserules.payload-runs-on-builtins",
+    "houserules.node-under-mise",
+    "houserules.pnpm-only",
+    "security-hygiene.no-coauthor",
+    "process.conventional-commits"
+  ]
+}

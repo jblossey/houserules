@@ -1,0 +1,354 @@
+{
+  "kind": "task-review",
+  "task": 2,
+  "base": "2fde017",
+  "head": "c081df4330df586db6688c51c8806625156a1126",
+  "spec_compliance": {
+    "verdict": "issues",
+    "items": [
+      {
+        "type": "missing",
+        "file": ".superpowers/sdd/2026-09-04-batch-14/task-2-report.json",
+        "text": "The brief requires \"`tdd` [] with the disclosure\". The report has `tdd: []` and no line in self_review or concerns that states why the cycle is empty. Everything else the spec and the brief list is present: the four sentences land verbatim in the three named files, no section is renamed and no bullet reordered, each sentence extends T1's current text, the root copies are byte-identical, the live run follows the capture form, and the report follows the reconciled flow (audit, fill self_audit, one validate)."
+      }
+    ]
+  },
+  "rule_adherence": [
+    {
+      "id": "houserules.node-under-mise",
+      "kind": "gotcha",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "Every command runs under mise: tests[0] `mise exec -- pnpm test`, live_run[0] `mise exec -- node bin/houserules.mjs init`; the shipped tools/kb.sh and tools/backlog.sh wrappers resolve node themselves."
+    },
+    {
+      "id": "houserules.payload-runs-on-builtins",
+      "kind": "invariant",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The range touches six Markdown files only (git diff 2fde017..c081df4): no dependency, no manifest, no build step."
+    },
+    {
+      "id": "houserules.pnpm-only",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The only package command in the report is `mise exec -- pnpm test` (tests[0]); no npm or npx in tests or live_run."
+    },
+    {
+      "id": "houserules.readme-mirrors-kit-owned",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "KIT_OWNED is unchanged (bin/houserules.mjs is not in the range), so no README update falls due; README.md is out of scope for this dispatch."
+    },
+    {
+      "id": "houserules.tag-pilot-is-read-only",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "No ~/projects/tag-pilot path in the diff, the tests, or the live run; the live run installs into a scratchpad directory."
+    },
+    {
+      "id": "houserules.template-is-the-source",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The three template sources changed and each root copy is byte-identical by blob id: `git rev-parse HEAD:<path>` equals `HEAD:template/<path>` for implementer.md (1d88113), task-reviewer.md (01079be) and skills/orchestrating/SKILL.md (a944598). No knowledge/*.json changed, so the generated rules and project-knowledge skill correctly stay untouched."
+    },
+    {
+      "id": "knowledge-base.ids-are-permanent",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "No knowledge file in the range; no id renamed or removed."
+    },
+    {
+      "id": "knowledge-base.rules-need-a-loading-path",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The task authors no entry; the ids the new prose cites already load through the process topic."
+    },
+    {
+      "id": "knowledge-base.state-only-the-source",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The rebuild bullet restates process.main-wins-backlog-collisions body[2] and adds no claim. I reproduced the fresh-install proof myself (git init plus `init --dir` into a scratch directory): all four sentences are present in the installed copies, `grep -nEi \"batch [0-9]+|HR-[0-9]+|houserules|tag-pilot|jblossey\"` over the three installed files matched nothing (exit 1), the installed tools/kb.sh resolved process.main-wins-backlog-collisions and process.gate-shell-chains, and `fix_rounds.findings` exists in the seeded schema (template/.claude/schemas/deliverables.json:331-360)."
+    },
+    {
+      "id": "knowledge-base.summary-is-the-rule",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "No knowledge entry authored in the range."
+    },
+    {
+      "id": "process.ask-when-missing",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The report states no assumption in place of a missing value; the one deviation from the spec's wording (a comma where the spec printed a semicolon) is forced by the bullet's own semicolon separators and is disclosed by the text itself."
+    },
+    {
+      "id": "process.backlog-drives-work",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "backlog holds HR-043 and HR-050, and each sentence traces to a clause of those bodies: HR-043 to the Calibration sentence, HR-050 (a) to the live_run clause, HR-050 (b) to checklist item 6, HR-050's rider to the rebuild step."
+    },
+    {
+      "id": "process.brainstorm-first",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The change follows docs/specs/2026-09-04-batch-14-hygiene.md task T2, approved by the owner on 2026-09-04; controller-side."
+    },
+    {
+      "id": "process.code-health-scan",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The spec section 6 carries the scan for these three files (\"one sentence each in place\"); the diff adds no structure and renames nothing."
+    },
+    {
+      "id": "process.conventional-commits",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "1 commits checked"
+    },
+    {
+      "id": "process.deliverables-json",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "report field self_audit is set"
+    },
+    {
+      "id": "process.evals-rerun",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "fail",
+      "evidence": ".claude/agents/implementer.md and .claude/agents/task-reviewer.md changed without .claude/evals/record.json. This is the interim state process.evals-rerun's last paragraph allows: the report discloses it in concerns, the status is DONE_WITH_CONCERNS, and the spec schedules T3 to run every scenario at the branch head. It stays a merge gate for the branch."
+    },
+    {
+      "id": "process.ff-only-merges",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "One commit, c081df4, on batch-14; no merge commit in 2fde017..c081df4."
+    },
+    {
+      "id": "process.knowledge-first",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "warn",
+      "result": "pass",
+      "evidence": "report field knowledge_used is set"
+    },
+    {
+      "id": "process.live-run-before-ci",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "Eight live_run entries, one command per entry, each `> <file> 2>&1` with its own exit and no `;` or `|` tail. The capture files still exist under the scratchpad and match the recorded outputs byte for byte; I re-read run-2c, run-3 (empty, exit 1) and run-4."
+    },
+    {
+      "id": "process.model-policy",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "Implementer on sonnet, this review on opus, per the spec's process line; controller-side."
+    },
+    {
+      "id": "process.no-tech-debt",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "0 files checked"
+    },
+    {
+      "id": "process.rulings-to-file",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "No new ruling. The one deferral, the evals-rerun row, is already written in the spec (T3) and in HR-050, and the report repeats it in concerns."
+    },
+    {
+      "id": "process.sequential-agents",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "One implementer produced one commit in the range; controller-side."
+    },
+    {
+      "id": "process.tdd",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "Prose-only change, so process.tdd's docs-only clause applies and the gates stand in for RED and GREEN: full suite 200/200, kb check, backlog check, three byte-parity diffs, the audit and validate, all in tests. The report omits the sentence that discloses the empty tdd; I file that as a Minor, not a rule fail, because the gates themselves are named."
+    },
+    {
+      "id": "quality.no-compat-softening",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The four sentences add constraints; nothing is softened for an older report or review shape."
+    },
+    {
+      "id": "quality.principles",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "KISS and YAGNI hold: four sentences, no section renamed, no bullet reordered, eight inserted lines in total. Each rule has one home, so there is no second copy to drift."
+    },
+    {
+      "id": "security-hygiene.dependency-vetting",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "not triggered"
+    },
+    {
+      "id": "security-hygiene.exact-pins",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "0 files checked"
+    },
+    {
+      "id": "security-hygiene.no-coauthor",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "1 commits checked"
+    },
+    {
+      "id": "security-hygiene.no-focused-tests",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "0 files checked"
+    },
+    {
+      "id": "security-hygiene.verify-current-docs",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "warn",
+      "result": "pass",
+      "evidence": "not triggered"
+    },
+    {
+      "id": "writing-style.code-comments",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "No code in the range."
+    },
+    {
+      "id": "writing-style.doc-comments",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "No exported symbol in the range."
+    },
+    {
+      "id": "writing-style.instructions-cover-the-state-space",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "Each conditional sentence names the value it is keyed to: item 6 names `all-addressed` and so displaces `findings-remain` (task-reviewer.md:27); the rebuild step names \"on a mid-batch branch rebuild\" (SKILL.md:56). The Calibration sentence (task-reviewer.md:31) and the live_run clause (implementer.md:40) are unconditioned and hold for every issue and every live_run entry, the empty array included. The two residuals I found are breadth and disposition, not an unnamed enum value, so they are Minor issues rather than a fail of this rule."
+    },
+    {
+      "id": "writing-style.principles",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "Active voice, subject next to verb, and each sentence ends on its emphasis: \"also fixes the intent\", \"one for one\", \"never edit closed-task deliverables\". The live_run clause joins its halves with a comma because the bullet already uses the semicolon as its top-level separator; the reading stays unambiguous."
+    }
+  ],
+  "strengths": [
+    "All four sentences land where HR-043, HR-050 and spec T2 place them, with no restructuring: eight inserted lines across three template files and their three root copies, and nothing else in the range.",
+    "Root and template parity is proved by blob id, not only by diff: all three pairs share one blob (implementer.md 1d88113, task-reviewer.md 01079be, orchestrating/SKILL.md a944598), and no generated artifact moved because no knowledge file changed.",
+    "The evidence obeys the very rule the task ships: every live_run capture file still exists in the scratchpad, holds exactly what the report records, and no entry appends a synthetic exit line to output. The exit status sits in the exit field alone, including the negative grep that legitimately exits 1.",
+    "Both incidents become catchable. I read them in the archives: batch 11 T2 round 0 prescribed \"present but not a string raises UsageError\", which an empty string survives, and the new Calibration sentence forces the invariant instead; batch 13 T2's fix_rounds[0].findings holds four entries against the five finding_verdicts of task-2-review-r1.json, and item 6 makes that comparison mandatory before an all-addressed ruling.",
+    "Every reference in the new prose resolves in a fresh install. My own scratch init shows the four sentences present, no repo id or batch number in the three installed files, and both cited knowledge ids resolvable through the installed tools/kb.sh; the `fix_rounds.findings` field item 6 names exists in the seeded schema.",
+    "The commit is clean and self-documenting: header 61 characters, longest body line 77, one paragraph per backlog item naming the incident each sentence encodes, no trailer.",
+    "The report's self_audit matches my independent audit row for row and summary for summary (10 deterministic rows, 9 pass, 1 fail, 0 skipped, 26 judged), and tools/kb.sh validate on the report is clean."
+  ],
+  "issues": [
+    {
+      "severity": "important",
+      "file": ".claude/evals/record.json",
+      "what": "The audit's process.evals-rerun row fails at this head: .claude/agents/implementer.md and .claude/agents/task-reviewer.md changed without .claude/evals/record.json.",
+      "why": "The scenarios in .claude/evals/ are the regression suite for the agent templates. Until a run set covers these template blobs, no evidence says the four new sentences steer an implementer and a reviewer as intended.",
+      "fix": "Invariant to hold: no branch merges while a template blob has no evaluation run set covering it. Observed instance: this task's range changes both agent templates and appends no record. Make no change in this task: the spec schedules T3, `docs(evals): seventh evaluation record`, to run every scenario at the branch head and key the record by both template blob ids, and the branch-range audit is the row that must pass before the merge.",
+      "rule": "process.evals-rerun",
+      "plan_mandated": true,
+      "backlog": "HR-050"
+    },
+    {
+      "severity": "minor",
+      "file": "template/.claude/agents/implementer.md:40",
+      "what": "The new clause \"`output` carries the command's stdout and stderr verbatim and nothing else, the `exit` field alone carries the exit status\" sits in the `live_run` bullet only. The batch 13 T2 incident it encodes appended the same synthetic `exit=0` line inside fix_rounds[0].tests[2..4] as well as inside live_run[10..21]; I confirmed both in .superpowers/sdd/2026-09-03-batch-13/task-2-report.json. Line 39's `tests` bullet still carries only the bare word \"verbatim\", which is the wording those fix-round captures already violated.",
+      "why": "The recurrence the sentence is meant to make impossible stays possible in `tests` and `fix_rounds[].tests`, where three of the five synthetic lines actually appeared. An evidence field that mixes a command's output with the author's annotation cannot be trusted, whichever field it is.",
+      "fix": "Invariant to hold: every report field that carries captured output holds what the command printed and nothing else, and the exit status lives only in an `exit` field, in `tests` and `fix_rounds[].tests` as well as `live_run`. Observed instance: template/.claude/agents/implementer.md:40 carries the clause in the `live_run` bullet while line 39 keeps only \"verbatim\". Extend the clause to the `tests` bullet, or state it once for both bullets; if the batch defers it, file a backlog item and name it in the deferral.",
+      "plan_mandated": true
+    },
+    {
+      "severity": "minor",
+      "file": "template/.claude/agents/task-reviewer.md:27",
+      "what": "Item 6 mandates the comparison but names no disposition for a mismatch: \"confirm the report's `fix_rounds` findings list matches the findings under verification one for one\". A re-review has no `issues` array, so item 4's \"file every fail under `issues`\" does not reach it, and the Output section's re-review fields (finding_verdicts, new_breakage, out_of_scope, verdict) are not named here. In batch 13 T2 round 1 the mismatch was in fact noticed and left in prose, which is the failure HR-050 names.",
+      "why": "The sentence closes the \"nobody compared the lists\" hole and leaves the \"compared them and recorded nothing enforceable\" hole open, so the same report defect can still pass a round with a prose mention. Read literally it also suggests a short list alone blocks `all-addressed`, which would mislabel a round whose findings are every one fixed.",
+      "fix": "Invariant to hold: a mismatch between the report's `fix_rounds` findings list and the findings under verification is recorded where the implementer must act on it, and it does not by itself reopen findings that are fixed. Observed instance: template/.claude/agents/task-reviewer.md:27 states the check with no destination and no ruling. Name the destination (`new_breakage`) and the ruling in the sentence; if the batch defers it, file a backlog item and name it in the deferral.",
+      "plan_mandated": true
+    },
+    {
+      "severity": "minor",
+      "file": ".superpowers/sdd/2026-09-04-batch-14/task-2-report.json",
+      "what": "`tdd` is `[]` with no line that discloses why. The brief asks for \"`tdd` [] with the disclosure\", and every earlier docs-only report in the workspace carries one (batch 13 T2: \"tdd is [] by disclosure: every changed file is prose ...\"; batches 4, 7, 8, 9, 10 and 11 the same). self_review[4] says no code was touched, but it argues doc-comments; the commit body's \"Data-only.\" is not the report.",
+      "why": "process.tdd calls an empty tdd honest only when the gates that replace RED and GREEN are named as the stand-in. Without the sentence a reader must infer the claim, and the branch review re-derives it.",
+      "fix": "Invariant to hold: a report with an empty `tdd` states in self_review or concerns that the change is data-only or docs-only and names the gates in `tests` that stand in for RED and GREEN. Observed instance: task-2-report.json carries `tdd: []` and no such sentence in either field. Add the disclosure line, naming the gates that ran."
+    }
+  ],
+  "assessment": {
+    "verdict": "needs-fixes",
+    "text": "The four sentences are right, well placed, and provably generic, and the evidence behind them is trustworthy. I ran the audit with the dispatch's nine Knowledge ids verbatim (--base 2fde017 --head c081df4 --report the task report): 10 deterministic rows, 9 pass, 1 fail, 0 skipped, and I judged all 26 open rows to pass. The report validates and its self_audit reproduces my audit row for row, with no row omitted or altered. I verified each sentence against the incident it encodes by reading the archives, not the report's account of them: batch 11 T2 round 0's prescription (\"present but not a string raises UsageError\") is exactly the letter-fix the new Calibration sentence now forbids, and batch 13 T2's four-of-five fix_rounds list against its five finding_verdicts is what item 6 now forces a reviewer to compare. I reproduced the fresh-install proofs myself: a scratch `init` ships all four sentences, the negative grep over the three installed files matches nothing, and both cited knowledge ids plus the `fix_rounds.findings` field resolve in the seed. All three template/root pairs share one blob id. The live-run captures still exist and match the report byte for byte, and none appends a synthetic exit line, which is the rule this task ships. The process.evals-rerun fail is the interim state the rule's own last paragraph allows and the spec schedules onto T3; I filed it as the mandatory issue for a fail row with plan_mandated set and HR-050 named, and it needs no change in this task. Three Minors remain: the verbatim-output clause covers `live_run` but not the `tests` and `fix_rounds[].tests` captures that carried three of the batch 13 synthetic lines; item 6 states the check but no disposition for a mismatch, so the defect it targets can still end in prose; and the report omits the empty-tdd disclosure the brief asks for. One thing I considered and cleared: the live_run clause joins two independent statements with a comma rather than the spec's semicolon, which is forced by the bullet's existing semicolon separators and reads unambiguously."
+  }
+}

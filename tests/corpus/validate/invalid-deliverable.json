@@ -1,0 +1,7 @@
+{
+  "command": "node tools/kb.mjs validate <fixtures>/invalid-deliverable/bad-report.json",
+  "cwd": "<frozen-worktree>",
+  "stdout": "[\n  {\n    \"file\": \"<fixtures>/invalid-deliverable/bad-report.json\",\n    \"kind\": \"task-report\",\n    \"errors\": [\n      \"<fixtures>/invalid-deliverable/bad-report.json.backlog: must be array\",\n      \"<fixtures>/invalid-deliverable/bad-report.json: status \\\"DONE\\\" needs a non-null self_audit\"\n    ]\n  }\n]\n",
+  "stderr": "",
+  "exit": 1
+}
