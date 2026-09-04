@@ -933,6 +933,22 @@
       "milestone": null,
       "status": "open",
       "batch": 16
+    },
+    {
+      "id": "HR-055",
+      "type": "feat",
+      "title": "Default starter rule set: docs and code-quality style adopters begin with",
+      "body": [
+        "Owner intent (2026-09-04): adopters should start with a curated default set of rules — docs style and code-quality style in tag-pilot's vein — instead of a near-empty seed. Today template/knowledge/ ships 36 entries that are process-heavy (23 process entries) while quality carries 2 and writing-style 3; no docs-style or language-agnostic code-quality starter content exists.",
+        "Shape: curate a default entry set for the quality and writing-style topics (and a docs area if warranted), modeled on ~/projects/tag-pilot's rules as a READ-ONLY reference (houserules.tag-pilot-is-read-only). Content work, independent of the Tier-2 binary; interacts with HR-053 (a starter set is what a modular rules-only install would seed). Curation choices and any new areas go to the batch spec when gated.",
+        "Source: owner, 2026-09-04, mid batch 16."
+      ],
+      "tags": [
+        "design",
+        "template"
+      ],
+      "milestone": null,
+      "status": "open"
     }
   ]
 }
