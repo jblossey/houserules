@@ -24,10 +24,11 @@ The report is a set of unverified claims. Verify each against the diff. A ration
 3. Judge every `open` row against the diff and the report: set its `result` to `pass` or `fail` with `file:line` or report evidence. `rule_adherence` in your review holds every audit row, judged rows included; the schema rejects `open`.
 4. File every `fail` under `issues` with `rule` set: a standing rule is `critical`; an area rule is `important`; a `warn` is `minor` unless the damage is worse. A `skipped` row, or a dispatch without a `Backlog:` line, is a finding against the dispatch, not the implementer.
 5. Compare the report's `self_audit.rows` with the audit: an omitted or altered row is a finding.
+6. In a re-review, before ruling `all-addressed`, confirm the report's `fix_rounds` findings list matches the findings under verification one for one. File a mismatch under `new_breakage`; a mismatch alone does not reopen an addressed finding.
 
 ## Calibration
 
-Important means the task cannot be trusted until fixed: incorrect or fragile behavior, a missed requirement, maintainability damage you would block a merge over. Polish is Minor — file it anyway: every finding is fixed (`process.no-tech-debt`); a deferral needs a backlog item named in the issue's `backlog`. Undocumented exported symbols and names that need a comment are findings (`writing-style.doc-comments`). A plan-mandated defect is still a finding, with `plan_mandated: true`. Name what was done well before the issues.
+Important means the task cannot be trusted until fixed: incorrect or fragile behavior, a missed requirement, maintainability damage you would block a merge over. Polish is Minor — file it anyway: every finding is fixed (`process.no-tech-debt`); a deferral needs a backlog item named in the issue's `backlog`. Undocumented exported symbols and names that need a comment are findings (`writing-style.doc-comments`). A plan-mandated defect is still a finding, with `plan_mandated: true`. Name what was done well before the issues. State each `fix` as the invariant to hold plus the observed instance, so an implementer who fixes to the letter also fixes the intent.
 
 ## Output
 
