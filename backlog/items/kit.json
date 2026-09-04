@@ -931,7 +931,7 @@
         "release"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 16
     },
     {
@@ -946,6 +946,54 @@
       "tags": [
         "design",
         "template"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-056",
+      "type": "fix",
+      "title": "Pin the bare `houserules` invocation behavior",
+      "body": [
+        "Batch 16 branch review, issue 4: bare `houserules` with no subcommand exits 0 silently (clap Command is Option, None maps to SUCCESS) — untested, undocumented, and new flat-surface behavior outside the parity gates; tools/kb.sh with no command prints usage and fails.",
+        "Fix in phase 2 when the next subcommands land, per the reviewer's own timing: set clap's arg_required_else_help(true), or pin the current behavior with a test and a doc comment stating why. Deferred because the choice interacts with the phase-2 command surface.",
+        "Source: batch 16 branch review, 2026-09-04."
+      ],
+      "tags": [
+        "cli",
+        "rust"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-057",
+      "type": "feat",
+      "title": "Capture-file citations for oversized report evidence",
+      "body": [
+        "Batch 16 branch review, template defect 1: task-4-report.json reached 583KB because all 41 tdd entries embed verbatim RED/GREEN inline; reviewers re-ran cycles anyway, and T5's fix round already invented the better shape (bulk evidence in named workspace files, byte-prefix-matching inline excerpts).",
+        "Change: let a tdd or live_run entry cite a workspace capture file by path for output beyond a stated size, keeping the first lines plus exit inline; standardize the t5-evidence/ convention in .claude/schemas/deliverables.json and both agent templates. Deferred from batch 16 because template changes trigger process.evals-rerun and the batch was already closing.",
+        "Source: batch 16 branch review retrospective, 2026-09-04."
+      ],
+      "tags": [
+        "template",
+        "process"
+      ],
+      "milestone": null,
+      "status": "open"
+    },
+    {
+      "id": "HR-058",
+      "type": "fix",
+      "title": "kb audit: an explicit empty-range mode",
+      "body": [
+        "Batch 16 branch review, template defect 2: T5's three empty-range audits (research task, no diff) produced three byte-identical near-vacuous files — every deterministic row passes trivially and none speaks to the actual deliverable; the schema still demands self_audit, so the ritual ran three times for no signal.",
+        "Change: give audit an explicit empty-range mode that says so in one summary row (it already emits empty_range: true), and let a research task's report point its evidence rows at the workspace doc instead of the diff. Ships in template/tools until the Tier-2 port owns audit (phase 2), then carries into the Rust audit.",
+        "Source: batch 16 branch review retrospective, 2026-09-04."
+      ],
+      "tags": [
+        "tools",
+        "process"
       ],
       "milestone": null,
       "status": "open"

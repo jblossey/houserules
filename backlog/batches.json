@@ -230,8 +230,8 @@
       "summary": "Tier-2 phase 1 (HR-054, under HR-047): the frozen fixture corpus, the cargo workspace with module boundaries and CI matrix, render and check-knowledge in Rust behind the byte-parity gate, the cross-compilation spike.",
       "kickoff": "docs/specs/2026-09-04-batch-15-tier2-spec.md",
       "status": {
-        "state": "planned",
-        "text": "Gated 2026-09-04: phase 1 chosen at the batch 15 close; plan pending."
+        "state": "done",
+        "text": "Done 2026-09-04: Tier-2 phase 1 delivered whole and merged fast-forward after the branch review (fable: ready with-fixes, five doc-level Minors all resolved at the homing pass). The frozen corpus (60 files, self-describing manifest, regeneration freeze); the cargo scaffold with rules/backlog/install boundaries and the three-OS CI matrix; render and check-knowledge in Rust behind byte-parity gates that demonstrably gate (controller live run: binary and JS byte-identical on the live tree); the cross-compilation spike recommending cargo-dist (zero cross-compilation for the matrix; cross rejected on live breakage). Mid-batch owner ruling: globset as the glob engine, divergences pinned 7/7 by the reviewer's 1853-cell matrix. Five spec-6 deviations recorded pending owner confirmation; the vitest suite shrank 206 to 184+85 under the two-run coverage ratchet. Retrospective: two gotchas and a matrix-closure bullet applied; two standing amendments and two proposed standing rules to the owner; HR-055/056/057/058 filed. Eleven review rounds across five tasks, every finding fixed in-branch or filed with a reason."
       }
     }
   ]

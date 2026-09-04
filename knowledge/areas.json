@@ -5,5 +5,5 @@
   "tools": { "paths": ["tools/**", ".github/**"] },
   "cli": { "paths": ["bin/**"] },
   "template": { "paths": ["template/**"] },
-  "tests": { "paths": ["tests/**", "vitest.config.mts"] }
+  "tests": { "paths": ["tests/**", "vitest.config.mts", "vitest.shared.mts", "vitest.kb-coverage.config.mts"] }
 }

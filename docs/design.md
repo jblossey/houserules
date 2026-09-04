@@ -420,3 +420,18 @@ Each item records the ruling with its date, or stays marked open.
     decision rows, past specs, eval records) keep their wording. The
     sweep is the closing task of phase 5 with a mechanical grep gate;
     the spec's §5 carries the detail. Source: owner, 2026-09-04.
+25. **Glob vocabulary for the Rust port — ruled 2026-09-04.** Raised
+    by the batch 16 T3 review: the Rust matcher had silently
+    replaced the JS two-engine union (node matchesGlob OR the custom
+    globToRegExp) and diverged on extglob, nested braces, one
+    dot-segment case, and two panicking malformed-class globs. The
+    owner rules: the globset crate becomes the single matching
+    engine (well-maintained library over custom code). Every
+    divergence from the frozen union is pinned by a counterexample
+    cargo test asserting the chosen answer; malformed globs are
+    named errors, never panics; extglob does not exist in the
+    vocabulary. This is the one further sanctioned exception to the
+    spec's §7 parity rule, beside the flat command surface. No glob
+    in this repository or the corpus uses the affected vocabulary
+    (all 59 are `**`, `*`, or literals). Source: owner, 2026-09-04,
+    mid batch 16.

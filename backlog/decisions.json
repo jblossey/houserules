@@ -92,6 +92,10 @@
     {
       "date": "2026-09-04",
       "text": "Post-port repository sweep (Tier-2 spec ruling 8): the migration closes with a full-repository scan that corrects every rule, knowledge entry, backlog item, and doc (README included) to the new setup; standing entries that encode the old world amend or retire under recorded rulings; historical records keep their wording; mechanical grep gate as phase 5's closing task. docs/design.md §5.24."
+    },
+    {
+      "date": "2026-09-04",
+      "text": "Glob vocabulary for the Rust port (mid batch 16): globset becomes the single matching engine; every divergence from the frozen JS union is pinned by a counterexample test asserting the chosen answer; malformed globs are named errors, never panics; extglob leaves the vocabulary. The one further sanctioned parity exception beside the flat surface. docs/design.md §5.25."
     }
   ],
   "notes": []
