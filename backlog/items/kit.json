@@ -901,6 +901,22 @@
       "milestone": null,
       "status": "open",
       "batch": 15
+    },
+    {
+      "id": "HR-053",
+      "type": "feat",
+      "title": "Modular installs: adopters choose the feature set",
+      "body": [
+        "Owner intent recorded at the Tier-2 CLI-surface ruling (2026-09-04): houserules becomes modular — an adopter can install only backlog management, or rules management without the backlog, or the full kit. This is WHY the flat command surface keeps per-module checks (check-knowledge, check-backlog) and the Rust crate separates rules, backlog, and install modules.",
+        "Shape: a feature/selection mechanism in init (and update honoring it) that installs a subset of the payload — the seeded files, generated artifacts, skills, and checks scoped to the chosen modules; the stamp records the selection. Details to the batch spec when gated, AFTER the Tier-2 port completes (the port ships everything; the crate boundaries prepare the split).",
+        "Source: owner, 2026-09-04, at the batch 15 CLI-surface ruling; the Tier-2 spec's architecture section carries the boundary design."
+      ],
+      "tags": [
+        "cli",
+        "design"
+      ],
+      "milestone": null,
+      "status": "open"
     }
   ]
 }
