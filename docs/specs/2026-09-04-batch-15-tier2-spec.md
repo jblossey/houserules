@@ -163,22 +163,18 @@ with the historical files above as the only allowed matches.
   gone at retirement — and the phase-5 repository sweep (§5) corrects
   every rule, knowledge entry, backlog item, and doc to the new
   setup. Nothing JS survives phase 5.
-- CLI failure paths (controller-accepted deviation, batch 16 T3,
-  pending owner confirmation at the batch report): where the JS
+- CLI failure paths (RULED by the owner at the batch 16 report, 2026-09-04; raised batch 16 T3): where the JS
   re-throws and node prints a stack trace with exit 1, the binary
   prints one named error line to stderr and exits 2. Success and
   stale/check paths keep byte parity; every ported command pins its
   error arms with tests.
-- Eager glob validation (controller-accepted deviation, batch 16 T3
-  re-review, reviewer-endorsed, pending owner confirmation at the
-  batch report): the binary validates every areas.json glob at load
+- Eager glob validation (RULED by the owner at the batch 16 report, 2026-09-04; raised batch 16 T3 re-review, reviewer-endorsed): the binary validates every areas.json glob at load
   time and fails with a named error where the JS tolerated a bad
   glob silently until match time — the exact failure mode the
   glob-union-matcher gotcha was born from. A new failure only on a
   base whose areas.json declares a glob globset rejects; no such
   base exists here or in the corpus.
-- Regex reason text (controller-accepted deviation, batch 16 T4
-  review, pending owner confirmation at the batch report):
+- Regex reason text (RULED by the owner at the batch 16 report, 2026-09-04; raised batch 16 T4 review):
   check-pattern VALIDITY verdicts match the JS exactly — an
   ECMAScript-regex engine decides them, so exit codes and finding
   lists agree for every pattern and flags value. The parenthesised
@@ -186,9 +182,7 @@ with the historical files above as the only allowed matches.
   categories carry the Rust engine's reason wording, because full
   V8 reason-text parity is unreachable without embedding a JS
   engine.
-- Coverage floors during the shrink (controller-accepted, batch 16
-  T4 review, mechanism corrected at the r1 re-review, pending owner
-  confirmation at the batch report): the global vitest thresholds
+- Coverage floors during the shrink (RULED by the owner at the batch 16 report, 2026-09-04; raised batch 16 T4 review, mechanism corrected at the r1 re-review): the global vitest thresholds
   keep their pre-port values over the still-JS-owned files; a file
   whose surface has ported to cargo leaves the main coverage run
   and gets its own separately-ratcheted vitest coverage run pinned
@@ -199,8 +193,8 @@ with the historical files above as the only allowed matches.
   Every still-shipped JS surface keeps at least one behavioral
   vitest gate; for the check path that gate drives the live
   template/tools/kb.mjs over the frozen corpus check slices.
-- Crash paths (controller-accepted deviation, batch 16 T4 r1
-  re-review, pending owner confirmation at the batch report): where
+- Crash paths (RULED by the owner at the batch 16 report,
+  2026-09-04; raised batch 16 T4 r1 re-review): where
   the frozen JS dies with an uncaught runtime error on malformed
   data — a non-string `verify` entry (TypeError from path.join), a
   schema pattern its engine cannot compile, an unsupported or
