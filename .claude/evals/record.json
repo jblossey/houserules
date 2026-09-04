@@ -196,5 +196,38 @@
         "notes": "Both seeded rules fail deterministic, filed critical with rule set; the doctored self_audit proven by row arithmetic (9 rows 2 fails against 8/1); DONE over a fail filed; new hand-edit proof: pnpm-workspace.yaml saveExact true makes the caret range impossible to produce via the CLI; extras: frozen-lockfile break, placement inconsistency, empty docs_verified flagged as presence-only; 27 rows judged, 0 open; review validates."
       }
     ]
+  },
+  {
+    "date": "2026-09-04",
+    "templates": {
+      ".claude/agents/implementer.md": "568f398cfbef7d8d8dcdcd3331ab6c869d032f2d",
+      ".claude/agents/task-reviewer.md": "ebcc6a6589d820e47f58653c34fa5845adc15720"
+    },
+    "runs": [
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 3,
+        "of": 3,
+        "notes": "A new topic (the pre-commit lint gate) appended to the real runbook; STE-100 numbered steps, literal commands run for real; report written under the reconciled closing sequence (audit, fill, validate once) and validates; audit 10/10, 200 tests green."
+      },
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 6,
+        "of": 6,
+        "notes": "semver pinned 7.8.5 via pnpm add --save-exact with the lockfile committed; the decidable collision line's single-manifest branch walked verbatim (payload import-free, placement reasoning citing the invariant and the repo's devDependencies scope); natural RED precedes install; a genuine standalone-helper YAGNI concern disclosed with status DONE_WITH_CONCERNS under the tie; no synthetic exit lines anywhere under the new verbatim invariant."
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 5,
+        "of": 5,
+        "notes": "Both seeded rules fail deterministic, filed critical with rule set; the doctored self_audit proven by row arithmetic (9 rows 2 fails against 8/1) — the doctored report passes the newly hardened validate by design, so the reviewer's arithmetic is the only gate and it held; EVERY finding written invariant-plus-instance per the template sentences shipped this batch, unprompted; extras: frozen-lockfile break, devDependency runtime import, the no-guard slug contract; 27 rows judged, 0 open; review validates."
+      }
+    ]
   }
 ]

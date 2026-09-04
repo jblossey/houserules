@@ -232,7 +232,7 @@
         "Run every scenario in a detached scratch worktree at the branch head before the branch review; the orchestrating skill holds the procedure. Keep nothing from a worktree; workspace artifacts carry the `eval-` prefix.",
         "A run set in the record names `date`, `templates` (the git blob id of each template under test from `git rev-parse HEAD:<path>`; blob ids survive commit aggregation, commit SHAs do not), and one row per scenario: `scenario`, `agent`, `model`, `pass`, `of`, `notes`. The branch reviewer compares the latest blob ids with `HEAD`.",
         "No scenario covers `branch-reviewer` or the orchestrating skill; a change there needs no run. The retrieval protocol text in `tools/kb.mjs` shapes the generated skill the implementer loads; run the scenarios after a change there too — the check cannot see it.",
-        "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns; the branch does not merge before the record commit lands, and the branch-range audit is the row that must pass (batches 7-11)."
+        "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns; the branch does not merge before the record commit lands, and the branch-range audit is the row that must pass (batches 7-11, 14)."
       ],
       "tags": ["evals", "templates", "agents"],
       "source": { "date": "2026-08-31", "by": "user", "ref": "tag-pilot fc3241b" },
@@ -339,6 +339,19 @@
       ],
       "tags": ["backlog", "collision", "rebuild"],
       "source": { "date": "2026-09-03", "by": "review", "ref": "batch 13 branch review; the HR-047/048 collision" }
+    },
+    {
+      "id": "process.owner-content-mid-batch",
+      "kind": "procedure",
+      "area": "process",
+      "summary": "Owner content found uncommitted on the shared tree mid-batch: commit it verbatim as its own commit, surface concerns instead of editing, record its position.",
+      "body": [
+        "Batch 14: the README convergence paragraphs surfaced while T1 ran; secured as their own docs(readme) commit, two notes surfaced to the owner (a dropped link, lowercase product names), nothing silently changed.",
+        "Verify the interleave position with git log before writing the ledger line: state which task commits sit below and above it. A wrong containment claim forces a ledger correction and changes which range the task review must read (batch 14 T1).",
+        "At aggregation the commit stays its own commit; no task diff absorbs it, and the task-review dispatch names it as owner content to be judged as such."
+      ],
+      "tags": ["owner-content", "ledger", "aggregation"],
+      "source": { "date": "2026-09-04", "by": "review", "ref": "batch 14 branch review" }
     }
   ]
 }
