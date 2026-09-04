@@ -385,3 +385,11 @@ Each item records the ruling with its date, or stays marked open.
     subprocesses, regex, markdown render) is correctness-bound, not
     performance-bound; the parity gates hold either way. Source:
     owner, 2026-09-04.
+22. **npm retires — ruled 2026-09-04.** Tier-2 spec ruling 3, closing
+    decision 3's npm part: distribution is binary-only (mise ubi,
+    asdf, taps, a curl installer); nothing was ever published to npm
+    and nothing will be under this ruling. package.json remains for
+    this repository's own dev tooling; the README's post-publish npm
+    form goes away at the rewrite. An esbuild-style wrapper package
+    (postinstall downloads the platform binary) stays purely additive
+    later if demand appears. Source: owner, 2026-09-04.
