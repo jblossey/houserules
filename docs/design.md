@@ -376,3 +376,12 @@ Each item records the ruling with its date, or stays marked open.
     uniform from the first release, and `houserules-v0.2.0-alpha`
     stays as history. Unblocks HR-048's channels and HR-049. Source:
     owner, 2026-09-04.
+21. **Tier-2 implementation language — ruled 2026-09-04: Rust.**
+    Tier-2 spec ruling 2, chosen over Go with the trade-offs on the
+    table: type-level correctness (serde models the deliverables and
+    knowledge schemas exactly), smaller binaries, no GC — accepting
+    slower compiles and a cross-compilation story (cargo-dist or
+    cross/zig) that the spec settles. The workload (JSON, globs, git
+    subprocesses, regex, markdown render) is correctness-bound, not
+    performance-bound; the parity gates hold either way. Source:
+    owner, 2026-09-04.
