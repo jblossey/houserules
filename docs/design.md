@@ -393,3 +393,20 @@ Each item records the ruling with its date, or stays marked open.
     form goes away at the rewrite. An esbuild-style wrapper package
     (postinstall downloads the platform binary) stays purely additive
     later if demand appears. Source: owner, 2026-09-04.
+    Superseded in part by §5.23: at full retirement package.json
+    leaves the tree with the rest of the JS dev tooling.
+23. **The Tier-2 surface and runtime — ruled 2026-09-04.** Four
+    rulings from the batch 15 spec gate: (a) NO SHIMS — `tools/kb.sh`
+    and `tools/backlog.sh` are deleted, every shipped reference
+    invokes the binary directly, and `update` gains KIT_OWNED
+    deletion; (b) FLAT commands, no kb/backlog namespaces, with
+    per-module checks (`check-knowledge`, `check-backlog`) because
+    (c) houserules becomes MODULAR — adopters will choose feature
+    sets (backlog-only, rules without backlog); the crate boundaries
+    prepare it, the feature itself is HR-053; (d) the DEV TOOLING
+    migrates too — cargo test replaces vitest phase by phase, a
+    built-in `check-commit` replaces the hook's commitlint probe,
+    and pnpm, package.json, and node_modules leave the tree at
+    retirement. Nothing JS survives phase 5. The full design lives in
+    docs/specs/2026-09-04-batch-15-tier2-spec.md. Source: owner,
+    2026-09-04.
