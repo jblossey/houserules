@@ -98,12 +98,39 @@ impl FrozenWorktree {
     /// mints a temp directory and immediately removes it, the same
     /// mkdtemp-then-remove approach `tools/make-corpus.mjs`'s
     /// `withFrozenWorktree` uses.
+    ///
+    /// `-c core.autocrlf=false -c core.eol=lf` (CI fix round: the windows
+    /// leg of the rust matrix) pin the checkout to the frozen sha's own
+    /// LF bytes regardless of the runner's ambient git config. The frozen
+    /// sha (a73a8c6) predates this repository's `.gitattributes`, so
+    /// nothing there marks its files `text`; a windows runner's
+    /// `core.autocrlf=true` (Git for Windows' common default, the same as
+    /// setting `text=auto` on every file plus `core.eol=crlf`, per `git
+    /// help config`) CRLF-translated the checked-out `.claude/rules/*.md` and
+    /// the skill on checkout, so `check-knowledge`'s fresh LF render
+    /// disagreed with the CRLF bytes already on disk -- a false
+    /// "generated file is out of date" finding, exit 1, empty stdout
+    /// where the frozen corpus records `knowledge: ok\n`, exit 0.
+    /// Command-line `-c` overrides outrank every config file (`git help
+    /// git`), so these two win over the runner's system/global setting
+    /// however it was set, and `git worktree add`'s own checkout (`git
+    /// help worktree`: "Create a worktree ... and checkout <commit-ish>
+    /// into it") is an ordinary checkout, subject to the same config.
     pub fn checkout(repo_root: &Path, sha: &str) -> Self {
         let holder = tempfile::tempdir().expect("tempdir");
         let path = holder.path().to_path_buf();
         drop(holder);
         let status = Command::new("git")
-            .args(["worktree", "add", "--detach", "--quiet"])
+            .args([
+                "-c",
+                "core.autocrlf=false",
+                "-c",
+                "core.eol=lf",
+                "worktree",
+                "add",
+                "--detach",
+                "--quiet",
+            ])
             .arg(&path)
             .arg(sha)
             .current_dir(repo_root)
