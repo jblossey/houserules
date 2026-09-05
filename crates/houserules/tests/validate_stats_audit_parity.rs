@@ -56,13 +56,169 @@ fn corpus_capture(relative: &str) -> CorpusCapture {
 }
 
 /// Replaces every occurrence of `from`'s displayed path in `text` with
-/// `placeholder` -- the inverse of `tools/make-corpus.mjs`'s own
+/// `placeholder`, and normalizes the run of path/filename characters
+/// immediately following each match (its own file name -- there are no
+/// nested subdirectories under any fixture this covers) to forward
+/// slashes -- the test-side inverse of `tools/make-corpus.mjs`'s own
 /// `redactPath`, applied to this binary's own output before comparing it
 /// against the corpus's already-redacted bytes (`kb.mjs validate` echoes
 /// the caller's resolved absolute path into each result's `file` field;
 /// the placeholder keeps the comparison host-independent).
+///
+/// Two candidate forms of `from` are tried, each in two byte shapes (CI
+/// round 3, issue 1): on Windows, `from` (built through `repo_root()`,
+/// which canonicalizes) carries a `\\?\` verbatim-disk prefix that the
+/// binary's own already-stripped output (`resolve_like_node`'s doc,
+/// `validate_deliverable.rs`) does not, so a plain-string match on
+/// `from`'s own displayed form misses it outright; trying the same form
+/// with that prefix stripped catches it. Each of those two forms is
+/// tried both as `from` itself (`stderr`'s own plain `eprintln!`,
+/// single-backslash) and with every backslash doubled (`stdout`'s own
+/// JSON-serialized `"file"` string, where a Windows path's single
+/// backslash is JSON's own escaped `\\`) -- a doubled-backslash pattern
+/// that never appears in `from` at all (Windows paths do not carry
+/// literal double backslashes) is a safe, redundant no-op to search for
+/// on every other platform. Neither candidate touches the SEPARATOR
+/// after the match, so a correct prefix match alone still leaves the
+/// corpus's own forward slashes fighting the binary's real backslashes
+/// (doubled or not) in whatever follows it on Windows -- not a new
+/// normalization this test invents, but the corpus's own recorded one:
+/// its `redactPath` ran against Linux-only bytes when the corpus was
+/// frozen, and Node's own `path.join` prints backslashes on win32 too,
+/// so a host-independent comparison always needed this, just never
+/// exercised it before a Windows CI run did. The normalization is scoped
+/// to each match's own trailing file name, not a blanket sweep of every
+/// backslash in `text`: an escaped quote inside an unrelated error
+/// message (`status \"DONE\" needs...`, this suite's own regression) is
+/// a backslash too, and a blanket replace corrupts it.
 fn redact(text: &str, from: &Path, placeholder: &str) -> String {
-    text.replace(&from.display().to_string(), placeholder)
+    let displayed = from.display().to_string();
+    let mut candidates = vec![displayed.clone()];
+    if let Some(stripped) = displayed.strip_prefix(r"\\?\") {
+        candidates.push(stripped.to_string());
+    }
+    let mut patterns: Vec<String> = Vec::new();
+    for candidate in &candidates {
+        let doubled = candidate.replace('\\', "\\\\");
+        if doubled != *candidate {
+            patterns.push(doubled);
+        }
+        patterns.push(candidate.clone());
+    }
+
+    let mut result = text.to_string();
+    for pattern in &patterns {
+        result = replace_and_normalize_suffix(&result, pattern, placeholder);
+    }
+    result
+}
+
+/// `true` for a byte that can appear in a bare file name or a path
+/// separator -- `redact`'s own scope for the suffix it normalizes after
+/// a match, deliberately excluding `"` (a JSON string's own closing
+/// quote) and `:` (the character every error message in this corpus
+/// puts right after a file name) so the scan never reaches, and never
+/// mistakes for a separator, an escaped quote inside unrelated prose
+/// later in the same string.
+fn is_path_suffix_byte(byte: u8) -> bool {
+    byte == b'\\'
+        || byte == b'/'
+        || byte.is_ascii_alphanumeric()
+        || matches!(byte, b'.' | b'-' | b'_')
+}
+
+/// Replaces every occurrence of `pattern` in `text` with `placeholder`,
+/// normalizing the run of `is_path_suffix_byte` bytes immediately after
+/// each match (doubled backslashes first, so a JSON-escaped `\\`
+/// collapses to one `/`, not two) to forward slashes -- `redact`'s own
+/// per-match, per-pattern step.
+fn replace_and_normalize_suffix(text: &str, pattern: &str, placeholder: &str) -> String {
+    if pattern.is_empty() {
+        return text.to_string();
+    }
+    let mut result = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(offset) = rest.find(pattern) {
+        result.push_str(&rest[..offset]);
+        result.push_str(placeholder);
+        let after = &rest[offset + pattern.len()..];
+        let suffix_len = after
+            .bytes()
+            .take_while(|&byte| is_path_suffix_byte(byte))
+            .count();
+        let (suffix, remainder) = after.split_at(suffix_len);
+        result.push_str(&suffix.replace("\\\\", "/").replace('\\', "/"));
+        rest = remainder;
+    }
+    result.push_str(rest);
+    result
+}
+
+/// CI round 3, issue 1: pure string logic, so the Windows-only shape this
+/// exercises (a verbatim-disk prefix, a JSON-doubled backslash separator)
+/// is testable here without a Windows runner, the same way
+/// `strip_verbatim_disk_prefix`'s own unit tests are (`validate_
+/// deliverable.rs`).
+#[test]
+fn redact_strips_a_verbatim_prefixed_windows_path_and_collapses_json_doubled_backslashes() {
+    let from = Path::new(r"\\?\D:\a\houserules\houserules\tests\corpus\fixtures\batch14-workspace");
+    let text = r#"[
+  {
+    "file": "D:\\a\\houserules\\houserules\\tests\\corpus\\fixtures\\batch14-workspace\\branch-review.json",
+    "errors": []
+  }
+]
+"#;
+    assert_eq!(
+        redact(text, from, "<fixtures>/batch14-workspace"),
+        "[\n  {\n    \"file\": \"<fixtures>/batch14-workspace/branch-review.json\",\n    \"errors\": []\n  }\n]\n"
+    );
+}
+
+/// The same Windows path, but in `stderr`'s own plain (non-JSON,
+/// single-backslash) form -- `eprintln!("{}: ...", path.display())`
+/// never goes through JSON's own escaping.
+#[test]
+fn redact_strips_a_verbatim_prefixed_windows_path_from_plain_unescaped_text() {
+    let from = Path::new(r"\\?\D:\a\houserules\houserules\tests\corpus\fixtures\batch14-workspace");
+    let text = r"D:\a\houserules\houserules\tests\corpus\fixtures\batch14-workspace\bad-report.json: invalid JSON";
+    assert_eq!(
+        redact(text, from, "<fixtures>/invalid-deliverable"),
+        "<fixtures>/invalid-deliverable/bad-report.json: invalid JSON"
+    );
+}
+
+/// A path with no verbatim prefix at all (Linux, macOS, or a Windows
+/// `from` that never went through `canonicalize`) -- the pre-existing,
+/// still-passing case, unaffected by either new candidate.
+#[test]
+fn redact_still_handles_a_plain_forward_slash_path_with_no_prefix() {
+    let from = Path::new("/home/jblossey/houserules/tests/corpus/fixtures/batch14-workspace");
+    let text = r#"[{"file": "/home/jblossey/houserules/tests/corpus/fixtures/batch14-workspace/branch-review.json"}]"#;
+    assert_eq!(
+        redact(text, from, "<fixtures>/batch14-workspace"),
+        r#"[{"file": "<fixtures>/batch14-workspace/branch-review.json"}]"#
+    );
+}
+
+/// CI round 3, issue 1's own regression, caught running the suite after
+/// the first version of this fix: `validate_matches_the_frozen_invalid_
+/// deliverable_slice`'s own error message names the fixture path THEN
+/// continues with prose holding an escaped quote (`status \"DONE\"
+/// needs...`) -- a blanket "every backslash becomes a forward slash"
+/// corrupted that escape into `status /"DONE/"`. Scoping the
+/// normalization to each match's own file-name suffix (up to the `:`
+/// this corpus's own error messages always put right after one) leaves
+/// it untouched.
+#[test]
+fn redact_does_not_touch_an_escaped_quote_later_in_the_same_error_message() {
+    let from =
+        Path::new(r"\\?\D:\a\houserules\houserules\tests\corpus\fixtures\invalid-deliverable");
+    let text = r#""D:\\a\\houserules\\houserules\\tests\\corpus\\fixtures\\invalid-deliverable\\bad-report.json: status \"DONE\" needs a non-null self_audit""#;
+    assert_eq!(
+        redact(text, from, "<fixtures>/invalid-deliverable"),
+        r#""<fixtures>/invalid-deliverable/bad-report.json: status \"DONE\" needs a non-null self_audit""#
+    );
 }
 
 fn sorted_json_names(dir: &Path) -> Vec<String> {
@@ -848,17 +1004,29 @@ fn validate_exits_1_when_any_file_has_errors_0_when_all_are_valid() {
 }
 
 /// Runs `houserules validate <args>` in `cwd` and returns the resulting
-/// single result's own `file` field -- the three tests below all compare
-/// two such calls against EACH OTHER rather than against an independently
-/// hand-built expectation (CI round 2, issue 1's own lesson): a `file`
-/// field this binary itself produced through `resolve_like_node` is the
-/// only oracle guaranteed to agree with what the SAME function produces
-/// for a different but equivalent input, on whatever this machine's OS
-/// naturally does -- a hand-built expectation using `std::fs::
-/// canonicalize` directly reintroduces exactly the class of platform
-/// quirk (Windows' own 8.3-short-name expansion, distinct from and in
-/// addition to the `\\?\` prefix `resolve_like_node`'s own doc covers)
-/// that broke this suite once already.
+/// single result's own `file` field -- two of the three tests below
+/// compare two such calls against EACH OTHER rather than against an
+/// independently hand-built expectation (CI round 2, issue 1's own
+/// lesson): a `file` field this binary itself produced through
+/// `resolve_like_node` is the only oracle guaranteed to agree with what
+/// the SAME function produces for a different but equivalent input, on
+/// whatever this machine's OS naturally does -- a hand-built expectation
+/// using `std::fs::canonicalize` directly reintroduces exactly the class
+/// of platform quirk (Windows' own 8.3-short-name expansion, distinct
+/// from and in addition to the `\\?\` prefix `resolve_like_node`'s own
+/// doc covers) that broke this suite once already.
+///
+/// Comparing two calls is not itself always safe, though (CI round 3,
+/// issue 2): it works only when BOTH calls resolve through the SAME
+/// branch of `resolve_like_node` (both relative, via `env::current_dir`,
+/// as the two tests below that use it this way do). A relative call
+/// compared against an explicit-absolute call -- which never queries the
+/// current directory at all -- can disagree on a host where the given
+/// cwd sits behind a symlink, since only the relative side resolves it;
+/// `validate_resolves_a_relative_path_against_the_given_cwd` uses this
+/// same helper for its own successful call, but verifies the underlying
+/// property (resolution used the given cwd) behaviorally instead, with
+/// its own second, negative call built directly.
 fn validate_file_field(args: &[&str], cwd: &Path) -> String {
     let output = houserules()
         .arg("validate")
@@ -884,13 +1052,27 @@ fn validate_file_field(args: &[&str], cwd: &Path) -> String {
 /// `main(['validate', 'rel.json'], io, dir)` directly, `dir` a plain
 /// string never itself touched by a real `chdir`/`getcwd`; this port
 /// instead spawns the compiled binary as a real, separate process (the
-/// only way to exercise a CLI at all). Verifies the same property a
-/// different way: an explicit absolute argument built from the identical
-/// `sub` (resolved through `resolve_like_node`'s own absolute-path
-/// branch, which never queries the current directory at all) must name
-/// the same file as the relative argument resolved against `sub` as cwd
-/// -- true only if the relative resolution actually used `sub`, not this
-/// test's own unrelated process cwd.
+/// only way to exercise a CLI at all).
+///
+/// CI round 3, issue 2: CI round 2's own rewrite (comparing a relative
+/// call against `sub` to an explicit-absolute call against `sub.join(
+/// "rel.json")`) had the same class of bug it was fixing, one level
+/// deeper: the relative call resolves through `resolve_like_node`'s
+/// current-directory branch (`env::current_dir`, which -- like every
+/// `getcwd(3)`-based query -- resolves every symlink on its own path),
+/// while the explicit-absolute call resolves through its own
+/// already-absolute branch, which never queries the current directory
+/// and so never resolves anything. On a host where the tempdir itself
+/// sits behind a symlink -- macOS's own `/tmp`/`/var`, true on EVERY run
+/// there, no test-created symlink needed -- those two branches
+/// necessarily disagree, since one half of the comparison resolves the
+/// symlink and the other cannot. Verifies the property behaviorally
+/// instead, sidestepping the whole question of which platform-specific
+/// form `env::current_dir` returns: `rel.json` resolves when `sub` is
+/// the given cwd, and does not resolve from a directory that does not
+/// itself contain it (the worktree root, `sub`'s own parent) -- true
+/// only if relative resolution actually used the given cwd, not this
+/// test's own unrelated process cwd or some other directory.
 #[test]
 fn validate_resolves_a_relative_path_against_the_given_cwd() {
     let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
@@ -899,13 +1081,23 @@ fn validate_resolves_a_relative_path_against_the_given_cwd() {
     let source = repo_root().join("tests/corpus/fixtures/batch14-workspace/task-1-report.json");
     fs::copy(&source, sub.join("rel.json")).expect("copy fixture");
 
-    let via_cwd = validate_file_field(&["rel.json"], &sub);
-    let absolute = sub.join("rel.json");
-    let via_absolute =
-        validate_file_field(&[absolute.to_str().expect("utf8 path")], &worktree.path);
-    assert_eq!(
-        via_cwd, via_absolute,
-        "a relative path must resolve against the given cwd (sub), not the test's own cwd"
+    let via_sub = validate_file_field(&["rel.json"], &sub);
+    assert!(
+        via_sub.ends_with("rel.json"),
+        "the reported file must name rel.json, got {via_sub:?}"
+    );
+
+    let output_from_parent = houserules()
+        .args(["validate", "rel.json"])
+        .current_dir(&worktree.path)
+        .output()
+        .expect("run validate rel.json from the worktree root");
+    assert_ne!(
+        output_from_parent.status.code(),
+        Some(0),
+        "rel.json must not resolve from the worktree root (sub's own parent, which does not \
+         itself contain rel.json) -- proving relative resolution used the given cwd (sub), \
+         not some other one"
     );
 }
 
