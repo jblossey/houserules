@@ -1,0 +1,40 @@
+{
+  "kind": "task-report",
+  "task": 1,
+  "backlog": ["HR-999"],
+  "status": "DONE",
+  "implemented": "Synthetic skipped-audit report fixture: the frozen validate slice for the self_audit.summary.skipped > 0 message shape (batch 16 T4 r1 re-review parked it; batch 17 T1 lands it).",
+  "commits": [],
+  "tests": [],
+  "live_run": [],
+  "tdd": [],
+  "files_changed": [],
+  "docs_verified": [],
+  "dependency_vetting": null,
+  "coverage": null,
+  "self_audit": {
+    "summary": {
+      "base": "0000000",
+      "head": "0000000",
+      "deterministic": 1,
+      "pass": 0,
+      "fail": 0,
+      "warn": 0,
+      "skipped": 1,
+      "judged": 0
+    },
+    "rows": [
+      {
+        "id": "process.tdd",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "skipped",
+        "evidence": "no --report given"
+      }
+    ]
+  },
+  "self_review": [],
+  "concerns": [],
+  "knowledge_used": []
+}

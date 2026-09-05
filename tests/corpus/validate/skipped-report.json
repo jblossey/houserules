@@ -1,0 +1,7 @@
+{
+  "command": "node tools/kb.mjs validate <fixtures>/skipped-report/skipped-report.json",
+  "cwd": "<frozen-worktree>",
+  "stdout": "[\n  {\n    \"file\": \"<fixtures>/skipped-report/skipped-report.json\",\n    \"kind\": \"task-report\",\n    \"errors\": [\n      \"<fixtures>/skipped-report/skipped-report.json: self_audit.summary.skipped is 1; re-run audit with --report\"\n    ]\n  }\n]\n",
+  "stderr": "",
+  "exit": 1
+}

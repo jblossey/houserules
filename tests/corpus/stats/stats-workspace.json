@@ -1,0 +1,7 @@
+{
+  "command": "node tools/kb.mjs stats <fixtures>/stats-workspace",
+  "cwd": "<frozen-worktree>",
+  "stdout": "{\n  \"violations\": [\n    {\n      \"id\": \"process.tdd\",\n      \"count\": 1,\n      \"tasks\": [\n        \"1\"\n      ]\n    }\n  ],\n  \"unused_ids\": [\n    {\n      \"id\": \"quality.principles\",\n      \"tasks\": [\n        \"1\"\n      ]\n    }\n  ],\n  \"audits\": {\n    \"files\": 1,\n    \"tasks\": 1\n  },\n  \"reviews\": {\n    \"files\": 0\n  }\n}\n",
+  "stderr": "",
+  "exit": 0
+}

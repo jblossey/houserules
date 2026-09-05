@@ -46,6 +46,14 @@
       ]
     },
     {
+      "command": "node <frozen-worktree>/tools/backlog.mjs set HR-901 status=done batch=2",
+      "cwd": "tests/corpus/fixtures/mini",
+      "produces": [
+        "backlog/set/mini/command.json",
+        "backlog/set/mini/backlog/items/misc.json"
+      ]
+    },
+    {
       "command": "node <frozen-worktree>/tools/kb.mjs check",
       "cwd": "tests/corpus/fixtures/mini-bad",
       "produces": [
@@ -74,6 +82,104 @@
       ]
     },
     {
+      "command": "node tools/kb.mjs for tools/kb.mjs --full",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "knowledge/for-tools-kb-mjs-full.json"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs for tools/kb.mjs",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "knowledge/for-tools-kb-mjs.json"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs get houserules.template-is-the-source",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "knowledge/get-houserules-template-is-the-source.json"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs index --standing",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "knowledge/index-standing.json"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs index",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "knowledge/index.json"
+      ]
+    },
+    {
+      "command": "node <frozen-worktree>/tools/kb.mjs for mini-tools/build.sh --full",
+      "cwd": "tests/corpus/fixtures/mini",
+      "produces": [
+        "knowledge/mini/for-mini-tools-build-sh-full.json"
+      ]
+    },
+    {
+      "command": "node <frozen-worktree>/tools/kb.mjs for mini-tools/build.sh",
+      "cwd": "tests/corpus/fixtures/mini",
+      "produces": [
+        "knowledge/mini/for-mini-tools-build-sh.json"
+      ]
+    },
+    {
+      "command": "node <frozen-worktree>/tools/kb.mjs get mini.build-cache",
+      "cwd": "tests/corpus/fixtures/mini",
+      "produces": [
+        "knowledge/mini/get-mini-build-cache.json"
+      ]
+    },
+    {
+      "command": "node <frozen-worktree>/tools/kb.mjs index --standing",
+      "cwd": "tests/corpus/fixtures/mini",
+      "produces": [
+        "knowledge/mini/index-standing.json"
+      ]
+    },
+    {
+      "command": "node <frozen-worktree>/tools/kb.mjs index",
+      "cwd": "tests/corpus/fixtures/mini",
+      "produces": [
+        "knowledge/mini/index.json"
+      ]
+    },
+    {
+      "command": "node <frozen-worktree>/tools/kb.mjs standing",
+      "cwd": "tests/corpus/fixtures/mini",
+      "produces": [
+        "knowledge/mini/standing.json"
+      ]
+    },
+    {
+      "command": "node <frozen-worktree>/tools/kb.mjs topics",
+      "cwd": "tests/corpus/fixtures/mini",
+      "produces": [
+        "knowledge/mini/topics.json"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs standing",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "knowledge/standing.json"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs topics",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "knowledge/topics.json"
+      ]
+    },
+    {
       "command": "node <frozen-worktree>/tools/kb.mjs render",
       "cwd": "tests/corpus/fixtures/mini",
       "produces": [
@@ -95,6 +201,20 @@
       ]
     },
     {
+      "command": "node tools/kb.mjs stats <fixtures>/batch14-workspace",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "stats/batch14-workspace.json"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs stats <fixtures>/stats-workspace",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "stats/stats-workspace.json"
+      ]
+    },
+    {
       "command": "node tools/kb.mjs validate <fixtures>/batch14-workspace/branch-review.json <fixtures>/batch14-workspace/eval-dependency-add-report.json <fixtures>/batch14-workspace/eval-docs-edit-report.json <fixtures>/batch14-workspace/eval-seeded-report.json <fixtures>/batch14-workspace/eval-seeded-review.json <fixtures>/batch14-workspace/task-1-report.json <fixtures>/batch14-workspace/task-1-review-r1.json <fixtures>/batch14-workspace/task-1-review-r2.json <fixtures>/batch14-workspace/task-1-review.json <fixtures>/batch14-workspace/task-2-report.json <fixtures>/batch14-workspace/task-2-review-r1.json <fixtures>/batch14-workspace/task-2-review.json",
       "cwd": "<frozen-worktree>",
       "produces": [
@@ -106,6 +226,13 @@
       "cwd": "<frozen-worktree>",
       "produces": [
         "validate/invalid-deliverable.json"
+      ]
+    },
+    {
+      "command": "node tools/kb.mjs validate <fixtures>/skipped-report/skipped-report.json",
+      "cwd": "<frozen-worktree>",
+      "produces": [
+        "validate/skipped-report.json"
       ]
     },
     {
@@ -130,6 +257,12 @@
       "reason": "kb.mjs validate echoes the caller's resolved absolute path into each result's \"file\" field; the placeholder keeps the corpus byte-identical across machines and CI."
     },
     {
+      "slice": "validate/skipped-report.json",
+      "field": "stdout/stderr: each result's \"file\"",
+      "substituted": "<fixtures>/skipped-report",
+      "reason": "kb.mjs validate echoes the caller's resolved absolute path into each result's \"file\" field; the placeholder keeps the corpus byte-identical across machines and CI."
+    },
+    {
       "slice": "validate/task-1-report.json",
       "field": "stdout/stderr: each result's \"file\"",
       "substituted": "<fixtures>/batch14-workspace",
@@ -143,6 +276,8 @@
     "backlog/check.json": "4de2fe7d12d317accfffd5acb8547415eba8e4a8e5ce82b3b7c44e990aabc658",
     "backlog/get-hr-052.json": "0b3d4164d9eecaed38a6f3e8cbe7e4511dc7cd62a988059ffb725ebe387572e3",
     "backlog/list-open.json": "dc02aac2f1b8484d576f2818913852a72ee34c50f91fe3986f3a95adc20eef79",
+    "backlog/set/mini/backlog/items/misc.json": "550d8530132301ba6b0f72bfee067e2e18ba99bb087bae177d9ebd3cda617884",
+    "backlog/set/mini/command.json": "3662e314dfa2c2852f16ba575a75443633aff9cca4c26a6ae1d82aed9cb63085",
     "check/mini-bad.json": "6b19b0296fa23bce97085ea03eb55d59273f4f515f0d7a9a25f46079fd586f50",
     "check/mini-stale.json": "1ced0780caa00d320cd25b9011b273d5a1886cb8bb1291842628f4001cdfead6",
     "check/mini.json": "85d84c7f01982d11bea46b388e579dfed439edf38fde9891e7218aee822a7373",
@@ -184,6 +319,23 @@
     "fixtures/mini-stale/knowledge/areas.json": "21e11c690d10bcb82daf73cdce3d8488327f4a8609689cf3a39878d7929215d7",
     "fixtures/mini-stale/knowledge/mini-stale.json": "1b3a7df92b487b15b1848ddc47711de896447fe1cd81fcbe17932fdf8265ce76",
     "fixtures/mini-stale/knowledge/schema.json": "84bc648adc91a50d18ff72eacf3ae0a4ea365e80d49968fad7ae3d8af933889d",
+    "fixtures/skipped-report/skipped-report.json": "ffc88043a3fc236c6c60294822bfe39f95e538bca7bb3fe8c39a92eb56fed4e4",
+    "fixtures/stats-workspace/task-1-audit.json": "9f53ef7e61ce917b419e144ec886a9c164ece589b7db87c4b422b875de8936f8",
+    "fixtures/stats-workspace/task-1-report.json": "8ee15b453417551e43732ea5d15bf857e4202551e90a09f2d57149d75be0b07d",
+    "knowledge/for-tools-kb-mjs-full.json": "801af65da79b61895bb2d06bb9b4c8bf64362f99964b2ee44907ac593969daa1",
+    "knowledge/for-tools-kb-mjs.json": "70ca9c22a09be216c837a919d5070de5c50204f5e989c891c6fa80ff03ddc8ab",
+    "knowledge/get-houserules-template-is-the-source.json": "feabbfa779b487aef1c1568c7f961dedc3aedc07cf2ca80929c692384ff20f66",
+    "knowledge/index-standing.json": "71b38953c21ca6991ef18aff41f230676871765c15ed2243152a09c8f83761d5",
+    "knowledge/index.json": "b09bec78e715098e11c2581fd5ad80f2e77545d695d56572852cbbeb50565817",
+    "knowledge/mini/for-mini-tools-build-sh-full.json": "bb8b3aaf16e4acdc4a08c538f565dcc888868a9daed9258ea2760185013ef5ea",
+    "knowledge/mini/for-mini-tools-build-sh.json": "e94ed177716f547216c973a02233efc02f420c5faf1fa37aa1b2a4baa3bfee9c",
+    "knowledge/mini/get-mini-build-cache.json": "664210d886815d18450d7392d7167db94ccbcec414581b07cdd81c6654d4d39e",
+    "knowledge/mini/index-standing.json": "e53aad8eca9cd4480c5f38c583157005320e1cd4dbc8254d08253a775165f9f4",
+    "knowledge/mini/index.json": "c114d86bfa4e22cb88f4d348cc897c6349764f34f436d1cebf910a404bd8049a",
+    "knowledge/mini/standing.json": "b5458add85ee0522aef8b4aeabf2158294c5027aaa7c70260b5546e905dbadd7",
+    "knowledge/mini/topics.json": "2a7efdd54f7f907fe570b759037f094a8adfde6969a09dea0dde532b1d53ca3a",
+    "knowledge/standing.json": "b094d0347609be4b32b094c4daf6437ac8b7684750944f77aaf63d5dd957912a",
+    "knowledge/topics.json": "7c103ede952b5ff5319e69983513941cef1832268d7b3a431376d451aac402c0",
     "render/mini/.claude/rules/standing-rules.md": "f048904bb281bb8b8a86ab9c587c9802d56fbae5ffad884068ab8ee2abb03ab0",
     "render/mini/.claude/rules/tools.md": "6cbc2a1a65f620c26c01a5a09602009f072b8056b6e954896f0e023af1ae4fd6",
     "render/mini/.claude/skills/project-knowledge/SKILL.md": "917a9655b3817a204c37aefe1dc743eb344362f1da8741cdc332048a5460b6de",
@@ -193,8 +345,11 @@
     "render/root/.claude/rules/template.md": "c663bff8702670ec1bd2ded330db362324dfa6a563bfd094597d01668a1c13b4",
     "render/root/.claude/rules/tests.md": "459812ad24e7ed09d303da019b4f663bc51adfcf8c124357c6841bdeec6cfea9",
     "render/root/.claude/skills/project-knowledge/SKILL.md": "287581472dcd29a97cd227804814179b911745949c7b7f55652706bc19f843c9",
+    "stats/batch14-workspace.json": "b502ab8e4b7aee471d2282938b3310c1676e5a9f88183b9c1a2637f7df77db8f",
+    "stats/stats-workspace.json": "3091bd866232173e9bce329c9f0d2e4563941a223c4b03fc9010ec437d6cf83a",
     "validate/batch14-workspace.json": "9a2ec836da35ff2da843c0178ef5b3f5ea65c93a282270085287d2f3e9951050",
     "validate/invalid-deliverable.json": "93a1e5491b9761df7c88dbbe024f20a700991bace6f8afdf12301bf45d6f57be",
+    "validate/skipped-report.json": "45a641b0c06ba74f6bc4c169873b6f1437194bb08669ebb0fbe03b123e774153",
     "validate/task-1-report.json": "a02b439ce7d3470284b63e2226827e594de30216cc76462a824a92e66eb8ddc7"
   }
 }

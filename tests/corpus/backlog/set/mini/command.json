@@ -1,0 +1,7 @@
+{
+  "command": "node <frozen-worktree>/tools/backlog.mjs set HR-901 status=done batch=2",
+  "cwd": "tests/corpus/fixtures/mini",
+  "stdout": "HR-901: status=done batch=2\n",
+  "stderr": "",
+  "exit": 0
+}

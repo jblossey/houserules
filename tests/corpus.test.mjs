@@ -148,4 +148,59 @@ describe('the frozen fixture corpus (HR-054)', () => {
     );
     expect(validateRuns.some((run) => run.exit !== 0)).toBe(true);
   });
+
+  it('freezes the skipped>0 validate message naming --report (batch 17 T1)', () => {
+    const run = JSON.parse(
+      readFileSync(join(COMMITTED, 'validate/skipped-report.json'), 'utf8'),
+    );
+    expect(run.exit).toBe(1);
+    expect(run.stdout).toContain(
+      'self_audit.summary.skipped is 1; re-run audit with --report',
+    );
+  });
+
+  it('freezes a stats slice over the committed batch-14 workspace fixtures', () => {
+    // This slice exercises stats()'s reviews input path only: the fixture
+    // holds no task-*-audit*.json, so audits and unused_ids stay
+    // structurally empty here. stats/stats-workspace.json (below) is the
+    // slice that exercises the audits path and the unused_ids
+    // cross-reference (batch 17 T1 fix round 1, review issue 4).
+    const run = JSON.parse(
+      readFileSync(join(COMMITTED, 'stats/batch14-workspace.json'), 'utf8'),
+    );
+    expect(run.exit).toBe(0);
+    const stats = JSON.parse(run.stdout);
+    expect(stats.reviews.files).toBeGreaterThan(0);
+    expect(stats.violations.length).toBeGreaterThan(0);
+  });
+
+  it('freezes a stats slice over a workspace with an audit file and a report (violations, unused_ids, audits, and the knowledge_used cross-reference all pinned)', () => {
+    const run = JSON.parse(
+      readFileSync(join(COMMITTED, 'stats/stats-workspace.json'), 'utf8'),
+    );
+    expect(run.exit).toBe(0);
+    const stats = JSON.parse(run.stdout);
+    expect(stats.audits.files).toBeGreaterThan(0);
+    expect(stats.audits.tasks).toBeGreaterThan(0);
+    expect(stats.violations.length).toBeGreaterThan(0);
+    // The fixture's report cites exactly one of the audit file's two injected
+    // ids in knowledge_used, so unused_ids must filter that one out -- a port
+    // that never reads knowledge_used would leave both ids unused instead of
+    // just the uncited one (batch 17 T1 fix round 2, review r1 new_breakage (c)).
+    expect(stats.unused_ids.map((u) => u.id)).toEqual(['quality.principles']);
+  });
+
+  it('freezes the set-written bytes backlog.mjs produces for a status+batch change', () => {
+    const run = JSON.parse(
+      readFileSync(join(COMMITTED, 'backlog/set/mini/command.json'), 'utf8'),
+    );
+    expect(run.exit).toBe(0);
+    expect(run.stdout).toBe('HR-901: status=done batch=2\n');
+    const written = readFileSync(
+      join(COMMITTED, 'backlog/set/mini/backlog/items/misc.json'),
+      'utf8',
+    );
+    expect(written).toContain('"status": "done"');
+    expect(written).toContain('"batch": 2');
+  });
 });

@@ -1,0 +1,19 @@
+{
+  "kind": "task-report",
+  "task": 1,
+  "backlog": ["HR-999"],
+  "status": "BLOCKED",
+  "implemented": "Synthetic report for the stats-workspace fixture (batch 17 T1 fix round 2, review r1 issue, new_breakage (c)): cites exactly one of the audit fixture's two injected ids in knowledge_used, so stats()'s unused_ids cross-reference has one cited id and one uncited id to distinguish, not two uncited ids a port that never reads knowledge_used would also reproduce.",
+  "commits": [],
+  "tests": [],
+  "live_run": [],
+  "tdd": [],
+  "files_changed": [],
+  "docs_verified": [],
+  "dependency_vetting": null,
+  "coverage": null,
+  "self_audit": null,
+  "self_review": [],
+  "concerns": [],
+  "knowledge_used": ["process.tdd"]
+}

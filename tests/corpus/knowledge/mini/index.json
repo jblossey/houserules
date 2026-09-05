@@ -1,0 +1,7 @@
+{
+  "command": "node <frozen-worktree>/tools/kb.mjs index",
+  "cwd": "tests/corpus/fixtures/mini",
+  "stdout": "[\n  {\n    \"id\": \"mini.build-cache\",\n    \"kind\": \"rule\",\n    \"area\": \"tools\",\n    \"standing\": false,\n    \"summary\": \"Clear the mini-tools build cache before every fixture regeneration run.\"\n  },\n  {\n    \"id\": \"mini.no-todo\",\n    \"kind\": \"rule\",\n    \"area\": \"tools\",\n    \"standing\": false,\n    \"summary\": \"Never leave a TODO marker under mini-tools/.\"\n  },\n  {\n    \"id\": \"mini.onboarding\",\n    \"kind\": \"procedure\",\n    \"area\": \"tools\",\n    \"standing\": false,\n    \"summary\": \"Onboarding steps for a new mini-tools contributor.\"\n  },\n  {\n    \"id\": \"mini.stale-lockfile\",\n    \"kind\": \"gotcha\",\n    \"area\": \"tools\",\n    \"standing\": false,\n    \"summary\": \"A stale mini-tools lockfile makes the fixture regenerate with drift.\"\n  },\n  {\n    \"id\": \"mini.standing-example\",\n    \"kind\": \"rule\",\n    \"area\": \"global\",\n    \"standing\": true,\n    \"summary\": \"Always run the mini fixture's own regeneration before trusting its output.\"\n  },\n  {\n    \"id\": \"mini.tool-timeout\",\n    \"kind\": \"invariant\",\n    \"area\": \"tools\",\n    \"standing\": false,\n    \"summary\": \"Every mini-tools command times out after five seconds.\"\n  }\n]\n",
+  "stderr": "",
+  "exit": 0
+}
