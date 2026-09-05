@@ -474,3 +474,16 @@ Each item records the ruling with its date, or stays marked open.
     before submitting a report). Applied in knowledge/ and
     template/knowledge/ (process.json, quality.json). Source:
     owner, 2026-09-04, batch 16 report.
+29. **The three batch-17 rulings — confirmed 2026-09-05.** Ruled as
+    a set at the batch 17 report: (a) the data-layer rule — typed
+    serde models serve only paths where data is never re-serialized
+    to its source file and a parse failure is acceptable; every
+    path preserving an adopter's on-disk key order or diagnosing
+    malformed input reads raw Value through tolerant loaders, and
+    consumerless models are deleted, not kept dormant; (b) the
+    unified get's arity-first ordering (its domain depends on the
+    ids; fixed-domain commands stay load-first per JS parity);
+    (c) the clap argv deviation — flags the JS silently swallowed
+    are named usage errors at exit 2, every observable instance
+    pinned by scripted enumeration. The spec's §3 and §6 carry the
+    detail. Source: owner, 2026-09-05, batch 17 report.
