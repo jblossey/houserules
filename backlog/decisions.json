@@ -116,6 +116,10 @@
     {
       "date": "2026-09-05",
       "text": "Batch 17 standing approvals, all five, with the Rust-tooling correction: the report-claims checker mandate (HR-061 ports it to a cargo bin - no Node tools in the codebase), the code-comments measurement clause, the exact-pins Cargo extension, the scratch-dirs sanctioned-forms bullet, and the new standing rules closure-claims-carry-enumeration and review-findings-are-claims-too. make-corpus.mjs stays the one interim exception (drives the frozen JS; retires with the corpus), pending confirmation. docs/design.md §5.30."
+    },
+    {
+      "date": "2026-09-05",
+      "text": "Well-maintained libraries over custom code, governed: quality.well-maintained-libraries standing in both copies - the orchestrator researches candidates at SPEC time, the owner rules the choice, refactors fold into specs and plans instead of deferring, and a mandatory whole-codebase sweep after the full Rust rewrite verifies the untouched remainder (rides the phase-5 sweep). docs/design.md §5.31."
     }
   ],
   "notes": []

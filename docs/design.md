@@ -505,3 +505,18 @@ Each item records the ruling with its date, or stays marked open.
     the one interim exception (it drives the frozen JS and retires
     with the corpus at phase 5). Source: owner, 2026-09-05,
     batch 17 report.
+31. **Well-maintained libraries over custom code, governed — ruled
+    2026-09-05.** The preference existed in quality.principles
+    (and tag-pilot); the owner adds the governance:
+    quality.well-maintained-libraries lands standing in both
+    copies. The orchestrator researches candidate libraries at
+    SPEC time with maintenance evidence — never the implementers,
+    never at plan time — and the owner rules the choice. Wherever
+    the codebase is touched, custom code a library should replace
+    is refactored in that batch, folded into the spec and plan;
+    deferring the rewrite is not an option. After the Rust rewrite
+    completes (no node/TypeScript/vitest traces), a mandatory
+    whole-codebase sweep verifies the untouched remainder abides —
+    riding the phase-5 repository sweep (§5.24). Enforced from
+    this ruling forward; the batch 18 spec amends to comply.
+    Source: owner, 2026-09-05, batch 18 spec gate.
