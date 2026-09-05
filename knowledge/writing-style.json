@@ -27,7 +27,9 @@
       "area": "global",
       "standing": true,
       "summary": "Write a code comment only for a constraint the code cannot show.",
-      "body": [],
+      "body": [
+        "A comment asserting measured or cross-engine behavior is a claim: run the measurement before committing the sentence, and state where it was verified (batch 17 task 3: three false comments shipped, one licensing a real defect, and the fix introduced a fourth)."
+      ],
       "tags": ["comments"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     },

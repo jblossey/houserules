@@ -11,14 +11,15 @@
       "summary": "Pin exact versions. Install only with a CLI (`pnpm add --save-exact`, `cargo add <crate>@=<version>`). Never write a version number by hand.",
       "body": [
         "Ranges (`^`, `~`) widen the attack surface. Resolve to the latest stable version at install time.",
-        "The deterministic check covers `package.json`; ranges inside the `engines` object are floors, not dependency pins, and are exempt. Other ecosystems are judged by the reviewer under the same rule."
+        "The deterministic check covers `package.json` and `Cargo.toml`; ranges inside the `engines` object are floors, not dependency pins, and are exempt. Other ecosystems are judged by the reviewer under the same rule.",
+        "A bare Cargo range (\"2.14\", an implicit caret) is invisible to the pattern without false-positiving the [package] version line; it stays judged material (batch 17: a Cargo dependency landed while the check read zero files)."
       ],
       "tags": ["dependencies", "supply-chain"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
       "check": {
         "type": "grep-absent",
         "level": "fail",
-        "files": "**/package.json",
+        "files": ["**/package.json", "**/Cargo.toml"],
         "pattern": "(?<!\"engines\":\\s*\\{[^}]*)(\"([\\^~]|>=?|<=?)\\s*\\d|\"\\*\"|\"latest\"|\"\\d+(\\.\\d+)*\\.x\")",
         "scope": "changed"
       }

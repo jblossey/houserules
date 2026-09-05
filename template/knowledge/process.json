@@ -381,6 +381,32 @@
       ],
       "tags": ["reports", "evidence", "review"],
       "source": { "date": "2026-09-04", "by": "review", "ref": "batch 16 task 2 re-review r1 trend note; owner ruling at the batch 16 report" }
+    },
+    {
+      "id": "process.closure-claims-carry-enumeration",
+      "kind": "rule",
+      "area": "process",
+      "standing": true,
+      "summary": "A claim that a set is closed ('every', 'all', 'no remaining') names the bounded, rerunnable enumeration that produced it; without the artifact, no claim.",
+      "body": [
+        "Born from the batch 17 argv-closure arc: every unenumerated closure sentence was false in at least one direction, and each fix was a script whose output the sentence could then cite.",
+        "The enumeration lives at a path that outlives the session and reruns cleanly; its own summary line states the counts the claim cites, so a reader checks the artifact, not the prose."
+      ],
+      "tags": ["reports", "evidence", "review"],
+      "source": { "date": "2026-09-05", "by": "user", "ref": "batch 17 report ruling; branch review retrospective" }
+    },
+    {
+      "id": "process.review-findings-are-claims-too",
+      "kind": "rule",
+      "area": "process",
+      "standing": true,
+      "summary": "A review finding stating a measurement, a reproduction, or a proposed fix's behavior is verified by running it before filing; restated claims are re-derived.",
+      "body": [
+        "Batch 17 caught the reviewer wrong twice (a prescribed device that provably did not work; a divergence tally measured with the wrong command names) and the controller's dispatch premises wrong twice - each caught only because someone re-ran the thing. The discipline that binds the implementer's report binds the review's findings and the dispatch's diagnosis alike.",
+        "The paired task-reviewer template clause lands with HR-060."
+      ],
+      "tags": ["review", "evidence"],
+      "source": { "date": "2026-09-05", "by": "user", "ref": "batch 17 report ruling; branch review retrospective" }
     }
   ]
 }

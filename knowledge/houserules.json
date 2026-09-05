@@ -274,7 +274,8 @@
       "summary": "Every test that mints a scratch directory registers its removal at the mkdtemp site: the shared helper, or onTestFinished/afterEach with recursive rmSync.",
       "body": [
         "At the batch 9 task 2 review, tests/ held 21 mkdtempSync call sites across seven test files with no cleanup; a full suite run left /tmp holding 1714 orphaned houserules-target-* trees plus 89 kb-* and 15 ws-* trees, and a transient inode exhaustion had already broken one suite attempt.",
-        "The suite leaves the temp root as it found it: call tests/scratch-dir.mjs's scratchDir(prefix), which mints the directory and registers rmSync(dir, { recursive: true, force: true }) on onTestFinished. A site that cannot use the shared helper registers the same removal itself, in an explicit onTestFinished or afterEach."
+        "The suite leaves the temp root as it found it: call tests/scratch-dir.mjs's scratchDir(prefix), which mints the directory and registers rmSync(dir, { recursive: true, force: true }) on onTestFinished. A site that cannot use the shared helper registers the same removal itself, in an explicit onTestFinished or afterEach.",
+        "The two sanctioned forms, and only these: a scratchDir(...) path, or a removal registered at the mkdtemp site (onTestFinished/afterEach in JS, a Drop-owning guard in Rust) before any fallible step runs. Batch 17 shipped two raw mkdtempSync sites that leaked on failure paths; a deterministic grep check stays parked unless violations recur (owner ruling at the batch 17 report)."
       ],
       "tags": [
         "tests",
