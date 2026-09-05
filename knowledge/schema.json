@@ -48,7 +48,8 @@
         "tools",
         "cli",
         "template",
-        "tests"
+        "tests",
+        "rust"
       ]
     },
     "glob": {

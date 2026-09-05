@@ -237,13 +237,14 @@
     {
       "number": 17,
       "items": [
-        "HR-059"
+        "HR-059",
+        "HR-056"
       ],
       "summary": "Tier-2 phase 2 (HR-059, under HR-047): audit, validate, stats, and the backlog commands in Rust with serde schema models; the glob functions wired into audit/for; per-surface coverage ratchets and live gates; HR-056's bare-invocation pin.",
       "kickoff": "docs/specs/2026-09-04-batch-15-tier2-spec.md",
       "status": {
-        "state": "planned",
-        "text": "Gated 2026-09-04: phase 2 chosen at the batch 16 report; plan pending."
+        "state": "done",
+        "text": "Done 2026-09-05: phase 2 delivered whole and merged fast-forward after the branch review (fable: ready with-fixes, both Minors fixed in-branch). Every phase-2 surface in Rust byte-identical live: validate/stats/audit (field-identical JSON, ten ranges byte-equal after the key-order fix), the backlog commands (set write-parity to the byte), the read commands with the unified get, HR-056's bare-invocation pin, zero dead-code allows. The model layer's full arc under the new data-layer rule (built, hardened, deleted to its real consumers); three controller-accepted rulings homed mid-batch (data-layer, get arity-first, clap argv) pending owner confirmation; the argv surface closed by scripted enumeration (36+21 shapes, every divergence pinned incl. bare and duplicated --dir); tools/check-report-claims.mjs born from five prose-drift rounds and mandated as the closing act. Retrospective: the rust area + crash-paths rule applied; HR-060 files the template clauses; five standing proposals to the owner. Fifteen review rounds across four tasks; twice a fix round corrected the REVIEWER's own measurement — the verify-by-running discipline now cuts both ways."
       }
     }
   ]
