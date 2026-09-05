@@ -255,10 +255,10 @@
         "HR-061"
       ],
       "summary": "Tier-2 phase 3 (HR-062, under HR-047): init/update/files with the embedded payload, the reference rewrite to the flat commands, tools/*.sh deletion, check-commit in the hook; plus the batch-17 process items — the template clauses with their evals rerun (HR-060) and the report-claims checker as a cargo bin (HR-061).",
-      "kickoff": "docs/specs/2026-09-04-batch-15-tier2-spec.md",
+      "kickoff": "docs/specs/2026-09-05-batch-18-phase3.md",
       "status": {
         "state": "planned",
-        "text": "Gated 2026-09-05: phase 3 + HR-060/061 chosen at the batch 17 report; plan pending."
+        "text": "Gated 2026-09-05: phase 3 + HR-060/061/051. Spec approved as amended (the library-governance ruling applied; rust-embed ruled); plan approval next."
       }
     }
   ]
