@@ -120,6 +120,10 @@
     {
       "date": "2026-09-05",
       "text": "Well-maintained libraries over custom code, governed: quality.well-maintained-libraries standing in both copies - the orchestrator researches candidates at SPEC time, the owner rules the choice, refactors fold into specs and plans instead of deferring, and a mandatory whole-codebase sweep after the full Rust rewrite verifies the untouched remainder (rides the phase-5 sweep). docs/design.md §5.31."
+    },
+    {
+      "date": "2026-09-05",
+      "text": "Spec before plan, strictly: a plan written before its approved spec is nil - deleted and the planning phase redone from the spec, never re-anchored. Applied as a process.brainstorm-first body bullet in both copies; the batch 18 plan was voided and rewritten under the ruling. docs/design.md §5.32."
     }
   ],
   "notes": []

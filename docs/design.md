@@ -520,3 +520,10 @@ Each item records the ruling with its date, or stays marked open.
     riding the phase-5 repository sweep (§5.24). Enforced from
     this ruling forward; the batch 18 spec amends to comply.
     Source: owner, 2026-09-05, batch 18 spec gate.
+32. **Spec before plan, strictly — ruled 2026-09-05.** A plan
+    written before its approved spec is nil: deleted, and the
+    planning phase redone from the spec — never re-anchored. Ruled
+    when the batch 18 plan predated its spec; the plan was voided
+    and rewritten from the approved spec. Applied as a
+    process.brainstorm-first body bullet in both copies. Source:
+    owner, 2026-09-05, batch 18 gate.

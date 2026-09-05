@@ -53,7 +53,8 @@
       "standing": true,
       "summary": "Start each batch with a brainstorming session or a written spec; get the user's approval before implementing.",
       "body": [
-        "Use the superpowers brainstorming and spec skills when the plugin is installed; otherwise write the spec by hand. Specs live in `docs/specs/`."
+        "Use the superpowers brainstorming and spec skills when the plugin is installed; otherwise write the spec by hand. Specs live in `docs/specs/`.",
+        "The order is strict: spec, then plan. A plan written before its approved spec is nil - deleted and the planning phase redone from the spec, never re-anchored."
       ],
       "tags": ["batch", "design"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
