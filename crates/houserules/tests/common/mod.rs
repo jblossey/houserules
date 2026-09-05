@@ -38,9 +38,19 @@ pub fn houserules() -> Command {
 
 /// This checkout's repository root, resolved at compile time from the
 /// crate's manifest directory (`crates/houserules`) so it is correct
-/// regardless of the test runner's working directory.
+/// regardless of the test runner's working directory. Canonicalized (CI
+/// fix round 1, issue 1): `CARGO_MANIFEST_DIR` joined with `../..` keeps
+/// those two literal components rather than collapsing them, and the
+/// binary's own `resolve_like_node` now collapses `..` textually like
+/// Node's `path.resolve` does (`validate_deliverable.rs`'s own doc) --
+/// left uncollapsed here, this path would no longer byte-match what the
+/// binary echoes back for an already-absolute argument built from it,
+/// breaking every corpus test that redacts this value out of the
+/// binary's own output before comparing.
 pub fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    root.canonicalize()
+        .unwrap_or_else(|error| panic!("canonicalize {}: {error}", root.display()))
 }
 
 /// Copies every file under `src` into `dst`, creating directories as needed.

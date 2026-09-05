@@ -17,7 +17,7 @@
 //! carry forward -- see this module's sibling doc comment on the deletion
 //! of `rules::deliverables` and `json_shape` for the full account.
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
 use serde_json::{Value, json};
@@ -26,6 +26,54 @@ use crate::emit::emit;
 
 use super::deliverable::read_deliverable_value;
 use super::model::load_base;
+
+/// The absolute form of `path`, matching Node's `path.resolve(cwd, path)`
+/// exactly -- `std::path::absolute` comes close but is not quite it: its
+/// own docs say it deliberately keeps `..` components unresolved on
+/// POSIX ("this function does not access the filesystem", so a `..` after
+/// a possible symlink cannot be collapsed with confidence), where
+/// `path.resolve` always collapses them textually, since Node's own
+/// version is a pure string operation with no such caution to begin with
+/// (verified live against `tools/kb.mjs` at the frozen sha:
+/// `path.resolve('/foo/../../baz')` is `/baz`, never `/../baz`). Both
+/// join onto `std::env::current_dir`/`process.cwd()` for a relative
+/// `path` -- CI issue 1's own root cause was a test asserting a symlinked
+/// temp directory's own name would survive that join, when neither
+/// engine's real current-directory query ever preserves one
+/// (`getcwd(3)`, which both ultimately call, is specified to resolve
+/// every symlink; verified live, `tools/kb.sh validate` run through a
+/// symlinked cwd reports the real directory, not the symlink's name --
+/// see `validate_stats_audit_parity.rs`'s own symlink test).
+fn resolve_like_node(path: &Path) -> std::io::Result<PathBuf> {
+    if path.is_absolute() {
+        return Ok(normalize_lexically(path));
+    }
+    Ok(normalize_lexically(&std::env::current_dir()?.join(path)))
+}
+
+/// Collapses `.`/`..` path components without touching the filesystem --
+/// `path.resolve`'s own final normalization step (`resolve_like_node`'s
+/// doc). `Path::components` already drops repeated separators and a bare
+/// `.` component on its own; only `..` needs handling here: it pops the
+/// last pushed normal component, or is dropped outright at the root
+/// (there being nothing above it to keep -- verified live: Node's own
+/// `path.resolve('/foo/../../baz')` is `/baz`, not `/../baz`).
+fn normalize_lexically(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::ParentDir => match out.components().next_back() {
+                Some(Component::Normal(_)) => {
+                    out.pop();
+                }
+                Some(Component::RootDir) | None => {}
+                _ => out.push(component),
+            },
+            other => out.push(other),
+        }
+    }
+    out
+}
 
 /// Path, relative to the repo root, of the agent-deliverables JSON Schema.
 const DELIVERABLES_SCHEMA: &str = ".claude/schemas/deliverables.json";
@@ -166,7 +214,7 @@ pub(crate) fn cmd_validate(dir: Option<PathBuf>, files: Vec<PathBuf>) -> ExitCod
 
     let mut results = Vec::with_capacity(files.len());
     for file in &files {
-        let absolute = match std::path::absolute(file) {
+        let absolute = match resolve_like_node(file) {
             Ok(path) => path,
             Err(error) => {
                 eprintln!("{}: {error}", file.display());
