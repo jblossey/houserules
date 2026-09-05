@@ -1037,7 +1037,8 @@
         "process"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 18
     },
     {
       "id": "HR-061",
@@ -1055,7 +1056,26 @@
         "process"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 18
+    },
+    {
+      "id": "HR-062",
+      "type": "feat",
+      "title": "Tier-2 phase 3: init/update/files, the reference rewrite, check-commit",
+      "body": [
+        "Phase 3 of the approved Tier-2 spec (docs/specs/2026-09-04-batch-15-tier2-spec.md, section 5.3), under HR-047: init/update/files in Rust with the payload embedded in the binary, KIT_OWNED sync gaining the deletion capability, the stamp and drift line, the settings merge; the reference rewrite across every shipped file to the flat houserules commands; tools/kb.sh and tools/backlog.sh deleted from the payload and from installs at the next update; check-commit lands and the shipped hook probes it in place of commitlint.",
+        "The phase where the payload contract flips: the section 2 invariant amendment and the design.md section 3 ownership prose land here (re-timed from batch 16). The plan must settle: the corpus render slices get re-baselined where the sanctioned rewrite changes output; the repository itself flips its own gates, CI, docs, and mise tasks to the binary when dogfooding deletes its root shell tools; template/tools/*.mjs linger through phase 4 (the live vitest gates and corpus regeneration drive them) and retire at phase 5.",
+        "Source: owner gate 2026-09-05 (batch 18: phase 3 + HR-060/061 folded in)."
+      ],
+      "tags": [
+        "cli",
+        "rust",
+        "template"
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 18
     }
   ]
 }
