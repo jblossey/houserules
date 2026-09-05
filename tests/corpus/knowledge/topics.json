@@ -1,0 +1,7 @@
+{
+  "command": "node tools/kb.mjs topics",
+  "cwd": "<frozen-worktree>",
+  "stdout": "[\n  {\n    \"topic\": \"houserules\",\n    \"entries\": 13,\n    \"title\": \"Working in the houserules kit repository\"\n  },\n  {\n    \"topic\": \"knowledge-base\",\n    \"entries\": 4,\n    \"title\": \"Authoring knowledge entries\"\n  },\n  {\n    \"topic\": \"process\",\n    \"entries\": 23,\n    \"title\": \"How work runs: batches, dispatch, reviews, rulings\"\n  },\n  {\n    \"topic\": \"quality\",\n    \"entries\": 4,\n    \"title\": \"Quality principles\"\n  },\n  {\n    \"topic\": \"security-hygiene\",\n    \"entries\": 5,\n    \"title\": \"Dependency, commit, and test hygiene\"\n  },\n  {\n    \"topic\": \"writing-style\",\n    \"entries\": 4,\n    \"title\": \"Writing style for docs, comments, commits, reports\"\n  }\n]\n",
+  "stderr": "",
+  "exit": 0
+}

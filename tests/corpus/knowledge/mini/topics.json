@@ -1,0 +1,7 @@
+{
+  "command": "node <frozen-worktree>/tools/kb.mjs topics",
+  "cwd": "tests/corpus/fixtures/mini",
+  "stdout": "[\n  {\n    \"topic\": \"mini\",\n    \"entries\": 6,\n    \"title\": \"Mini fixture knowledge\"\n  }\n]\n",
+  "stderr": "",
+  "exit": 0
+}

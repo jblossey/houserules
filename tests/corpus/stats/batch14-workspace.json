@@ -1,0 +1,7 @@
+{
+  "command": "node tools/kb.mjs stats <fixtures>/batch14-workspace",
+  "cwd": "<frozen-worktree>",
+  "stdout": "{\n  \"violations\": [\n    {\n      \"id\": \"writing-style.instructions-cover-the-state-space\",\n      \"count\": 1,\n      \"tasks\": [\n        \"1\"\n      ]\n    }\n  ],\n  \"unused_ids\": [],\n  \"audits\": {\n    \"files\": 0,\n    \"tasks\": 0\n  },\n  \"reviews\": {\n    \"files\": 5\n  }\n}\n",
+  "stderr": "",
+  "exit": 0
+}

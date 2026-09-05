@@ -1,0 +1,36 @@
+{
+  "base": "0000000",
+  "head": "0000001",
+  "ids": ["process.tdd", "quality.principles"],
+  "changed_files": ["src/example.rs"],
+  "areas": ["global"],
+  "area_files": { "global": [] },
+  "rules": [
+    {
+      "id": "process.tdd",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "fail",
+      "evidence": "synthetic failing evidence for the stats-workspace fixture"
+    },
+    {
+      "id": "quality.principles",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "warn",
+      "result": "pass",
+      "evidence": "synthetic passing evidence for the stats-workspace fixture"
+    }
+  ],
+  "summary": {
+    "base": "0000000",
+    "head": "0000001",
+    "deterministic": 2,
+    "pass": 1,
+    "fail": 1,
+    "warn": 0,
+    "skipped": 0,
+    "judged": 0
+  }
+}

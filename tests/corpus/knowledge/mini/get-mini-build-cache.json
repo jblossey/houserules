@@ -1,0 +1,7 @@
+{
+  "command": "node <frozen-worktree>/tools/kb.mjs get mini.build-cache",
+  "cwd": "tests/corpus/fixtures/mini",
+  "stdout": "[\n  {\n    \"id\": \"mini.build-cache\",\n    \"kind\": \"rule\",\n    \"area\": \"tools\",\n    \"summary\": \"Clear the mini-tools build cache before every fixture regeneration run.\",\n    \"body\": [\n      \"Synthetic rule for the mini fixture; it exercises the rule kind in a rendered area file.\"\n    ],\n    \"tags\": [\n      \"fixture\",\n      \"tools\"\n    ],\n    \"source\": {\n      \"date\": \"2026-09-04\",\n      \"by\": \"docs\",\n      \"ref\": \"HR-054 fixture corpus\"\n    },\n    \"topic\": \"mini\"\n  }\n]\n",
+  "stderr": "",
+  "exit": 0
+}

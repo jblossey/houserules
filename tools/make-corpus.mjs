@@ -77,6 +77,21 @@ const BACKLOG_RUNS = [
   { file: 'check.json', args: ['check'] },
 ];
 
+/**
+ * `kb.mjs` read-command invocations (`topics`/`index`/`index --standing`/
+ * `standing`, no id or path) frozen under `tests/corpus/knowledge/` (batch
+ * 17 T4). `get` and `for` (bare and `--full`) each need an id/path
+ * meaningful to the base they run against, so those are their own
+ * `runAndFreeze` calls beside this list, on both the frozen worktree and
+ * the `mini` fixture.
+ */
+const KNOWLEDGE_RUNS = [
+  { file: 'topics.json', args: ['topics'] },
+  { file: 'index.json', args: ['index'] },
+  { file: 'index-standing.json', args: ['index', '--standing'] },
+  { file: 'standing.json', args: ['standing'] },
+];
+
 const SKILL_PATH = '.claude/skills/project-knowledge/SKILL.md';
 const WORKTREE_LABEL = '<frozen-worktree>';
 const FIXTURES_DIR = 'tests/corpus/fixtures';
@@ -163,7 +178,16 @@ function renderedPaths(root) {
  * `tests/corpus/`, the same directory the fixtures are read from, so wiping
  * the whole tree would delete the committed inputs before they get copied.
  */
-const OWNED_ENTRIES = ['render', 'check', 'audit', 'validate', 'backlog', 'manifest.json'];
+const OWNED_ENTRIES = [
+  'render',
+  'check',
+  'audit',
+  'validate',
+  'stats',
+  'backlog',
+  'knowledge',
+  'manifest.json',
+];
 
 /**
  * Builds the frozen fixture corpus into `outDir` and returns the sorted
@@ -233,12 +257,33 @@ export function generateCorpus({ outDir, root = repoRoot() } = {}) {
       produces: paths.map((path) => `${outPrefix}/${path}`),
     });
   }
+  /**
+   * Runs a mutating `backlog.mjs set` in `cwd`, freezes its run capture at
+   * `outPrefix/command.json`, and freezes the raw bytes `set` wrote to
+   * `itemFile` (repo-relative to `cwd`) at `outPrefix/itemFile` -- the two
+   * pieces T2's `set` port byte-compares its own written file against: the
+   * captured stdout/exit, and the exact post-write bytes of the mutated
+   * items file.
+   */
+  function setAndFreeze({ execArgs, cwd, displayCommand, cwdLabel, outPrefix, itemFile }) {
+    const result = runNode(execArgs, cwd);
+    assertExit(displayCommand, result, 0);
+    writeJson(`${outPrefix}/command.json`, capture(displayCommand, cwdLabel, result));
+    write(`${outPrefix}/${itemFile}`, readFileSync(join(cwd, itemFile)));
+    runs.push({
+      command: displayCommand,
+      cwd: cwdLabel,
+      produces: [`${outPrefix}/command.json`, `${outPrefix}/${itemFile}`],
+    });
+  }
 
   const fixturesMini = join(root, FIXTURES_DIR, 'mini');
   const fixturesMiniBad = join(root, FIXTURES_DIR, 'mini-bad');
   const fixturesMiniStale = join(root, FIXTURES_DIR, 'mini-stale');
   const fixturesBatch14 = join(root, FIXTURES_DIR, 'batch14-workspace');
   const fixturesInvalid = join(root, FIXTURES_DIR, 'invalid-deliverable');
+  const fixturesSkipped = join(root, FIXTURES_DIR, 'skipped-report');
+  const fixturesStatsWorkspace = join(root, FIXTURES_DIR, 'stats-workspace');
 
   withFrozenWorktree(root, (worktree) => {
     // render/root: every file renderAll produces for the frozen repository.
@@ -295,6 +340,81 @@ export function generateCorpus({ outDir, root = repoRoot() } = {}) {
       });
     }
 
+    // knowledge/: the read commands (batch 17 T4), against the frozen
+    // worktree's own knowledge base -- topics/index/standing take no
+    // arguments; get and for each name something real in that base
+    // (houserules.template-is-the-source predates FROZEN_SHA; tools/kb.mjs
+    // itself falls under the "tools" area's `tools/**` glob).
+    for (const { file, args } of KNOWLEDGE_RUNS) {
+      const execArgs = ['tools/kb.mjs', ...args];
+      runAndFreeze({
+        execArgs,
+        cwd: worktree,
+        displayCommand: `node ${execArgs.join(' ')}`,
+        cwdLabel: WORKTREE_LABEL,
+        outPath: `knowledge/${file}`,
+        expectExit: 0,
+      });
+    }
+    runAndFreeze({
+      execArgs: ['tools/kb.mjs', 'get', 'houserules.template-is-the-source'],
+      cwd: worktree,
+      displayCommand: 'node tools/kb.mjs get houserules.template-is-the-source',
+      cwdLabel: WORKTREE_LABEL,
+      outPath: 'knowledge/get-houserules-template-is-the-source.json',
+      expectExit: 0,
+    });
+    runAndFreeze({
+      execArgs: ['tools/kb.mjs', 'for', 'tools/kb.mjs'],
+      cwd: worktree,
+      displayCommand: 'node tools/kb.mjs for tools/kb.mjs',
+      cwdLabel: WORKTREE_LABEL,
+      outPath: 'knowledge/for-tools-kb-mjs.json',
+      expectExit: 0,
+    });
+    runAndFreeze({
+      execArgs: ['tools/kb.mjs', 'for', 'tools/kb.mjs', '--full'],
+      cwd: worktree,
+      displayCommand: 'node tools/kb.mjs for tools/kb.mjs --full',
+      cwdLabel: WORKTREE_LABEL,
+      outPath: 'knowledge/for-tools-kb-mjs-full.json',
+      expectExit: 0,
+    });
+
+    // stats/: the frozen kb.mjs stats over the committed batch-14 workspace fixtures
+    // (houserules.corpus-batch14-fixtures-are-committed). stats never echoes a path
+    // into its output (only ids, counts, and task labels), so no redaction applies.
+    // batch14-workspace holds no task-*-audit*.json, so this slice alone exercises
+    // only stats()'s reviews input path -- the audits path and the unused_ids
+    // cross-reference stay structurally empty here (batch 17 T1 fix round 1, review
+    // issue 4). stats-workspace/ below is the slice that exercises those.
+    runAndFreeze({
+      execArgs: ['tools/kb.mjs', 'stats', fixturesBatch14],
+      cwd: worktree,
+      displayCommand: 'node tools/kb.mjs stats <fixtures>/batch14-workspace',
+      cwdLabel: WORKTREE_LABEL,
+      outPath: 'stats/batch14-workspace.json',
+      expectExit: 0,
+    });
+
+    // stats/stats-workspace.json: a small fixture with one task-*-audit*.json
+    // (one fail row, two injected ids) and one task-<n>-report.json whose
+    // knowledge_used cites exactly one of those two ids -- so unused_ids comes
+    // out as the other id alone, not both, pinning the cited-vs-injected
+    // cross-reference itself (batch 17 T1 fix round 2, review r1 new_breakage
+    // (c): two uncited ids alone left that subtraction unobservable, since a
+    // port that never read knowledge_used would reproduce the same output).
+    // violations, unused_ids, and audits are all non-trivial here, unlike the
+    // batch14-workspace slice above.
+    runAndFreeze({
+      execArgs: ['tools/kb.mjs', 'stats', fixturesStatsWorkspace],
+      cwd: worktree,
+      displayCommand: 'node tools/kb.mjs stats <fixtures>/stats-workspace',
+      cwdLabel: WORKTREE_LABEL,
+      outPath: 'stats/stats-workspace.json',
+      expectExit: 0,
+    });
+
     // validate/: the frozen kb.mjs validate over the committed batch-14 deliverables,
     // plus one invalid fixture so the slice also freezes a failing verdict.
     const redactReason =
@@ -339,9 +459,26 @@ export function generateCorpus({ outDir, root = repoRoot() } = {}) {
       redact: { from: fixturesInvalid, to: invalidPlaceholder, reason: redactReason },
     });
 
+    // validate/skipped-report.json: the self_audit.summary.skipped > 0 message
+    // (parked by the batch 16 T4 r1 re-review; see checkTaskReportAudit,
+    // template/tools/kb.mjs:799-811 at the frozen sha) -- a terminal-status
+    // report whose self_audit is filled but names a nonzero skipped count.
+    const skippedPlaceholder = '<fixtures>/skipped-report';
+    runAndFreeze({
+      execArgs: ['tools/kb.mjs', 'validate', join(fixturesSkipped, 'skipped-report.json')],
+      cwd: worktree,
+      displayCommand: `node tools/kb.mjs validate ${skippedPlaceholder}/skipped-report.json`,
+      cwdLabel: WORKTREE_LABEL,
+      outPath: 'validate/skipped-report.json',
+      expectExit: 1,
+      redact: { from: fixturesSkipped, to: skippedPlaceholder, reason: redactReason },
+    });
+
     // render/mini and check/{mini,mini-bad}: synthetic fixtures, frozen kb.mjs.
     const kbInWorktree = join(worktree, 'tools/kb.mjs');
     const kbDisplay = `node ${WORKTREE_LABEL}/tools/kb.mjs`;
+    const backlogInWorktree = join(worktree, 'tools/backlog.mjs');
+    const backlogDisplay = `node ${WORKTREE_LABEL}/tools/backlog.mjs`;
     const miniLabel = `${FIXTURES_DIR}/mini`;
     const miniBadLabel = `${FIXTURES_DIR}/mini-bad`;
 
@@ -360,6 +497,60 @@ export function generateCorpus({ outDir, root = repoRoot() } = {}) {
         displayCommand: `${kbDisplay} check`,
         cwdLabel: miniLabel,
         outPath: 'check/mini.json',
+        expectExit: 0,
+      });
+
+      // backlog/set/mini: a representative status+batch set against the
+      // mini fixture's own backlog/ (unrelated to the mini knowledge base
+      // render/check above -- loadBacklog never touches knowledge/). HR-901
+      // starts with no `batch` key at all, so this run freezes both write
+      // shapes T2 must reproduce byte-exact: an in-place field update
+      // (status) and a brand-new trailing key (batch).
+      setAndFreeze({
+        execArgs: [backlogInWorktree, 'set', 'HR-901', 'status=done', 'batch=2'],
+        cwd: miniCopy,
+        displayCommand: `${backlogDisplay} set HR-901 status=done batch=2`,
+        cwdLabel: miniLabel,
+        outPrefix: 'backlog/set/mini',
+        itemFile: 'backlog/items/misc.json',
+      });
+
+      // knowledge/mini/: the same read commands, over the mini fixture's
+      // own small, synthetic knowledge base -- mini.build-cache and
+      // mini-tools/build.sh (the "tools" area's own `mini-tools/**` glob)
+      // exercise get/for on data this corpus already commits verbatim.
+      for (const { file, args } of KNOWLEDGE_RUNS) {
+        runAndFreeze({
+          execArgs: [kbInWorktree, ...args],
+          cwd: miniCopy,
+          displayCommand: `${kbDisplay} ${args.join(' ')}`,
+          cwdLabel: miniLabel,
+          outPath: `knowledge/mini/${file}`,
+          expectExit: 0,
+        });
+      }
+      runAndFreeze({
+        execArgs: [kbInWorktree, 'get', 'mini.build-cache'],
+        cwd: miniCopy,
+        displayCommand: `${kbDisplay} get mini.build-cache`,
+        cwdLabel: miniLabel,
+        outPath: 'knowledge/mini/get-mini-build-cache.json',
+        expectExit: 0,
+      });
+      runAndFreeze({
+        execArgs: [kbInWorktree, 'for', 'mini-tools/build.sh'],
+        cwd: miniCopy,
+        displayCommand: `${kbDisplay} for mini-tools/build.sh`,
+        cwdLabel: miniLabel,
+        outPath: 'knowledge/mini/for-mini-tools-build-sh.json',
+        expectExit: 0,
+      });
+      runAndFreeze({
+        execArgs: [kbInWorktree, 'for', 'mini-tools/build.sh', '--full'],
+        cwd: miniCopy,
+        displayCommand: `${kbDisplay} for mini-tools/build.sh --full`,
+        cwdLabel: miniLabel,
+        outPath: 'knowledge/mini/for-mini-tools-build-sh-full.json',
         expectExit: 0,
       });
     });
@@ -402,6 +593,8 @@ export function generateCorpus({ outDir, root = repoRoot() } = {}) {
     ['mini-stale', fixturesMiniStale],
     ['batch14-workspace', fixturesBatch14],
     ['invalid-deliverable', fixturesInvalid],
+    ['skipped-report', fixturesSkipped],
+    ['stats-workspace', fixturesStatsWorkspace],
   ]) {
     for (const relPath of listFilesRecursive(dir)) {
       write(`fixtures/${label}/${relPath}`, readFileSync(join(dir, relPath)));
