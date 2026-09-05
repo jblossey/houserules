@@ -20,7 +20,9 @@ pub(crate) const SKILL_PATH: &str = ".claude/skills/project-knowledge/SKILL.md";
 /// `tools/kb.mjs`'s `RULE_KINDS` constant serves for both surfaces.
 pub(super) const RULE_KINDS: [&str; 2] = ["rule", "invariant"];
 /// Entry kinds rendered into a per-area `.claude/rules/<area>.md` file.
-const AREA_FILE_KINDS: [&str; 3] = ["rule", "invariant", "gotcha"];
+/// `pub(super)` (batch 17 T4): `read::for_result` needs the same three
+/// kinds, plus `procedure`, for `cmdFor`'s own `FOR_KINDS`.
+pub(super) const AREA_FILE_KINDS: [&str; 3] = ["rule", "invariant", "gotcha"];
 /// An area file's sections, in render order, each paired with its entry kind.
 const SECTION_KINDS: [(&str, &str); 3] = [
     ("Rules", "rule"),
@@ -202,17 +204,22 @@ pub(crate) fn render(base: &Base, check: bool) -> io::Result<Vec<String>> {
 }
 
 /// Resolves the enclosing git repository's top-level directory from the
-/// current working directory, the same resolution `tools/kb.sh render` (and
-/// `tools/kb.sh check`, via `cmd_check_knowledge` in `check.rs`) performs
-/// before loading the knowledge base. On failure (no enclosing
-/// repository, for instance) git itself can print more than one stderr
-/// line -- verified live: `git rev-parse --show-toplevel` outside any
-/// repository prints "fatal: not a git repository ..." AND a second
-/// "Stopping at filesystem boundary ..." line -- so this keeps only the
-/// first non-empty one, the same convention `tools/kb.mjs`'s `gitDiff`
-/// uses for its own git-subprocess errors, to hold the recorded one-line
-/// error contract (docs/specs/2026-09-04-batch-15-tier2-spec.md §6).
-pub(super) fn repo_root_from_cwd() -> io::Result<PathBuf> {
+/// current working directory, the same resolution `tools/kb.sh render`
+/// (and `tools/kb.sh check` / `tools/backlog.sh`, via `cmd_check_knowledge`
+/// in `check.rs` and the `backlog` module's CLI wrappers) performs before
+/// loading its base -- `tools/lib/json-store.mjs`'s `repoRoot`, the one
+/// helper the frozen `kb.mjs` and `backlog.mjs` both import. Crate-visible
+/// (batch 17 T2), not `rules`-private, for that same reason: the `backlog`
+/// module needs the identical resolution and would otherwise duplicate it.
+/// On failure (no enclosing repository, for instance) git itself can print
+/// more than one stderr line -- verified live: `git rev-parse
+/// --show-toplevel` outside any repository prints "fatal: not a git
+/// repository ..." AND a second "Stopping at filesystem boundary ..."
+/// line -- so this keeps only the first non-empty one, the same
+/// convention `tools/kb.mjs`'s `gitDiff` uses for its own git-subprocess
+/// errors, to hold the recorded one-line error contract (docs/specs/
+/// 2026-09-04-batch-15-tier2-spec.md §6).
+pub(crate) fn repo_root_from_cwd() -> io::Result<PathBuf> {
     let output = Command::new("git")
         .args(["rev-parse", "--show-toplevel"])
         .output()?;
@@ -237,15 +244,9 @@ pub(super) fn repo_root_from_cwd() -> io::Result<PathBuf> {
 /// reports which ones are stale — and prints the same messages and exit
 /// code as `tools/kb.sh render`.
 pub(crate) fn cmd_render(root: Option<PathBuf>, check: bool) -> ExitCode {
-    let root = match root {
-        Some(path) => path,
-        None => match repo_root_from_cwd() {
-            Ok(path) => path,
-            Err(error) => {
-                eprintln!("{error}");
-                return ExitCode::from(2);
-            }
-        },
+    let root = match crate::root::resolve_root(root) {
+        Ok(root) => root,
+        Err(code) => return code,
     };
     let base = match load_base(&root) {
         Ok(base) => base,
@@ -282,7 +283,7 @@ pub(crate) fn cmd_render(root: Option<PathBuf>, check: bool) -> ExitCode {
 mod tests {
     use std::collections::HashMap;
 
-    use super::super::model::{AreaDef, TopicMeta};
+    use super::super::model::{AreaDef, CheckField, TopicMeta};
     use super::*;
 
     fn entry(id: &str, kind: &str, area: &str, standing: bool, summary: &str) -> Entry {
@@ -292,6 +293,7 @@ mod tests {
             area: area.to_string(),
             standing,
             summary: summary.to_string(),
+            check: CheckField::Absent,
         }
     }
 
@@ -348,6 +350,7 @@ mod tests {
             root: PathBuf::new(),
             areas,
             entries,
+            raw_entries: HashMap::new(),
             topics,
             schema: serde_json::Value::Null,
             areas_raw: serde_json::Value::Null,

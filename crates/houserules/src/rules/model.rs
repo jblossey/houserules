@@ -1,10 +1,11 @@
-//! The knowledge base render and check draw from: `knowledge/schema.json`,
-//! `knowledge/areas.json`, every topic file under `knowledge/`, and the
-//! entries they declare.
+//! The knowledge base render, check, and audit draw from:
+//! `knowledge/schema.json`, `knowledge/areas.json`, every topic file under
+//! `knowledge/`, and the entries they declare.
 //!
-//! Ports the slice of `tools/kb.mjs`'s `loadBase` the render and check
-//! surfaces need (docs/specs/2026-09-04-batch-15-tier2-spec.md §3, HR-054
-//! tasks 3 and 4). `load_base` mirrors `loadBase`'s own tolerance exactly:
+//! Ports the slice of `tools/kb.mjs`'s `loadBase` the render, check, and
+//! audit surfaces need (docs/specs/2026-09-04-batch-15-tier2-spec.md §3,
+//! HR-054 tasks 3 and 4; batch 17 T3 adds `Entry.check` for the audit
+//! engine). `load_base` mirrors `loadBase`'s own tolerance exactly:
 //! a knowledge file must exist and parse as JSON, but its *shape* is never
 //! enforced here -- neither a topic file whose `entries` array holds a
 //! malformed item (missing `id`, wrong type, `null`), nor `areas.json`
@@ -26,6 +27,8 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use serde_json::Value;
 
+use super::check::falsy;
+use super::check_shape::CheckDef;
 use super::glob::{GlobError, compile};
 
 /// One area's glob membership, as declared under its key in
@@ -44,6 +47,38 @@ pub(crate) struct AreaDef {
 /// the same tolerance `tools/kb.mjs`'s `loadBase` gives every field it
 /// spreads onto an indexed entry (`{...item, topic: topic.name}`, no shape
 /// check beyond `typeof item.id === 'string'`).
+/// The three states an entry's raw `check` JSON field takes once
+/// "malformed" is told apart from "absent" -- fix round 1, issue 7
+/// (task-3-review.json): a plain `Option<CheckDef>` could not distinguish
+/// them, so `audit` treated a JS-truthy-but-invalid `check` (an unknown
+/// `type`, a missing required field, or a non-object truthy value) exactly
+/// like no `check` at all, silently downgrading a checked, possibly
+/// *standing*, entry to a judged row. `tools/kb.mjs`'s own `audit` has no
+/// such tolerance: a truthy `e.check` always reaches `runCheck`'s `switch
+/// (c.type)`, which returns `undefined` with no matching arm, crashing the
+/// caller downstream (docs/specs/2026-09-04-batch-15-tier2-spec.md §6's
+/// crash-path ruling: report a NAMED finding for this, not silence --
+/// `audit.rs`'s own row-building is `CheckField`'s one production
+/// consumer, and reports `Malformed` as a named, exit-2 error). `check-
+/// knowledge` (`check.rs`) already reports a malformed `check` as its own
+/// check finding via the untyped `check_shape` function there, independent
+/// of this field, and is unaffected by it either way.
+#[derive(Clone)]
+pub(crate) enum CheckField {
+    /// No `check` key, or one whose value is falsy in the JS sense
+    /// (`null`, `false`, `0`, `""`) -- `super::check::falsy`.
+    Absent,
+    /// A JS-truthy `check` value that is not a JSON object, or an object
+    /// that fails to parse as a `CheckDef`.
+    Malformed,
+    /// A `check` object that parsed cleanly. Boxed: `Absent`/`Malformed`
+    /// carry no data, so an unboxed `CheckDef` (`check_shape::CheckDef`'s
+    /// several `Option<Glob>`/`Option<String>` fields add up) would make
+    /// every `Entry` pay for the largest variant's size regardless of
+    /// which one it holds.
+    Valid(Box<CheckDef>),
+}
+
 #[derive(Clone)]
 pub(crate) struct Entry {
     pub id: String,
@@ -51,6 +86,10 @@ pub(crate) struct Entry {
     pub area: String,
     pub standing: bool,
     pub summary: String,
+    /// The entry's `check` field, classified by `CheckField`. See that
+    /// type's own doc for the load-time tolerance this buys and why it
+    /// still names a production finding rather than reproducing a crash.
+    pub check: CheckField,
 }
 
 /// One topic file's render-relevant metadata: its file slug (`name`),
@@ -75,10 +114,24 @@ pub(crate) struct TopicMeta {
 /// `schema.json` content, `areas.json`'s content before it is narrowed to
 /// `AreaDef`, and every topic file's full parsed content paired with its
 /// repo-relative path and file-stem name.
+///
+/// `raw_entries` (batch 17 T4) is `entries`' own tie-broken id index again,
+/// but each value is the entry's ENTIRE original JSON object -- every field
+/// `Entry` keeps, plus every field it drops (`body`, `tags`, `source`,
+/// `see`, `verify`, `check`'s own raw shape), in the item's own on-disk key
+/// order, with `topic` appended (or, if an entry's JSON somehow already
+/// carried that key, overwritten in place) exactly the way `loadBase`'s own
+/// `{ ...item, topic: topic.name }` spread builds `base.entries`. `get`,
+/// `for --full`, and `index`'s `--topic`/`--tag` filters (`read.rs`) all
+/// need this: `Entry`'s reduced field set cannot answer a `--tag` filter at
+/// all, and reconstructing an entry through any typed struct would reorder
+/// a hand-edited file's own key order on print -- the spec §3 data-layer
+/// rule the `backlog` module's `get`/`set` already follow.
 pub(crate) struct Base {
     pub root: PathBuf,
     pub areas: Vec<(String, AreaDef)>,
     pub entries: HashMap<String, Entry>,
+    pub raw_entries: HashMap<String, Value>,
     pub topics: Vec<TopicMeta>,
     pub schema: Value,
     pub areas_raw: Value,
@@ -147,6 +200,24 @@ fn string_field(item: &Value, key: &str) -> String {
         .to_string()
 }
 
+/// Classifies a raw `check` field into `CheckField::{Absent, Malformed,
+/// Valid}` -- `Absent` for a missing key or a JS-falsy value, `Valid` for
+/// an object that parses cleanly as a `CheckDef`, `Malformed` for
+/// everything JS-truthy in between (a non-object truthy value, or an
+/// object that fails to parse: an unknown `type`, a missing required
+/// field). See `CheckField`'s own doc for why the distinction matters.
+fn classify_check(raw: Option<&Value>) -> CheckField {
+    if falsy(raw) {
+        return CheckField::Absent;
+    }
+    match raw.filter(|value| value.is_object()) {
+        Some(value) => serde_json::from_value::<CheckDef>(value.clone())
+            .map(|check| CheckField::Valid(Box::new(check)))
+            .unwrap_or(CheckField::Malformed),
+        None => CheckField::Malformed,
+    }
+}
+
 /// Loads every knowledge topic file under `root`, indexing entries by id.
 /// Topic files are `knowledge/*.json` other than `schema.json` and
 /// `areas.json`, read in filename order. `schema.json` must exist and
@@ -170,18 +241,20 @@ pub(crate) fn load_base(root: &Path) -> Result<Base, LoadError> {
     names.sort();
 
     let mut entries: HashMap<String, Entry> = HashMap::new();
+    let mut raw_entries: HashMap<String, Value> = HashMap::new();
     let mut topics = Vec::with_capacity(names.len());
     let mut topic_files = Vec::with_capacity(names.len());
     for name in names {
         let path = dir.join(&name);
         let content = read_json_value(&path)?;
         let title = string_field(&content, "title");
-        let raw_entries: Vec<Value> = content
+        let name_stem = name.strip_suffix(".json").unwrap_or(&name).to_string();
+        let items: Vec<Value> = content
             .get("entries")
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default();
-        for item in &raw_entries {
+        for item in &items {
             let Some(id) = item.get("id").and_then(Value::as_str) else {
                 continue;
             };
@@ -194,13 +267,20 @@ pub(crate) fn load_base(root: &Path) -> Result<Base, LoadError> {
                     .and_then(Value::as_bool)
                     .unwrap_or(false),
                 summary: string_field(item, "summary"),
+                check: classify_check(item.get("check")),
+            });
+            raw_entries.entry(id.to_string()).or_insert_with(|| {
+                let mut merged = item.clone();
+                if let Value::Object(map) = &mut merged {
+                    map.insert("topic".to_string(), Value::String(name_stem.clone()));
+                }
+                merged
             });
         }
-        let name_stem = name.strip_suffix(".json").unwrap_or(&name).to_string();
         topics.push(TopicMeta {
             name: name_stem.clone(),
             title,
-            entry_count: raw_entries.len(),
+            entry_count: items.len(),
         });
         topic_files.push((format!("knowledge/{name}"), name_stem, content));
     }
@@ -209,6 +289,7 @@ pub(crate) fn load_base(root: &Path) -> Result<Base, LoadError> {
         root: root.to_path_buf(),
         areas,
         entries,
+        raw_entries,
         topics,
         schema,
         areas_raw,
@@ -268,9 +349,15 @@ fn build_areas(raw: &Value, path: &Path) -> Result<Vec<(String, AreaDef)>, LoadE
 /// from `load_base`, which also needs the raw parsed value `build_areas`
 /// consumes -- for the matcher's own tests (`glob.rs`), which need only the
 /// typed list; production code reaches `build_areas` through `load_base`
-/// instead, so this has no production caller (`#[allow(dead_code)]`,
-/// matching `glob.rs`'s own precedent for test-only entry points).
-#[allow(dead_code)]
+/// instead, so this has no production caller planned at all. `#[cfg(test)]`
+/// (batch 17 T4, replacing an `#[allow(dead_code)]`): the crate's last
+/// dead-code allow dropped without becoming a lie, since a genuinely
+/// test-only function that says so compiles out of every non-test target
+/// entirely, the same convention `backlog::test_support`'s own module doc
+/// already uses -- an `#[allow]` here would have kept asserting "this is
+/// dead code, and that's fine" forever, where `#[cfg(test)]` asserts the
+/// truer "this does not exist outside `cargo test`".
+#[cfg(test)]
 pub(crate) fn load_areas(path: &Path) -> Result<Vec<(String, AreaDef)>, LoadError> {
     let raw = read_json_value(path)?;
     build_areas(&raw, path)

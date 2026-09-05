@@ -335,3 +335,75 @@ fn render_fails_on_a_malformed_area_glob_with_a_named_error() {
         "the error names the offending glob, got: {stderr:?}"
     );
 }
+
+// ---- the ruled clap argv deviation (spec §6), for `render` -- the same
+// pattern backlog_parity.rs's, validate_stats_audit_parity.rs's, and
+// read_parity.rs's own such tests use. Batch 17 T4 fix round 2, review
+// new_breakage 1: argv_closure.rs's own closure sentence named `render` as
+// exempt from this class entirely; these three shapes were unpinned
+// anywhere in the suite.
+
+fn frozen_sha() -> String {
+    let manifest_text =
+        fs::read_to_string(repo_root().join("tests/corpus/manifest.json")).expect("read manifest");
+    let manifest: serde_json::Value = serde_json::from_str(&manifest_text).expect("parse manifest");
+    manifest["frozen_sha"]
+        .as_str()
+        .expect("manifest.frozen_sha is a string")
+        .to_string()
+}
+
+/// `render --bogus`: JS ignores the unrecognized flag and renders (exit
+/// 0); the binary reports it as an unexpected argument, exit 2.
+#[test]
+fn render_with_an_unknown_flag_exits_2_where_js_ignored_it_and_succeeded() {
+    let worktree = FrozenWorktree::checkout(&repo_root(), &frozen_sha());
+    let output = houserules()
+        .args(["render", "--bogus", "--dir"])
+        .arg(&worktree.path)
+        .output()
+        .expect("run render --bogus");
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.starts_with("error: unexpected argument '--bogus' found"),
+        "got: {stderr:?}"
+    );
+}
+
+/// `render extra`: JS ignores the unexpected positional and renders (exit
+/// 0); the binary reports it as an unexpected argument, exit 2.
+#[test]
+fn render_with_an_unexpected_positional_exits_2_where_js_ignored_it_and_succeeded() {
+    let worktree = FrozenWorktree::checkout(&repo_root(), &frozen_sha());
+    let output = houserules()
+        .args(["render", "extra", "--dir"])
+        .arg(&worktree.path)
+        .output()
+        .expect("run render extra");
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.starts_with("error: unexpected argument 'extra' found"),
+        "got: {stderr:?}"
+    );
+}
+
+/// `render --check --check`: JS's `parseArgs` sets the same `opts.check =
+/// true` twice, still `true`, exit 0; the binary refuses the duplicate,
+/// exit 2.
+#[test]
+fn render_with_a_duplicated_check_flag_exits_2_where_js_let_the_repeat_be_a_no_op() {
+    let worktree = FrozenWorktree::checkout(&repo_root(), &frozen_sha());
+    let output = houserules()
+        .args(["render", "--check", "--check", "--dir"])
+        .arg(&worktree.path)
+        .output()
+        .expect("run render --check --check");
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.starts_with("error: the argument '--check' cannot be used multiple times"),
+        "got: {stderr:?}"
+    );
+}
