@@ -55,8 +55,21 @@ use clap::{Parser, Subcommand};
 /// wording (its derived help text, not `kb.mjs`'s hand-written `usage:`
 /// line), the same disclosed, ruled exception spec §7 already grants every
 /// other unrecognized-command case in this flat surface.
+///
+/// `bin_name = "houserules"` (CI fix round 1, issue 2): without it, clap
+/// derives the name shown in `Usage:` from `argv[0]` at runtime, which is
+/// `houserules.exe` on Windows -- the same fix clap's own `typed-derive`
+/// example carries, for the same reason (its own comment: "avoid `.exe`
+/// in Usage on Windows"). `name` above only sets the program's own
+/// identity (used for `--version`, for instance); it does not reach the
+/// usage line clap builds from the binary's real invocation name.
 #[derive(Parser)]
-#[command(name = "houserules", version, arg_required_else_help = true)]
+#[command(
+    name = "houserules",
+    version,
+    arg_required_else_help = true,
+    bin_name = "houserules"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
