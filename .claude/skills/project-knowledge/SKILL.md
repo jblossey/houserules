@@ -47,7 +47,7 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 
 ## Topics
 
-houserules  18  Working in the houserules kit repository
+houserules  19  Working in the houserules kit repository
 knowledge-base  4  Authoring knowledge entries
 process  25  How work runs: batches, dispatch, reviews, rulings
 quality  4  Quality principles

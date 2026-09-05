@@ -964,7 +964,8 @@
         "rust"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "done",
+      "batch": 17
     },
     {
       "id": "HR-057",
@@ -1005,12 +1006,38 @@
       "body": [
         "Phase 2 of the approved Tier-2 spec (docs/specs/2026-09-04-batch-15-tier2-spec.md §5.2), under HR-047: the deterministic check runners and serde schema models — `audit` (field-identical JSON against the corpus), `validate`, `stats`, and the backlog commands (`list`, `get`, `set`, `batch`, `check-backlog`) — with their vitest cases ported per the coverage-ratchet pattern (houserules.vitest-coverage-floor-tracks-the-rust-port) and per-surface live behavioral gates.",
         "Carries from batch 16: wire glob_match/area_files/areas_for into audit and for, dropping the #[allow(dead_code)] attributes in the same commit; HR-056's bare-invocation pin; freeze the skipped>0 validate message the T4 r1 re-review parked; the knowledge read commands (get, for, index, topics, standing) land here or the plan states where — the spec's phasing leaves them unassigned and the phase-3 reference rewrite needs every command shipped.",
+        "Carries from T1 (fix round 1, review issue 6): T1 landed four wholly-dormant model files, each carrying a file-level #![allow(dead_code)] (crates/houserules/src/backlog/model.rs, crates/houserules/src/json_shape.rs, crates/houserules/src/rules/deliverables.rs, crates/houserules/src/rules/check_shape.rs) — the same obligation the batch-16 carry above records, at file scope instead of per-item because every item in each file was dormant alike. Each file-level allow narrows to only the items still dead in the same commit that wires that file's first consumer (T2 for backlog/model.rs; T3 or T4 for the three rules/ files), and the allow disappears entirely once none remain.",
+        "Data-layer verdict (T2 review, per the spec §3 rule): backlog/model.rs keeps ItemStatus (the status oracle) plus anything the surface consumes; its fourteen dormant types and their pin tests are DELETED in the T2 fix round — no consumer can exist under the rule. The allow-narrowing obligation ends by deletion for a model file the port will never need. rules/deliverables.rs and check_shape.rs stay for T3’s aggregating readers, judged per the same rule at T3.",
+        "Carried from the T1 r4 re-review (reviewer-sanctioned, non-blocking): tools/check-report-claims.mjs fails open when a listed commit sha does not resolve (report an error instead; test with one unresolvable sha) and its narrative-sha check misfires after aggregation discards pre-aggregation shas (add the aggregation-window limit; consider exempting shas a sentence marks as replaced). Fix in a later phase-2 task or the batch close.",
+        "T3 data-layer verdict (per the spec §3 rule, judged as T2's own verdict above delegated): none of validate/stats/audit ends up a consumer for rules/deliverables.rs's ~30 types. validate stays on the generic schema engine (its own module doc already ruled this out at T1); stats and audit's --report/--workspace reads must stay tolerant serde_json::Value, matching the frozen JS's `?? []` fallbacks for a malformed workspace file (the rule's own worked example); and audit's own JSON output cannot reuse AuditRow/AuditRowResult at all — its judged rows carry `result: \"open\"`, a value .claude/schemas/deliverables.json's auditRow.result enum forbids, so the two shapes are not actually the same type despite the superficial resemblance a prior task's module doc anticipated. rules/deliverables.rs and crate::json_shape (its one remaining consumer) are DELETED with their pin tests at T3, not kept dormant a further phase — no command in the whole flat surface (spec §3) ever constructs or strictly parses a schema-exact deliverable; every schema.json/backlog.json model layer that does keep a real consumer (backlog::model's ItemStatus, check_shape.rs's CheckDef, wired into model::Entry.check and the audit engine) stays. check_shape.rs's file-level allow drops entirely.",
+        "T4 fold-ins (T3 rounds, reviewer-sanctioned deferrals): the binary-wide bare --dir divergence (JS exit 0, clap exit 2 — verified on five commands incl. render/check-knowledge; one argv-closure pass over the WHOLE flat surface at T4, extending each command’s pins); the four duplicate-value-flag pins T3’s enumeration class omitted (--head/--ids/--report/--workspace doubled; extend task-3-fix2-enumerate-argv.sh to 25 shapes); the T3 report’s one wrong exit field (fix_rounds[1].tests[0]: script exits 0, the 2 was read off its output); the T1 claims-tool carries (fail-open on unresolvable listed sha; aggregation-window Limits gap).",
+        "Residual from the T4 r2 re-review (non-blocking, reviewer-recorded): a duplicated --dir with values (--dir X --dir Y) exits 2 in the binary and 0 in the JS uniformly across all fourteen commands — the binary-own flag class argv_closure.rs governs. Cheap close at the branch review or phase 3: narrow argv_closure.rs’s duplicated-value-flags clause to flags the frozen JS also has, or add a second loop probing --dir X --dir Y across the fourteen commands.",
         "Source: owner gate 2026-09-04 (batch 17: phase 2)."
       ],
-      "tags": ["cli", "rust"],
+      "tags": [
+        "cli",
+        "rust"
+      ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 17
+    },
+    {
+      "id": "HR-060",
+      "type": "process",
+      "title": "Template clauses and CI wiring from the batch 17 retrospective",
+      "body": [
+        "Batch 17 branch review, template_defects: (a) .claude/agents/implementer.md gains two clauses — every audit of record, fix-diff audits included, runs WITH --report <REPORT_FILE> (two batch-17 audits ran without it, skipping the checks they appeared to cover), and the closing act is a clean node tools/check-report-claims.mjs run pasted last; (b) .claude/agents/task-reviewer.md gains the verify-by-running clause — a finding stating a measurement, reproduction, or proposed-fix behavior is run before filing (two reviewer-side errors this batch). Template changes trigger process.evals-rerun — one shared rerun.",
+        "Also homes the claims-tool CI-wiring decision (currently unwired; T1 r4 review prose): decide whether tools/check-report-claims.mjs joins a CI job or stays a closing-act tool, and record the answer.",
+        "Deferred from batch 17 for the evals cost; the paired standing-entry amendments (claims-match tool mandate, code-comments measurement clause, exact-pins Cargo extension, tests-clean-scratch-dirs check) are owner-gated at the batch 17 report and land with this item if approved.",
+        "Source: batch 17 branch review retrospective, 2026-09-05."
+      ],
+      "tags": [
+        "template",
+        "process"
+      ],
+      "milestone": null,
+      "status": "open"
     }
   ]
 }

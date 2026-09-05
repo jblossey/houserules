@@ -54,8 +54,13 @@ would state what is not yet so).
   the audit's existing subject/body rules; adopters lose their last
   soft Node dependency), `audit`, `validate`, `stats`, `get`
   (resolves by id shape: `HR-031` is a backlog item, `process.tdd` a
-  knowledge entry), `for`, `index`, `topics`, `standing`, `list`,
-  `set`, `batch`. The checks stay per-module by the owner's ruling;
+  knowledge entry; ordering ruled at the batch 17 T4 review — a
+  fixed-domain command loads its domain before its arity check, JS
+  parity, while the unified `get` checks arity first because its
+  domain depends on the ids: loading a default domain would wrongly
+  fail in a repository holding only the other one; the divergence
+  is pinned by a counterexample test), `for`, `index`, `topics`,
+  `standing`, `list`, `set`, `batch`. The checks stay per-module by the owner's ruling;
   exact check-command names settle in phase 1 against the module
   names below.
 - The crate layout separates the feature modules the owner intends to
@@ -69,6 +74,18 @@ would state what is not yet so).
 - serde models the knowledge, backlog, and deliverables schemas
   exactly; the JSON Schema files stay the vendored source of truth and
   a build test pins the serde models against them.
+- Data-layer rule (controller-accepted at the batch 17 T2 review,
+  pending owner confirmation at the batch report): typed serde
+  models serve only paths where the data is never re-serialized
+  back to its source file and a parse failure is an acceptable
+  outcome (aggregating readers, the schema-pin build tests). Every
+  path that must preserve an adopter's on-disk key order or
+  diagnose malformed input reads raw serde_json::Value through
+  tolerant loaders — a typed round-trip reorders user-owned files,
+  and a strict loader cannot report the malformed data the checks
+  exist to diagnose (both proven at the T2 review). Model types
+  with no consumer under this rule are deleted with their pin
+  tests, not kept dormant.
 - No shims: every shipped file that says `tools/kb.sh ...` or
   `tools/backlog.sh ...` today — CLAUDE.md, the generated rules files,
   the three skills, the agent templates, entries' verify paths —
@@ -113,7 +130,11 @@ would state what is not yet so).
 2. `audit`, `validate`, `stats`, and the backlog commands (`list`,
    `get`, `set`, `batch`, `check-backlog`) — the deterministic check
    runners and serde schema models, with their vitest cases ported to
-   cargo test.
+   cargo test. Also the knowledge read commands (`get`, `for`,
+   `index`, `topics`, `standing`), assigned here with the batch 17
+   plan (owner-approved 2026-09-04): they share this phase's models,
+   `for` is a dormant glob call site, and phase 3's reference
+   rewrite needs every command shipped.
 3. `init`/`update`/`files` — KIT_OWNED sync with the new deletion
    capability, the stamp and drift line, settings merge; the
    reference rewrite across every shipped file to the flat commands;
@@ -202,6 +223,16 @@ with the historical files above as the only allowed matches.
   reports named check findings with exit 1. Reproducing a crash
   would be wrong; the deviation is that the binary is reachable
   where the JS was not.
+- CLI argument parsing (controller-accepted deviation, batch 17 T2
+  review, pending owner confirmation at the batch report): the
+  binary parses argv with clap, so a flag the JS's parseArgs
+  silently ignored, coerced to a bare true, or let a duplicate
+  override becomes a named usage error at exit 2, and usage lines
+  name the flat surface. Reproducing parseArgs's ambiguity would
+  silently swallow typo'd flags. Every observable instance —
+  including the four JS success paths and the error-text
+  differences the T2 review enumerated — is pinned by a
+  counterexample test asserting the clap answer.
 
 ## 7. Out of scope
 

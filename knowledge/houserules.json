@@ -220,7 +220,7 @@
     {
       "id": "houserules.glob-union-matcher",
       "kind": "gotcha",
-      "area": "template",
+      "area": "rust",
       "summary": "globMatch in tools/kb.mjs is a union: matchesGlob for the full vocabulary, globToRegExp only for `**`/`*` with dot-segments; combining both matches neither.",
       "body": [
         "node:path matchesGlob excludes a path segment that starts with `.` under `**` (undocumented; verified live on Node 24.18.1). globToRegExp restores dot-segments but translates only `**` and `*`, escaping every other metacharacter as a literal.",
@@ -350,7 +350,8 @@
         "HR-054 task 4 ported checkBase/checkShape/checkBudget to Rust; kb.mjs itself is unchanged, but its measured branch coverage fell from 99.36% to 67.08% (no vitest caller left for that code). The first fix round's answer -- one global branches drop, 99 to 80 -- was rejected in review: a single global number also weakens the gate over bin/houserules.mjs, backlog.mjs, json-store.mjs, and cli.mjs, none of which this task touched (task-4-review.json, fix round 1, finding 4).",
         "The held mechanism instead: vitest.config.mts keeps the pre-port global floor (branches 99, lines 80) over the four still-fully-JS-owned files; kb.mjs is excluded from that run's coverage.include and measured in its own second run, vitest.kb-coverage.config.mts, ratcheted at its measured post-removal numbers (branches 67, lines 72) so it cannot slide further without a gate firing. `package.json`'s `test` script runs both. A single config cannot hold both floors: vitest counts every included file, glob-keyed threshold or not, into the same global aggregate (verified live; vitest.dev/config/coverage: 'Vitest counts all files, including those covered by glob-patterns, into the global coverage thresholds. This is different from Jest behavior') -- kb.mjs's low number drags the aggregate below 99% regardless of its own override sitting beside it.",
         "tests/kb.test.mjs also gained a live behavioral gate (describe('the live check command over the frozen corpus')): the shipped template/tools/kb.mjs, not a frozen-sha worktree copy, driven over the corpus check fixtures, so a future regression in the still-shipped check path fails a real test, not only the corpus-regeneration self-consistency check.",
-        "Each later Tier-2 phase (audit/validate/stats/backlog, then init/update/files) gets the same treatment on porting: its own excluded, separately-ratcheted coverage run and its own live behavioral gate, never a lowered global floor. The JS path retires fully at spec phase 5; every per-file coverage config, the shared vitest.shared.mts, and the live behavioral gates retire with it."
+        "Each later Tier-2 phase (audit/validate/stats/backlog, then init/update/files) gets the same treatment on porting: its own excluded, separately-ratcheted coverage run and its own live behavioral gate, never a lowered global floor. The JS path retires fully at spec phase 5; every per-file coverage config, the shared vitest.shared.mts, and the live behavioral gates retire with it.",
+        "Batch 17 T2 (backlog.mjs) narrowed this further after a fix round: when a ported file's whole command surface leaves in one task, its post-removal coverage can measure 0%/0% (nothing left in-process exercises it; the live behavioral gate only spawns the CLI as a subprocess, which v8's coverage instrumentation cannot see). A ratchet run gated at a 0 floor can never fail, so it is not minted -- the exclusion from the main run's coverage.include plus the live spawn gate is the whole mechanism in that case, and package.json's test script stays at two vitest invocations, not three (task-2-review.json, fix round 1, issue 6). A ratchet run is minted only when the post-removal number is high enough to still regress."
       ],
       "tags": [
         "vitest",
@@ -433,6 +434,26 @@
       "verify": [
         "mise.toml"
       ]
+    },
+    {
+      "id": "houserules.crash-paths-are-named",
+      "kind": "rule",
+      "area": "rust",
+      "summary": "Where the frozen JS crashed or a glob/regex fails to compile, the binary reports one named error or finding — never a reproduced crash, never a silent default.",
+      "body": [
+        "Spec §6's crash-path and CLI-failure-path rulings, extracted so they load with the files they govern. The two failure shapes to refuse: a panic/.expect on data an adopter can write (reproduces the crash), and an unwrap_or(default) on a Result whose error the ruling says must be named (swallows it — batch 17 T3 fix round 1 issue 4, and the report-field workspace residual the batch 17 branch review found at audit.rs:558).",
+        "Absence stays tolerated exactly as the JS tolerates it; the named-error contract covers present-but-malformed data and compile failures. One stderr line naming the data, exit 2 for load/usage arms; a named finding row where the surface reports findings."
+      ],
+      "tags": [
+        "rust",
+        "tier2",
+        "error-handling"
+      ],
+      "source": {
+        "date": "2026-09-05",
+        "by": "review",
+        "ref": "batch 17 branch review, uncovered_findings"
+      }
     }
   ]
 }

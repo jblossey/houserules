@@ -5,5 +5,6 @@
   "tools": { "paths": ["tools/**", ".github/**", "mise.toml"] },
   "cli": { "paths": ["bin/**"] },
   "template": { "paths": ["template/**"] },
-  "tests": { "paths": ["tests/**", "vitest.config.mts", "vitest.shared.mts", "vitest.kb-coverage.config.mts"] }
+  "tests": { "paths": ["tests/**", "vitest.config.mts", "vitest.shared.mts", "vitest.kb-coverage.config.mts"] },
+  "rust": { "paths": ["crates/**", "Cargo.toml", "Cargo.lock"] }
 }
