@@ -66,6 +66,21 @@
       ],
       "tags": ["output", "absence", "cli"],
       "source": { "date": "2026-09-03", "by": "review", "ref": "batch 11 branch review, uncovered finding; task 2 review r0" }
+    },
+    {
+      "id": "quality.well-maintained-libraries",
+      "kind": "rule",
+      "area": "process",
+      "standing": true,
+      "summary": "Use well-maintained libraries over custom code. The orchestrator researches candidates at spec time; the owner rules the choice; refactors fold into specs.",
+      "body": [
+        "The orchestrator researches candidate libraries or packages AT SPEC TIME with maintenance evidence, and presents them for the owner's ruling - never delegated to implementers, never deferred to plan time. The choice is ultimately the owner's.",
+        "Wherever the codebase is touched, existing custom code that a well-maintained library should replace is refactored in that batch: the refactor folds into the spec and plan. Deferring the rewrite is not an option.",
+        "After the Rust rewrite completes (no node, TypeScript, or vitest traces remain), a mandatory whole-codebase sweep verifies that code untouched since this ruling abides by the rule; it rides the phase-5 repository sweep (docs/design.md §5.24).",
+        "quality.principles carries the underlying preference (also present in tag-pilot); security-hygiene.dependency-vetting and exact-pins govern each adoption."
+      ],
+      "tags": ["libraries", "dependencies", "process"],
+      "source": { "date": "2026-09-05", "by": "user", "ref": "owner ruling at the batch 18 spec gate; docs/design.md §5.31" }
     }
   ]
 }

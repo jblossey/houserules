@@ -38,6 +38,20 @@
       "tags": ["quality", "compatibility"],
       "source": { "date": "2026-09-02", "by": "user", "ref": "owner instruction of 2026-09-02, batch 7" },
       "see": ["process.no-tech-debt"]
+    },
+    {
+      "id": "quality.well-maintained-libraries",
+      "kind": "rule",
+      "area": "process",
+      "standing": true,
+      "summary": "Use well-maintained libraries over custom code. The orchestrator researches candidates at spec time; the owner rules the choice; refactors fold into specs.",
+      "body": [
+        "The orchestrator researches candidate libraries or packages AT SPEC TIME with maintenance evidence, and presents them for the owner's ruling - never delegated to implementers, never deferred to plan time. The choice is ultimately the owner's.",
+        "Wherever the codebase is touched, existing custom code that a well-maintained library should replace is refactored in that batch: the refactor folds into the spec and plan. Deferring the rewrite is not an option.",
+        "quality.principles carries the underlying preference; security-hygiene.dependency-vetting and exact-pins govern each adoption."
+      ],
+      "tags": ["libraries", "dependencies", "process"],
+      "source": { "date": "2026-09-05", "by": "user", "ref": "owner ruling, batch 18" }
     }
   ]
 }

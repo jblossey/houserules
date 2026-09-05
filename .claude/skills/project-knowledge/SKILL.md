@@ -32,6 +32,7 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 - [process.tdd] Test-driven development for every executable change: the failing test first, or a disclosed-mutation proof for already-correct behavior; verbatim RED and GREEN.
 - [quality.no-compat-softening] Never soften a design for backward compatibility. Make the correct change and migrate everything it breaks; the codebase is not built on compromises.
 - [quality.principles] YAGNI, KISS, DRY; prefer a well-maintained library to custom code; one responsibility per unit; tests assert behavior; a11y and i18n are part of done.
+- [quality.well-maintained-libraries] Use well-maintained libraries over custom code. The orchestrator researches candidates at spec time; the owner rules the choice; refactors fold into specs.
 - [security-hygiene.dependency-vetting] Verify every new dependency is well-maintained before adding it. Record the check in the task report's `dependency_vetting` field.
 - [security-hygiene.exact-pins] Pin exact versions. Install only with a CLI (`pnpm add --save-exact`, `cargo add <crate>@=<version>`). Never write a version number by hand.
 - [security-hygiene.no-coauthor] Never add a co-author or session trailer line to any commit.
@@ -52,6 +53,6 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 houserules  19  Working in the houserules kit repository
 knowledge-base  4  Authoring knowledge entries
 process  27  How work runs: batches, dispatch, reviews, rulings
-quality  4  Quality principles
+quality  5  Quality principles
 security-hygiene  5  Dependency, commit, and test hygiene
 writing-style  4  Writing style for docs, comments, commits, reports

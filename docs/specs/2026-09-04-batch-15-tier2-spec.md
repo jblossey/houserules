@@ -173,6 +173,13 @@ the live files finds no reference to `kb.sh`, `backlog.sh`,
 `houserules.mjs`, pnpm, vitest, or commitlint when the sweep is done,
 with the historical files above as the only allowed matches.
 
+The sweep also carries the mandatory library audit (owner ruling
+2026-09-05, quality.well-maintained-libraries, design.md §5.31):
+every unit of code untouched since that ruling is checked against
+the rule — custom code a well-maintained library should replace is
+found and either refactored or presented for the owner's ruling,
+with candidates researched by the orchestrator.
+
 ## 6. What does not change
 
 - The knowledge/backlog JSON formats, ids, and schemas; the agent
