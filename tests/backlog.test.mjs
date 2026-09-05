@@ -1,428 +1,162 @@
-import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { execFileSync } from 'node:child_process';
-import { describe, expect, it } from 'vitest';
-import {
-  checkBacklog,
-  cmdBatch,
-  cmdGet,
-  cmdList,
-  cmdSet,
-  loadBacklog,
-  main,
-} from '../template/tools/backlog.mjs';
-import { UsageError } from '../template/tools/lib/cli.mjs';
+import { cpSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it, onTestFinished } from 'vitest';
 import { scratchDir } from './scratch-dir.mjs';
 
-const SCHEMA = readFileSync(
-  new URL('../template/backlog/schema.json', import.meta.url),
-  'utf8',
-);
-// Derived, never hand-typed: the enum grows as new item types are converted.
-const TYPE_ENUM = JSON.parse(SCHEMA)
-  .$defs.type.enum.map((value) => JSON.stringify(value))
-  .join(', ');
+// tools/backlog.mjs's CLI surface (loadBacklog, checkBacklog, cmdGet,
+// cmdList, cmdBatch, cmdSet, main) ported to crates/houserules/src/backlog/
+// (batch 17 T2, docs/specs/2026-09-04-batch-15-tier2-spec.md §5 phase 2):
+// crates/houserules/src/backlog/{load,commands,cli}.rs carry the ported
+// logic and crates/houserules/tests/backlog_parity.rs the ported test
+// cases, byte-compared against the compiled binary. This file keeps the
+// one behavioral gate the still-shipped `template/tools/backlog.mjs` needs
+// per houserules.vitest-coverage-floor-tracks-the-rust-port: a live
+// regression check driving the SHIPPED JS itself, not only the
+// corpus-regeneration self-consistency check (tests/corpus.test.mjs),
+// which would not catch a regression in backlog.mjs's own logic. Coverage
+// for this file moves to its own ratchet run (vitest.backlog-coverage.
+// config.mts), pinned at the numbers measured once these cases left.
 
-function write(root, path, content) {
-  mkdirSync(join(root, dirname(path)), { recursive: true });
-  writeFileSync(
-    join(root, path),
-    typeof content === 'string'
-      ? content
-      : `${JSON.stringify(content, null, 2)}\n`,
-  );
-}
-function item(over = {}) {
-  return {
-    id: 'WI-001',
-    type: 'feat',
-    milestone: 'M0',
-    status: 'open',
-    title: 'First item.',
-    body: ['Body one.', 'Body two.'],
-    ...over,
-  };
-}
-// Shared with the `read commands` tests below: those tests assert against
-// these literals directly, never against the map `loadBacklog` builds from
-// them, so a bug in `loadBacklog` cannot hide behind a fixture that mirrors
-// the same bug.
-const DEFAULT_ITEMS = [
-  item(),
-  item({
-    id: 'WI-002',
-    status: 'done',
-    batch: 1,
-    title: 'Second item:',
-    milestone: null,
-    rulings: [
-      {
-        date: '2026-08-29',
-        by: 'user',
-        text: 'USER RULING 2026-08-29: do it.',
-      },
-    ],
-    see: ['WI-001', 'A-01'],
-  }),
-];
-const DEFAULT_AMENDMENT = {
-  id: 'A-01',
-  type: 'constraint',
-  status: 'done',
-  text: ['Latest stable versions.'],
-};
-function makeRepo({
-  items = DEFAULT_ITEMS,
-  batches = [
-    {
-      number: 1,
-      items: ['WI-002'],
-      summary: 'WI-002 — second',
-      kickoff: 'user 2026-08-01',
-      status: { state: 'done', text: 'done — merged' },
-    },
-  ],
-  extra = {},
-} = {}) {
-  const root = scratchDir('backlog-');
-  execFileSync('git', ['init', '-q', root]);
-  write(root, 'backlog/schema.json', SCHEMA);
-  write(root, 'backlog/amendments.json', {
-    heading: 'A. Amendments',
-    amendments: [DEFAULT_AMENDMENT],
-  });
-  write(root, 'backlog/items/E01.json', {
-    section: 'E01',
-    heading: 'E01. Product scope (§1)',
-    title: 'Product scope',
-    spec: '§1',
-    items,
-  });
-  write(root, 'backlog/batches.json', {
-    heading: 'Batch planning',
-    intro: [],
-    table_header: [
-      '| Batch | Items | Kick-off artifact | Status |',
-      '|---|---|---|---|',
-    ],
-    batches,
-  });
-  write(root, 'backlog/decisions.json', {
-    preamble: '# Backlog',
-    decisions: [{ date: '2026-08-01', text: 'Markdown only.' }],
-    notes: ['A note.'],
-  });
-  write(root, 'backlog/parked.json', {
-    groups: [
-      {
-        batch: 29,
-        intro: 'Batch 29 parked polish',
-        items: [{ id: 'PP-29-01', text: 'A parked item.' }],
-      },
-    ],
-  });
-  for (const [path, content] of Object.entries(extra))
-    write(root, path, content);
-  return root;
-}
-function capture() {
-  const io = {
-    stdout: '',
-    stderr: '',
-    out: (s) => (io.stdout += s),
-    err: (s) => (io.stderr += s),
-  };
-  return io;
+const BACKLOG_MJS = fileURLToPath(new URL('../template/tools/backlog.mjs', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
+
+/** Reads one frozen `tests/corpus/backlog/<relative>` capture. */
+function readCorpusRun(relative) {
+  return JSON.parse(readFileSync(new URL(`./corpus/backlog/${relative}`, import.meta.url), 'utf8'));
 }
 
-describe('loadBacklog and checkBacklog', () => {
-  it('loads every file and indexes items with their section', () => {
-    const b = loadBacklog(makeRepo());
-    expect(b.items.get('WI-002').section).toBe('E01');
-    expect(b.sections.map((s) => s.name)).toEqual(['E01']);
-    expect(checkBacklog(b)).toEqual({ errors: [], warnings: [] });
-  });
-  it('reports schema errors, duplicate ids, dangling references, and batch problems', () => {
-    const root = makeRepo({
-      items: [
-        item(),
-        item({ id: 'WI-001', type: 'nope' }),
-        item({ id: 'WI-003', see: ['WI-999'] }),
-      ],
-      batches: [
-        {
-          number: 2,
-          items: ['WI-404'],
-          summary: 's',
-          kickoff: '',
-          status: { state: 'in-progress', text: '' },
-        },
-        {
-          number: 2,
-          items: [],
-          summary: 's',
-          kickoff: '',
-          status: { state: 'in-progress', text: '' },
-        },
-      ],
-    });
-    const first = checkBacklog(loadBacklog(root));
-    expect(first.errors).toEqual([
-      `backlog/items/E01.json.items[1].type: must be one of ${TYPE_ENUM}`,
-    ]);
-    write(root, 'backlog/items/E01.json', {
-      section: 'E01',
-      heading: 'h',
-      title: 't',
-      spec: '',
-      items: [
-        item(),
-        item({ id: 'WI-001' }),
-        item({ id: 'WI-003', see: ['WI-999'] }),
-      ],
-    });
-    const second = checkBacklog(loadBacklog(root));
-    expect(second.errors).toEqual([
-      'backlog/items/E01.json WI-001: duplicate id (also in backlog/items/E01.json)',
-      'backlog/items/E01.json WI-003: see "WI-999" does not exist',
-      'backlog/batches.json batch 2: item "WI-404" does not exist',
-      'backlog/batches.json: duplicate batch 2',
-      'backlog/batches.json: 2 batches in progress (at most one)',
-    ]);
-  });
-  it('warns about done items without a batch and a section whose name differs from its file', () => {
-    const root = makeRepo({ items: [item({ status: 'done' })] });
-    expect(checkBacklog(loadBacklog(root)).warnings).toEqual([
-      'backlog/items/E01.json WI-001: done without a batch',
-    ]);
-    write(root, 'backlog/items/E01.json', {
-      section: 'E02',
-      heading: 'h',
-      title: 't',
-      spec: '',
-      items: [],
-    });
-    expect(checkBacklog(loadBacklog(root)).errors).toEqual([
-      'backlog/items/E01.json: section "E02" must equal the file name "E01"',
-    ]);
-  });
-  // Not in the brief: covers loadBacklog's `Array.isArray(section.items) ? section.items : []`
-  // ternary false branch — a section file with no `items` array (the schema
-  // would flag this, but loadBacklog itself must not crash reading it).
-  it('treats a section with no items array as having none', () => {
-    const root = makeRepo();
-    write(root, 'backlog/items/E02.json', {
-      section: 'E02',
-      heading: 'h',
-      title: 't',
-      spec: '',
-    });
-    const b = loadBacklog(root);
-    const e02 = b.sections.find((s) => s.name === 'E02');
-    expect(e02.items).toBeUndefined();
-    expect(b.items.has('WI-001')).toBe(true);
-  });
-});
+/** This checkout's frozen corpus sha (`tests/corpus/manifest.json`), read rather than duplicated. */
+function frozenSha() {
+  return JSON.parse(readFileSync(new URL('./corpus/manifest.json', import.meta.url), 'utf8'))
+    .frozen_sha;
+}
 
-const listRowFixture = (id, status, milestone, batch, title) => ({
-  id,
-  status,
-  milestone,
-  batch,
-  title,
-});
+/** Runs the live `template/tools/backlog.mjs <args>` in `cwd`, without throwing on a non-zero exit. */
+function runBacklog(args, cwd) {
+  const result = spawnSync(process.execPath, [BACKLOG_MJS, ...args], {
+    cwd,
+    encoding: 'utf8',
+  });
+  return { stdout: result.stdout, stderr: result.stderr, exit: result.status };
+}
 
-describe('read commands', () => {
-  it('get returns items with section and file, an amendment record, and a parked item with batch; rejects unknown ids', () => {
-    const b = loadBacklog(makeRepo());
-    // Compares against the fixture literals (DEFAULT_ITEMS, DEFAULT_AMENDMENT)
-    // as authored, not against `b.items.get(...)`/`b.amendments...` — a test
-    // asserting on the same structures the command reads from cannot catch a
-    // change in what `loadBacklog` puts into them.
-    expect(cmdGet(b, ['WI-002'])).toEqual([
-      { ...DEFAULT_ITEMS[1], section: 'E01', file: 'backlog/items/E01.json' },
-    ]);
-    expect(cmdGet(b, ['WI-001'])).toEqual([
-      { ...DEFAULT_ITEMS[0], section: 'E01', file: 'backlog/items/E01.json' },
-    ]);
-    expect(cmdGet(b, ['A-01'])).toEqual([DEFAULT_AMENDMENT]);
-    expect(cmdGet(b, ['PP-29-01'])).toEqual([
-      { id: 'PP-29-01', text: 'A parked item.', batch: 29 },
-    ]);
-    expect(() => cmdGet(b, ['WI-999'])).toThrow(UsageError);
+/**
+ * Copies the `mini` fixture into a fresh scratch directory and `git init`s
+ * it, then runs `fn(root)` there. `backlog.mjs`'s `repoRoot` resolves via
+ * `git rev-parse --show-toplevel`, which climbs to the *nearest* enclosing
+ * `.git` -- the committed fixture under `tests/corpus/fixtures/mini` has
+ * none of its own, so running against that path directly would silently
+ * resolve to this repository's own root instead (verified live: doing so
+ * loads and checks the real `backlog/`, not the fixture's, and happens to
+ * pass only because the real backlog is also clean). A private copy with
+ * its own `.git` is the only way to exercise the fixture's own data.
+ */
+function withMiniFixtureRepo(fn) {
+  const root = scratchDir('backlog-live-check-');
+  cpSync(fileURLToPath(new URL('./corpus/fixtures/mini', import.meta.url)), root, {
+    recursive: true,
   });
-  it('list filters and returns one row per item, with null for a missing milestone or batch', () => {
-    const b = loadBacklog(makeRepo());
-    const row = listRowFixture;
-    expect(cmdList(b, {})).toEqual([
-      row('WI-001', 'open', 'M0', null, 'First item.'),
-      row('WI-002', 'done', null, 1, 'Second item:'),
-    ]);
-    expect(cmdList(b, { open: true })).toEqual([
-      row('WI-001', 'open', 'M0', null, 'First item.'),
-    ]);
-    expect(
-      cmdList(b, {
-        status: 'done',
-        batch: '1',
-        section: 'E01',
-        type: 'feat',
-        milestone: '-',
-      }),
-    ).toEqual([row('WI-002', 'done', null, 1, 'Second item:')]);
-    expect(cmdList(b, { milestone: 'M0' })).toEqual([
-      row('WI-001', 'open', 'M0', null, 'First item.'),
-    ]);
-    expect(cmdList(b, { batch: '9' })).toEqual([]);
-  });
-  it('batch returns the record and its item rows', () => {
-    const b = loadBacklog(makeRepo());
-    expect(cmdBatch(b, '1')).toEqual({
-      number: 1,
-      summary: 'WI-002 — second',
-      kickoff: 'user 2026-08-01',
-      status: { state: 'done', text: 'done — merged' },
-      items: [
-        {
-          id: 'WI-002',
-          status: 'done',
-          milestone: null,
-          batch: 1,
-          title: 'Second item:',
-        },
-      ],
-    });
-    expect(() => cmdBatch(b, '7')).toThrow(/unknown batch "7"/);
-    expect(() => cmdBatch(b, 'x')).toThrow(UsageError);
-  });
-});
+  execFileSync('git', ['init', '--quiet', root]);
+  return fn(root);
+}
 
-describe('set', () => {
-  it('updates status and batch in the item file, keeping the file formatting', () => {
-    const root = makeRepo();
-    const b = loadBacklog(root);
-    expect(cmdSet(b, 'WI-001', ['status=done', 'batch=3'])).toBe(
-      'WI-001: status=done batch=3\n',
-    );
-    const text = readFileSync(join(root, 'backlog/items/E01.json'), 'utf8');
-    expect(text.endsWith('\n')).toBe(true);
-    const saved = JSON.parse(text).items[0];
-    expect(saved.status).toBe('done');
-    expect(saved.batch).toBe(3);
-    expect(Object.keys(saved)).toEqual([
-      'id',
-      'type',
-      'milestone',
-      'status',
-      'title',
-      'body',
-      'batch',
-    ]);
-    expect(() => cmdSet(loadBacklog(root), 'WI-001', ['status=nope'])).toThrow(
-      /status must be one of/,
-    );
-    expect(() => cmdSet(loadBacklog(root), 'WI-001', ['batch=x'])).toThrow(
-      /batch must be a positive integer/,
-    );
-    // Not in the brief: covers the `value ?? ''` fallback in the batch check —
-    // an assignment with no `=` at all leaves `value` undefined.
-    expect(() => cmdSet(loadBacklog(root), 'WI-001', ['batch'])).toThrow(
-      /batch must be a positive integer/,
-    );
-    expect(() => cmdSet(loadBacklog(root), 'WI-001', ['title=x'])).toThrow(
-      /unknown field "title"/,
-    );
-    expect(() => cmdSet(loadBacklog(root), 'WI-001', [])).toThrow(/set needs/);
-    expect(() => cmdSet(loadBacklog(root), 'WI-404', ['status=done'])).toThrow(
-      /unknown item/,
-    );
+/**
+ * Creates a detached git worktree at the frozen sha under a temp dir, runs
+ * `fn(worktreeDir)`, then removes it -- `tools/make-corpus.mjs`'s
+ * `withFrozenWorktree`, reimplemented locally rather than imported: that
+ * function is not exported, and `tools/*.mjs` is out of this task's scope
+ * to modify. `list --open`/`get HR-052`/`batch 14` are content-specific
+ * (their expected output names actual items and their current state), so
+ * this pins them against the frozen sha's own backlog, immune to this
+ * repository's own backlog changing on every later batch -- unlike
+ * `check`, whose "ok" result is content-independent and safe to assert
+ * against the live tree the same way `tests/kb.test.mjs`'s live-check
+ * gate does for its own `root` slice.
+ *
+ * The scratch directory comes from `scratchDir` (houserules.tests-clean-
+ * scratch-dirs), not a raw `mkdtempSync`, and `git worktree remove`'s own
+ * `onTestFinished` is registered separately from -- and after -- the one
+ * `scratchDir` already registered: `onTestFinished` callbacks run in
+ * reverse registration order (verified live, vitest 4.1.11), so the
+ * worktree-removal callback registered here runs FIRST, and `scratchDir`'s
+ * own `rmSync` still runs after it even when `git worktree remove` itself
+ * throws (task-2-review.json, issue 4: the previous try/finally version
+ * skipped that `rmSync` on exactly this failure, matching `common/mod.rs`'s
+ * `Drop` impl on the Rust side, which reports rather than swallows it).
+ */
+function withFrozenWorktree(fn) {
+  const dir = scratchDir('backlog-worktree-');
+  rmSync(dir, { recursive: true, force: true }); // git worktree add wants the path free
+  execFileSync('git', ['worktree', 'add', '--detach', '--quiet', dir, frozenSha()], {
+    cwd: REPO_ROOT,
   });
-});
+  onTestFinished(() => {
+    try {
+      execFileSync('git', ['worktree', 'remove', '--force', dir], { cwd: REPO_ROOT });
+    } catch (error) {
+      console.error(
+        `warning: git worktree remove --force ${dir} failed: ${error.message}; ` +
+          `run \`git worktree prune\` in ${REPO_ROOT}`,
+      );
+    }
+  });
+  return fn(dir);
+}
 
-describe('main', () => {
-  it('dispatches commands and exit codes', () => {
-    const root = makeRepo();
-    const b = loadBacklog(root);
-    let io = capture();
-    expect(main(['list', '--open'], io, root)).toBe(0);
-    expect(JSON.parse(io.stdout)).toEqual(cmdList(b, { open: true }));
-    io = capture();
-    // Not in the brief: covers parseArgs' `--key value` branch (a bare `--flag`
-    // is the only shape the rest of this test exercises).
-    expect(main(['list', '--status', 'done'], io, root)).toBe(0);
-    expect(JSON.parse(io.stdout)).toEqual(cmdList(b, { status: 'done' }));
-    io = capture();
-    expect(main(['get', 'A-01'], io, root)).toBe(0);
-    expect(JSON.parse(io.stdout)).toEqual(cmdGet(b, ['A-01']));
-    io = capture();
-    expect(main(['get'], io, root)).toBe(2);
-    io = capture();
-    expect(main(['batch', '1'], io, root)).toBe(0);
-    expect(JSON.parse(io.stdout)).toEqual(cmdBatch(b, '1'));
-    io = capture();
-    expect(main(['batch'], io, root)).toBe(2);
-    io = capture();
-    expect(main(['set', 'WI-001', 'status=partial'], io, root)).toBe(0);
-    expect(io.stdout).toBe('WI-001: status=partial\n');
-    io = capture();
-    expect(main(['set'], io, root)).toBe(2);
-    io = capture();
-    expect(main(['check'], io, root)).toBe(0);
-    expect(io.stdout).toBe('backlog: ok\n');
-    write(root, 'backlog/items/E01.json', {
-      section: 'E01',
-      heading: 'h',
-      title: 't',
-      spec: '',
-      items: [item({ status: 'done' })],
+describe('the live check command over the frozen corpus', () => {
+  it("matches the frozen check slice's ok result against the mini fixture", () => {
+    const expected = readCorpusRun('check.json');
+    withMiniFixtureRepo((root) => {
+      expect(runBacklog(['check'], root)).toEqual({
+        stdout: expected.stdout,
+        stderr: expected.stderr,
+        exit: expected.exit,
+      });
     });
-    // The default batches.json still points batch 1 at WI-002; dropping WI-002
-    // from the items file above would otherwise turn this into a dangling-
-    // reference error instead of the done-without-a-batch warning under test.
-    write(root, 'backlog/batches.json', {
-      heading: 'h',
-      intro: [],
-      table_header: [],
-      batches: [],
-    });
-    io = capture();
-    expect(main(['check'], io, root)).toBe(0);
-    expect(io.stdout).toBe(
-      'warn: backlog/items/E01.json WI-001: done without a batch\nbacklog: ok\n',
-    );
-    write(root, 'backlog/batches.json', {
-      heading: 'h',
-      intro: [],
-      table_header: [],
-      batches: [
-        {
-          number: 1,
-          items: ['WI-404'],
-          summary: 's',
-          kickoff: '',
-          status: { state: 'done', text: '' },
-        },
-      ],
-    });
-    io = capture();
-    expect(main(['check'], io, root)).toBe(1);
-    expect(io.stderr).toBe(
-      'backlog/batches.json batch 1: item "WI-404" does not exist\n',
-    );
-    io = capture();
-    expect(main(['bogus'], io, root)).toBe(2);
-    expect(io.stderr).toMatch(/^usage: backlog </);
-    write(root, 'backlog/items/E01.json', '{');
-    io = capture();
-    expect(main(['list'], io, root)).toBe(2);
-    expect(io.stderr).toMatch(/backlog\/items\/E01\.json: invalid JSON/);
-    expect(io.stdout).toBe('');
-    expect(io.stderr.split('\n')).toEqual([expect.stringMatching(/./), '']);
   });
-  it('lets a missing backlog file propagate as a real error, not a usage error', () => {
-    const root = makeRepo();
-    unlinkSync(join(root, 'backlog/schema.json'));
-    expect(() => main(['list'], capture(), root)).toThrow(/schema\.json/);
-    expect(() => main(['list'], capture(), root)).not.toThrow(UsageError);
+
+  it("matches the frozen check slice's ok result against this repository's own live tree", () => {
+    const expected = readCorpusRun('check.json');
+    expect(runBacklog(['check'], REPO_ROOT)).toEqual({
+      stdout: expected.stdout,
+      stderr: expected.stderr,
+      exit: expected.exit,
+    });
+  });
+
+  it('matches the frozen list --open, get HR-052, and batch 14 slices against a worktree pinned at the frozen sha', () => {
+    withFrozenWorktree((root) => {
+      for (const [args, slice] of [
+        [['list', '--open'], 'list-open.json'],
+        [['get', 'HR-052'], 'get-hr-052.json'],
+        [['batch', '14'], 'batch-14.json'],
+      ]) {
+        const expected = readCorpusRun(slice);
+        expect(runBacklog(args, root)).toEqual({
+          stdout: expected.stdout,
+          stderr: expected.stderr,
+          exit: expected.exit,
+        });
+      }
+    });
+  });
+
+  it('matches the frozen set slice: stdout and the written file, on a scratch copy of mini', () => {
+    const expected = readCorpusRun('set/mini/command.json');
+    withMiniFixtureRepo((root) => {
+      expect(runBacklog(['set', 'HR-901', 'status=done', 'batch=2'], root)).toEqual({
+        stdout: expected.stdout,
+        stderr: expected.stderr,
+        exit: expected.exit,
+      });
+      const written = readFileSync(join(root, 'backlog/items/misc.json'), 'utf8');
+      const expectedWritten = readFileSync(
+        new URL('./corpus/backlog/set/mini/backlog/items/misc.json', import.meta.url),
+        'utf8',
+      );
+      expect(written).toBe(expectedWritten);
+    });
   });
 });

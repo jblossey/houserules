@@ -20,7 +20,7 @@ use regress::Regex;
 use serde_json::Value;
 
 use super::model::{Base, load_base};
-use super::render::{RULE_KINDS, SKILL_PATH, render_all, repo_root_from_cwd};
+use super::render::{RULE_KINDS, SKILL_PATH, render_all};
 
 /// Size limits `check_base` enforces on the generated markdown files and
 /// `CLAUDE.md` -- the exact values `tools/kb.mjs`'s `BUDGETS` constant
@@ -62,8 +62,11 @@ fn check_fields(check_type: &str) -> Option<&'static [&'static str]> {
 /// non-empty string, non-zero number, and `true` is truthy. `check_shape`'s
 /// `commits`-needs-a-field rule (`!check.subject && !check.body_absent &&
 /// !check.body_line_max`) and `check_base`'s `if (item.standing && ...)`
-/// guard (fix round 1, finding 3) are its callers.
-fn falsy(value: Option<&Value>) -> bool {
+/// guard (fix round 1, finding 3) are its callers; `model::load_base`'s
+/// `CheckField` classification (batch 17 T3 fix round 1, issue 7) is a
+/// third, reusing this rather than a second hand-written truthiness check
+/// that could drift from it.
+pub(super) fn falsy(value: Option<&Value>) -> bool {
     match value {
         None | Some(Value::Null) => true,
         Some(Value::Bool(b)) => !b,
@@ -654,15 +657,9 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
 /// stderr lines and exit 1 (spec §6's CLI-failure-path deviation; docs/specs/
 /// 2026-09-04-batch-15-tier2-spec.md).
 pub(crate) fn cmd_check_knowledge(root: Option<PathBuf>) -> ExitCode {
-    let root = match root {
-        Some(path) => path,
-        None => match repo_root_from_cwd() {
-            Ok(path) => path,
-            Err(error) => {
-                eprintln!("{error}");
-                return ExitCode::from(2);
-            }
-        },
+    let root = match crate::root::resolve_root(root) {
+        Ok(root) => root,
+        Err(code) => return code,
     };
     let base = match load_base(&root) {
         Ok(base) => base,

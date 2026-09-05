@@ -203,6 +203,51 @@ fn check_knowledge_outside_a_git_repository_prints_a_named_error_and_exits_2() {
     assert!(!stderr.trim().is_empty(), "the error line is not empty");
 }
 
+// ---- the ruled clap argv deviation (spec §6), for `check-knowledge` --
+// batch 17 T4 fix round 2: argv_closure.rs's own closure sentence claimed
+// `check-knowledge` and `check-backlog` were exempt from this class
+// entirely, since neither takes a value-bearing flag or a positional
+// beyond `--dir`; probing them live (`tools/kb.mjs check --bogus`/`extra`)
+// found the same JS-ignores-it-and-succeeds divergence every other flat
+// command has -- the exemption was as false as the one review new_breakage
+// 1 already named for `render`/`batch`/`set`.
+
+/// `check-knowledge --bogus`: JS ignores the unrecognized flag and checks
+/// (exit 0, `knowledge: ok`); the binary reports it as an unexpected
+/// argument, exit 2.
+#[test]
+fn check_knowledge_with_an_unknown_flag_exits_2_where_js_ignored_it_and_succeeded() {
+    let output = houserules()
+        .args(["check-knowledge", "--bogus", "--dir"])
+        .arg(repo_root().join("tests/corpus/fixtures/mini"))
+        .output()
+        .expect("run check-knowledge --bogus");
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.starts_with("error: unexpected argument '--bogus' found"),
+        "got: {stderr:?}"
+    );
+}
+
+/// `check-knowledge extra`: JS ignores the unexpected positional and
+/// checks (exit 0); the binary reports it as an unexpected argument,
+/// exit 2.
+#[test]
+fn check_knowledge_with_an_unexpected_positional_exits_2_where_js_ignored_it_and_succeeded() {
+    let output = houserules()
+        .args(["check-knowledge", "extra", "--dir"])
+        .arg(repo_root().join("tests/corpus/fixtures/mini"))
+        .output()
+        .expect("run check-knowledge extra");
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.starts_with("error: unexpected argument 'extra' found"),
+        "got: {stderr:?}"
+    );
+}
+
 /// tests/kb.test.mjs, `describe('main (render, check)')`: "render --check
 /// exits 1 while stale, render writes, check reports and passes" -- ported
 /// whole (both the render half and the check half were one interleaved

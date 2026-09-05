@@ -1,13 +1,17 @@
 //! The glob matcher: `tools/kb.mjs`'s `globMatch` ported for `area_files`/
 //! `areas_for`, which `audit` (kb.mjs:707) and `cmdFor` (kb.mjs:927) call
 //! in the frozen JS source -- both phase-2 surfaces (docs/specs/
-//! 2026-09-04-batch-15-tier2-spec.md §5). Neither `render` nor this
-//! phase's `check-knowledge` task calls the matcher: `renderAll` never
-//! matches a glob, and `checkBase` does not call `areaFiles`/`areasFor`
-//! either. So `glob_match`/`area_files`/`areas_for` stay `#[allow(dead_code)]`
-//! through the rest of phase 1; phase 2 wires them into `audit` and `for`.
-//! `compile` and `GlobError` are not dead: `model::load_areas` calls
-//! `compile` to validate every area's globs at load time (see its doc).
+//! 2026-09-04-batch-15-tier2-spec.md §5). Batch 17 T3 wired `area_files`
+//! (and, through it, `glob_match`/`strip_dot`) into the `audit` engine's
+//! rule-package assembly, dropping their `#[allow(dead_code)]`; `audit`
+//! also calls `glob_match` directly for its checks' own glob matching
+//! (`matchAny` in the frozen JS). Batch 17 T4 wires `areas_for` into
+//! `read::for_result` (`cmdFor`'s port), dropping ITS `#[allow(dead_code)]`
+//! too -- the crate's last one on a function ever meant to ship (see
+//! `model::load_areas`'s own doc for the one that stays, by a different
+//! route: it never had a production caller planned at all). `compile` and
+//! `GlobError` are not dead: `model::load_areas` calls `compile` to
+//! validate every area's globs at load time (see its doc).
 //!
 //! Ruled 2026-09-04 (design.md §5.25, decisions.json, the
 //! `houserules.glob-union-matcher` gotcha's fourth bullet, this spec's §3
@@ -35,19 +39,21 @@
 //! globset's own default lets a bare `*` cross `/` (verified live), which
 //! the union's `*` never does (`globToRegExp` translates it to `[^/]*`).
 
-use std::collections::HashMap;
 use std::fmt;
 
 use globset::GlobBuilder;
+use indexmap::IndexMap;
 
 use super::model::AreaDef;
 
 /// Removes a single leading `./` from `path`, the same normalization
 /// `tools/kb.mjs`'s `stripDot` applies before matching (a path is matched
 /// relative-clean even when a caller passes it `git diff --name-only`
-/// style with a leading `./`).
-#[allow(dead_code)]
-fn strip_dot(path: &str) -> &str {
+/// style with a leading `./`). `pub(super)` (batch 17 T4): `read::for_result`
+/// needs the identical normalization for `cmdFor`'s own `paths.map(stripDot)`
+/// and `wanted`/`verify` comparison, and a second hand-written copy could
+/// drift from this one silently.
+pub(super) fn strip_dot(path: &str) -> &str {
     path.strip_prefix("./").unwrap_or(path)
 }
 
@@ -92,25 +98,42 @@ pub(crate) fn compile(glob: &str) -> Result<globset::GlobMatcher, GlobError> {
 }
 
 /// Matches `path` against `glob`, or the `GlobError` `compile` returns
-/// when `glob` fails to compile -- never a panic. The one matcher
-/// `area_files` calls, and the one phase 2's `audit`/`cmdFor` will call.
-#[allow(dead_code)]
+/// when `glob` fails to compile -- never a panic. `area_files` calls it
+/// internally; batch 17 T3's `audit` engine calls it directly too, for the
+/// `report-field`/`grep-absent`/`co-change`/`diff-append-only` checks'
+/// `matchAny`-equivalent glob matching.
 pub(crate) fn glob_match(path: &str, glob: &str) -> Result<bool, GlobError> {
     compile(glob).map(|matcher| matcher.is_match(path))
 }
 
 /// Groups `paths` by every area whose globs match, each area mapped to
-/// the paths that matched it. `global` always appears, mapped to an empty
-/// list: it has no globs of its own but applies to every path. Stops at
-/// the first `GlobError` a glob raises, matching `.some()`'s short-circuit
-/// on the JS side: an area whose earlier glob already matched never
-/// reaches a later, possibly-malformed one.
-#[allow(dead_code)]
+/// the paths that matched it, in insertion order: `global` first (it has no
+/// globs of its own but applies to every path), then every other area in
+/// the order its FIRST matching path touches it -- `tools/kb.mjs`'s
+/// `areaFiles` builds a plain object the same way (`found[area] ??= []`
+/// inserts the key on first touch), and that key order is observable in
+/// `audit`'s own `area_files` JSON field (fix round 1, issue 6: a prior cut
+/// sorted the keys instead, which `cargo test`'s field-identical corpus
+/// comparison could not see -- `serde_json::Value` equality under this
+/// crate's `preserve_order` feature ignores object key order -- but every
+/// live `houserules audit`/`--json` run could, and did, diverge from
+/// `tools/kb.sh audit` byte-for-byte on every range touching a non-global
+/// area). `IndexMap` is this crate's existing `serde_json`/`preserve_order`
+/// dependency's own map type, already resolved in `Cargo.lock` before this
+/// fix pinned it directly; `.entry().or_default()` preserves first-touch
+/// order exactly like a JS object literal's `??=`, so swapping the
+/// container is the whole fix. Stops at the first `GlobError` a glob
+/// raises, matching `.some()`'s short-circuit on the JS side: an area
+/// whose earlier glob already matched never reaches a later, possibly-
+/// malformed one. Batch 17 T3's `audit` engine is its first production
+/// caller (the rule-package's touched-areas computation, `tools/kb.mjs:707`
+/// at the frozen sha); `areas_for` (below) is T4's `for` command's own
+/// caller.
 pub(crate) fn area_files(
     paths: &[&str],
     areas: &[(String, AreaDef)],
-) -> Result<HashMap<String, Vec<String>>, GlobError> {
-    let mut found: HashMap<String, Vec<String>> = HashMap::new();
+) -> Result<IndexMap<String, Vec<String>>, GlobError> {
+    let mut found: IndexMap<String, Vec<String>> = IndexMap::new();
     found.insert("global".to_string(), Vec::new());
     for &path in paths {
         let rel = strip_dot(path);
@@ -133,8 +156,9 @@ pub(crate) fn area_files(
     Ok(found)
 }
 
-/// Resolves `paths` to their areas through the glob map; `global` always applies.
-#[allow(dead_code)]
+/// Resolves `paths` to their areas through the glob map; `global` always
+/// applies. `read::for_result` (batch 17 T4, `cmdFor`'s own `areasFor`
+/// call) is its production caller.
 pub(crate) fn areas_for(
     paths: &[&str],
     areas: &[(String, AreaDef)],
@@ -259,19 +283,45 @@ mod tests {
             ("docs", &["docs/**", "CLAUDE.md"]),
         ]);
         let result = area_files(&["docs/x.md", "tools/a.mjs"], &areas).unwrap();
-        let expected: HashMap<String, Vec<String>> = [
-            ("docs".to_string(), vec!["docs/x.md".to_string()]),
+        let expected: IndexMap<String, Vec<String>> = [
             ("global".to_string(), vec![]),
+            ("docs".to_string(), vec!["docs/x.md".to_string()]),
             ("infra".to_string(), vec!["tools/a.mjs".to_string()]),
         ]
         .into_iter()
         .collect();
         assert_eq!(result, expected);
+        assert_eq!(
+            result.keys().collect::<Vec<_>>(),
+            vec!["global", "docs", "infra"],
+            "insertion order must be global first, then each area in first-touch order"
+        );
 
         let empty = area_files(&[], &areas).unwrap();
-        let expected_empty: HashMap<String, Vec<String>> =
+        let expected_empty: IndexMap<String, Vec<String>> =
             [("global".to_string(), vec![])].into_iter().collect();
         assert_eq!(empty, expected_empty);
+    }
+
+    /// Fix round 1, issue 6: `area_files` must reproduce `tools/kb.mjs`'s
+    /// own object-literal insertion order (`found[area] ??= []` inserts a
+    /// key on the FIRST path that touches it), not sort it -- the frozen
+    /// JS's own order for this fixture is `global, infra, docs` (the first
+    /// path, `tools/a.mjs`, touches `infra` before the second path,
+    /// `docs/x.md`, touches `docs`), which is neither insertion order by
+    /// area declaration nor alphabetical.
+    #[test]
+    fn area_files_key_order_follows_first_touch_by_path_order_not_area_declaration_order() {
+        let areas = areas(&[
+            ("global", &[]),
+            ("docs", &["docs/**"]),
+            ("infra", &["tools/**"]),
+        ]);
+        let result = area_files(&["tools/a.mjs", "docs/x.md"], &areas).unwrap();
+        assert_eq!(
+            result.keys().collect::<Vec<_>>(),
+            vec!["global", "infra", "docs"]
+        );
     }
 
     /// Fix round 1, finding 1: the owner's globset ruling names nested

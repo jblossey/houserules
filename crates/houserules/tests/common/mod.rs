@@ -12,6 +12,24 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
+
+/// Serializes `git worktree add`/`remove` across this test binary's
+/// threads. `git worktree` mutates shared metadata under `.git/worktrees/`,
+/// and the default parallel test runner can start several
+/// `FrozenWorktree::checkout` calls at once (batch 17 T2's
+/// `backlog_parity.rs` alone mints one per corpus slice and per
+/// worktree-backed error-arm test): without this lock, a concurrent `git
+/// worktree add` intermittently fails outright -- reproduced live by
+/// temporarily removing the lock and running `--test-threads=16` eight
+/// times (3 of 8 failed; task-2-fix1-worktree-race-without-lock.txt
+/// retains one failure, `fatal: failed to read
+/// .git/worktrees/.../commondir: Success`), then confirmed the lock as
+/// shown here removes the race (five more runs, all green). Each worktree
+/// still gets its own temp path and lives independently once added; only
+/// the two git subprocess calls that touch the shared metadata need to
+/// run one at a time.
+static WORKTREE_LOCK: Mutex<()> = Mutex::new(());
 
 /// A `Command` for the compiled `houserules` binary under test.
 pub fn houserules() -> Command {
@@ -120,22 +138,27 @@ impl FrozenWorktree {
         let holder = tempfile::tempdir().expect("tempdir");
         let path = holder.path().to_path_buf();
         drop(holder);
-        let status = Command::new("git")
-            .args([
-                "-c",
-                "core.autocrlf=false",
-                "-c",
-                "core.eol=lf",
-                "worktree",
-                "add",
-                "--detach",
-                "--quiet",
-            ])
-            .arg(&path)
-            .arg(sha)
-            .current_dir(repo_root)
-            .status()
-            .expect("run git worktree add");
+        let status = {
+            let _guard = WORKTREE_LOCK
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner());
+            Command::new("git")
+                .args([
+                    "-c",
+                    "core.autocrlf=false",
+                    "-c",
+                    "core.eol=lf",
+                    "worktree",
+                    "add",
+                    "--detach",
+                    "--quiet",
+                ])
+                .arg(&path)
+                .arg(sha)
+                .current_dir(repo_root)
+                .status()
+                .expect("run git worktree add")
+        };
         assert!(status.success(), "git worktree add {sha} failed");
         FrozenWorktree {
             repo_root: repo_root.to_path_buf(),
@@ -152,12 +175,16 @@ impl Drop for FrozenWorktree {
     /// run `git worktree prune`, instead of the prior silent `let _ = ...`
     /// that let a leak accumulate with no signal.
     fn drop(&mut self) {
-        match Command::new("git")
+        let guard = WORKTREE_LOCK
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let result = Command::new("git")
             .args(["worktree", "remove", "--force"])
             .arg(&self.path)
             .current_dir(&self.repo_root)
-            .status()
-        {
+            .status();
+        drop(guard);
+        match result {
             Ok(status) if status.success() => {}
             Ok(status) => eprintln!(
                 "warning: git worktree remove --force {} exited {status}; run `git worktree prune` in {}",

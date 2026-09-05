@@ -11,7 +11,6 @@ export default defineConfig(() => ({
       provider: 'v8' as const,
       include: [
         'bin/houserules.mjs',
-        'template/tools/backlog.mjs',
         'template/tools/lib/json-store.mjs',
         'template/tools/lib/cli.mjs',
       ],
