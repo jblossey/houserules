@@ -847,23 +847,50 @@ fn validate_exits_1_when_any_file_has_errors_0_when_all_are_valid() {
     assert_eq!(output_ok.status.code(), Some(0));
 }
 
+/// Runs `houserules validate <args>` in `cwd` and returns the resulting
+/// single result's own `file` field -- the three tests below all compare
+/// two such calls against EACH OTHER rather than against an independently
+/// hand-built expectation (CI round 2, issue 1's own lesson): a `file`
+/// field this binary itself produced through `resolve_like_node` is the
+/// only oracle guaranteed to agree with what the SAME function produces
+/// for a different but equivalent input, on whatever this machine's OS
+/// naturally does -- a hand-built expectation using `std::fs::
+/// canonicalize` directly reintroduces exactly the class of platform
+/// quirk (Windows' own 8.3-short-name expansion, distinct from and in
+/// addition to the `\\?\` prefix `resolve_like_node`'s own doc covers)
+/// that broke this suite once already.
+fn validate_file_field(args: &[&str], cwd: &Path) -> String {
+    let output = houserules()
+        .arg("validate")
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .unwrap_or_else(|error| panic!("run houserules validate {args:?} in {cwd:?}: {error}"));
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "validate {args:?} in {cwd:?}: stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let results: Value = serde_json::from_slice(&output.stdout).expect("parse stdout");
+    results[0]["file"]
+        .as_str()
+        .unwrap_or_else(|| panic!("validate {args:?} in {cwd:?}: no file field in {results}"))
+        .to_string()
+}
+
 /// tests/kb.test.mjs, describe('main (validate)'): "resolves a relative
 /// path against the given cwd, not process.cwd()" -- the JS test calls
 /// `main(['validate', 'rel.json'], io, dir)` directly, `dir` a plain
 /// string never itself touched by a real `chdir`/`getcwd`; this port
 /// instead spawns the compiled binary as a real, separate process (the
-/// only way to exercise a CLI at all), so the expected path is
-/// canonicalized before comparison (CI fix round 1, issue 1): on a
-/// platform where the tempdir itself sits behind a symlink (macOS's own
-/// `/tmp`/`/var`, `/private/var/...` under the hood), both engines'
-/// real current-directory query resolves it away before this test's own
-/// process even starts (`env::current_dir`/`process.cwd()` both call
-/// `getcwd(3)`, which POSIX specifies to contain no symlink -- verified
-/// live for the real JS CLI too,
-/// `validate_resolves_a_symlinked_cwd_to_the_real_directory` below
-/// proves it), so asserting the un-canonicalized `sub` here was
-/// asserting something neither engine's real binary ever produces, not
-/// a genuine JS/binary divergence.
+/// only way to exercise a CLI at all). Verifies the same property a
+/// different way: an explicit absolute argument built from the identical
+/// `sub` (resolved through `resolve_like_node`'s own absolute-path
+/// branch, which never queries the current directory at all) must name
+/// the same file as the relative argument resolved against `sub` as cwd
+/// -- true only if the relative resolution actually used `sub`, not this
+/// test's own unrelated process cwd.
 #[test]
 fn validate_resolves_a_relative_path_against_the_given_cwd() {
     let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
@@ -871,23 +898,14 @@ fn validate_resolves_a_relative_path_against_the_given_cwd() {
     fs::create_dir(&sub).expect("mkdir sub");
     let source = repo_root().join("tests/corpus/fixtures/batch14-workspace/task-1-report.json");
     fs::copy(&source, sub.join("rel.json")).expect("copy fixture");
-    let real_sub = fs::canonicalize(&sub).expect("canonicalize sub");
 
-    let output = houserules()
-        .args(["validate", "rel.json"])
-        .current_dir(&sub)
-        .output()
-        .expect("run validate rel.json");
+    let via_cwd = validate_file_field(&["rel.json"], &sub);
+    let absolute = sub.join("rel.json");
+    let via_absolute =
+        validate_file_field(&[absolute.to_str().expect("utf8 path")], &worktree.path);
     assert_eq!(
-        output.status.code(),
-        Some(0),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let results: Value = serde_json::from_slice(&output.stdout).expect("parse stdout");
-    assert_eq!(
-        results[0]["file"],
-        serde_json::json!(real_sub.join("rel.json").display().to_string())
+        via_cwd, via_absolute,
+        "a relative path must resolve against the given cwd (sub), not the test's own cwd"
     );
 }
 
@@ -903,12 +921,13 @@ fn validate_resolves_a_relative_path_against_the_given_cwd() {
 /// which the JS CLI's `main` never reads -- would preserve it, and this
 /// binary reading it instead would make it diverge FROM parity, not
 /// restore it). This test pins the verified truth for the binary instead:
-/// a relative path resolved through a symlinked cwd names the real
-/// directory, matching real JS, not the symlink. `resolve_like_node`'s
-/// own `std::env::current_dir` call is already correct here (nothing
-/// about the CI failure was a canonicalize bug); disclosed mutation
-/// proves this test would catch a regression: replacing it with a raw,
-/// non-canonicalizing join breaks it.
+/// visiting the real directory and visiting it through a symlink must
+/// report the identical file -- true only if the symlinked cwd resolves
+/// to the real one, matching real JS, not the symlink's own name.
+/// CI round 2, issue 1: rewritten to compare two calls against each
+/// other rather than against a `std::fs::canonicalize` built expectation,
+/// which also broke Windows CI a second, unrelated way (its own 8.3-
+/// short-name expansion, `validate_file_field`'s own doc has the reason).
 #[test]
 fn validate_resolves_a_symlinked_cwd_to_the_real_directory() {
     let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
@@ -921,24 +940,13 @@ fn validate_resolves_a_symlinked_cwd_to_the_real_directory() {
     std::os::unix::fs::symlink(&real, &symlinked).expect("symlink real as via-symlink");
     #[cfg(windows)]
     std::os::windows::fs::symlink_dir(&real, &symlinked).expect("symlink real as via-symlink");
-    let real_canonical = fs::canonicalize(&real).expect("canonicalize real");
 
-    let output = houserules()
-        .args(["validate", "rel.json"])
-        .current_dir(&symlinked)
-        .output()
-        .expect("run validate rel.json through the symlinked cwd");
+    let via_real = validate_file_field(&["rel.json"], &real);
+    let via_symlink = validate_file_field(&["rel.json"], &symlinked);
     assert_eq!(
-        output.status.code(),
-        Some(0),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let results: Value = serde_json::from_slice(&output.stdout).expect("parse stdout");
-    assert_eq!(
-        results[0]["file"],
-        serde_json::json!(real_canonical.join("rel.json").display().to_string()),
-        "must name the real directory, matching the real JS CLI run through the same symlink"
+        via_real, via_symlink,
+        "a symlinked cwd must resolve to the same real directory as visiting it directly, \
+         matching the real JS CLI run through the same symlink"
     );
 }
 
@@ -947,7 +955,10 @@ fn validate_resolves_a_symlinked_cwd_to_the_real_directory() {
 /// Node's `path.resolve` always collapses it textually (verified live:
 /// `path.resolve('/foo/../../baz')` is `/baz`). A relative path with a
 /// `..` component used to echo back with the `..` still in it; now it
-/// resolves the same way Node's own does.
+/// resolves the same way Node's own does -- visiting `sibling` through
+/// `sub/../sibling` must report the identical file as visiting `sibling`
+/// directly. CI round 2, issue 1: rewritten off `std::fs::canonicalize`
+/// for the same reason as the two tests above.
 #[test]
 fn validate_collapses_a_relative_paths_dot_dot_components_like_node_does() {
     let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
@@ -957,24 +968,12 @@ fn validate_collapses_a_relative_paths_dot_dot_components_like_node_does() {
     fs::create_dir(&sibling).expect("mkdir sibling");
     let source = repo_root().join("tests/corpus/fixtures/batch14-workspace/task-1-report.json");
     fs::copy(&source, sibling.join("rel.json")).expect("copy fixture");
-    let real_sibling = fs::canonicalize(&sibling).expect("canonicalize sibling");
 
-    let output = houserules()
-        .args(["validate", "../sibling/rel.json"])
-        .current_dir(&sub)
-        .output()
-        .expect("run validate ../sibling/rel.json");
+    let via_dot_dot = validate_file_field(&["../sibling/rel.json"], &sub);
+    let via_sibling = validate_file_field(&["rel.json"], &sibling);
     assert_eq!(
-        output.status.code(),
-        Some(0),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let results: Value = serde_json::from_slice(&output.stdout).expect("parse stdout");
-    assert_eq!(
-        results[0]["file"],
-        serde_json::json!(real_sibling.join("rel.json").display().to_string()),
-        "the .. must collapse textually, not survive in the echoed path"
+        via_dot_dot, via_sibling,
+        "the .. must collapse to the same file as visiting sibling directly"
     );
 }
 
