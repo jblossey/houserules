@@ -54,7 +54,8 @@ would state what is not yet so).
   the audit's existing subject/body rules; adopters lose their last
   soft Node dependency), `audit`, `validate`, `stats`, `get`
   (resolves by id shape: `HR-031` is a backlog item, `process.tdd` a
-  knowledge entry; ordering ruled at the batch 17 T4 review — a
+  knowledge entry; ordering RULED by the owner at the batch 17
+  report, 2026-09-05, raised at the T4 review — a
   fixed-domain command loads its domain before its arity check, JS
   parity, while the unified `get` checks arity first because its
   domain depends on the ids: loading a default domain would wrongly
@@ -74,8 +75,8 @@ would state what is not yet so).
 - serde models the knowledge, backlog, and deliverables schemas
   exactly; the JSON Schema files stay the vendored source of truth and
   a build test pins the serde models against them.
-- Data-layer rule (controller-accepted at the batch 17 T2 review,
-  pending owner confirmation at the batch report): typed serde
+- Data-layer rule (RULED by the owner at the batch 17 report,
+  2026-09-05; raised at the batch 17 T2 review): typed serde
   models serve only paths where the data is never re-serialized
   back to its source file and a parse failure is an acceptable
   outcome (aggregating readers, the schema-pin build tests). Every
@@ -223,8 +224,8 @@ with the historical files above as the only allowed matches.
   reports named check findings with exit 1. Reproducing a crash
   would be wrong; the deviation is that the binary is reachable
   where the JS was not.
-- CLI argument parsing (controller-accepted deviation, batch 17 T2
-  review, pending owner confirmation at the batch report): the
+- CLI argument parsing (RULED by the owner at the batch 17 report,
+  2026-09-05; raised at the batch 17 T2 review): the
   binary parses argv with clap, so a flag the JS's parseArgs
   silently ignored, coerced to a bare true, or let a duplicate
   override becomes a named usage error at exit 2, and usage lines
