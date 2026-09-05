@@ -1058,21 +1058,29 @@ fn validate_file_field(args: &[&str], cwd: &Path) -> String {
 /// call against `sub` to an explicit-absolute call against `sub.join(
 /// "rel.json")`) had the same class of bug it was fixing, one level
 /// deeper: the relative call resolves through `resolve_like_node`'s
-/// current-directory branch (`env::current_dir`, which -- like every
-/// `getcwd(3)`-based query -- resolves every symlink on its own path),
-/// while the explicit-absolute call resolves through its own
-/// already-absolute branch, which never queries the current directory
-/// and so never resolves anything. On a host where the tempdir itself
-/// sits behind a symlink -- macOS's own `/tmp`/`/var`, true on EVERY run
-/// there, no test-created symlink needed -- those two branches
-/// necessarily disagree, since one half of the comparison resolves the
-/// symlink and the other cannot. Verifies the property behaviorally
-/// instead, sidestepping the whole question of which platform-specific
-/// form `env::current_dir` returns: `rel.json` resolves when `sub` is
-/// the given cwd, and does not resolve from a directory that does not
-/// itself contain it (the worktree root, `sub`'s own parent) -- true
-/// only if relative resolution actually used the given cwd, not this
-/// test's own unrelated process cwd or some other directory.
+/// current-directory branch (`env::current_dir`, which -- on POSIX,
+/// where `getcwd(3)` is specified to resolve every symlink on its own
+/// path -- resolves a symlinked cwd away), while the explicit-absolute
+/// call resolves through its own already-absolute branch, which never
+/// queries the current directory and so never resolves anything. On a
+/// host where the tempdir itself sits behind a symlink -- macOS's own
+/// `/tmp`/`/var`, true on EVERY run there, no test-created symlink
+/// needed -- those two branches necessarily disagree there, since one
+/// half of the comparison resolves the symlink and the other cannot.
+/// Verifies the property behaviorally instead, sidestepping the whole
+/// question of which platform-specific form `env::current_dir` returns
+/// (CI round 4 confirmed this is the right instinct a second time:
+/// Windows' own `GetCurrentDirectoryW`, unlike `getcwd(3)`, does not
+/// resolve a symlinked cwd at all -- `validate_resolves_a_symlinked_cwd_
+/// to_the_real_directory`'s own doc has the verified sources -- so even
+/// a same-branch comparison assuming resolution happens everywhere
+/// would have been wrong here too, had this test made one): `rel.json`
+/// resolves when `sub` is the given cwd, and does not resolve from a
+/// directory that does not itself contain it (the worktree root, `sub`'s
+/// own parent) -- true only if relative resolution actually used the
+/// given cwd, not this test's own unrelated process cwd or some other
+/// directory, on every platform, regardless of which form `env::
+/// current_dir` reports it in.
 #[test]
 fn validate_resolves_a_relative_path_against_the_given_cwd() {
     let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
@@ -1107,19 +1115,33 @@ fn validate_resolves_a_relative_path_against_the_given_cwd() {
 /// canonicalizes a symlinked cwd where the real JS CLI does not -- probed
 /// live before trusting it (`tools/kb.sh validate` run through an
 /// identically-symlinked cwd, real git worktree, real `PWD` set by the
-/// shell's own `cd`), and found the opposite: `process.cwd()` resolves
-/// the symlink away in JS's own real entry point too (it, like every
-/// `getcwd(3)`-based query, is specified to; only a shell's own `$PWD` --
-/// which the JS CLI's `main` never reads -- would preserve it, and this
-/// binary reading it instead would make it diverge FROM parity, not
-/// restore it). This test pins the verified truth for the binary instead:
-/// visiting the real directory and visiting it through a symlink must
-/// report the identical file -- true only if the symlinked cwd resolves
-/// to the real one, matching real JS, not the symlink's own name.
-/// CI round 2, issue 1: rewritten to compare two calls against each
-/// other rather than against a `std::fs::canonicalize` built expectation,
-/// which also broke Windows CI a second, unrelated way (its own 8.3-
-/// short-name expansion, `validate_file_field`'s own doc has the reason).
+/// shell's own `cd`), and found that `process.cwd()` resolves the symlink
+/// away in JS's own real entry point too, on POSIX. CI round 2, issue 1:
+/// rewritten to compare two calls against each other rather than against
+/// a `std::fs::canonicalize` built expectation, which also broke Windows
+/// CI a second, unrelated way (its own 8.3-short-name expansion,
+/// `validate_file_field`'s own doc has the reason).
+///
+/// CI round 4: the round 1/2 doc above overstated its own finding as
+/// cross-platform, and Windows CI caught it -- `via_symlink` kept the
+/// symlink's own name (`...\via-symlink\rel.json`) instead of resolving
+/// to `real` there. Verified directly rather than assumed (no Windows
+/// runner in this environment): `std::env::current_dir`'s own docs name
+/// its Windows implementation as `GetCurrentDirectoryW`; libuv's `uv_cwd`
+/// (Node's own `process.cwd()`, `src/win/util.c`) calls that same
+/// function through `uv__cwd`, with no reparse-point resolution in
+/// either -- POSIX's `getcwd(3)` is alone in being SPECIFIED to resolve
+/// every symlink on its own path (libuv's own `src/unix/core.c` `uv_cwd`
+/// calls it directly); Windows has no equivalent guarantee, and neither
+/// Rust's `env::current_dir` nor Node's `process.cwd()` adds one on top.
+/// `resolve_like_node` needed no change for this: it already calls
+/// `env::current_dir()` verbatim, with no explicit canonicalize of its
+/// own to remove -- the round-1 dispatch's premise that one existed was
+/// itself the part that did not survive verification, not this test's
+/// own resolution logic. Only this ASSERTION was wrong, assuming POSIX's
+/// own resolving behavior held everywhere; the fix is per-platform, each
+/// arm matching the OS-appropriate half of the same, now fully verified,
+/// Node parity claim.
 #[test]
 fn validate_resolves_a_symlinked_cwd_to_the_real_directory() {
     let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
@@ -1135,11 +1157,35 @@ fn validate_resolves_a_symlinked_cwd_to_the_real_directory() {
 
     let via_real = validate_file_field(&["rel.json"], &real);
     let via_symlink = validate_file_field(&["rel.json"], &symlinked);
+
+    // POSIX's own getcwd(3) is specified to contain no symlink component,
+    // and Node's process.cwd() (libuv's uv_cwd, src/unix/core.c) calls it
+    // directly with no override -- verified live already (this doc's own
+    // history) for the real JS CLI too.
+    #[cfg(unix)]
     assert_eq!(
         via_real, via_symlink,
-        "a symlinked cwd must resolve to the same real directory as visiting it directly, \
-         matching the real JS CLI run through the same symlink"
+        "on POSIX, a symlinked cwd must resolve to the same real directory as visiting it \
+         directly, matching real JS (getcwd(3) is specified to contain no symlink)"
     );
+
+    // Windows' GetCurrentDirectoryW does not resolve reparse points, and
+    // Node's process.cwd() (libuv's uv_cwd, src/win/util.c) calls it with
+    // no override either -- neither engine's real cwd query ever
+    // resolves a Windows symlink, so the symlink's own name must survive
+    // here, not the real directory's.
+    #[cfg(windows)]
+    {
+        assert_ne!(
+            via_real, via_symlink,
+            "on Windows, GetCurrentDirectoryW does not resolve reparse points, so a symlinked \
+             cwd must NOT resolve to the real directory's own name"
+        );
+        assert!(
+            via_symlink.contains("via-symlink"),
+            "on Windows the symlink's own name must survive in the reported file, got {via_symlink:?}"
+        );
+    }
 }
 
 /// CI fix round 1, issue 1's other half: `std::path::absolute` keeps a
@@ -1150,7 +1196,13 @@ fn validate_resolves_a_symlinked_cwd_to_the_real_directory() {
 /// resolves the same way Node's own does -- visiting `sibling` through
 /// `sub/../sibling` must report the identical file as visiting `sibling`
 /// directly. CI round 2, issue 1: rewritten off `std::fs::canonicalize`
-/// for the same reason as the two tests above.
+/// for the same reason as the two tests above. CI round 4: re-checked
+/// under the same lens as the symlink test above (Windows' own
+/// `GetCurrentDirectoryW` not resolving reparse points) and found not
+/// to apply here -- `sub` and `sibling` are both real, unsymlinked
+/// directories, so `env::current_dir`'s platform-specific symlink
+/// behavior never enters either call; both compare the same way on
+/// every platform.
 #[test]
 fn validate_collapses_a_relative_paths_dot_dot_components_like_node_does() {
     let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
