@@ -9,6 +9,7 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 - [process.backlog-drives-work] The backlog drives all work. Select backlog items before you start; every requirement traces to an item.
 - [process.brainstorm-first] Start each batch with a brainstorming session or a written spec; get the user's approval before implementing.
 - [process.claims-match-artifacts] Before submitting a report, re-open every artifact a claim cites and confirm the artifact shows what the sentence says.
+- [process.closure-claims-carry-enumeration] A claim that a set is closed ('every', 'all', 'no remaining') names the bounded, rerunnable enumeration that produced it; without the artifact, no claim.
 - [process.code-health-scan] Every plan carries a code-health scan of the files the batch touches: name the smells and antipatterns found, and fold targeted fixes into the tasks.
 - [process.conventional-commits] Commits use Conventional Commits (feat, fix, chore, test, ci, docs, refactor). Header at most 100 characters, body lines at most 100.
 - [process.deliverables-json] Task reports, reviews, and branch reviews are JSON files that pass `tools/kb.sh validate` against `.claude/schemas/deliverables.json`.
@@ -18,6 +19,7 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 - [process.live-run-before-ci] Verify a change live (run the app, service, or tool for real; capture evidence) before any PR, merge, or deploy spend.
 - [process.model-policy] Every review runs on a mightier model than the implementer it reviews. Implementers use the cheapest model that fits the task.
 - [process.no-tech-debt] Fix every review finding, Minor included. Defer a fix only for a stated reason, as a backlog item; never as a TODO in code.
+- [process.review-findings-are-claims-too] A review finding stating a measurement, a reproduction, or a proposed fix's behavior is verified by running it before filing; restated claims are re-derived.
 - [process.rulings-to-file] Every ruling goes to its home file in the same turn — a deferral’s backlog item included. A ledger and the chat are not home files; neither survives compaction.
 - [process.sequential-agents] Run all agent work strictly sequentially. Never dispatch two implementers or two reviewers at the same time.
 - [process.tdd] Test-driven development for every executable change: the failing test first, or a disclosed-mutation proof for already-correct behavior; verbatim RED and GREEN.

@@ -112,6 +112,10 @@
     {
       "date": "2026-09-05",
       "text": "The three batch-17 rulings confirmed as a set at the batch report: the data-layer rule (typed models only for never-re-serialized, parse-failure-tolerant paths; consumerless models delete), the unified get’s arity-first ordering, and the clap argv deviation with every observable instance pinned by scripted enumeration. docs/design.md §5.29; spec §3 and §6 carry the detail."
+    },
+    {
+      "date": "2026-09-05",
+      "text": "Batch 17 standing approvals, all five, with the Rust-tooling correction: the report-claims checker mandate (HR-061 ports it to a cargo bin - no Node tools in the codebase), the code-comments measurement clause, the exact-pins Cargo extension, the scratch-dirs sanctioned-forms bullet, and the new standing rules closure-claims-carry-enumeration and review-findings-are-claims-too. make-corpus.mjs stays the one interim exception (drives the frozen JS; retires with the corpus), pending confirmation. docs/design.md §5.30."
     }
   ],
   "notes": []

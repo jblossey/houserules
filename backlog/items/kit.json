@@ -1038,6 +1038,24 @@
       ],
       "milestone": null,
       "status": "open"
+    },
+    {
+      "id": "HR-061",
+      "type": "chore",
+      "title": "Port check-report-claims to a cargo bin; dev tools are Rust-native",
+      "body": [
+        "Owner ruling at the batch 17 report (2026-09-05): no Node tools in the codebase - the tooling choice is Rust. Rewrite tools/check-report-claims.mjs as a bin target in the houserules crate (same five checks, the same honest Limits section, cargo-tested incl. the unresolvable-sha error and the aggregation-window limit), delete the .mjs and tests/check-report-claims.test.mjs, and update the process.claims-match-artifacts bullet to the cargo invocation in the same task.",
+        "Controller interpretation pending owner confirmation: tools/make-corpus.mjs stays as the one sanctioned interim exception - it exists to drive the FROZEN JS implementation for corpus generation and retires with the corpus at phase 5; porting it to Rust would still spawn Node, gaining nothing. Veto this and it ports too.",
+        "Schedule with HR-060 (the template clauses reference the checker) or ride batch 18.",
+        "Source: owner, 2026-09-05, batch 17 report."
+      ],
+      "tags": [
+        "tools",
+        "rust",
+        "process"
+      ],
+      "milestone": null,
+      "status": "open"
     }
   ]
 }

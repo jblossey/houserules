@@ -487,3 +487,21 @@ Each item records the ruling with its date, or stays marked open.
     are named usage errors at exit 2, every observable instance
     pinned by scripted enumeration. The spec's §3 and §6 carry the
     detail. Source: owner, 2026-09-05, batch 17 report.
+30. **Batch 17 standing approvals + Rust-native dev tooling — ruled
+    2026-09-05.** All five retrospective proposals approved with
+    one correction: the tooling is Rust, not Node. Applied: the
+    report-claims checker mandate on process.claims-match-artifacts
+    (root copy; HR-061 ports the checker to a cargo bin and retires
+    the interim script); the measurement clause on
+    writing-style.code-comments (both copies); the exact-pins check
+    extended to **/Cargo.toml with the bare-range residual noted
+    (both copies); the sanctioned-forms bullet on
+    houserules.tests-clean-scratch-dirs (the grep check parked
+    unless violations recur); the new standing rules
+    process.closure-claims-carry-enumeration and
+    process.review-findings-are-claims-too (both copies). The
+    owner's words: no Node tools in the codebase. Controller
+    interpretation pending confirmation: make-corpus.mjs stays as
+    the one interim exception (it drives the frozen JS and retires
+    with the corpus at phase 5). Source: owner, 2026-09-05,
+    batch 17 report.
