@@ -66,9 +66,10 @@ fn resolve_like_node(path: &Path) -> std::io::Result<PathBuf> {
 /// Node's real output never carries one, because `std::fs::canonicalize`
 /// returns Windows' own UNC-verbatim form and neither `path.resolve` nor
 /// the Win32 calls it wraps (`GetFullPathNameW`, `GetCurrentDirectoryW`)
-/// ever produce it (verified against the installed clap-adjacent Rust
-/// std docs: `std::fs::canonicalize`'s own "Platform-specific behavior"
-/// section names this exact form). Considered the `dunce` crate first
+/// ever produce it (verified against the installed toolchain's own
+/// `std::fs::canonicalize` docs: its "Platform-specific behavior" section
+/// says plainly that on Windows "this converts the path to use extended
+/// length path syntax", the `\\?\` form). Considered the `dunce` crate first
 /// (crates.io, security-hygiene.dependency-vetting) -- it does this and
 /// more (also declines to strip a path Windows would then read
 /// differently: a reserved device name, or one past `MAX_PATH`) -- but
