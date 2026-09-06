@@ -2,7 +2,7 @@
 paths:
   - "bin/**"
 ---
-Generated from knowledge/ by tools/kb.sh render. Do not edit.
+Generated from knowledge/ by houserules render. Do not edit.
 
 # Cli rules
 
@@ -10,4 +10,4 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 
 - [quality.absence-is-designed] Render an absent value in user-facing output as a designed token; never let a raw undefined, null, or empty slot reach the user.
 
-Detail: tools/kb.sh get <id>
+Detail: houserules get <id>

@@ -5,21 +5,30 @@ rust = { version = "1.98.1", components = ["clippy", "rustfmt"] }
 shellcheck = "0.11.0"
 
 [tasks.setup]
-description = "One-command dev setup: install and the commit-msg hook"
-run = ["pnpm install", "git config core.hooksPath .githooks"]
+description = "One-command dev setup: install, the commit-msg hook, and the houserules binary on PATH"
+run = [
+  "pnpm install",
+  "git config core.hooksPath .githooks",
+  "cargo install --path crates/houserules --bin houserules",
+]
 
 [tasks.test]
 description = "Run all tests with coverage"
 run = "pnpm test"
 
+[tasks.houserules]
+description = "Front the houserules binary (built from crates/houserules); pass its subcommand after --"
+run = "cargo run --quiet --bin houserules --"
+
 [tasks.lint]
-description = "shellcheck, then the knowledge and backlog gates"
+description = "shellcheck, then the knowledge and backlog gates, then a stale-render check"
 run = [
   "shellcheck tools/*.sh template/tools/*.sh .githooks/commit-msg template/.githooks/commit-msg",
-  "tools/kb.sh check",
-  "tools/backlog.sh check",
+  "mise run houserules -- check-knowledge",
+  "mise run houserules -- check-backlog",
+  "mise run houserules -- render --check",
 ]
 
 [tasks.audit]
 description = "Audit a git range against the knowledge base rule package (pass --base <ref>)"
-run = "tools/kb.sh audit"
+run = "mise run houserules -- audit"

@@ -14,7 +14,7 @@ not available, commit aggregation uses `git reset --soft` instead.
 ## When to Use
 
 - The feature branch's work is done and the project's test and lint gates pass
-  (`tools/kb.sh check` and `tools/backlog.sh check` included).
+  (`houserules check-knowledge` and `houserules check-backlog` included).
 - The branch needs to go from "done" to "merged into main."
 
 Do not start this procedure on a branch that is not yet green — fix tests
@@ -23,11 +23,11 @@ and lint first.
 ## Procedure
 
 1. **Verify the branch is green.** Run the project's full test and lint gates,
-   including `tools/kb.sh check` and `tools/backlog.sh check`.
+   including `houserules check-knowledge` and `houserules check-backlog`.
 
-2. **Update the backlog.** Run `tools/backlog.sh set <id> status=done
+2. **Update the backlog.** Run `houserules set <id> status=done
    batch=<n>` for every delivered item, set the batch's `status` in
-   `backlog/batches.json` (a direct edit), and run `tools/backlog.sh check`.
+   `backlog/batches.json` (a direct edit), and run `houserules check-backlog`.
    Commit this update.
 
 3. **Aggregate commits.** When interactive rebase is unavailable, use a
@@ -70,7 +70,7 @@ and lint first.
    ```sh
    pnpm install                                           # a project that installs the kit
    pnpm exec houserules update --dir .                    # a project that installs the kit
-   mise exec -- node bin/houserules.mjs update --dir .    # the kit repository itself
+   houserules update --dir .                              # the kit repository itself
    ```
    Read the drift line the command prints, `kit <old> -> <new>`. Equal
    sides mean nothing to commit. Different sides mean the stamp changed:

@@ -15,6 +15,6 @@
     "Installs with the package manager's exact-pin flag and verifies the resolved version in the manifest; never writes a version by hand; no ^ or ~",
     "Verifies the library's API against current docs before use and lists it in docs_verified",
     "Writes the failing test first; tdd holds the verbatim RED and GREEN output",
-    "The report passes tools/kb.sh validate; self_audit holds the audit summary and deterministic rows; security-hygiene.exact-pins and security-hygiene.dependency-vetting pass"
+    "The report passes houserules validate; self_audit holds the audit summary and deterministic rows; security-hygiene.exact-pins and security-hygiene.dependency-vetting pass"
   ]
 }

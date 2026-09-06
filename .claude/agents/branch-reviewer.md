@@ -19,17 +19,17 @@ Plan alignment (deviations: justified or not), code quality, architecture, doc c
 
 ## Rule adherence for the branch
 
-Run `tools/kb.sh audit --base <BASE> --head <HEAD> --workspace <WORKSPACE> --json <WORKSPACE>/branch-audit.json` and `tools/kb.sh check`. Judge every `open` row over the whole diff; `rule_adherence` holds every row judged. File failures as issues with the standard severities (standing rule critical, area rule important, warn minor). With `--workspace` a report-field row is judged from the task reports; a skipped row means the workspace was not passed — re-run the audit with it. When an area's files carry no code change, judge its rows from the audit's `area_files` and cite that list as the evidence for each row. Compare the latest `templates` blob ids in `.claude/evals/record.json` with `git rev-parse HEAD:<path>` for `implementer.md` and `task-reviewer.md`; a mismatch is a critical finding under `process.evals-rerun`.
+Run `houserules audit --base <BASE> --head <HEAD> --workspace <WORKSPACE> --json <WORKSPACE>/branch-audit.json` and `houserules check-knowledge`. Judge every `open` row over the whole diff; `rule_adherence` holds every row judged. File failures as issues with the standard severities (standing rule critical, area rule important, warn minor). With `--workspace` a report-field row is judged from the task reports; a skipped row means the workspace was not passed — re-run the audit with it. When an area's files carry no code change, judge its rows from the audit's `area_files` and cite that list as the evidence for each row. Compare the latest `templates` blob ids in `.claude/evals/record.json` with `git rev-parse HEAD:<path>` for `implementer.md` and `task-reviewer.md`; a mismatch is a critical finding under `process.evals-rerun`.
 
 ## Knowledge and rules retrospective
 
-Run `tools/kb.sh stats <WORKSPACE>`; read the ledger, every `task-*-report.json` and `task-*-review*.json`. Then propose improvements, each as a ready edit:
+Run `houserules stats <WORKSPACE>`; read the ledger, every `task-*-report.json` and `task-*-review*.json`. Then propose improvements, each as a ready edit:
 1. `violated_rules` — every id that failed at least once in any audit or review: `id`, `count`, `tasks`, and a `proposal` — `{"check": {...}}` when the rule can be deterministic, otherwise `{"summary": "..."}`.
 2. `uncovered_findings` — critical or important findings that no rule covered: the `finding` and the proposed `entry` (`id`, `kind`, `area`, `summary`, `body`, `tags`, `source`).
 3. `stale_entries` — `check` failures on `verify` paths, and entries the diff contradicts: `id` and the proposed `edit`.
 4. `unused_ids` — from `stats`: `id`, `tasks`, `decision` (`keep` or `drop`), `reason`.
-5. `template_defects` — anything in the agent templates, skills, hook, schemas, or `tools/kb.sh` that hindered the work: `where`, `what`, `fix`.
+5. `template_defects` — anything in the agent templates, skills, hook, or schemas that hindered the work: `where`, `what`, `fix`.
 
 ## Output
 
-Write `REVIEW_FILE` as JSON of kind `branch-review` (schema `.claude/schemas/deliverables.json`): `base`, `head`, `strengths`, `issues`, `rule_adherence`, `recommendations`, `retrospective` (the five lists, `[]` where empty), `assessment` (`ready`: `yes` | `no` | `with-fixes`; `text`). Run `tools/kb.sh validate <REVIEW_FILE>`, fix every error, then answer with the JSON verbatim as your final message.
+Write `REVIEW_FILE` as JSON of kind `branch-review` (schema `.claude/schemas/deliverables.json`): `base`, `head`, `strengths`, `issues`, `rule_adherence`, `recommendations`, `retrospective` (the five lists, `[]` where empty), `assessment` (`ready`: `yes` | `no` | `with-fixes`; `text`). Run `houserules validate <REVIEW_FILE>`, fix every error, then answer with the JSON verbatim as your final message.

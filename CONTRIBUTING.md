@@ -5,17 +5,24 @@ workflow for this repository.
 
 ## Setup
 
-houserules runs on Node under [mise](https://mise.jdx.dev); pnpm is the
-only package manager.
+houserules itself runs on the compiled `houserules` binary, built from
+`crates/houserules`; its own dev tooling (vitest, the commit-msg hook's
+trailer gate) still runs on Node. Both toolchains, plus pnpm, are pinned
+in [mise](https://mise.jdx.dev).
 
 ```sh
 git clone https://github.com/jblossey/houserules.git
 cd houserules
-mise run setup   # pnpm install, activates the commit-msg hook
+mise run setup   # pnpm install, the commit-msg hook, houserules on PATH
 ```
 
-`mise run setup` installs dependencies and points `core.hooksPath` at
-`.githooks`, so the commit-msg gate below runs on every commit you make.
+`mise run setup` installs dependencies, points `core.hooksPath` at
+`.githooks`, and runs `cargo install --path crates/houserules --bin
+houserules` so the binary is on `PATH`. The commit-msg hook's
+conventional-commit arm (`houserules check-commit`) runs only when that
+probe succeeds; without it, the hook degrades to the trailer check alone
+and the `check-commit` CI job is the backstop that still catches a bad
+subject or body before merge.
 
 ## The batch process
 
@@ -48,16 +55,17 @@ stay at most 100 characters too.
 
 Never add a `Co-Authored-By:` or `Claude-Session:` trailer to a commit, no
 matter what tool wrote the message. `.githooks/commit-msg` rejects both
-trailers, then runs commitlint (`@commitlint/config-conventional`) against
-the rest of the message.
+trailers, then probes `houserules check-commit --help` and, when it
+succeeds, runs `houserules check-commit` against the rest of the message.
 
 ## Before you open a pull request
 
 ```sh
-mise run lint    # shellcheck, tools/kb.sh check, tools/backlog.sh check
+mise run lint    # shellcheck, houserules check-knowledge, check-backlog, render --check
 mise run test    # vitest with coverage
+cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 ```
 
-Both must pass locally. CI (`.github/workflows/ci.yml`) runs the same
-gates, plus a commitlint pass over your commit range and a knowledge-base
-audit of your diff, on every pull request.
+All three must pass locally. CI (`.github/workflows/ci.yml`) runs the same
+gates, plus a `houserules check-commit` pass over your commit range and a
+knowledge-base audit of your diff, on every pull request.

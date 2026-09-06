@@ -2,7 +2,7 @@
 paths:
   - "template/**"
 ---
-Generated from knowledge/ by tools/kb.sh render. Do not edit.
+Generated from knowledge/ by houserules render. Do not edit.
 
 # Template rules
 
@@ -12,6 +12,6 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 
 ## Invariants
 
-- [houserules.payload-runs-on-builtins] The payload in `template/` runs on Node built-ins and POSIX shell only: no dependency, no build step; the CLIs work in a fresh clone before any install.
+- [houserules.payload-runs-on-builtins] The vendored payload runs on the `houserules` binary and POSIX shell only: every shipped reference invokes it directly; no file needs Node, npm, or an install.
 
-Detail: tools/kb.sh get <id>
+Detail: houserules get <id>
