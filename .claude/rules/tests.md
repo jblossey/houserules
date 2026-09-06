@@ -5,7 +5,7 @@ paths:
   - "vitest.shared.mts"
   - "vitest.kb-coverage.config.mts"
 ---
-Generated from knowledge/ by tools/kb.sh render. Do not edit.
+Generated from knowledge/ by houserules render. Do not edit.
 
 # Tests rules
 
@@ -21,4 +21,4 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 - [houserules.vitest-coverage-floor-tracks-the-rust-port] A ported file's coverage floor moves to its own excluded, separately-ratcheted vitest run; the still-JS-owned files' global floor never drops.
 - [houserules.vitest-restore-mocks-scope] Vitest `restoreMocks` restores `vi.spyOn` spies only; reset a `vi.mock` factory’s `vi.fn` in an explicit `afterEach` with `mockReset()`.
 
-Detail: tools/kb.sh get <id>
+Detail: houserules get <id>

@@ -4,7 +4,7 @@ paths:
   - "Cargo.toml"
   - "Cargo.lock"
 ---
-Generated from knowledge/ by tools/kb.sh render. Do not edit.
+Generated from knowledge/ by houserules render. Do not edit.
 
 # Rust rules
 
@@ -16,4 +16,4 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 
 - [houserules.glob-union-matcher] globMatch in tools/kb.mjs is a union: matchesGlob for the full vocabulary, globToRegExp only for `**`/`*` with dot-segments; combining both matches neither.
 
-Detail: tools/kb.sh get <id>
+Detail: houserules get <id>

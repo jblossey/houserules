@@ -50,8 +50,8 @@ its own `history` entry when it is long enough to want one.
 
 ## Write entries
 
-- Before you write an entry, check `tools/kb.sh index --topic <t>` or
-  `tools/kb.sh standing` for a seeded rule that already says it. Drop the
+- Before you write an entry, check `houserules index --topic <t>` or
+  `houserules standing` for a seeded rule that already says it. Drop the
   duplicate instead of filing it — the seed already carries 23 standing
   rules (conventional commits, TDD, exact pins, ff-only merges, and more).
 - `summary` states the rule in one sentence, ≤ 160 characters, with no
@@ -86,7 +86,7 @@ together, in the same commit — one without the other fails validation or
 never loads.
 
 Mark a migrated non-negotiable `standing: true`; it loads in every session
-instead of only when a matching file is read. `tools/kb.sh check` allows
+instead of only when a matching file is read. `houserules check-knowledge` allows
 it only for kind `rule` or `invariant` in area `global` or `process` —
 leave everything else area-scoped so it loads with its files.
 
@@ -120,9 +120,9 @@ config or a comment that still does the work its entry now documents.
 After every topic:
 
 ```sh
-tools/kb.sh render
-tools/kb.sh check
-tools/backlog.sh check
+houserules render
+houserules check-knowledge
+houserules check-backlog
 ```
 
 Fix every failure before the next topic. The next branch audit checks the
@@ -161,4 +161,4 @@ carries both reasons the source gave plus the fallback, and `verify`
 points at the code the rule protects. The entry is `standing: true`: a
 review-before-merge rule is a non-negotiable, and area `process` carries
 no file globs, so only `standing` gives the entry a loading path. Delete
-the CLAUDE.md paragraph once `tools/kb.sh render` and both checks pass.
+the CLAUDE.md paragraph once `houserules render` and both checks pass.

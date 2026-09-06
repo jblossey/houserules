@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Agent deliverables",
-  "description": "Task reports, task reviews, re-reviews, and branch reviews written by the agent templates in .claude/agents/. The `kind` field selects the definition. Validate with tools/kb.sh validate <file>.",
+  "description": "Task reports, task reviews, re-reviews, and branch reviews written by the agent templates in .claude/agents/. The `kind` field selects the definition. Validate with houserules validate <file>.",
   "$defs": {
     "sha": {
       "type": "string",

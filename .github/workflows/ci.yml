@@ -37,7 +37,7 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
 
-  commitlint:
+  check-commit:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -45,9 +45,7 @@ jobs:
         with:
           fetch-depth: 0
       - uses: jdx/mise-action@v4
-      - run: pnpm install --frozen-lockfile
       - run: >
-          pnpm exec commitlint
+          mise run houserules -- check-commit
           --from ${{ github.event.pull_request.base.sha }}
           --to ${{ github.event.pull_request.head.sha }}
-          --verbose

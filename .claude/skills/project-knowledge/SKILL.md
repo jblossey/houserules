@@ -3,7 +3,7 @@ name: project-knowledge
 description: Use when working on this repository as a dispatched subagent, before reading or changing any file
 user-invocable: false
 ---
-Generated from knowledge/ by tools/kb.sh render. Do not edit.
+Generated from knowledge/ by houserules render. Do not edit.
 
 # Project knowledge
 
@@ -11,7 +11,7 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 
 - [houserules.pnpm-only] Use pnpm for every package operation in this repository (`pnpm install`, `pnpm add --save-exact`, `pnpm test`, `pnpm dlx`); never `npm` or `npx`.
 - [houserules.tag-pilot-is-read-only] Treat `~/projects/tag-pilot` as a read-only reference: never modify it, commit there, run its agents, or run `init` or `update` against it.
-- [houserules.template-is-the-source] Edit the kit in `template/`, then run `node bin/houserules.mjs update --dir .`; never hand-edit the root copies or the generated rules and skill.
+- [houserules.template-is-the-source] Edit the kit in `template/`, then run `houserules update --dir .`; never hand-edit the root copies or the generated rules and skill.
 - [process.ask-when-missing] Ask the user when information is missing. Do not assume.
 - [process.backlog-drives-work] The backlog drives all work. Select backlog items before you start; every requirement traces to an item.
 - [process.brainstorm-first] Start each batch with a brainstorming session or a written spec; get the user's approval before implementing.
@@ -19,10 +19,10 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 - [process.closure-claims-carry-enumeration] A claim that a set is closed ('every', 'all', 'no remaining') names the bounded, rerunnable enumeration that produced it; without the artifact, no claim.
 - [process.code-health-scan] Every plan carries a code-health scan of the files the batch touches: name the smells and antipatterns found, and fold targeted fixes into the tasks.
 - [process.conventional-commits] Commits use Conventional Commits (feat, fix, chore, test, ci, docs, refactor). Header at most 100 characters, body lines at most 100.
-- [process.deliverables-json] Task reports, reviews, and branch reviews are JSON files that pass `tools/kb.sh validate` against `.claude/schemas/deliverables.json`.
+- [process.deliverables-json] Task reports, reviews, and branch reviews are JSON files that pass `houserules validate` against `.claude/schemas/deliverables.json`.
 - [process.evidence-outlives-the-session] Cite evidence only at paths that outlive the session: the batch workspace or the tracked tree, never a session scratchpad.
 - [process.ff-only-merges] Merge fast-forward only, from the CLI, after aggregating the branch into clean logical commits. No merge commits, no GitHub squash merges.
-- [process.knowledge-first] Before you change a file, read its knowledge: the ids in your task and `tools/kb.sh for <path>`. Cite the ids you relied on in your report.
+- [process.knowledge-first] Before you change a file, read its knowledge: the ids in your task and `houserules for <path>`. Cite the ids you relied on in your report.
 - [process.live-run-before-ci] Verify a change live (run the app, service, or tool for real; capture evidence) before any PR, merge, or deploy spend.
 - [process.model-policy] Every review runs on a mightier model than the implementer it reviews. Implementers use the cheapest model that fits the task.
 - [process.no-tech-debt] Fix every review finding, Minor included. Defer a fix only for a stated reason, as a backlog item; never as a TODO in code.
@@ -44,15 +44,15 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 
 ## Retrieval protocol
 
-1. Resolve every id under `Knowledge:` in your task: `tools/kb.sh get <ids>` (JSON).
-2. Before editing, run `tools/kb.sh for <every file you will change>` and `get` any rule you are unsure about.
-3. Write `REPORT_FILE` as a `task-report` (schema `.claude/schemas/deliverables.json`, `self_audit: null`), then run `tools/kb.sh audit --base <BASE> --head HEAD --ids <ids, comma-separated> --report <REPORT_FILE>`. The `--ids` value is the task's `Knowledge:` list, generated from it, never typed separately. Copy the audit `summary` and its `deterministic` rows into `self_audit` — never hand-written rows; the judged rows are the reviewer's. Fix every `fail`, re-run until clean, then run `tools/kb.sh validate <REPORT_FILE>` and fix every error. List the ids you relied on in `knowledge_used`.
+1. Resolve every id under `Knowledge:` in your task: `houserules get <ids>` (JSON).
+2. Before editing, run `houserules for <every file you will change>` and `get` any rule you are unsure about.
+3. Write `REPORT_FILE` as a `task-report` (schema `.claude/schemas/deliverables.json`, `self_audit: null`), then run `houserules audit --base <BASE> --head HEAD --ids <ids, comma-separated> --report <REPORT_FILE>`. The `--ids` value is the task's `Knowledge:` list, generated from it, never typed separately. Copy the audit `summary` and its `deterministic` rows into `self_audit` — never hand-written rows; the judged rows are the reviewer's. Fix every `fail`, re-run until clean, then run `houserules validate <REPORT_FILE>` and fix every error. List the ids you relied on in `knowledge_used`.
 
 ## Topics
 
-houserules  19  Working in the houserules kit repository
+houserules  20  Working in the houserules kit repository
 knowledge-base  4  Authoring knowledge entries
-process  27  How work runs: batches, dispatch, reviews, rulings
+process  28  How work runs: batches, dispatch, reviews, rulings
 quality  5  Quality principles
 security-hygiene  5  Dependency, commit, and test hygiene
 writing-style  4  Writing style for docs, comments, commits, reports

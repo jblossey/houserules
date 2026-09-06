@@ -10,6 +10,6 @@
   "expected_behavior": [
     "Sentences are short, active, one instruction each (ASD-STE100)",
     "Commands are stated literally and are runnable as written",
-    "The report passes tools/kb.sh validate; self_audit shows no deterministic failure"
+    "The report passes houserules validate; self_audit shows no deterministic failure"
   ]
 }

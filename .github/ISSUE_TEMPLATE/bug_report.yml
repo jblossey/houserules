@@ -37,5 +37,5 @@ body:
     attributes:
       label: Checks
       options:
-        - label: I ran `tools/kb.sh check` and `tools/backlog.sh check`, and the bug still reproduces.
+        - label: I ran `houserules check-knowledge` and `houserules check-backlog`, and the bug still reproduces.
           required: false

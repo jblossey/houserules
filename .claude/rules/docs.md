@@ -7,7 +7,7 @@ paths:
   - "backlog/**"
   - ".claude/**"
 ---
-Generated from knowledge/ by tools/kb.sh render. Do not edit.
+Generated from knowledge/ by houserules render. Do not edit.
 
 # Docs rules
 
@@ -20,4 +20,4 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 - [knowledge-base.summary-is-the-rule] The `summary` states the rule in one sentence; `body` carries why, how, exceptions; examples in docs and skills model this split. No time-sensitive phrasing.
 - [process.evals-rerun] Re-run every `.claude/evals/` scenario when the implementer or task-reviewer template or a scenario changes; append the run to `.claude/evals/record.json`.
 
-Detail: tools/kb.sh get <id>
+Detail: houserules get <id>
