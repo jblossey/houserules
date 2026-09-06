@@ -11,13 +11,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-      - run: tools/kb.sh check
-      - run: tools/backlog.sh check
+      - run: houserules check-knowledge
+      - run: houserules check-backlog
       - if: github.event_name == 'pull_request'
         run: >
-          tools/kb.sh audit
+          houserules audit
           --base ${{ github.event.pull_request.base.sha }}
           --head ${{ github.event.pull_request.head.sha }}

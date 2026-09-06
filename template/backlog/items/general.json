@@ -13,7 +13,7 @@
       "title": "Replace this example item with the project's real backlog.",
       "body": [
         "Seeded by houserules init. Add sections as `backlog/items/<section>.json` files; keep ids unique across the backlog.",
-        "Read the backlog with `tools/backlog.sh list --open`, `get <id>`, `batch <n>`; tick items with `set <id> status=done batch=<n>`."
+        "Read the backlog with `houserules list --open`, `get <id>`, `batch <n>`; tick items with `set <id> status=done batch=<n>`."
       ]
     }
   ]

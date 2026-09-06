@@ -1,9 +1,9 @@
 #!/usr/bin/env sh
-# commit-msg hook: reject a Co-Authored-By or Claude-Session trailer line,
-# then run commitlint when the project has it (node_modules/.bin/commitlint
-# present). Runs commitlint through `mise exec -- pnpm exec` only once mise
-# itself resolves pnpm for this project; otherwise execs the commitlint
-# shim directly. Execs neither mise nor pnpm when commitlint is absent.
+# commit-msg hook: the trailer gate below always runs. `houserules
+# check-commit` runs only when a quiet `houserules check-commit --help`
+# probe succeeds (the binary is on PATH and understands the subcommand,
+# not merely present -- an older binary without it degrades here instead
+# of blocking every commit); nothing else executes.
 set -eu
 
 msg_file="$1"
@@ -14,9 +14,6 @@ if [ -n "$trailer" ]; then
   exit 1
 fi
 
-if [ -x "node_modules/.bin/commitlint" ]; then
-  if command -v mise >/dev/null 2>&1 && mise which pnpm >/dev/null 2>&1; then
-    exec mise exec -- pnpm exec commitlint --edit "$msg_file"
-  fi
-  exec node_modules/.bin/commitlint --edit "$msg_file"
+if houserules check-commit --help >/dev/null 2>&1; then
+  exec houserules check-commit "$msg_file"
 fi
