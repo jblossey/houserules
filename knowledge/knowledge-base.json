@@ -25,7 +25,8 @@
         "Invented claims read plausibly; that is what makes them dangerous.",
         "When two sources disagree, read the code and record which one the entry follows.",
         "A shipped template or seed names no root-only id, path, or command; verify every reference resolves in a fresh install before syncing the root copy (batch 7 task 3).",
-        "Run every command block you ship exactly as printed, top to bottom, in the environment the reader will have (a fresh directory for a quick start). A block that needs unstated context, or that resolves differently than printed (an unpinned git spec), fails this rule (batch 13: a quick start that exited 1 as printed, an install form floating to the default branch, a kit-only mechanism shipped as generic)."
+        "Run every command block you ship exactly as printed, top to bottom, in the environment the reader will have (a fresh directory for a quick start). A block that needs unstated context, or that resolves differently than printed (an unpinned git spec), fails this rule (batch 13: a quick start that exited 1 as printed, an install form floating to the default branch, a kit-only mechanism shipped as generic).",
+        "The walk includes a control: when a line looks optional, re-run the block without it and confirm the block then fails — that proves the line load-bearing instead of decorative (batch 18 T6 r2: the quick start's `houserules update --dir .` line was proven load-bearing by exactly this control). Sweeps keyed on deleted-tool names miss claims keyed on surviving names (batch 18 branch review: a design-doc aside naming `bin/houserules.mjs` escaped a sweep that grepped for the deleted wrappers); sweep for the claim's subject too."
       ],
       "tags": ["knowledge", "authoring", "fidelity"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
@@ -47,8 +48,8 @@
       "area": "docs",
       "summary": "Give every rule, invariant, or checked entry a loading path: `standing: true`, or an area whose globs match the files it governs.",
       "body": [
-        "A non-standing entry in an area with empty globs other than global (`process` in the seed) never loads with a file. A global entry loads with every file through `kb.sh for` and joins every audit package, but renders into no rules file (batch 11).",
-        "After filing, run `tools/kb.sh for <a file the rule governs>` and confirm the entry appears.",
+        "A non-standing entry in an area with empty globs other than global (`process` in the seed) never loads with a file. A global entry loads with every file through `houserules for` and joins every audit package, but renders into no rules file (batch 11).",
+        "After filing, run `houserules for <a file the rule governs>` and confirm the entry appears.",
         "A `check` needs an audit loading path too: it joins the package when its entry is `standing`, sits in a touched or global area (any kind, not only rule and invariant), or is named in `--ids`."
       ],
       "tags": ["knowledge", "authoring", "areas", "standing"],

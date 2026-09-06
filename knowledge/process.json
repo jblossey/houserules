@@ -20,7 +20,7 @@
       "standing": true,
       "summary": "The backlog drives all work. Select backlog items before you start; every requirement traces to an item.",
       "body": [
-        "The backlog lives in `backlog/` (JSON). Read it with `tools/backlog.sh list --open`, `get <id>`, `batch <n>`; tick items with `set <id> status=done batch=<n>`."
+        "The backlog lives in `backlog/` (JSON). Read it with `houserules list --open`, `get <id>`, `batch <n>`; tick items with `set <id> status=done batch=<n>`."
       ],
       "tags": ["backlog"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
@@ -96,7 +96,7 @@
       "kind": "rule",
       "area": "process",
       "standing": true,
-      "summary": "Before you change a file, read its knowledge: the ids in your task and `tools/kb.sh for <path>`. Cite the ids you relied on in your report.",
+      "summary": "Before you change a file, read its knowledge: the ids in your task and `houserules for <path>`. Cite the ids you relied on in your report.",
       "body": [],
       "tags": ["knowledge"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
@@ -211,12 +211,12 @@
       "kind": "rule",
       "area": "process",
       "standing": true,
-      "summary": "Task reports, reviews, and branch reviews are JSON files that pass `tools/kb.sh validate` against `.claude/schemas/deliverables.json`.",
+      "summary": "Task reports, reviews, and branch reviews are JSON files that pass `houserules validate` against `.claude/schemas/deliverables.json`.",
       "body": [
         "Every deliverable an agent writes is structured data in the batch workspace: `task-<N>-report.json`, `task-<N>-review.json`, `task-<N>-review-r<R>.json`, `branch-review.json`. The `kind` field names the definition.",
-        "Write the file, run `tools/kb.sh validate <file>`, fix every error, then audit. A deliverable that does not validate is incomplete; the controller re-dispatches.",
+        "Write the file, run `houserules validate <file>`, fix every error, then audit. A deliverable that does not validate is incomplete; the controller re-dispatches.",
         "The implementer's `self_audit` starts as `null` and holds the audit's `summary` and deterministic rows after the audit; the check below fails until it does. `self_audit` always covers the whole task (`BASE..HEAD` at report time); a fix round's audit over the fix diff goes into that `fix_rounds` entry's `tests`.",
-        "`tools/kb.sh stats` and the branch retrospective read these files; prose is invisible to them."
+        "`houserules stats` and the branch retrospective read these files; prose is invisible to them."
       ],
       "tags": ["reports", "deliverables"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
@@ -233,7 +233,7 @@
         "The scenarios are the regression suite for the agent templates. The check is a `co-change`: a change to `.claude/agents/implementer.md`, `.claude/agents/task-reviewer.md`, or `.claude/evals/*.json` without a change to `.claude/evals/record.json` fails the audit. The entry routes through the `docs` area (`.claude/**`), so every audit that touches the templates carries it without `--ids`; the `process` area has no paths.",
         "Run every scenario in a detached scratch worktree at the branch head before the branch review; the orchestrating skill holds the procedure. Keep nothing from a worktree; workspace artifacts carry the `eval-` prefix.",
         "A run set in the record names `date`, `templates` (the git blob id of each template under test from `git rev-parse HEAD:<path>`; blob ids survive commit aggregation, commit SHAs do not), and one row per scenario: `scenario`, `agent`, `model`, `pass`, `of`, `notes`. The branch reviewer compares the latest blob ids with `HEAD`.",
-        "No scenario covers `branch-reviewer` or the orchestrating skill; a change there needs no run. The retrieval protocol text in `tools/kb.mjs` shapes the generated skill the implementer loads; run the scenarios after a change there too — the check cannot see it.",
+        "No scenario covers `branch-reviewer` or the orchestrating skill; a change there needs no run. The `houserules render` command's own retrieval-protocol text shapes the generated skill the implementer loads; run the scenarios after a change there too — the check cannot see it.",
         "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns; the branch does not merge before the record commit lands, and the branch-range audit is the row that must pass (batches 7-11, 14)."
       ],
       "tags": ["evals", "templates", "agents"],
@@ -269,7 +269,7 @@
       "area": "process",
       "summary": "Add knowledge future sessions need to `knowledge/`; session memory is not portable, repo files are.",
       "body": [
-        "Write the entry in the same turn you learn the fact. Then run `tools/kb.sh render` and commit the generated files with it."
+        "Write the entry in the same turn you learn the fact. Then run `houserules render` and commit the generated files with it."
       ],
       "tags": ["knowledge"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
@@ -379,7 +379,7 @@
         "The recurring failure is not fabrication but drift: the work is right while the sentence describing it cites a capture that is not there, quotes a line the capture lost, or keeps a rationale a later verification overturned (batch 16 tasks 2 and 5).",
         "The check is mechanical: for each named file, open it; for each quoted line, grep it; for each number, recompute it from the artifact. A reviewer does exactly this, so a report that skips it converts Minor findings into review rounds.",
         "A reversed trend is worth recording too: name the pattern in the review when it appears, and name its reversal when a later round demonstrates it (batch 16 task 2 round 2).",
-        "Close every report by running the report-claims checker over the report file after the last edit, and paste its clean run as the final tests entry. The checker is a floor, not a substitute for the manual sweep: its Limits section names what only the sweep catches. Dev tools are Rust-native by the owner's batch-17 ruling; HR-061 ports the checker to a cargo bin and retires the interim script."
+        "Close every report by running the report-claims checker (`cargo run --quiet --bin check-report-claims -- <REPORT_FILE>`) over the report file after the last edit, and paste its clean run as the final tests entry. The checker is a floor, not a substitute for the manual sweep: its Limits section names what only the sweep catches. Dev tools are Rust-native (owner ruling, batch 17 report; HR-061 ported the checker). The checker gates gitignored workspace reports, never a tracked artifact a CI job could see, so it carries no CI job of its own -- the implementer template's closing-act mandate (HR-060) is the whole mechanism."
       ],
       "tags": ["reports", "evidence", "review"],
       "source": { "date": "2026-09-04", "by": "review", "ref": "batch 16 task 2 re-review r1 trend note; owner ruling at the batch 16 report" }
@@ -409,6 +409,18 @@
       ],
       "tags": ["review", "evidence"],
       "source": { "date": "2026-09-05", "by": "user", "ref": "batch 17 report ruling; branch review retrospective" }
+    },
+    {
+      "id": "process.verify-in-persisted-state",
+      "kind": "gotcha",
+      "area": "process",
+      "summary": "Verify behavior against the persisted state the code reads in production; a one-off override is a different state and can falsify the measurement.",
+      "body": [
+        "Batch 18 T2: `git -c core.commentChar=X commitlint --edit` measured 'both tools share the blind spot' because -c never persists and commitlint's `git config` lookup found nothing; with the value persisted in the repository's config, commitlint adapted and check-commit did not - the reversed measurement was the real finding and produced the fix.",
+        "Before citing a tool's behavior under configuration, persist the configuration the way a user would (config file, not a process-scoped flag or env var), then run both sides from that state. State the persistence mechanism in the capture."
+      ],
+      "tags": ["verification", "measurement", "review"],
+      "source": { "date": "2026-09-06", "by": "review", "ref": "batch 18 T2 fix round 2 correction; task-2-review-r3.json re-derivation" }
     }
   ]
 }

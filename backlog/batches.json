@@ -252,13 +252,15 @@
       "items": [
         "HR-062",
         "HR-060",
-        "HR-061"
+        "HR-061",
+        "HR-051",
+        "HR-065"
       ],
       "summary": "Tier-2 phase 3 (HR-062, under HR-047): init/update/files with the embedded payload, the reference rewrite to the flat commands, tools/*.sh deletion, check-commit in the hook; plus the batch-17 process items — the template clauses with their evals rerun (HR-060) and the report-claims checker as a cargo bin (HR-061).",
       "kickoff": "docs/specs/2026-09-05-batch-18-phase3.md",
       "status": {
-        "state": "planned",
-        "text": "Gated 2026-09-05: phase 3 + HR-060/061/051. Spec approved as amended (the library-governance ruling applied; rust-embed ruled); plan approval next."
+        "state": "done",
+        "text": "Done 2026-09-06: phase 3 delivered whole — init/update/files on the rust-embed payload (byte-parity, RETIRED deletion), check-commit at measured commitlint parity with the capability-probing hook, the reference rewrite bounded by rerunnable closure bins, the render/check/read-parity goldens off the frozen corpus behind the diff-shape gate, HR-051a deterministic, and the repository flipped onto its own binary (commitlint out, mise/CI fronting, the ninth evals record at the flipped blobs). Branch review ready-with-fixes; all four findings closed in-branch or at aggregation; §10 acceptance arcs captured."
       }
     }
   ]

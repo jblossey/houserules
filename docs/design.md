@@ -64,9 +64,10 @@ machinery fixes never reach adopters.
 **B+C hybrid: a scaffold-and-vendor CLI with an ownership manifest.**
 `houserules init` copies the payload into the project; `houserules update`
 overwrites only kit-owned machinery; per-project data is seeded once and
-never touched again. Runnable today from a local clone
-(`node ~/projects/houserules/bin/houserules.mjs init`), publishable later as
-`npx houserules init` without structural change (the `bin` field is wired).
+never touched again. Runnable today from a local clone via the compiled
+binary (`cargo install --path crates/houserules`, then `houserules init`);
+the JS form retired at batch 18 when the payload flipped to the binary, and
+distribution channels land at phase 4 (HR-048).
 
 The two strongest reasons:
 
@@ -83,9 +84,12 @@ The two strongest reasons:
    the installed version.
 
 Harness portability comes free: the payload is plain JSON, markdown, and
-POSIX shell + Node scripts. Another harness can read `knowledge/*.json`
-directly or shell out to `tools/kb.sh`; nothing depends on Claude Code
-except the `.claude/` conventions, which other tools ignore harmlessly.
+POSIX shell; the `houserules` binary reads and writes it (amended at
+batch 18 T6, docs/specs/2026-09-05-batch-18-phase3.md §1 —
+`houserules.payload-runs-on-builtins` carries the full contract and its
+history). Another harness can read `knowledge/*.json` directly or shell
+out to the `houserules` binary; nothing depends on Claude Code except the
+`.claude/` conventions, which other tools ignore harmlessly.
 
 A plugin remains a possible **later complement** (publishing the orchestrating
 skill and agent templates for teams that want central updates), recorded here

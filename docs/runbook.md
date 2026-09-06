@@ -12,8 +12,8 @@ the running version.
 
 After you merge a release-please PR, restamp the kit:
 
-1. Run `mise exec -- node bin/houserules.mjs update --dir .`. The command
-   prints a drift line, for example `kit 0.1.0 -> 0.2.0-alpha`.
+1. Run `houserules update --dir .`. The command prints a drift line, for
+   example `kit 0.1.0 -> 0.2.0-alpha`.
 2. Commit the restamped `.houserules.json`:
    `chore(release): restamp the kit version`.
 3. Push the commit to main.

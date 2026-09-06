@@ -883,7 +883,7 @@
         "evals"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 18
     },
     {
@@ -1038,7 +1038,7 @@
         "process"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 18
     },
     {
@@ -1057,7 +1057,7 @@
         "process"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 18
     },
     {
@@ -1075,8 +1075,87 @@
         "template"
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 18
+    },
+    {
+      "id": "HR-063",
+      "type": "fix",
+      "title": "Seeded knowledge.yml needs an install step before it can run",
+      "body": [
+        "Batch 18 T5 fix round 1 (task-5-review.json, findings \"seeded CI gate + hook\" and houserules.payload-runs-on-builtins): template/.github/workflows/knowledge.yml now runs houserules check-knowledge, houserules check-backlog, and houserules audit, but no step in that job puts the houserules binary on the runner -- an adopter's houserules init seeds a PR gate whose first real step fails. The dead actions/setup-node@v7 step is dropped in the same fix round; this item tracks the missing install step itself.",
+        "Blocked on the binary reaching a real distribution channel: HR-048 (binary delivery channels for the rewritten kit, Tier 2, phase 4) is the actual channel this seeded workflow needs (a release-asset download step, a mise/ubi-backed install, or similar); HR-049 (the README's pinned install tag) rides the same release-asset mechanism once it lands, so it names related install-pin machinery worth checking against when this is unblocked. Spec section 9 (docs/specs/2026-09-05-batch-18-phase3.md) puts delivery channels in phase 4, out of this batch's scope, so this cannot land before HR-048 does.",
+        "houserules.payload-runs-on-builtins (the invariant that the SessionStart hook and the CI gates run where nothing is installed) is amended at T6 to the ruled binary+POSIX contract; that amendment should land against this fact, not silently past it.",
+        "Source: batch 18 T5 fix round 1 review, filed by the implementer per process.no-tech-debt."
+      ],
+      "tags": [
+        "cli",
+        "ci",
+        "template"
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null
+    },
+    {
+      "id": "HR-064",
+      "type": "fix",
+      "title": "README's build-from-source step follows HR-048/HR-049's real channel",
+      "body": [
+        "Batch 18 T6 fix round 1 (task-6-review.json, issue 2, knowledge-base.state-only-the-source): the README's runnable blocks called a bare `houserules` binary no install path supplied. The fix round's answer is a temporary \"Building the houserules binary\" section (`git clone` this repository, `cargo install --path crates/houserules --bin houserules`) placed before the first bare `houserules` call, explicitly marked pending HR-048.",
+        "This item tracks retiring that section once HR-048 ships a real binary delivery channel: replace the build-from-source block with the shipped install form (the release-asset download, mise/ubi, or whichever channel HR-048 lands), and re-verify every runnable block top to bottom against it. Interlocked with HR-049 (the README's pinned install tag following each release) -- both touch the same blocks and should land together or in HR-049's wake, the same ordering HR-063 already notes for the seeded CI workflow's install step.",
+        "Blocked on HR-048; cannot land before it.",
+        "Source: batch 18 T6 fix round 1 review, issue 2 (2026-09-06)."
+      ],
+      "tags": [
+        "docs",
+        "release"
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null
+    },
+    {
+      "id": "HR-065",
+      "type": "fix",
+      "title": "Sync the root eval scenario copies once the shared evals rerun lands",
+      "body": [
+        "Batch 18 T6 fix round 1 (task-6-review.json, issue 4, process.no-tech-debt): the three root .claude/evals/{dependency-add,docs-edit,seeded-violations}.json copies still read \"tools/kb.sh validate\" (T5 rewrote template/'s copies to \"houserules validate\"; the root copies are seed-once and update never revisits them). tests/dogfood.test.mjs pins the root/template divergence explicitly (PENDING_EVALS_RERUN_SYNC) instead of dropping the assertion, because this task's own brief bars touching .claude/evals/ directly.",
+        "HR-060 does not cover this reconciliation (read in full at the fix round: it covers the implementer/task-reviewer template clauses, the claims-tool CI-wiring decision, the batch-17 standing-entry amendments, and the shared rerun mechanism itself -- never the root scenario copies or the substitution that has to be reverted with them). This item is that home file.",
+        "Fix, in one commit, timed with the controller's imminent shared evals rerun (HR-060/process.evals-rerun): sync the three root scenario copies to their template sources (the one-line \"houserules validate\" wording), delete PENDING_EVALS_RERUN_SYNC from tests/dogfood.test.mjs (the pin reverts to plain byte equality, matching every other seeded scenario copy), and append the run to .claude/evals/record.json.",
+        "Source: batch 18 T6 fix round 1 review, issue 4 (2026-09-06)."
+      ],
+      "tags": [
+        "evals",
+        "template"
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 18
+    },
+    {
+      "id": "HR-066",
+      "type": "fix",
+      "title": "Ship the report-claims check through the binary so the seeded closing act runs everywhere",
+      "body": [
+        "Batch 18 branch review, important finding: the seeded implementer template's closing act names `cargo run --quiet --bin check-report-claims -- <REPORT_FILE>`, a command only the kit repository can run - the checker is deliberately unshipped dev tooling, so every adopter repo seeded by `houserules init` carries a mandatory report step that cannot run. Interim disclosure lives as the second known-gap bullet in houserules.payload-runs-on-builtins (batch 18).",
+        "Durable fix: ship the check as a `houserules` subcommand (or make the shipped clause name the project's report-claims checker abstractly) and re-point template/.claude/agents/implementer.md's step 4 at the binary form; the template edit pays the evals rerun that batch owes anyway. Rides Tier-2 phase 4/5 with HR-048's delivery work."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null
+    },
+    {
+      "id": "HR-067",
+      "type": "chore",
+      "title": "The orchestrating skill's fix-round dispatch relays only verified premises",
+      "body": [
+        "Batch 18 branch review, template_defects: nothing stops the controller from relaying a review finding's unverified premise into a fix-round dispatch. T6 r1 filed a false hook-history premise without running `git show`; the controller relayed it verbatim; the implementer wrote a false correction from it; T6 r2 had to unwind the history (task-6-review-r2.json, new_breakage 1c).",
+        "Add the relay clause to the orchestrating skill (template + root): a dispatch quotes a finding's premise only with the review's named verification run beside it; absent that, the dispatch instructs the implementer to measure first. Folds into the next template-touching batch so the skill edit rides work that already pays its gates."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null
     }
   ]
 }
