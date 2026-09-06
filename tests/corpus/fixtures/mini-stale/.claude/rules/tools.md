@@ -2,7 +2,7 @@
 paths:
   - "mini-stale-tools/**"
 ---
-Generated from knowledge/ by tools/kb.sh render. Do not edit.
+Generated from knowledge/ by houserules render. Do not edit.
 
 # Tools rules (STALE: hand-edited, does not match renderAll)
 

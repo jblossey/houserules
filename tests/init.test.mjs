@@ -1,19 +1,82 @@
 import {
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { KIT_OWNED, SEED_ONCE, main } from '../bin/houserules.mjs';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { KIT_OWNED, SEED_ONCE } from '../bin/houserules.mjs';
 import { UsageError } from '../template/tools/lib/cli.mjs';
+import { RETIRED } from './retired-paths.mjs';
 import { scratchDir } from './scratch-dir.mjs';
+
+const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
+
+/**
+ * The last commit on `origin/main` before batch 18 T5 rewrote every shipped
+ * `tools/kb.sh`/`tools/backlog.sh` reference (docs/specs/2026-09-05-batch-
+ * 18-phase3.md §3): `git rev-parse <sha>:<path>` against `HEAD` (re-checked
+ * for this fix round) shows `bin/houserules.mjs` and
+ * `template/tools/{kb,backlog}.mjs`/`lib/` byte-identical, so `install()`'s
+ * own KIT_OWNED loop -- unchanged, still naming both retired shell wrappers
+ * -- can still read them from a worktree checked out here. `package.json`
+ * differs (0e5c6cd, inside this same batch's range, dropped the two
+ * @commitlint devDependencies) but keeps the same `version` field, the only
+ * one `bin/houserules.mjs` reads (`VERSION`, stamped into `.houserules.json`)
+ * -- so the divergence does not affect anything this suite exercises.
+ * `houserules.pinned-shas-live-on-mains-ancestry`: pinned on `origin/main`'s
+ * own history, not this branch's pre-aggregation commits, so it survives
+ * the batch's ff-only merge.
+ */
+const FROZEN_TEMPLATE_SHA = 'fc25fd72c9c691572afa68281355ac7d25034de5';
+
+/**
+ * `bin/houserules.mjs`'s own `main`, imported from a detached worktree at
+ * `FROZEN_TEMPLATE_SHA` instead of this checkout's `../bin/houserules.mjs`.
+ * `TEMPLATE_DIR` inside that module resolves relative to ITS OWN
+ * `import.meta.url`, i.e. `<worktree>/template/`, which still carries
+ * `tools/kb.sh`/`tools/backlog.sh` -- T5 (this repository's own sanctioned
+ * rewrite) deleted both from the LIVE `template/`, so `install()` run
+ * against the live tree throws ENOENT on the first KIT_OWNED entry it
+ * cannot find, before any of this suite's own scenarios are reached. Set
+ * once in `beforeAll` below; every `it` in this file closes over it.
+ * `vi.mock('node:child_process', ...)` above intercepts this module's
+ * `execFileSync` import exactly as it intercepts the live tree's, since
+ * vitest mocks by specifier, not by importer path -- the render-failure
+ * tests' `execFileSync.mockImplementationOnce` still reaches `renderIn`'s
+ * one call site.
+ */
+let main;
+let worktreeDir;
+
+beforeAll(async () => {
+  worktreeDir = mkdtempSync(join(tmpdir(), 'houserules-frozen-template-'));
+  rmSync(worktreeDir, { recursive: true, force: true }); // git worktree add wants the path free
+  execFileSync(
+    'git',
+    ['worktree', 'add', '--detach', '--quiet', worktreeDir, FROZEN_TEMPLATE_SHA],
+    { cwd: REPO_ROOT },
+  );
+  ({ main } = await import(pathToFileURL(join(worktreeDir, 'bin/houserules.mjs')).href));
+});
+
+afterAll(() => {
+  if (!worktreeDir) return;
+  try {
+    execFileSync('git', ['worktree', 'remove', '--force', worktreeDir], { cwd: REPO_ROOT });
+  } catch {
+    // `add` may have failed before registering the worktree; rmSync below still runs.
+  }
+  rmSync(worktreeDir, { recursive: true, force: true });
+});
 
 /** The running kit's own version, the value `init` stamps into a fresh install. */
 const PACKAGE_VERSION = JSON.parse(
@@ -85,8 +148,11 @@ describe('manifest', () => {
       .filter((d) => d.isFile())
       .map((d) => join(d.parentPath.slice(templateDir.length), d.name))
       .toSorted();
+    // tools/kb.sh and tools/backlog.sh left the LIVE template/ at batch 18 T5
+    // (docs/specs/2026-09-05-batch-18-phase3.md §§1,3); bin/houserules.mjs's
+    // own frozen KIT_OWNED still names them.
     expect(actual).toEqual(
-      [...KIT_OWNED, ...SEED_ONCE, '.claude/settings.json'].toSorted(),
+      [...KIT_OWNED.filter((f) => !RETIRED.includes(f)), ...SEED_ONCE, '.claude/settings.json'].toSorted(),
     );
   });
 });

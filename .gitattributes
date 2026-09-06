@@ -5,3 +5,12 @@
 # leg) keeps the committed bytes exactly, instead of translating them to
 # CRLF and breaking every byte compare.
 tests/corpus/** -text
+
+# The reviewed, Rust-generated goldens (tests/goldens/, batch 18 T5) are
+# byte-compared the same way the frozen corpus is (render_parity.rs,
+# check_parity.rs, read_parity.rs) but were committed without this same
+# protection, so the windows-latest CI leg's autocrlf checkout converted
+# their LF bytes to CRLF and broke render_parity's byte compare (PR #6,
+# run 34056471594). Same fix, same reason: `-text` keeps the committed
+# bytes exact on every checkout.
+tests/goldens/** -text

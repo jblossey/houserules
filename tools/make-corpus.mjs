@@ -92,7 +92,6 @@ const KNOWLEDGE_RUNS = [
   { file: 'standing.json', args: ['standing'] },
 ];
 
-const SKILL_PATH = '.claude/skills/project-knowledge/SKILL.md';
 const WORKTREE_LABEL = '<frozen-worktree>';
 const FIXTURES_DIR = 'tests/corpus/fixtures';
 
@@ -162,25 +161,19 @@ function withFixtureCopy(sourceDir, fn) {
   }
 }
 
-/** Every `.claude/rules/*.md` file plus the knowledge skill, present under `root` after a render. */
-function renderedPaths(root) {
-  const rulesDir = join(root, '.claude/rules');
-  const ruleFiles = readdirSync(rulesDir)
-    .filter((name) => name.endsWith('.md'))
-    .toSorted()
-    .map((name) => `.claude/rules/${name}`);
-  return [...ruleFiles, SKILL_PATH];
-}
-
 /**
  * Top-level `outDir` entries this generator owns and rebuilds on every run.
  * `fixtures/` is deliberately excluded: outDir defaults to this repo's own
  * `tests/corpus/`, the same directory the fixtures are read from, so wiping
  * the whole tree would delete the committed inputs before they get copied.
+ * `render`/`check` are NOT here (batch 18 T5, docs/specs/2026-09-05-batch-
+ * 18-phase3.md §3): both commands' output now embeds the flat `houserules`
+ * command surface, which the frozen JS at `FROZEN_SHA` cannot produce, so
+ * their slices moved to reviewed, Rust-generated goldens
+ * (`tests/goldens/render/`, `tests/goldens/check/`, `cargo run --bin
+ * gen-goldens`) -- this generator no longer touches either directory.
  */
 const OWNED_ENTRIES = [
-  'render',
-  'check',
   'audit',
   'validate',
   'stats',
@@ -245,18 +238,6 @@ export function generateCorpus({ outDir, root = repoRoot() } = {}) {
       });
     }
   }
-  /** Runs `kb.mjs render` in `cwd`, freezes every produced file under `outPrefix/`, and records the run. */
-  function renderAndFreeze({ execArgs, cwd, displayCommand, cwdLabel, outPrefix }) {
-    const result = runNode(execArgs, cwd);
-    assertExit(displayCommand, result, 0);
-    const paths = renderedPaths(cwd);
-    for (const path of paths) write(`${outPrefix}/${path}`, readFileSync(join(cwd, path)));
-    runs.push({
-      command: displayCommand,
-      cwd: cwdLabel,
-      produces: paths.map((path) => `${outPrefix}/${path}`),
-    });
-  }
   /**
    * Runs a mutating `backlog.mjs set` in `cwd`, freezes its run capture at
    * `outPrefix/command.json`, and freezes the raw bytes `set` wrote to
@@ -286,25 +267,6 @@ export function generateCorpus({ outDir, root = repoRoot() } = {}) {
   const fixturesStatsWorkspace = join(root, FIXTURES_DIR, 'stats-workspace');
 
   withFrozenWorktree(root, (worktree) => {
-    // render/root: every file renderAll produces for the frozen repository.
-    renderAndFreeze({
-      execArgs: ['tools/kb.mjs', 'render'],
-      cwd: worktree,
-      displayCommand: 'node tools/kb.mjs render',
-      cwdLabel: WORKTREE_LABEL,
-      outPrefix: 'render/root',
-    });
-
-    // check/root: expected ok against the frozen repository base.
-    runAndFreeze({
-      execArgs: ['tools/kb.mjs', 'check'],
-      cwd: worktree,
-      displayCommand: 'node tools/kb.mjs check',
-      cwdLabel: WORKTREE_LABEL,
-      outPath: 'check/root.json',
-      expectExit: 0,
-    });
-
     // audit/: two ranges on main's own ancestry, re-run against the frozen kb.mjs.
     for (const range of AUDIT_RANGES) {
       const execArgs = [
@@ -364,22 +326,12 @@ export function generateCorpus({ outDir, root = repoRoot() } = {}) {
       outPath: 'knowledge/get-houserules-template-is-the-source.json',
       expectExit: 0,
     });
-    runAndFreeze({
-      execArgs: ['tools/kb.mjs', 'for', 'tools/kb.mjs'],
-      cwd: worktree,
-      displayCommand: 'node tools/kb.mjs for tools/kb.mjs',
-      cwdLabel: WORKTREE_LABEL,
-      outPath: 'knowledge/for-tools-kb-mjs.json',
-      expectExit: 0,
-    });
-    runAndFreeze({
-      execArgs: ['tools/kb.mjs', 'for', 'tools/kb.mjs', '--full'],
-      cwd: worktree,
-      displayCommand: 'node tools/kb.mjs for tools/kb.mjs --full',
-      cwdLabel: WORKTREE_LABEL,
-      outPath: 'knowledge/for-tools-kb-mjs-full.json',
-      expectExit: 0,
-    });
+    // `for`'s two root slices (bare and `--full`) moved to reviewed,
+    // Rust-generated goldens at batch 18 T5 fix round 1 (spec §3 boundary
+    // clarification, commit 878265b): `for`'s `"standing"` field carries
+    // STANDING_COMMAND, which the rewrite flips, so the frozen JS here can
+    // no longer produce its bytes. `cargo run --bin gen-goldens` writes
+    // `tests/goldens/read-parity/for-tools-kb-mjs{,-full}.json` instead.
 
     // stats/: the frozen kb.mjs stats over the committed batch-14 workspace fixtures
     // (houserules.corpus-batch14-fixtures-are-committed). stats never echoes a path
@@ -474,35 +426,20 @@ export function generateCorpus({ outDir, root = repoRoot() } = {}) {
       redact: { from: fixturesSkipped, to: skippedPlaceholder, reason: redactReason },
     });
 
-    // render/mini and check/{mini,mini-bad}: synthetic fixtures, frozen kb.mjs.
+    // backlog/set/mini and knowledge/mini/: synthetic fixtures, frozen
+    // kb.mjs/backlog.mjs. `render`/`check` no longer run here (batch 18 T5):
+    // their `mini` slices moved to `tests/goldens/` (`OWNED_ENTRIES`'s own
+    // doc has the full account).
     const kbInWorktree = join(worktree, 'tools/kb.mjs');
     const kbDisplay = `node ${WORKTREE_LABEL}/tools/kb.mjs`;
     const backlogInWorktree = join(worktree, 'tools/backlog.mjs');
     const backlogDisplay = `node ${WORKTREE_LABEL}/tools/backlog.mjs`;
     const miniLabel = `${FIXTURES_DIR}/mini`;
-    const miniBadLabel = `${FIXTURES_DIR}/mini-bad`;
 
     withFixtureCopy(fixturesMini, (miniCopy) => {
-      renderAndFreeze({
-        execArgs: [kbInWorktree, 'render'],
-        cwd: miniCopy,
-        displayCommand: `${kbDisplay} render`,
-        cwdLabel: miniLabel,
-        outPrefix: 'render/mini',
-      });
-
-      runAndFreeze({
-        execArgs: [kbInWorktree, 'check'],
-        cwd: miniCopy,
-        displayCommand: `${kbDisplay} check`,
-        cwdLabel: miniLabel,
-        outPath: 'check/mini.json',
-        expectExit: 0,
-      });
-
       // backlog/set/mini: a representative status+batch set against the
-      // mini fixture's own backlog/ (unrelated to the mini knowledge base
-      // render/check above -- loadBacklog never touches knowledge/). HR-901
+      // mini fixture's own backlog/ (unrelated to its knowledge/ --
+      // loadBacklog never touches it). HR-901
       // starts with no `batch` key at all, so this run freezes both write
       // shapes T2 must reproduce byte-exact: an in-place field update
       // (status) and a brand-new trailing key (batch).
@@ -537,50 +474,19 @@ export function generateCorpus({ outDir, root = repoRoot() } = {}) {
         outPath: 'knowledge/mini/get-mini-build-cache.json',
         expectExit: 0,
       });
-      runAndFreeze({
-        execArgs: [kbInWorktree, 'for', 'mini-tools/build.sh'],
-        cwd: miniCopy,
-        displayCommand: `${kbDisplay} for mini-tools/build.sh`,
-        cwdLabel: miniLabel,
-        outPath: 'knowledge/mini/for-mini-tools-build-sh.json',
-        expectExit: 0,
-      });
-      runAndFreeze({
-        execArgs: [kbInWorktree, 'for', 'mini-tools/build.sh', '--full'],
-        cwd: miniCopy,
-        displayCommand: `${kbDisplay} for mini-tools/build.sh --full`,
-        cwdLabel: miniLabel,
-        outPath: 'knowledge/mini/for-mini-tools-build-sh-full.json',
-        expectExit: 0,
-      });
+      // `for`'s two mini slices (bare and `--full`) moved to
+      // `tests/goldens/read-parity/mini/` alongside the root slices above,
+      // same reason (batch 18 T5 fix round 1, commit 878265b).
     });
 
-    withFixtureCopy(fixturesMiniBad, (miniBadCopy) => {
-      runAndFreeze({
-        execArgs: [kbInWorktree, 'check'],
-        cwd: miniBadCopy,
-        displayCommand: `${kbDisplay} check`,
-        cwdLabel: miniBadLabel,
-        outPath: 'check/mini-bad.json',
-        expectExit: 1,
-      });
-    });
-
-    // mini-stale is schema-valid, so it passes checkBase's early return and
-    // reaches the five checks mini-bad's seeded violations never get to: a
-    // stale generated file, a stray rules file, a missing rendered file, and
-    // both budget shapes (lines and bytes).
-    const miniStaleLabel = `${FIXTURES_DIR}/mini-stale`;
-    withFixtureCopy(fixturesMiniStale, (miniStaleCopy) => {
-      runAndFreeze({
-        execArgs: [kbInWorktree, 'check'],
-        cwd: miniStaleCopy,
-        displayCommand: `${kbDisplay} check`,
-        cwdLabel: miniStaleLabel,
-        outPath: 'check/mini-stale.json',
-        expectExit: 1,
-      });
-    });
+    // mini-bad and mini-stale had no other frozen slice besides their own
+    // `check` capture (mini-bad: schema-shape errors; mini-stale: a stale
+    // generated file, a stray rules file, a missing rendered file, both
+    // budget shapes) -- both moved to `tests/goldens/check/` at batch 18 T5
+    // (`OWNED_ENTRIES`'s own doc), so this generator no longer opens either
+    // fixture at all. `fixturesMiniBad`/`fixturesMiniStale` (declared above)
+    // are still read by the `fixtures/` copy loop below: `cargo run --bin
+    // gen-goldens` reads the same committed fixture directories.
   });
 
   // fixtures/: the static, committed inputs, copied into the corpus verbatim
