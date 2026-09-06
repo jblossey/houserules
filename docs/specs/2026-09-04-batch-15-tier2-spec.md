@@ -241,6 +241,16 @@ with candidates researched by the orchestrator.
   including the four JS success paths and the error-text
   differences the T2 review enumerated — is pinned by a
   counterexample test asserting the clap answer.
+- HR-051(a) (post-port improvement, landed at batch 18 T6, spec
+  docs/specs/2026-09-05-batch-18-phase3.md §5): the Rust `validate`'s
+  `checkTaskReportAudit` port additionally scans
+  `fix_rounds[].tests[].output` for an embedded audit result whose
+  `summary.skipped` is nonzero — the batch 12 shape, recurred at
+  batch 14 T1 fix round 0, that the JS-era check (the top-level
+  `self_audit` only) could not catch. Additive: no frozen corpus
+  slice reads this path, the live `kb.mjs` stays unchanged, and the
+  extension carries its own fixtures in
+  `crates/houserules/src/rules/validate_deliverable.rs`.
 
 ## 7. Out of scope
 
