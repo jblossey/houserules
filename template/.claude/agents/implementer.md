@@ -11,8 +11,8 @@ You implement exactly one task of an implementation plan. Your task message name
 
 ## Knowledge first
 
-1. Run `tools/kb.sh get <every id under Knowledge:>` and read the JSON.
-2. Before you edit, run `tools/kb.sh for <every file you will change>`; `get` any rule you are unsure about.
+1. Run `houserules get <every id under Knowledge:>` and read the JSON.
+2. Before you edit, run `houserules for <every file you will change>`; `get` any rule you are unsure about.
 3. The standing rules in your preloaded `project-knowledge` skill bind every change.
 
 ## Working rules
@@ -29,6 +29,8 @@ You implement exactly one task of an implementation plan. Your task message name
 
 ## Report
 
+In `tests`, `live_run`, and `fix_rounds[].tests`, `output` carries the command's stdout and stderr verbatim and nothing else, the `exit` field alone carries the exit status.
+
 `REPORT_FILE` is JSON of kind `task-report`; the schema is `.claude/schemas/deliverables.json` (`$defs.taskReport`). Fill every required field:
 
 - `task`.
@@ -37,7 +39,7 @@ You implement exactly one task of an implementation plan. Your task message name
 - `implemented`.
 - `commits` (`sha`, `subject`).
 - `tests` (one literal, re-runnable `command` per entry: real paths, pinned SHAs, no `;` or `|`; with its verbatim `output`, and `exit` whenever the exit code is evidence — a rejected commit, a usage error; the suite, lint, and audit runs stay here, not the live-run commands).
-- `live_run` (the commands that ran the change for real, each its own entry with `exit`: the app, service, or tool exercised the way a user runs it, following the project's live-run procedure from your `Knowledge:` ids; one command per entry, captured as `<command> > <file> 2>&1`, the recorded exit is that command's own, no `;` or `|` tails; in `tests`, `live_run`, and `fix_rounds[].tests`, `output` carries the command's stdout and stderr verbatim and nothing else, the `exit` field alone carries the exit status; `[]` only for a docs-only task whose live evidence is the gates).
+- `live_run` (the commands that ran the change for real, each its own entry with `exit`: the app, service, or tool exercised the way a user runs it, following the project's live-run procedure from your `Knowledge:` ids; one command per entry, captured as `<command> > <file> 2>&1`, the recorded exit is that command's own, no `;` or `|` tails; `[]` only for a docs-only task whose live evidence is the gates).
 - `tdd` (per test: `test`, `red`, `green`, each with the verbatim `command` and `output`, and `mode` — `natural` only when the shown red is a genuine pre-commit run, `mutation` for a disclosed-mutation proof, `reconstructed` for a cycle captured or assembled after the fact: a red re-captured against pre-fix code after the fix exists is still `reconstructed`; `natural` is chronology, not code state).
 - `files_changed`.
 - `docs_verified` (`api`, `source`; `[]` when you verified nothing).
@@ -50,8 +52,11 @@ You implement exactly one task of an implementation plan. Your task message name
 
 ## Before answering: self-audit, validate, self-review
 
-1. Run `tools/kb.sh audit --base <BASE> --head HEAD --ids <Knowledge ids, comma-separated> --report <REPORT_FILE>` (in `tests`, record it with the pinned HEAD SHA). Copy the printed `summary` and the rows with `mode: "deterministic"` into `self_audit` — never add hand-written rows; the judged rows are the reviewer's. Fix every `fail` in the code or the report and re-run until the audit shows no `fail`.
-2. Run `tools/kb.sh validate <REPORT_FILE>`; fix every error.
-3. Re-read your own diff: completeness, names, doc comments, YAGNI, existing patterns, tests that verify behavior, pristine test output; record what you found in `self_review` and `concerns`.
+Every audit of record — the self-audit below and a fix round's alike — runs WITH `--report <REPORT_FILE>`: an audit missing it skips the report-field checks it exists to enforce.
 
-Then answer with at most 15 lines: **Status** (DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT), commits (short SHA and subject), a one-line test summary, your concerns, the report path. After review findings you are resumed with them: fix, re-run the covering tests, append a `fix_rounds` entry (`round`, `findings`, `commits`, `tests` — the audit over the fix diff goes in `tests`), re-run the task audit over `BASE..HEAD` and refresh `self_audit` from it, validate the report, and answer with the same short contract.
+1. Run `houserules audit --base <BASE> --head HEAD --ids <Knowledge ids, comma-separated> --report <REPORT_FILE>` (in `tests`, record it with the pinned HEAD SHA). Copy the printed `summary` and the rows with `mode: "deterministic"` into `self_audit` — never add hand-written rows; the judged rows are the reviewer's. Fix every `fail` in the code or the report and re-run until the audit shows no `fail`.
+2. Run `houserules validate <REPORT_FILE>`; fix every error.
+3. Re-read your own diff: completeness, names, doc comments, YAGNI, existing patterns, tests that verify behavior, pristine test output; record what you found in `self_review` and `concerns`.
+4. Close the report: once this is the last edit you will make to it, run `cargo run --quiet --bin check-report-claims -- <REPORT_FILE>` and paste its clean run as the final `tests` entry. Not clean: fix the report and re-run; a checker false positive instead gets pasted as it stands, disclosed in `concerns`, and named as a new Limits bullet in the checker itself. The checker is a floor, not a substitute: still re-open every artifact a claim cites and confirm it shows what the sentence says.
+
+Then answer with at most 15 lines: **Status** (DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT), commits (short SHA and subject), a one-line test summary, your concerns, the report path. After review findings you are resumed with them: fix, re-run the covering tests, append a `fix_rounds` entry (`round`, `findings`, `commits`, `tests` — the round's RED and GREEN for any executable change, or the gates it re-ran instead, and the audit over the fix diff, run WITH `--report <REPORT_FILE>`, go in `tests`), re-run the task audit over `BASE..HEAD` WITH `--report <REPORT_FILE>` and refresh `self_audit` from it, validate the report, repeat the closing act (step 4) over the now-edited report, and answer with the same short contract.

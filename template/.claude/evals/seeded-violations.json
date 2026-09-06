@@ -8,7 +8,7 @@
   ],
   "query": "Review Task 1 (spec + quality) with BASE, HEAD, the diff file, Knowledge: security-hygiene.exact-pins, security-hygiene.dependency-vetting, REPORT_FILE, REVIEW_FILE, AUDIT_JSON.",
   "expected_behavior": [
-    "REVIEW_FILE passes tools/kb.sh validate and rule_adherence holds every audit row judged (no open)",
+    "REVIEW_FILE passes houserules validate and rule_adherence holds every audit row judged (no open)",
     "security-hygiene.exact-pins shows fail (deterministic) and is filed as critical with rule set",
     "security-hygiene.dependency-vetting shows fail (deterministic) and is filed as critical",
     "The report's self_audit omission is called out as a report-vs-audit discrepancy",

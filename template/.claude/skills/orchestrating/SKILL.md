@@ -5,21 +5,21 @@ description: Use when starting a session in this repository, starting or resumin
 
 # Orchestrating a batch
 
-You are the controller. Subagents get knowledge through their templates; you get it through this skill, the standing rules, and `tools/kb.sh`. Every read command of `tools/kb.sh` and `tools/backlog.sh` prints JSON; read every output below as JSON.
+You are the controller. Subagents get knowledge through their templates; you get it through this skill, the standing rules, and `houserules`. Every read command prints JSON; read every output below as JSON.
 
 ## Session ritual (session start, resume, and after compaction)
 
 1. `git status --short && git log --oneline -15`
-2. `tools/backlog.sh list --batch <n>` for the in-progress batch, or `tools/backlog.sh list --open` when none is in progress.
+2. `houserules list --batch <n>` for the in-progress batch, or `houserules list --open` when none is in progress.
 3. If a plan is in flight: read the batch workspace ledger. Trust the ledger and `git log` over memory.
-4. `tools/kb.sh index --area process`; `tools/kb.sh get` what the next step needs.
+4. `houserules index --area process`; `houserules get` what the next step needs.
 5. Re-read the spec and plan in flight before the next dispatch.
 
 ## Batch lifecycle
 
 | Phase | Skill | Repo gate |
 |---|---|---|
-| Select items | — | `tools/backlog.sh list --open`; record the batch in `backlog/batches.json` and schedule its items (`set <id> batch=<n>`) |
+| Select items | — | `houserules list --open`; record the batch in `backlog/batches.json` and schedule its items (`set <id> batch=<n>`) |
 | Design | superpowers:brainstorming when installed, else write it by hand | spec in `docs/specs/`; user approval |
 | Plan | superpowers:writing-plans when installed, else write it by hand | plan in `docs/plans/`; code-health scan of the touched files (`process.code-health-scan`); user approval when asked |
 | Build | superpowers:subagent-driven-development when installed, else dispatch tasks yourself | the dispatch protocol below; strictly sequential |
@@ -34,7 +34,7 @@ You are the controller. Subagents get knowledge through their templates; you get
 - An implementer dispatch is the task brief plus these lines:
   - `BASE: <sha>` — the commit before the task.
   - `Backlog: <ids the task delivers>`
-  - `Knowledge: <ids>` — `tools/kb.sh for <the brief's files>` plus the procedure ids the task needs. Five to ten ids.
+  - `Knowledge: <ids>` — `houserules for <the brief's files>` plus the procedure ids the task needs. Five to ten ids.
   - `REPORT_FILE: <workspace>/task-<N>-report.json`
 - A reviewer dispatch adds `BASE`, `HEAD`, the same `Backlog:` and `Knowledge:` lines, `REPORT_FILE`, `REVIEW_FILE: <workspace>/task-<N>-review.json` (re-review: `task-<N>-review-r<R>.json`), `AUDIT_JSON: <workspace>/task-<N>-audit.json` (re-review: `-r<R>`), and the audit command's `--ids <the Knowledge ids>`.
 - The audit `--ids` value is the dispatch's `Knowledge:` list, generated from it, never typed separately — true for round 0 and every re-review alike.
@@ -47,7 +47,7 @@ You are the controller. Subagents get knowledge through their templates; you get
 
 ## Handling reviews
 
-- A review that fails `tools/kb.sh validate` (an `open` row included) or is not at `REVIEW_FILE` with its `AUDIT_JSON` is incomplete: re-dispatch it. `tools/kb.sh stats` reads only those files.
+- A review that fails `houserules validate` (an `open` row included) or is not at `REVIEW_FILE` with its `AUDIT_JSON` is incomplete: re-dispatch it. `houserules stats` reads only those files.
 - A branch review's audit runs `--workspace <WORKSPACE>`: its `report-field` rows are judged from every task report, not skipped.
 - Severity of an adherence failure: standing rule is Critical; area rule is Important; `warn` is Minor.
 - Every finding is fixed (`process.no-tech-debt`). A deferral is a backlog item with a reason, named in the finding.
@@ -64,4 +64,4 @@ You are the controller. Subagents get knowledge through their templates; you get
 
 ## Rulings
 
-Write every ruling to its home file in the same turn (`process.rulings-to-file`), then `tools/kb.sh render`. A ruling that lives only in chat is lost at compaction.
+Write every ruling to its home file in the same turn (`process.rulings-to-file`), then `houserules render`. A ruling that lives only in chat is lost at compaction.

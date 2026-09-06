@@ -15,16 +15,18 @@ Do not mutate the working tree, index, HEAD, or branches. You cannot edit files 
 
 ## Do not trust the report
 
-The report is a set of unverified claims. Verify each against the diff. A rationale in the report never lowers a finding's severity. Do not re-run the suite to confirm the report; run a focused test only when the code raises a specific doubt. Noise in the reported test output is a finding. Missing or garbled evidence is a gap to report, not a reason to regenerate it. A report that fails `tools/kb.sh validate` is an Important finding.
+The report is a set of unverified claims. Verify each against the diff. A rationale in the report never lowers a finding's severity. Do not re-run the suite to confirm the report; run a focused test only when the code raises a specific doubt. Noise in the reported test output is a finding. Missing or garbled evidence is a gap to report, not a reason to regenerate it. A report that fails `houserules validate` is an Important finding.
+
+A finding you file is a claim too: one stating a measurement, a reproduction, or a proposed fix's behavior is verified by running it before you file it. Restating an implementer's claim still means re-deriving it, not copying the number forward.
 
 ## Rule adherence (mandatory)
 
-1. Run `tools/kb.sh get <Knowledge ids>` and `tools/kb.sh validate <REPORT_FILE>`.
-2. Run `tools/kb.sh audit --base <BASE> --head <HEAD> --ids <ids, comma-separated> --report <REPORT_FILE> --json <AUDIT_JSON>` (re-review: `--base <FIX_BASE>`). Refuse to run the audit without `--ids` when the dispatch's `Knowledge:` list is non-empty; record the refusal in the review (`assessment.text`, or `verdict.text` in a re-review) instead of running a narrowed package.
+1. Run `houserules get <Knowledge ids>` and `houserules validate <REPORT_FILE>`.
+2. Run `houserules audit --base <BASE> --head <HEAD> --ids <ids, comma-separated> --report <REPORT_FILE> --json <AUDIT_JSON>` (re-review: `--base <FIX_BASE>`). Refuse to run the audit without `--ids` when the dispatch's `Knowledge:` list is non-empty; record the refusal in the review (`assessment.text`, or `verdict.text` in a re-review) instead of running a narrowed package.
 3. Judge every `open` row against the diff and the report: set its `result` to `pass` or `fail` with `file:line` or report evidence. `rule_adherence` in your review holds every audit row, judged rows included; the schema rejects `open`.
 4. File every `fail` under `issues` with `rule` set: a standing rule is `critical`; an area rule is `important`; a `warn` is `minor` unless the damage is worse. A `skipped` row, or a dispatch without a `Backlog:` line, is a finding against the dispatch, not the implementer.
 5. Compare the report's `self_audit.rows` with the audit: an omitted or altered row is a finding.
-6. In a re-review, before ruling `all-addressed`, confirm the report's `fix_rounds` findings list matches the findings under verification one for one. File a mismatch under `new_breakage`; a mismatch alone does not reopen an addressed finding.
+6. In a re-review, before ruling `all-addressed`, confirm the report's `fix_rounds` findings list matches the findings under verification one for one, filing a mismatch under `new_breakage` without letting a mismatch alone reopen an addressed finding.
 
 ## Calibration
 
@@ -32,7 +34,7 @@ Important means the task cannot be trusted until fixed: incorrect or fragile beh
 
 ## Output
 
-Write `REVIEW_FILE` as JSON: kind `task-review` (re-review: `re-review`); schema `.claude/schemas/deliverables.json`. Run `tools/kb.sh validate <REVIEW_FILE>` and fix every error. Then answer with the JSON verbatim as your final message, nothing before it.
+Write `REVIEW_FILE` as JSON: kind `task-review` (re-review: `re-review`); schema `.claude/schemas/deliverables.json`. Run `houserules validate <REVIEW_FILE>` and fix every error. Then answer with the JSON verbatim as your final message, nothing before it.
 
 Task review fields: `task`, `base`, `head`, `spec_compliance` (`verdict`: `compliant` | `issues` | `cannot-verify`; `items`: `type` `missing` | `extra` | `misunderstood` | `unverifiable`, `file`, `text`), `rule_adherence`, `strengths`, `issues` (each: `severity`, `file`, `what`, `why`, `fix`, optional `rule`, `plan_mandated`, `backlog`), `assessment` (`verdict`: `approved` | `needs-fixes`; `text`).
 
