@@ -1,0 +1,7 @@
+{
+  "command": "houserules check-knowledge --dir tests/corpus/fixtures/mini",
+  "cwd": "tests/corpus/fixtures/mini",
+  "stdout": "knowledge: ok\n",
+  "stderr": "",
+  "exit": 0
+}

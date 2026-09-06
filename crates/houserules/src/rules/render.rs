@@ -2,16 +2,27 @@
 //! writer, ported byte-for-byte (HR-054 task 3; the frozen fixture corpus
 //! under `tests/corpus/` is the parity gate — see
 //! `crates/houserules/tests/`).
+//!
+//! `render_and_report` (batch 18 T3) is `cmd_render`'s own non-`--check`
+//! body, extracted so `install::cmd_init` can render a freshly-seeded
+//! target exactly as a `houserules render` run there would -- `init`
+//! seeds the knowledge base then must produce the same generated markdown
+//! `bin/houserules.mjs`'s own `install` gets by shelling out to the
+//! seeded `tools/kb.mjs render`; this binary has no Node to shell out to,
+//! so it reruns its own already-ported writer directly instead. A second,
+//! independently-written "load, write stale files, report the lines"
+//! sequence in `install.rs` would risk exactly the drift this crate's
+//! `emit`/`root`/`get` crate-root modules already exist to prevent.
 
 use std::fs;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 use super::model::{Base, Entry, load_base};
 
 /// Header stamped on every file `render` writes, so an editor knows not to hand-edit it.
-pub(crate) const GENERATED: &str = "Generated from knowledge/ by tools/kb.sh render. Do not edit.";
+pub(crate) const GENERATED: &str = "Generated from knowledge/ by houserules render. Do not edit.";
 /// Repo-relative path of the generated knowledge skill file.
 pub(crate) const SKILL_PATH: &str = ".claude/skills/project-knowledge/SKILL.md";
 /// Entry kinds eligible for the standing rules, in the order they render.
@@ -31,9 +42,9 @@ const SECTION_KINDS: [(&str, &str); 3] = [
 ];
 /// The retrieval protocol lines the knowledge skill lists under `## Retrieval protocol`.
 const PROTOCOL: [&str; 3] = [
-    "1. Resolve every id under `Knowledge:` in your task: `tools/kb.sh get <ids>` (JSON).",
-    "2. Before editing, run `tools/kb.sh for <every file you will change>` and `get` any rule you are unsure about.",
-    "3. Write `REPORT_FILE` as a `task-report` (schema `.claude/schemas/deliverables.json`, `self_audit: null`), then run `tools/kb.sh audit --base <BASE> --head HEAD --ids <ids, comma-separated> --report <REPORT_FILE>`. The `--ids` value is the task's `Knowledge:` list, generated from it, never typed separately. Copy the audit `summary` and its `deterministic` rows into `self_audit` — never hand-written rows; the judged rows are the reviewer's. Fix every `fail`, re-run until clean, then run `tools/kb.sh validate <REPORT_FILE>` and fix every error. List the ids you relied on in `knowledge_used`.",
+    "1. Resolve every id under `Knowledge:` in your task: `houserules get <ids>` (JSON).",
+    "2. Before editing, run `houserules for <every file you will change>` and `get` any rule you are unsure about.",
+    "3. Write `REPORT_FILE` as a `task-report` (schema `.claude/schemas/deliverables.json`, `self_audit: null`), then run `houserules audit --base <BASE> --head HEAD --ids <ids, comma-separated> --report <REPORT_FILE>`. The `--ids` value is the task's `Knowledge:` list, generated from it, never typed separately. Copy the audit `summary` and its `deterministic` rows into `self_audit` — never hand-written rows; the judged rows are the reviewer's. Fix every `fail`, re-run until clean, then run `houserules validate <REPORT_FILE>` and fix every error. List the ids you relied on in `knowledge_used`.",
 ];
 
 /// Uppercases the first character of `s`, the rest untouched -- the port
@@ -146,7 +157,7 @@ pub(crate) fn render_all(base: &Base) -> Vec<(String, String)> {
         files.push((
             format!(".claude/rules/{area}.md"),
             format!(
-                "---\npaths:\n{paths_block}\n---\n{GENERATED}\n\n# {title} rules\n\n{body}\nDetail: tools/kb.sh get <id>\n",
+                "---\npaths:\n{paths_block}\n---\n{GENERATED}\n\n# {title} rules\n\n{body}\nDetail: houserules get <id>\n",
                 title = capitalize(area),
                 body = sections.join("\n"),
             ),
@@ -204,9 +215,10 @@ pub(crate) fn render(base: &Base, check: bool) -> io::Result<Vec<String>> {
 }
 
 /// Resolves the enclosing git repository's top-level directory from the
-/// current working directory, the same resolution `tools/kb.sh render`
-/// (and `tools/kb.sh check` / `tools/backlog.sh`, via `cmd_check_knowledge`
-/// in `check.rs` and the `backlog` module's CLI wrappers) performs before
+/// current working directory, the same resolution `houserules render`
+/// (and `houserules check-knowledge` / `houserules check-backlog`, via
+/// `cmd_check_knowledge` in `check.rs` and the `backlog` module's CLI
+/// wrappers) performs before
 /// loading its base -- `tools/lib/json-store.mjs`'s `repoRoot`, the one
 /// helper the frozen `kb.mjs` and `backlog.mjs` both import. Crate-visible
 /// (batch 17 T2), not `rules`-private, for that same reason: the `backlog`
@@ -238,16 +250,47 @@ pub(crate) fn repo_root_from_cwd() -> io::Result<PathBuf> {
     ))
 }
 
+/// Loads the knowledge base at `root`, writes every stale generated file,
+/// and prints the same `<path>: written` / `render: up to date` lines a
+/// non-`--check` `houserules render` run prints -- `cmd_render`'s own
+/// non-`--check` body, shared with `install::cmd_init` (this module's own
+/// doc has the reuse account). Named `String` errors, not `io::Error`:
+/// `install::cmd_init` folds this into its own `Result<(), String>`
+/// error chain (`houserules.crash-paths-are-named`'s one-named-line
+/// contract), and an `io::Error`'s `Display` text is exactly what both
+/// callers already print, so converting costs nothing.
+pub(crate) fn render_and_report(root: &Path) -> Result<(), String> {
+    let base = load_base(root).map_err(|error| error.to_string())?;
+    let stale = render(&base, false).map_err(|error| error.to_string())?;
+    if stale.is_empty() {
+        println!("render: up to date");
+    } else {
+        for path in &stale {
+            println!("{path}: written");
+        }
+    }
+    Ok(())
+}
+
 /// Runs the `render` subcommand: loads the knowledge base at `root`
 /// (resolving the enclosing git repository's top level when `root` is
 /// `None`), writes every stale generated file — or, with `check`, only
 /// reports which ones are stale — and prints the same messages and exit
-/// code as `tools/kb.sh render`.
+/// code as `houserules render`.
 pub(crate) fn cmd_render(root: Option<PathBuf>, check: bool) -> ExitCode {
     let root = match crate::root::resolve_root(root) {
         Ok(root) => root,
         Err(code) => return code,
     };
+    if !check {
+        return match render_and_report(&root) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(message) => {
+                eprintln!("{message}");
+                ExitCode::from(2)
+            }
+        };
+    }
     let base = match load_base(&root) {
         Ok(base) => base,
         Err(error) => {
@@ -255,27 +298,20 @@ pub(crate) fn cmd_render(root: Option<PathBuf>, check: bool) -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let stale = match render(&base, check) {
+    let stale = match render(&base, true) {
         Ok(stale) => stale,
         Err(error) => {
             eprintln!("{error}");
             return ExitCode::from(2);
         }
     };
-
-    if check && !stale.is_empty() {
+    if !stale.is_empty() {
         for path in &stale {
             eprintln!("{path}: would change");
         }
         return ExitCode::from(1);
     }
-    if !stale.is_empty() && !check {
-        for path in &stale {
-            println!("{path}: written");
-        }
-    } else {
-        println!("render: up to date");
-    }
+    println!("render: up to date");
     ExitCode::SUCCESS
 }
 
@@ -384,7 +420,7 @@ mod tests {
         assert_eq!(
             files[1].1,
             format!(
-                "---\npaths:\n  - \"crates/**\"\n  - \"Cargo.toml\"\n---\n{GENERATED}\n\n# Rust rules\n\n## Rules\n\n- [rust.floor] Never lower a floor.\n\n## Gotchas\n\n- [rust.clean] Clean before retry.\n\nDetail: tools/kb.sh get <id>\n"
+                "---\npaths:\n  - \"crates/**\"\n  - \"Cargo.toml\"\n---\n{GENERATED}\n\n# Rust rules\n\n## Rules\n\n- [rust.floor] Never lower a floor.\n\n## Gotchas\n\n- [rust.clean] Clean before retry.\n\nDetail: houserules get <id>\n"
             ),
         );
 

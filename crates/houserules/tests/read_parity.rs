@@ -1,8 +1,18 @@
 //! The knowledge read-command parity tests (batch 17 T4): the frozen
-//! fixture corpus's `knowledge/` slices (`topics`/`index`/`standing`/`get`/
-//! `for`, on both the frozen worktree and the `mini` fixture),
-//! byte-compared verbatim against the compiled binary, plus the CLI's
-//! usage-error arms these five commands add to the flat surface.
+//! fixture corpus's `knowledge/` slices (`topics`/`index`/`standing`/`get`),
+//! on both the frozen worktree and the `mini` fixture, byte-compared
+//! verbatim against the compiled binary, plus the CLI's usage-error arms
+//! these five commands add to the flat surface.
+//!
+//! `for` (bare and `--full`) moved to reviewed, Rust-generated goldens
+//! under `tests/goldens/read-parity/` at batch 18 T5 fix round 1 (spec §3
+//! boundary clarification, commit 878265b): its `"standing"` field embeds
+//! `STANDING_COMMAND`, which the rewrite flips from `tools/kb.sh standing`
+//! to `houserules standing`, so the frozen JS at `tests/corpus/
+//! manifest.json`'s `frozen_sha` can no longer produce its bytes.
+//! `cargo run --bin gen-goldens` regenerates them; `diff-shape-gate`
+//! (`cargo run --bin diff-shape-gate`) proves the re-baseline changed
+//! only the command string.
 
 mod common;
 
@@ -11,20 +21,31 @@ use std::path::Path;
 
 use common::{FrozenWorktree, copy_dir_recursive, houserules, repo_root};
 
-/// One frozen `tests/corpus/knowledge/<relative>` capture: `stdout`,
-/// `stderr`, and `exit`, read directly from the corpus file so a corpus
-/// regeneration is the only way this test's expectation can drift.
+/// One frozen capture: `stdout`, `stderr`, and `exit`, read directly from
+/// its file so a corpus regeneration is the only way a test's expectation
+/// can drift.
 struct CorpusRun {
     stdout: String,
     stderr: String,
     exit: i32,
 }
 
+/// Reads one frozen `tests/corpus/knowledge/<relative>` capture.
 fn corpus_run(relative: &str) -> CorpusRun {
-    let text = fs::read_to_string(repo_root().join(format!("tests/corpus/knowledge/{relative}")))
-        .unwrap_or_else(|error| panic!("read tests/corpus/knowledge/{relative}: {error}"));
-    let value: serde_json::Value =
-        serde_json::from_str(&text).expect("parse corpus knowledge slice");
+    read_run(&format!("tests/corpus/knowledge/{relative}"))
+}
+
+/// Reads one reviewed `tests/goldens/read-parity/<relative>` capture --
+/// `corpus_run`'s own sibling for the slices batch 18 T5 fix round 1 moved
+/// out of the frozen corpus (this module's own doc has the account).
+fn golden_run(relative: &str) -> CorpusRun {
+    read_run(&format!("tests/goldens/read-parity/{relative}"))
+}
+
+fn read_run(relative_path: &str) -> CorpusRun {
+    let text = fs::read_to_string(repo_root().join(relative_path))
+        .unwrap_or_else(|error| panic!("read {relative_path}: {error}"));
+    let value: serde_json::Value = serde_json::from_str(&text).expect("parse frozen/golden slice");
     CorpusRun {
         stdout: value["stdout"].as_str().expect("stdout").to_string(),
         stderr: value["stderr"].as_str().expect("stderr").to_string(),
@@ -32,8 +53,7 @@ fn corpus_run(relative: &str) -> CorpusRun {
     }
 }
 
-fn assert_run_matches(args: &[&str], dir: &Path, slice: &str) {
-    let expected = corpus_run(slice);
+fn assert_matches(args: &[&str], dir: &Path, expected: &CorpusRun, slice: &str) {
     let output = houserules()
         .args(args)
         .args(["--dir"])
@@ -43,18 +63,26 @@ fn assert_run_matches(args: &[&str], dir: &Path, slice: &str) {
     assert_eq!(
         String::from_utf8(output.stdout).expect("utf8 stdout"),
         expected.stdout,
-        "{slice}: stdout diverged from the frozen corpus"
+        "{slice}: stdout diverged"
     );
     assert_eq!(
         String::from_utf8(output.stderr).expect("utf8 stderr"),
         expected.stderr,
-        "{slice}: stderr diverged from the frozen corpus"
+        "{slice}: stderr diverged"
     );
     assert_eq!(
         output.status.code(),
         Some(expected.exit),
-        "{slice}: exit code diverged from the frozen corpus"
+        "{slice}: exit code diverged"
     );
+}
+
+fn assert_run_matches(args: &[&str], dir: &Path, slice: &str) {
+    assert_matches(args, dir, &corpus_run(slice), slice);
+}
+
+fn assert_run_matches_golden(args: &[&str], dir: &Path, slice: &str) {
+    assert_matches(args, dir, &golden_run(slice), slice);
 }
 
 fn read_frozen_sha() -> String {
@@ -112,7 +140,7 @@ fn get_matches_the_frozen_corpus_on_the_worktree() {
 #[test]
 fn for_matches_the_frozen_corpus_on_the_worktree() {
     let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
-    assert_run_matches(
+    assert_run_matches_golden(
         &["for", "tools/kb.mjs"],
         &worktree.path,
         "for-tools-kb-mjs.json",
@@ -122,7 +150,7 @@ fn for_matches_the_frozen_corpus_on_the_worktree() {
 #[test]
 fn for_full_matches_the_frozen_corpus_on_the_worktree() {
     let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
-    assert_run_matches(
+    assert_run_matches_golden(
         &["for", "tools/kb.mjs", "--full"],
         &worktree.path,
         "for-tools-kb-mjs-full.json",
@@ -173,7 +201,7 @@ fn get_matches_the_frozen_corpus_on_the_mini_fixture() {
 
 #[test]
 fn for_matches_the_frozen_corpus_on_the_mini_fixture() {
-    assert_run_matches(
+    assert_run_matches_golden(
         &["for", "mini-tools/build.sh"],
         mini_copy().path(),
         "mini/for-mini-tools-build-sh.json",
@@ -182,7 +210,7 @@ fn for_matches_the_frozen_corpus_on_the_mini_fixture() {
 
 #[test]
 fn for_full_matches_the_frozen_corpus_on_the_mini_fixture() {
-    assert_run_matches(
+    assert_run_matches_golden(
         &["for", "mini-tools/build.sh", "--full"],
         mini_copy().path(),
         "mini/for-mini-tools-build-sh-full.json",

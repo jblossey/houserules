@@ -602,7 +602,7 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
         let current = fs::read_to_string(&abs).ok();
         if current.as_deref() != Some(content.as_str()) {
             errors.push(format!(
-                "{path}: generated file is out of date (run tools/kb.sh render)"
+                "{path}: generated file is out of date (run houserules render)"
             ));
         }
     }
@@ -653,7 +653,7 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
 /// is `None`, exactly like `cmd_render`), then runs `check_base` against
 /// it. A load failure (missing knowledge dir, missing `schema.json`, a
 /// malformed area glob) prints one named line and exits 2 -- distinct from
-/// a clean load whose check findings print as `tools/kb.sh check`'s own
+/// a clean load whose check findings print as `houserules check-knowledge`'s own
 /// stderr lines and exit 1 (spec §6's CLI-failure-path deviation; docs/specs/
 /// 2026-09-04-batch-15-tier2-spec.md).
 pub(crate) fn cmd_check_knowledge(root: Option<PathBuf>) -> ExitCode {
@@ -1384,7 +1384,7 @@ mod tests {
         make_repo(root, &entries);
         let base = load_base(root).expect("loads");
         assert!(check_base(&base).contains(
-            &".claude/rules/standing-rules.md: generated file is out of date (run tools/kb.sh render)".to_string()
+            &".claude/rules/standing-rules.md: generated file is out of date (run houserules render)".to_string()
         ));
         crate::rules::render::render(&base, false).expect("render");
         fs::write(root.join(".claude/rules/stray.md"), "x").unwrap();

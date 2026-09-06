@@ -22,12 +22,31 @@
 //! reason (`get.rs`'s own module doc). `root` (batch 17 T4 fix round 1)
 //! is the third crate-root file, holding `resolve_root`, the one
 //! `--dir`-or-git-root fallback every load-first command and `get` itself
-//! now share (`root.rs`'s own module doc has the full account).
+//! now share (`root.rs`'s own module doc has the full account). Batch 18 T2
+//! (HR-062, spec §6) adds `check-commit`, a genuinely new command with no
+//! frozen-JS predecessor: it runs the knowledge base's `commits`-type
+//! checks against a not-yet-committed message or a git range, reusing
+//! `audit`'s own per-commit evaluation rather than reimplementing it
+//! (`rules::check_commit`'s own module doc has the full account). Batch 18
+//! T3 (HR-047, spec §§1-2) adds `init` and `files` (`install::cmd_init`,
+//! `install::cmd_files`): the kit payload now embeds inside the binary
+//! (`rust-embed`), so `init` seeds a target repository and `files` prints
+//! the ownership split with no `template/` checkout needed at runtime
+//! (`install.rs`'s own module doc has the full account). `node_path`
+//! (batch 18 T3) is the fourth crate-root file, holding
+//! `resolve_like_node`, the Node-`path.resolve` parity `validate` and
+//! `install` both need (`node_path.rs`'s own module doc has the full
+//! account). Batch 18 T4 (same spec, §1) adds `update`
+//! (`install::cmd_update`): the `KIT_OWNED` sync, the version-drift line,
+//! and the new deletion capability for kit files the payload has retired
+//! (`install.rs`'s own "update"/"Deletion" doc sections have the full
+//! account).
 
 mod backlog;
 mod emit;
 mod get;
 mod install;
+mod node_path;
 mod root;
 mod rules;
 #[cfg(test)]
@@ -49,12 +68,18 @@ use clap::{Parser, Subcommand};
 /// subcommand and no flag, prints help on stderr and exits 2, instead of
 /// clap's own default for an all-`Option` derive struct (silently
 /// succeeding). Pinned rather than merely documented, because it is also
-/// the choice that matches the frozen source's own contract: `tools/kb.sh`
-/// (or `tools/backlog.sh`) with no command prints its usage line and fails
-/// (batch 16 branch review, issue 4) -- clap's own message differs in
-/// wording (its derived help text, not `kb.mjs`'s hand-written `usage:`
-/// line), the same disclosed, ruled exception spec §7 already grants every
-/// other unrecognized-command case in this flat surface.
+/// the choice that matches the frozen JS's own contract: its two shell
+/// wrappers, run with no command, print a usage line and fail (batch 16
+/// branch review, issue 4) -- clap's own message differs in wording (its
+/// derived help text, not the frozen JS's hand-written `usage:` line), the
+/// same disclosed, ruled exception spec §7 already grants every other
+/// unrecognized-command case in this flat surface. This struct's own doc
+/// comment is clap's `--help` "about" text verbatim (batch 18 T5 fix round
+/// 1, spec §1: `--help` printing a retired shell wrapper's name is itself
+/// a remaining shipped reference) -- every paragraph here is
+/// adopter-visible output, not only internal history, so this doc names
+/// the two retired shell wrappers only by role, never by their literal,
+/// no-longer-shipped filenames.
 ///
 /// `bin_name = "houserules"` (CI fix round 1, issue 2): without it, clap
 /// derives the name shown in `Usage:` from `argv[0]` at runtime, which is
@@ -80,8 +105,11 @@ struct Cli {
 /// `render` and `check-knowledge` ported first (spec §5 phase 1); `list`,
 /// `get`, `batch`, `set`, and `check-backlog` (batch 17 T2), then `audit`,
 /// `validate`, and `stats` (batch 17 T3); `index`, `for`, `topics`, and
-/// `standing` (batch 17 T4, spec §5 phase 2) round out the flat surface
-/// (§3). `get`'s own dispatch (below) is `crate::get::cmd_get`, not a
+/// `standing` (batch 17 T4, spec §5 phase 2) round out the ported flat
+/// surface (§3). `check-commit` (batch 18 T2, HR-062, spec §6) is the first
+/// command with no frozen-JS predecessor at all; `init` and `files`
+/// (batch 18 T3) and `update` (batch 18 T4) round out spec §1's install
+/// surface. `get`'s own dispatch (below) is `crate::get::cmd_get`, not a
 /// `backlog`/`rules` function directly -- see that module's doc for why.
 #[derive(Subcommand)]
 enum Command {
@@ -263,6 +291,54 @@ enum Command {
         #[arg(long)]
         dir: Option<PathBuf>,
     },
+    /// Runs every `commits`-type knowledge check against a not-yet-committed
+    /// message or a git range.
+    CheckCommit {
+        /// A not-yet-committed message file (the commit-msg hook's own call
+        /// shape: git passes the proposed message's path as `$1`). Exactly
+        /// one of this or `--from` is required.
+        message_file: Option<PathBuf>,
+        /// The range's exclusive base ref (CI's own call shape: commitlint's
+        /// `--from`). Checks every commit strictly after this ref.
+        #[arg(long)]
+        from: Option<String>,
+        /// The range's inclusive head ref; defaults to `HEAD`. Only valid
+        /// alongside `--from`.
+        #[arg(long)]
+        to: Option<String>,
+        /// Repository root to check from; defaults to the enclosing git
+        /// repository's top level, resolved from the current directory.
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
+    /// Seeds the kit into a target git repository from the embedded payload.
+    Init {
+        /// The target directory; defaults to the current directory. Unlike
+        /// every read command's `--dir` above, this is not resolved against
+        /// an enclosing git repository -- the target itself must already be
+        /// one (`install::cmd_init`'s own doc has the full account).
+        #[arg(long)]
+        dir: Option<PathBuf>,
+        /// The backlog id prefix seeded schemas carry; defaults to `WI`.
+        #[arg(long)]
+        id_prefix: Option<String>,
+    },
+    /// Prints the kit-owned and seed-once file lists the embedded payload defines.
+    Files,
+    /// Syncs an already-`init`ed target's `KIT_OWNED` files from the
+    /// embedded payload, deletes any retired kit file still present, and
+    /// reports the stamped-to-running version drift.
+    Update {
+        /// The target directory; defaults to the current directory. Resolved
+        /// the same way `init`'s own `--dir` is (`install::cmd_update`'s own
+        /// doc has the full account).
+        #[arg(long)]
+        dir: Option<PathBuf>,
+        /// The backlog id prefix a still-unstamped install's marker
+        /// defaults to; defaults to `WI`.
+        #[arg(long)]
+        id_prefix: Option<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -328,5 +404,14 @@ fn main() -> ExitCode {
         Some(Command::For { paths, full, dir }) => rules::cmd_for(dir, paths, full),
         Some(Command::Topics { dir }) => rules::cmd_topics(dir),
         Some(Command::Standing { dir }) => rules::cmd_standing(dir),
+        Some(Command::CheckCommit {
+            message_file,
+            from,
+            to,
+            dir,
+        }) => rules::cmd_check_commit(dir, message_file, from, to),
+        Some(Command::Init { dir, id_prefix }) => install::cmd_init(dir, id_prefix),
+        Some(Command::Files) => install::cmd_files(),
+        Some(Command::Update { dir, id_prefix }) => install::cmd_update(dir, id_prefix),
     }
 }
