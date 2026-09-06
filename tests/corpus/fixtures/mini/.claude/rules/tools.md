@@ -2,7 +2,7 @@
 paths:
   - "mini-tools/**"
 ---
-Generated from knowledge/ by tools/kb.sh render. Do not edit.
+Generated from knowledge/ by houserules render. Do not edit.
 
 # Tools rules
 
@@ -19,4 +19,4 @@ Generated from knowledge/ by tools/kb.sh render. Do not edit.
 
 - [mini.stale-lockfile] A stale mini-tools lockfile makes the fixture regenerate with drift.
 
-Detail: tools/kb.sh get <id>
+Detail: houserules get <id>

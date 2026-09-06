@@ -54,48 +54,6 @@
       ]
     },
     {
-      "command": "node <frozen-worktree>/tools/kb.mjs check",
-      "cwd": "tests/corpus/fixtures/mini-bad",
-      "produces": [
-        "check/mini-bad.json"
-      ]
-    },
-    {
-      "command": "node <frozen-worktree>/tools/kb.mjs check",
-      "cwd": "tests/corpus/fixtures/mini-stale",
-      "produces": [
-        "check/mini-stale.json"
-      ]
-    },
-    {
-      "command": "node <frozen-worktree>/tools/kb.mjs check",
-      "cwd": "tests/corpus/fixtures/mini",
-      "produces": [
-        "check/mini.json"
-      ]
-    },
-    {
-      "command": "node tools/kb.mjs check",
-      "cwd": "<frozen-worktree>",
-      "produces": [
-        "check/root.json"
-      ]
-    },
-    {
-      "command": "node tools/kb.mjs for tools/kb.mjs --full",
-      "cwd": "<frozen-worktree>",
-      "produces": [
-        "knowledge/for-tools-kb-mjs-full.json"
-      ]
-    },
-    {
-      "command": "node tools/kb.mjs for tools/kb.mjs",
-      "cwd": "<frozen-worktree>",
-      "produces": [
-        "knowledge/for-tools-kb-mjs.json"
-      ]
-    },
-    {
       "command": "node tools/kb.mjs get houserules.template-is-the-source",
       "cwd": "<frozen-worktree>",
       "produces": [
@@ -114,20 +72,6 @@
       "cwd": "<frozen-worktree>",
       "produces": [
         "knowledge/index.json"
-      ]
-    },
-    {
-      "command": "node <frozen-worktree>/tools/kb.mjs for mini-tools/build.sh --full",
-      "cwd": "tests/corpus/fixtures/mini",
-      "produces": [
-        "knowledge/mini/for-mini-tools-build-sh-full.json"
-      ]
-    },
-    {
-      "command": "node <frozen-worktree>/tools/kb.mjs for mini-tools/build.sh",
-      "cwd": "tests/corpus/fixtures/mini",
-      "produces": [
-        "knowledge/mini/for-mini-tools-build-sh.json"
       ]
     },
     {
@@ -177,27 +121,6 @@
       "cwd": "<frozen-worktree>",
       "produces": [
         "knowledge/topics.json"
-      ]
-    },
-    {
-      "command": "node <frozen-worktree>/tools/kb.mjs render",
-      "cwd": "tests/corpus/fixtures/mini",
-      "produces": [
-        "render/mini/.claude/rules/standing-rules.md",
-        "render/mini/.claude/rules/tools.md",
-        "render/mini/.claude/skills/project-knowledge/SKILL.md"
-      ]
-    },
-    {
-      "command": "node tools/kb.mjs render",
-      "cwd": "<frozen-worktree>",
-      "produces": [
-        "render/root/.claude/rules/cli.md",
-        "render/root/.claude/rules/docs.md",
-        "render/root/.claude/rules/standing-rules.md",
-        "render/root/.claude/rules/template.md",
-        "render/root/.claude/rules/tests.md",
-        "render/root/.claude/skills/project-knowledge/SKILL.md"
       ]
     },
     {
@@ -278,10 +201,6 @@
     "backlog/list-open.json": "dc02aac2f1b8484d576f2818913852a72ee34c50f91fe3986f3a95adc20eef79",
     "backlog/set/mini/backlog/items/misc.json": "550d8530132301ba6b0f72bfee067e2e18ba99bb087bae177d9ebd3cda617884",
     "backlog/set/mini/command.json": "3662e314dfa2c2852f16ba575a75443633aff9cca4c26a6ae1d82aed9cb63085",
-    "check/mini-bad.json": "6b19b0296fa23bce97085ea03eb55d59273f4f515f0d7a9a25f46079fd586f50",
-    "check/mini-stale.json": "1ced0780caa00d320cd25b9011b273d5a1886cb8bb1291842628f4001cdfead6",
-    "check/mini.json": "85d84c7f01982d11bea46b388e579dfed439edf38fde9891e7218aee822a7373",
-    "check/root.json": "7e9b0423f497a72881b1f4f8d325c8ff4a7149ad873ef132f02af0581532aee0",
     "fixtures/batch14-workspace/branch-review.json": "287827ce4557ebbc35f4132a36329001806fe789eaa1e1d89e52937f88c8dacc",
     "fixtures/batch14-workspace/eval-dependency-add-report.json": "10e1dda9460bda3b5e37f457e84d9083586c044d4f9ac85e9f47ba1e871ecb22",
     "fixtures/batch14-workspace/eval-docs-edit-report.json": "60581ed2e2dd2c4ef9ebfbecb3313acc770220efe0b37ee5a5b208ac35d63c8b",
@@ -295,9 +214,9 @@
     "fixtures/batch14-workspace/task-2-review-r1.json": "90701312752968dbfb1847790d9a8ef1d44642eefb4ab0bca041bd450b1de202",
     "fixtures/batch14-workspace/task-2-review.json": "c7b9e1765e7d56846656f841ebe1f2e47245b1152aa83b27ae10fd1a5f867f22",
     "fixtures/invalid-deliverable/bad-report.json": "5ee2ac6e90ac2c27c53a97dbbd1b032e381a336960c8ca6e6ddfe185a4a8e3e0",
-    "fixtures/mini/.claude/rules/standing-rules.md": "f048904bb281bb8b8a86ab9c587c9802d56fbae5ffad884068ab8ee2abb03ab0",
-    "fixtures/mini/.claude/rules/tools.md": "6cbc2a1a65f620c26c01a5a09602009f072b8056b6e954896f0e023af1ae4fd6",
-    "fixtures/mini/.claude/skills/project-knowledge/SKILL.md": "917a9655b3817a204c37aefe1dc743eb344362f1da8741cdc332048a5460b6de",
+    "fixtures/mini/.claude/rules/standing-rules.md": "4d727284c4fa0a5bb10174d4208d523569acaac9f88cb18e9a26bd0f89ffbd0a",
+    "fixtures/mini/.claude/rules/tools.md": "6b51166aa5954f2eb1b263621c11b2f4f9962e641e60f1005c68e04bbde6ac46",
+    "fixtures/mini/.claude/skills/project-knowledge/SKILL.md": "79de14f90a1161a3574780d8fd0734671f2a449ae5ff0da9986936041b0a4957",
     "fixtures/mini/CLAUDE.md": "911fc9c3dea7e8fe0ad5962a29bc4453ad86df353eaf7ebb0b334874b9bd11fd",
     "fixtures/mini/backlog/amendments.json": "6ffad6265b2091ba7e17eb93b4dfc509f4b87008d463e4befb49ae2e7f6d07bf",
     "fixtures/mini/backlog/batches.json": "8bb8908d14e8a87805fc9d590f0d848ff967e03bdb817e6562b11f9034098460",
@@ -312,9 +231,9 @@
     "fixtures/mini-bad/knowledge/entries.json": "13c31c438aee8179e8f7695a8e8376f9f82dda229e881a2b79adeef48ec1f1ee",
     "fixtures/mini-bad/knowledge/mismatch.json": "0f47cff8e0431d50832fd12933e392ffcab6415b279d5617abe9476a97ebe18c",
     "fixtures/mini-bad/knowledge/schema.json": "84bc648adc91a50d18ff72eacf3ae0a4ea365e80d49968fad7ae3d8af933889d",
-    "fixtures/mini-stale/.claude/rules/standing-rules.md": "19f2408b3bc06f790c2b1757e12b816cf20534883afe63be698addddd419f748",
-    "fixtures/mini-stale/.claude/rules/stray.md": "7010d0a5d9e495acc04971faccdaf9c86954f7a41e0847ef316780cd1592dc22",
-    "fixtures/mini-stale/.claude/rules/tools.md": "f84e06e2c2bb3829effe2b58f5be1bf590c48b6d42435d829548dae8fe1bcfaa",
+    "fixtures/mini-stale/.claude/rules/standing-rules.md": "d8b0128e7101887a4c3d943001e28dc299fd7e6d2b693b05f8cd6dbf3e2a4888",
+    "fixtures/mini-stale/.claude/rules/stray.md": "1886a236a75d2ea30f944ce9e5efc1e52c476bd19ffa8f179e645af9ba44fe9f",
+    "fixtures/mini-stale/.claude/rules/tools.md": "0a27c0b28ef26e23edaab037aaca929a4ba0042b502af9951c0065e87536f2ed",
     "fixtures/mini-stale/CLAUDE.md": "b02bd85e7278008ad6297be24744ad0ea068adce8b613c521971dca107aea0ce",
     "fixtures/mini-stale/knowledge/areas.json": "21e11c690d10bcb82daf73cdce3d8488327f4a8609689cf3a39878d7929215d7",
     "fixtures/mini-stale/knowledge/mini-stale.json": "1b3a7df92b487b15b1848ddc47711de896447fe1cd81fcbe17932fdf8265ce76",
@@ -322,13 +241,9 @@
     "fixtures/skipped-report/skipped-report.json": "ffc88043a3fc236c6c60294822bfe39f95e538bca7bb3fe8c39a92eb56fed4e4",
     "fixtures/stats-workspace/task-1-audit.json": "9f53ef7e61ce917b419e144ec886a9c164ece589b7db87c4b422b875de8936f8",
     "fixtures/stats-workspace/task-1-report.json": "8ee15b453417551e43732ea5d15bf857e4202551e90a09f2d57149d75be0b07d",
-    "knowledge/for-tools-kb-mjs-full.json": "801af65da79b61895bb2d06bb9b4c8bf64362f99964b2ee44907ac593969daa1",
-    "knowledge/for-tools-kb-mjs.json": "70ca9c22a09be216c837a919d5070de5c50204f5e989c891c6fa80ff03ddc8ab",
     "knowledge/get-houserules-template-is-the-source.json": "feabbfa779b487aef1c1568c7f961dedc3aedc07cf2ca80929c692384ff20f66",
     "knowledge/index-standing.json": "71b38953c21ca6991ef18aff41f230676871765c15ed2243152a09c8f83761d5",
     "knowledge/index.json": "b09bec78e715098e11c2581fd5ad80f2e77545d695d56572852cbbeb50565817",
-    "knowledge/mini/for-mini-tools-build-sh-full.json": "bb8b3aaf16e4acdc4a08c538f565dcc888868a9daed9258ea2760185013ef5ea",
-    "knowledge/mini/for-mini-tools-build-sh.json": "e94ed177716f547216c973a02233efc02f420c5faf1fa37aa1b2a4baa3bfee9c",
     "knowledge/mini/get-mini-build-cache.json": "664210d886815d18450d7392d7167db94ccbcec414581b07cdd81c6654d4d39e",
     "knowledge/mini/index-standing.json": "e53aad8eca9cd4480c5f38c583157005320e1cd4dbc8254d08253a775165f9f4",
     "knowledge/mini/index.json": "c114d86bfa4e22cb88f4d348cc897c6349764f34f436d1cebf910a404bd8049a",
@@ -336,15 +251,6 @@
     "knowledge/mini/topics.json": "2a7efdd54f7f907fe570b759037f094a8adfde6969a09dea0dde532b1d53ca3a",
     "knowledge/standing.json": "b094d0347609be4b32b094c4daf6437ac8b7684750944f77aaf63d5dd957912a",
     "knowledge/topics.json": "7c103ede952b5ff5319e69983513941cef1832268d7b3a431376d451aac402c0",
-    "render/mini/.claude/rules/standing-rules.md": "f048904bb281bb8b8a86ab9c587c9802d56fbae5ffad884068ab8ee2abb03ab0",
-    "render/mini/.claude/rules/tools.md": "6cbc2a1a65f620c26c01a5a09602009f072b8056b6e954896f0e023af1ae4fd6",
-    "render/mini/.claude/skills/project-knowledge/SKILL.md": "917a9655b3817a204c37aefe1dc743eb344362f1da8741cdc332048a5460b6de",
-    "render/root/.claude/rules/cli.md": "b1e5e65326be91cbd53d36e865c7c8e79b51b41f2bdb238d557241478e587b71",
-    "render/root/.claude/rules/docs.md": "a440f0071b7bae174cbf7c33af12c2db4fa80936519ad0efa7d660bb8b4582b4",
-    "render/root/.claude/rules/standing-rules.md": "904c194346b6fff43d343485738bdb9b83abd666c5775f70599bf957c266de8f",
-    "render/root/.claude/rules/template.md": "c663bff8702670ec1bd2ded330db362324dfa6a563bfd094597d01668a1c13b4",
-    "render/root/.claude/rules/tests.md": "459812ad24e7ed09d303da019b4f663bc51adfcf8c124357c6841bdeec6cfea9",
-    "render/root/.claude/skills/project-knowledge/SKILL.md": "287581472dcd29a97cd227804814179b911745949c7b7f55652706bc19f843c9",
     "stats/batch14-workspace.json": "b502ab8e4b7aee471d2282938b3310c1676e5a9f88183b9c1a2637f7df77db8f",
     "stats/stats-workspace.json": "3091bd866232173e9bce329c9f0d2e4563941a223c4b03fc9010ec437d6cf83a",
     "validate/batch14-workspace.json": "9a2ec836da35ff2da843c0178ef5b3f5ea65c93a282270085287d2f3e9951050",

@@ -1,18 +1,34 @@
 // This repository runs its own kit (docs/design.md §5.5). The root copy of every
-// kit-owned file is installed by `node bin/houserules.mjs update --dir .` and must
-// stay byte-identical to its source in template/.
+// kit-owned file is installed by `houserules update --dir .` and must stay
+// byte-identical to its source in template/.
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { KIT_OWNED, SEED_ONCE } from '../bin/houserules.mjs';
+import { RETIRED } from './retired-paths.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (path) => readFileSync(`${ROOT}${path}`, 'utf8');
 
+// tools/kb.sh and tools/backlog.sh retired from the payload at batch 18 T5
+// (docs/specs/2026-09-05-batch-18-phase3.md §§1,3): the Rust binary's own
+// KIT_OWNED (crates/houserules/src/install.rs) dropped both and RETIRED
+// deletes them from an install. bin/houserules.mjs stays frozen at its
+// pre-T5 KIT_OWNED (phase 5 retires it), so its constant still names them --
+// `quality.pin-copies-byte-exact` bars silently dropping the pair from the
+// pin, so the split below states the difference explicitly instead.
+
 describe('dogfood', () => {
-  it.each(KIT_OWNED)('%s at the root equals its template source', (file) => {
-    expect(existsSync(`${ROOT}${file}`)).toBe(true);
-    expect(read(file)).toBe(read(`template/${file}`));
+  it.each(KIT_OWNED.filter((file) => !RETIRED.includes(file)))(
+    '%s at the root equals its template source',
+    (file) => {
+      expect(existsSync(`${ROOT}${file}`)).toBe(true);
+      expect(read(file)).toBe(read(`template/${file}`));
+    },
+  );
+  it.each(RETIRED)('%s has retired from both the root and template', (file) => {
+    expect(existsSync(`${ROOT}${file}`)).toBe(false);
+    expect(existsSync(`${ROOT}template/${file}`)).toBe(false);
   });
   it('stamps the installed version and the HR id prefix', () => {
     const stamp = JSON.parse(read('.houserules.json'));
@@ -53,7 +69,10 @@ describe('the seeded eval scenario copies', () => {
     expect(SCENARIOS).not.toHaveLength(0);
   });
 
-  it.each(SCENARIOS)('%s at the root equals its template source', (file) => {
-    expect(read(file)).toBe(read(`template/${file}`));
-  });
+  it.each(SCENARIOS)(
+    '%s at the root equals its template source byte for byte',
+    (file) => {
+      expect(read(file)).toBe(read(`template/${file}`));
+    },
+  );
 });
