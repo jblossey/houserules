@@ -137,8 +137,10 @@ fn stderr_headline(error: &RawGitError) -> String {
 /// Resolves `reference` to its short commit sha -- `tools/kb.mjs`'s `rev`.
 /// Any failure (a bad ref, or git itself failing to run) is `bad ref
 /// "<reference>"`, discarding git's own message the same way the frozen
-/// JS's `catch { throw ... }` does.
-fn rev(root: &Path, reference: &str) -> Result<String, String> {
+/// JS's `catch { throw ... }` does. `pub(super)`: `check_commit`'s own
+/// range arm resolves its `--from`/`--to` refs through this same function,
+/// so a bad ref reads identically from either command.
+pub(super) fn rev(root: &Path, reference: &str) -> Result<String, String> {
     run_git(
         root,
         &[
@@ -209,8 +211,14 @@ fn show_file(root: &Path, head: &str, path: &str) -> Result<String, String> {
 
 /// Every commit's `(subject, body)` strictly between `base` and `head`
 /// (two-dot range -- not `range()`'s three-dot merge-base form) --
-/// `tools/kb.mjs`'s `commitsIn`.
-fn commits_in(root: &Path, base: &str, head: &str) -> Result<Vec<(String, String)>, String> {
+/// `tools/kb.mjs`'s `commitsIn`. `pub(super)`: `check_commit`'s own range
+/// arm reads a git range through this same function, not a second `git
+/// log` invocation of its own.
+pub(super) fn commits_in(
+    root: &Path,
+    base: &str,
+    head: &str,
+) -> Result<Vec<(String, String)>, String> {
     let output = run_git(
         root,
         &["log", "--format=%s%x00%b%x1e", &format!("{base}..{head}")],
@@ -297,6 +305,88 @@ fn filter_matching(paths: &[String], glob: &Option<Glob>) -> Result<Vec<String>,
 fn compile_check_regex(pattern: &str, flags: &str) -> Result<Regex, String> {
     let stripped: String = flags.chars().filter(|c| *c != 'g' && *c != 'y').collect();
     Regex::with_flags(pattern, stripped.as_str()).map_err(|error| error.to_string())
+}
+
+/// One `commits`-type check, its `subject`/`body_absent` patterns compiled
+/// once -- the per-commit evaluation `run_check`'s `CheckType::Commits` arm
+/// and `check_commit::check_commit` (HR-062, batch 18 T2, spec §6) both
+/// run, factored here so the two commands can never drift apart on what
+/// counts as a violation or how it reads (`houserules check-commit` reuses
+/// the audit's `commits` rules; it does not reimplement them). `pub(super)`
+/// rather than `pub(crate)`: `check_commit` is a sibling module under
+/// `rules`, and nothing outside this module needs it.
+pub(super) struct CommitsCheck<'a> {
+    check: &'a CheckDef,
+    subject_re: Option<Regex>,
+    body_re: Option<Regex>,
+}
+
+impl<'a> CommitsCheck<'a> {
+    /// Compiles `check`'s `subject`/`body_absent` patterns under its own
+    /// `flags` (`g`/`y` stripped, `compile_check_regex`) -- a malformed
+    /// pattern is a named `Err`, never a panic
+    /// (`houserules.crash-paths-are-named`).
+    pub(super) fn compile(check: &'a CheckDef) -> Result<Self, String> {
+        let flags = check.flags.as_deref().unwrap_or_default();
+        let subject_re = match &check.subject {
+            Some(s) if !s.is_empty() => Some(compile_check_regex(s, flags)?),
+            _ => None,
+        };
+        let body_re = match &check.body_absent {
+            Some(s) if !s.is_empty() => Some(compile_check_regex(s, flags)?),
+            _ => None,
+        };
+        Ok(Self {
+            check,
+            subject_re,
+            body_re,
+        })
+    }
+
+    /// Evaluates one commit's `(subject, body)` against this check, in the
+    /// same subject/body_absent/body_line_max order `run_check`'s own
+    /// commit loop tests them: `Some(evidence)` for the first rule this
+    /// commit breaks, its text identical to what `run_check` used to build
+    /// inline (the audit command's own output must not change), `None`
+    /// when `subject`/`body` satisfy every rule this check declares.
+    pub(super) fn violation(&self, subject: &str, body: &str) -> Option<String> {
+        if let Some(re) = &self.subject_re
+            && re.find(subject).is_none()
+        {
+            return Some(format!(
+                "commit \"{subject}\" does not match {}",
+                self.check.subject.as_deref().unwrap_or_default()
+            ));
+        }
+        if let Some(re) = &self.body_re
+            && body.split('\n').any(|line| re.find(line).is_some())
+        {
+            return Some(format!(
+                "commit \"{subject}\" body matches {}",
+                self.check.body_absent.as_deref().unwrap_or_default()
+            ));
+        }
+        if let Some(limit) = self.check.body_line_max.filter(|&limit| limit > 0)
+            && body
+                .split('\n')
+                .any(|line| line.encode_utf16().count() as u64 > limit)
+        {
+            return Some(format!(
+                "commit \"{subject}\" has a body line over {limit} characters"
+            ));
+        }
+        None
+    }
+
+    /// This check's declared `level` -- spec §6's level-survives ruling:
+    /// `check_commit`'s own outcome carries this forward onto each finding
+    /// the same way `run_check`'s `violated_result` already reads
+    /// `check.level` to decide a row's `result` (`"warn"` vs `"fail"`), so
+    /// a warn-level `commits` check cannot silently escalate into a hard
+    /// block on either surface.
+    pub(super) fn level(&self) -> super::check_shape::CheckLevel {
+        self.check.level
+    }
 }
 
 /// The value at a dot-separated `field` path in `data`, indexing into
@@ -416,41 +506,11 @@ fn run_check(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result<Valu
             Ok(pass(format!("{} files checked", files.len())))
         }
         CheckType::Commits => {
-            let flags = check.flags.as_deref().unwrap_or_default();
-            let subject_re = match &check.subject {
-                Some(s) if !s.is_empty() => Some(compile_check_regex(s, flags)?),
-                _ => None,
-            };
-            let body_re = match &check.body_absent {
-                Some(s) if !s.is_empty() => Some(compile_check_regex(s, flags)?),
-                _ => None,
-            };
+            let compiled = CommitsCheck::compile(check)?;
             let commits = ctx.commits()?;
             for (subject, body) in &commits {
-                if let Some(re) = &subject_re
-                    && re.find(subject).is_none()
-                {
-                    return Ok(violate(format!(
-                        "commit \"{subject}\" does not match {}",
-                        check.subject.as_deref().unwrap_or_default()
-                    )));
-                }
-                if let Some(re) = &body_re
-                    && body.split('\n').any(|line| re.find(line).is_some())
-                {
-                    return Ok(violate(format!(
-                        "commit \"{subject}\" body matches {}",
-                        check.body_absent.as_deref().unwrap_or_default()
-                    )));
-                }
-                if let Some(limit) = check.body_line_max.filter(|&limit| limit > 0)
-                    && body
-                        .split('\n')
-                        .any(|line| line.encode_utf16().count() as u64 > limit)
-                {
-                    return Ok(violate(format!(
-                        "commit \"{subject}\" has a body line over {limit} characters"
-                    )));
+                if let Some(evidence) = compiled.violation(subject, body) {
+                    return Ok(violate(evidence));
                 }
             }
             Ok(pass(format!("{} commits checked", commits.len())))

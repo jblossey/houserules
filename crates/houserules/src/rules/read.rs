@@ -35,11 +35,15 @@ use super::model::{Base, load_base};
 use super::render::{AREA_FILE_KINDS, RULE_KINDS};
 
 /// The command a `for` result points readers at, to see the full standing
-/// set -- `tools/kb.mjs`'s `STANDING_COMMAND`. Kept at its frozen, literal
-/// value for byte parity: the flat surface's own `houserules standing`
-/// rewrite is a separate, later, mechanical phase-3 task (spec §3's "no
-/// shims" bullet), not this port's job.
-const STANDING_COMMAND: &str = "tools/kb.sh standing";
+/// set -- `tools/kb.mjs`'s `STANDING_COMMAND`. Rewritten to the flat form
+/// (batch 18 T5 fix round 1, spec §3 boundary clarification at commit
+/// 878265b): `standing`'s command string reaches `for`'s JSON output, so
+/// the read-parity slices that carry it join the rewrite boundary exactly
+/// as the render and check slices did, moving to reviewed, Rust-generated
+/// goldens (`tests/goldens/read-parity/`) instead of staying frozen-JS-
+/// pinned. `tools/find-shell-tool-refs`'s own exceptions list no longer
+/// carries this file for that reason.
+const STANDING_COMMAND: &str = "houserules standing";
 
 /// Entry kinds `for` includes by area membership alone (no `verify` match
 /// needed) -- `tools/kb.mjs`'s `FOR_KINDS`, `AREA_FILE_KINDS` plus
@@ -770,7 +774,9 @@ mod tests {
                 // The literal, not the constant: a change to STANDING_COMMAND's
                 // own value must still fail this test (mirrors task-4-review.json
                 // fix round 1, finding 7, on the JS side of this same case).
-                "standing": "tools/kb.sh standing",
+                // Batch 18 T5 fix round 1 consciously changed it; this literal
+                // moved with it.
+                "standing": "houserules standing",
             })
         );
         assert_eq!(

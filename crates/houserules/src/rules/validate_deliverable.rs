@@ -17,103 +17,16 @@
 //! carry forward -- see this module's sibling doc comment on the deletion
 //! of `rules::deliverables` and `json_shape` for the full account.
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use serde_json::{Value, json};
 
 use crate::emit::emit;
+use crate::node_path::resolve_like_node;
 
 use super::deliverable::read_deliverable_value;
 use super::model::load_base;
-
-/// The absolute form of `path`, matching Node's `path.resolve(cwd, path)`
-/// exactly -- `std::path::absolute` comes close but is not quite it: its
-/// own docs say it deliberately keeps `..` components unresolved on
-/// POSIX ("this function does not access the filesystem", so a `..` after
-/// a possible symlink cannot be collapsed with confidence), where
-/// `path.resolve` always collapses them textually, since Node's own
-/// version is a pure string operation with no such caution to begin with
-/// (verified live against `tools/kb.mjs` at the frozen sha:
-/// `path.resolve('/foo/../../baz')` is `/baz`, never `/../baz`). Both
-/// join onto `std::env::current_dir`/`process.cwd()` for a relative
-/// `path` -- CI issue 1's own root cause was a test asserting a symlinked
-/// temp directory's own name would survive that join, when neither
-/// engine's real current-directory query ever preserves one
-/// (`getcwd(3)`, which both ultimately call, is specified to resolve
-/// every symlink; verified live, `tools/kb.sh validate` run through a
-/// symlinked cwd reports the real directory, not the symlink's name --
-/// see `validate_stats_audit_parity.rs`'s own symlink test). CI round 2's
-/// own fix: `strip_verbatim_disk_prefix`'s doc has the Windows-only half
-/// of this parity (a `\\?\` extended-length prefix `path.resolve`/
-/// `GetFullPathNameW` never produce, but a Windows `canonicalize` --
-/// this crate's own `tests/common/mod.rs::repo_root`, an already-absolute
-/// argument built from it -- always does).
-fn resolve_like_node(path: &Path) -> std::io::Result<PathBuf> {
-    if path.is_absolute() {
-        return Ok(normalize_lexically(&strip_verbatim_disk_prefix(path)));
-    }
-    let cwd = std::env::current_dir()?;
-    Ok(normalize_lexically(&strip_verbatim_disk_prefix(
-        &cwd.join(path),
-    )))
-}
-
-/// Strips a `\\?\` extended-length-path prefix from `path`'s own plain-disk
-/// form, if present -- CI round 2, issue 1 (Windows only; a no-op
-/// everywhere else, since the prefix cannot occur there): the binary's
-/// own parity slices showed it verbatim (`\\?\D:\a\houserules\...`) where
-/// Node's real output never carries one, because `std::fs::canonicalize`
-/// returns Windows' own UNC-verbatim form and neither `path.resolve` nor
-/// the Win32 calls it wraps (`GetFullPathNameW`, `GetCurrentDirectoryW`)
-/// ever produce it (verified against the installed toolchain's own
-/// `std::fs::canonicalize` docs: its "Platform-specific behavior" section
-/// says plainly that on Windows "this converts the path to use extended
-/// length path syntax", the `\\?\` form). Considered the `dunce` crate first
-/// (crates.io, security-hygiene.dependency-vetting) -- it does this and
-/// more (also declines to strip a path Windows would then read
-/// differently: a reserved device name, or one past `MAX_PATH`) -- but
-/// its own safety check is `const fn ... -> bool { false }` outside
-/// `cfg(windows)` (its published source), making the transformation
-/// itself impossible to exercise without a Windows runner, which this
-/// development environment does not have; this crate's own narrower,
-/// always-active equivalent keeps it testable here (below), with the
-/// Windows CI parity slices as the platform proof for the cases it
-/// cannot reach: a resolved path shaped this narrowly (a deliverable
-/// JSON file a user or agent placed and is now pointing this command
-/// at) is not expected to carry a reserved device name or exceed
-/// `MAX_PATH`, and matching Node's own unprotected behavior there is the
-/// correct parity, not a gap this fix introduces.
-fn strip_verbatim_disk_prefix(path: &Path) -> PathBuf {
-    match path.to_str().and_then(|s| s.strip_prefix(r"\\?\")) {
-        Some(rest) if rest.as_bytes().get(1) == Some(&b':') => PathBuf::from(rest),
-        _ => path.to_path_buf(),
-    }
-}
-
-/// Collapses `.`/`..` path components without touching the filesystem --
-/// `path.resolve`'s own final normalization step (`resolve_like_node`'s
-/// doc). `Path::components` already drops repeated separators and a bare
-/// `.` component on its own; only `..` needs handling here: it pops the
-/// last pushed normal component, or is dropped outright at the root
-/// (there being nothing above it to keep -- verified live: Node's own
-/// `path.resolve('/foo/../../baz')` is `/baz`, not `/../baz`).
-fn normalize_lexically(path: &Path) -> PathBuf {
-    let mut out = PathBuf::new();
-    for component in path.components() {
-        match component {
-            Component::ParentDir => match out.components().next_back() {
-                Some(Component::Normal(_)) => {
-                    out.pop();
-                }
-                Some(Component::RootDir) | None => {}
-                _ => out.push(component),
-            },
-            other => out.push(other),
-        }
-    }
-    out
-}
 
 /// Path, relative to the repo root, of the agent-deliverables JSON Schema.
 const DELIVERABLES_SCHEMA: &str = ".claude/schemas/deliverables.json";
@@ -155,6 +68,7 @@ fn check_task_report_audit(value: &Value, path: &str, errors: &mut Vec<String>) 
     if !TERMINAL_STATUSES.contains(&status) {
         return;
     }
+    check_fix_round_audits(value, path, errors);
     let self_audit = value.get("self_audit");
     if matches!(self_audit, Some(Value::Null)) {
         errors.push(format!(
@@ -171,6 +85,84 @@ fn check_task_report_audit(value: &Value, path: &str, errors: &mut Vec<String>) 
         errors.push(format!(
             "{path}: self_audit.summary.skipped is {skipped}; re-run audit with --report"
         ));
+    }
+}
+
+/// Parses the first JSON value at or after `output`'s first `{` and
+/// returns its `summary.skipped` count when that value is a number
+/// greater than zero -- `None` for output carrying no `{` at all (a
+/// cargo/vitest run's prose), no `summary.skipped`, or one that is zero.
+///
+/// Two tolerances, both required by `output` being a verbatim command
+/// capture (`process.evidence-outlives-the-session`'s invariant), not a
+/// hand-trimmed excerpt:
+/// - Leading bytes: `output.find('{')` skips past any prose before the
+///   JSON starts (a shell prompt echo, a blank line) -- batch 18 branch
+///   review issue 4, `rejects_a_fix_round_audit_output_with_one_prose_line
+///   _before_the_json` pins it. Before this, the scan started at byte 0,
+///   so a single leading line silently defeated the whole check.
+/// - Trailing bytes: `Deserializer::from_str(..).into_iter().next()`
+///   reads only the FIRST top-level value and tolerates bytes after it,
+///   unlike `serde_json::from_str`, which rejects anything but trailing
+///   whitespace -- a trailing newline or a second line of shell noise
+///   must not turn a real match into a parse failure.
+///
+/// Limits (honest, not exhaustive): a capture whose PROSE itself contains
+/// a `{` before the real audit JSON starts is not scanned past that
+/// point. `find` returns the first occurrence unconditionally, so the
+/// parse is attempted from the prose's own brace; when that slice is not
+/// valid JSON the whole function returns `None` -- a silent miss, the
+/// same shape this fix closes for a plain leading line, just for a
+/// leading line that happens to contain `{`.
+/// `accepts_a_fix_round_test_whose_prose_contains_a_brace_before_the_json`
+/// pins this residual gap rather than leaving it unmeasured. Retrying at
+/// each subsequent `{` until one parses would close it, but checking
+/// every `fix_rounds[].tests[].output` across the frozen corpus fixtures
+/// and every committed batch report found no case of a stray brace ahead
+/// of a real, skipped-carrying audit JSON in the same capture (the one
+/// non-brace-leading output found, a Node crash trace whose `{ errno:
+/// -2, ... }` is JS object-literal syntax, not JSON, and carries no audit
+/// summary either side of it, already returns `None` before and after
+/// this fix); adding the retry loop now would be speculative complexity
+/// YAGNI already rules against.
+fn parse_audit_summary_skipped(output: &str) -> Option<serde_json::Number> {
+    let start = output.find('{')?;
+    let value = serde_json::Deserializer::from_str(&output[start..])
+        .into_iter::<Value>()
+        .next()?
+        .ok()?;
+    match value.get("summary")?.get("skipped")? {
+        Value::Number(n) if n.as_f64().is_some_and(|f| f > 0.0) => Some(n.clone()),
+        _ => None,
+    }
+}
+
+/// HR-051a (docs/specs/2026-09-05-batch-18-phase3.md §5, parent spec
+/// docs/specs/2026-09-04-batch-15-tier2-spec.md §6): `check_task_report_audit`
+/// inspected only the top-level `self_audit`, so a fix round whose OWN
+/// audit test ran without `--report` -- the batch 12 shape, recurred at
+/// batch 14 T1 fix round 0 -- still validated. Scans every
+/// `fix_rounds[].tests[].output` for an embedded audit result carrying a
+/// nonzero `summary.skipped`, the same threshold `check_task_report_audit`
+/// already applies to the top-level audit.
+fn check_fix_round_audits(value: &Value, path: &str, errors: &mut Vec<String>) {
+    let Some(fix_rounds) = value.get("fix_rounds").and_then(Value::as_array) else {
+        return;
+    };
+    for (round_index, round) in fix_rounds.iter().enumerate() {
+        let Some(tests) = round.get("tests").and_then(Value::as_array) else {
+            continue;
+        };
+        for (test_index, test) in tests.iter().enumerate() {
+            let Some(output) = test.get("output").and_then(Value::as_str) else {
+                continue;
+            };
+            if let Some(skipped) = parse_audit_summary_skipped(output) {
+                errors.push(format!(
+                    "{path}.fix_rounds[{round_index}].tests[{test_index}].output: audit summary skipped is {skipped}; re-run audit with --report"
+                ));
+            }
+        }
     }
 }
 
@@ -295,40 +287,6 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-
-    /// CI round 2, issue 1: pure string logic, so this runs the same on
-    /// every platform even though the prefix itself only ever appears in
-    /// a real path on Windows -- the point of writing it this way rather
-    /// than reaching only for a Windows-gated library call, since no
-    /// Windows runner exists in this development environment to exercise
-    /// one otherwise (this function's own doc has the full account).
-    #[test]
-    fn strip_verbatim_disk_prefix_removes_the_prefix_from_a_plain_disk_path() {
-        assert_eq!(
-            strip_verbatim_disk_prefix(Path::new(r"\\?\C:\Users\runneradmin")),
-            PathBuf::from(r"C:\Users\runneradmin")
-        );
-    }
-
-    /// A UNC-share verbatim path (`\\?\UNC\server\share\...`) is not a
-    /// plain disk path -- `C` at the position right after the prefix is
-    /// `U`, not a drive letter followed by `:` -- so it must be left
-    /// alone: stripping it would silently change which server the path
-    /// names, not just its cosmetic form.
-    #[test]
-    fn strip_verbatim_disk_prefix_leaves_a_unc_share_path_alone() {
-        let unc = Path::new(r"\\?\UNC\server\share\file.json");
-        assert_eq!(strip_verbatim_disk_prefix(unc), unc.to_path_buf());
-    }
-
-    /// A path that never carried the prefix at all -- the common case on
-    /// every non-Windows platform, and most Windows paths too -- passes
-    /// through unchanged.
-    #[test]
-    fn strip_verbatim_disk_prefix_leaves_an_unprefixed_path_alone() {
-        let plain = Path::new("/foo/bar.json");
-        assert_eq!(strip_verbatim_disk_prefix(plain), plain.to_path_buf());
-    }
 
     fn template_root() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../template")
@@ -597,6 +555,164 @@ mod tests {
                 "result": "pass", "evidence": "empty range: 0 commits checked",
             }],
         });
+        let file = write_report(root.path(), &report);
+        assert_eq!(
+            validate_deliverable(root.path(), &file).unwrap().errors,
+            Vec::<String>::new()
+        );
+    }
+
+    /// HR-051a (docs/specs/2026-09-05-batch-18-phase3.md §5): a fix round's
+    /// own audit output can carry a skipped report-field check the same
+    /// way the top-level `self_audit` can (the batch 12 shape, recurred at
+    /// batch 14 T1 fix round 0) -- rejects it there too.
+    #[test]
+    fn rejects_a_fix_round_audit_output_with_a_nonzero_skipped_summary() {
+        let root = schema_root();
+        let mut report = report_sample();
+        report["fix_rounds"] = json!([{
+            "round": 1,
+            "findings": [{"finding": "f", "fix": "x"}],
+            "commits": [{"sha": "abc1236", "subject": "fix: x"}],
+            "tests": [{
+                "command": "houserules audit --base abc1234 --head abc1235",
+                "output": serde_json::to_string(&json!({
+                    "base": "abc1234", "head": "abc1235", "rules": [],
+                    "summary": {
+                        "base": "abc1234", "head": "abc1235", "deterministic": 1,
+                        "pass": 0, "fail": 0, "warn": 0, "skipped": 3, "judged": 0,
+                    },
+                })).unwrap(),
+            }],
+        }]);
+        let file = write_report(root.path(), &report);
+        let result = validate_deliverable(root.path(), &file).unwrap();
+        assert_eq!(
+            result.errors,
+            vec![format!(
+                "{}.fix_rounds[0].tests[0].output: audit summary skipped is 3; re-run audit with --report",
+                file.display()
+            )]
+        );
+    }
+
+    /// Batch 18 branch review, issue 4: a verbatim capture can carry one
+    /// prose line before the audit JSON starts (a shell prompt echo, a
+    /// leading blank line) -- `parse_audit_summary_skipped` must still
+    /// find the nonzero `skipped` past it, not only when the JSON is the
+    /// very first byte.
+    #[test]
+    fn rejects_a_fix_round_audit_output_with_one_prose_line_before_the_json() {
+        let root = schema_root();
+        let mut report = report_sample();
+        let audit_json = serde_json::to_string(&json!({
+            "base": "abc1234", "head": "abc1235", "rules": [],
+            "summary": {
+                "base": "abc1234", "head": "abc1235", "deterministic": 1,
+                "pass": 0, "fail": 0, "warn": 0, "skipped": 2, "judged": 0,
+            },
+        }))
+        .unwrap();
+        report["fix_rounds"] = json!([{
+            "round": 1,
+            "findings": [{"finding": "f", "fix": "x"}],
+            "commits": [{"sha": "abc1236", "subject": "fix: x"}],
+            "tests": [{
+                "command": "houserules audit --base abc1234 --head abc1235",
+                "output": format!("Running the audit...\n{audit_json}"),
+            }],
+        }]);
+        let file = write_report(root.path(), &report);
+        let result = validate_deliverable(root.path(), &file).unwrap();
+        assert_eq!(
+            result.errors,
+            vec![format!(
+                "{}.fix_rounds[0].tests[0].output: audit summary skipped is 2; re-run audit with --report",
+                file.display()
+            )]
+        );
+    }
+
+    /// Batch 18 branch review, issue 4 (the fix's own documented residual
+    /// limitation): a stray `{` inside the PROSE ahead of the real audit
+    /// JSON -- not the JSON's own opening brace -- defeats the scan the
+    /// same way a bare leading line used to. `parse_audit_summary_skipped`
+    /// finds this earlier, invalid brace first, fails to parse from it,
+    /// and returns `None` without ever reaching the real, nonzero-skipped
+    /// JSON later in the same capture. This is the one shape the fix
+    /// does not close; the function's own doc names it and this test
+    /// measures it rather than leaving it asserted only in prose.
+    #[test]
+    fn accepts_a_fix_round_test_whose_prose_contains_a_brace_before_the_json() {
+        let root = schema_root();
+        let mut report = report_sample();
+        let audit_json = serde_json::to_string(&json!({
+            "base": "abc1234", "head": "abc1235", "rules": [],
+            "summary": {
+                "base": "abc1234", "head": "abc1235", "deterministic": 1,
+                "pass": 0, "fail": 0, "warn": 0, "skipped": 5, "judged": 0,
+            },
+        }))
+        .unwrap();
+        report["fix_rounds"] = json!([{
+            "round": 1,
+            "findings": [{"finding": "f", "fix": "x"}],
+            "commits": [{"sha": "abc1236", "subject": "fix: x"}],
+            "tests": [{
+                "command": "houserules audit --base abc1234 --head abc1235",
+                "output": format!("Compiling {{ not json }}\n{audit_json}"),
+            }],
+        }]);
+        let file = write_report(root.path(), &report);
+        assert_eq!(
+            validate_deliverable(root.path(), &file).unwrap().errors,
+            Vec::<String>::new(),
+            "documents the residual gap: the stray brace in the prose is not skipped past"
+        );
+    }
+
+    /// A fix round audit whose skipped count is 0 raises nothing --
+    /// pins `parse_audit_summary_skipped`'s threshold, not merely its
+    /// presence.
+    #[test]
+    fn accepts_a_fix_round_audit_output_with_a_zero_skipped_summary() {
+        let root = schema_root();
+        let mut report = report_sample();
+        report["fix_rounds"] = json!([{
+            "round": 1,
+            "findings": [{"finding": "f", "fix": "x"}],
+            "commits": [{"sha": "abc1236", "subject": "fix: x"}],
+            "tests": [{
+                "command": "houserules audit --base abc1234 --head abc1235 --report r.json",
+                "output": serde_json::to_string(&json!({
+                    "base": "abc1234", "head": "abc1235", "rules": [],
+                    "summary": {
+                        "base": "abc1234", "head": "abc1235", "deterministic": 1,
+                        "pass": 1, "fail": 0, "warn": 0, "skipped": 0, "judged": 0,
+                    },
+                })).unwrap(),
+            }],
+        }]);
+        let file = write_report(root.path(), &report);
+        assert_eq!(
+            validate_deliverable(root.path(), &file).unwrap().errors,
+            Vec::<String>::new()
+        );
+    }
+
+    /// A fix round test whose output is not JSON at all (cargo/vitest
+    /// prose, say) is inspected and quietly skipped, not misread as an
+    /// audit summary.
+    #[test]
+    fn accepts_a_fix_round_test_whose_output_is_not_json() {
+        let root = schema_root();
+        let mut report = report_sample();
+        report["fix_rounds"] = json!([{
+            "round": 1,
+            "findings": [{"finding": "f", "fix": "x"}],
+            "commits": [{"sha": "abc1236", "subject": "fix: x"}],
+            "tests": [{"command": "cargo test", "output": "running 1 test\ntest ok\n"}],
+        }]);
         let file = write_report(root.path(), &report);
         assert_eq!(
             validate_deliverable(root.path(), &file).unwrap().errors,

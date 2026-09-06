@@ -33,7 +33,14 @@
 //! `model::{Base, load_base}` are re-exported too, for the crate-root `get`
 //! command (`crate::get`) that spans this module and `backlog` both -- see
 //! that file's own doc for why the flat surface's `get` cannot live in
-//! either feature module.
+//! either feature module. Batch 18 T2 (HR-062, spec §6) adds `check-commit`
+//! (`check_commit`): it reuses `audit`'s own `CommitsCheck`, `rev`, and
+//! `commits_in` for its per-commit evaluation and range reading rather than
+//! duplicating them, so it and `audit` can never independently drift on
+//! what counts as a `commits`-type violation (`check_commit.rs`'s own
+//! module doc has the command's full account, including the two real call
+//! sites -- the commit-msg hook, CI's commitlint job -- its CLI shape is
+//! derived from).
 //!
 //! `rules::deliverables` and `crate::json_shape` (batch 17 T1's typed
 //! deliverables-schema model layer) are DELETED in the same commit that
@@ -59,6 +66,7 @@
 
 mod audit;
 mod check;
+mod check_commit;
 mod check_shape;
 mod deliverable;
 mod glob;
@@ -70,8 +78,9 @@ mod validate_deliverable;
 
 pub(crate) use audit::cmd_audit;
 pub(crate) use check::{cmd_check_knowledge, validate};
+pub(crate) use check_commit::cmd_check_commit;
 pub(crate) use model::{Base, load_base};
 pub(crate) use read::{IndexOpts, cmd_for, cmd_index, cmd_standing, cmd_topics, get_entries};
-pub(crate) use render::{cmd_render, repo_root_from_cwd};
+pub(crate) use render::{cmd_render, render_and_report, repo_root_from_cwd};
 pub(crate) use stats::cmd_stats;
 pub(crate) use validate_deliverable::cmd_validate;
