@@ -60,9 +60,10 @@ use clap::{Parser, Subcommand};
 /// The `houserules` command line.
 ///
 /// `--help` and `--version` come from clap; `--version` reports the crate
-/// version (`CARGO_PKG_VERSION`), which does not track the kit's own
-/// version until the release-please wiring lands (see the package comment
-/// in `Cargo.toml`).
+/// version (`CARGO_PKG_VERSION`), which tracks the kit's own version:
+/// release-please's `extra-files` config keeps `Cargo.toml`'s `version`
+/// field in lockstep with `package.json`'s at every release (see the
+/// package comment in `Cargo.toml`).
 ///
 /// `arg_required_else_help = true` (HR-056): a bare `houserules`, no
 /// subcommand and no flag, prints help on stderr and exits 2, instead of

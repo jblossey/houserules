@@ -331,12 +331,12 @@ fn is_id_prefix(value: &str) -> bool {
 /// disk to read at runtime (the whole point of embedding), and a
 /// hand-copied literal constant would drift silently the next time
 /// `package.json`'s `version` changes without this file being touched.
-/// Deliberately distinct from `CARGO_PKG_VERSION`
-/// (`houserules --version`, `tests/version.rs`), which stays the crate's
-/// own release-cadence version until the two converge at the release-please
-/// wiring (Tier-2 phase 4, `Cargo.toml`'s own comment) -- until then, the
-/// stamped kit version and `--version`'s own answer are two different
-/// numbers by design, not a bug in either.
+/// A separate read from `CARGO_PKG_VERSION` (`houserules --version`,
+/// `tests/version.rs`) by construction, not by value: release-please's
+/// `extra-files` config keeps `Cargo.toml`'s `version` field equal to
+/// `package.json`'s at every release (`Cargo.toml`'s own comment), and
+/// `kit_version_matches_the_crate_s_own_cargo_pkg_version` pins the two
+/// answers equal.
 fn kit_version() -> String {
     const PACKAGE_JSON: &str = include_str!("../../../package.json");
     let value: Value = serde_json::from_str(PACKAGE_JSON)
@@ -785,6 +785,18 @@ mod tests {
     #[test]
     fn kit_version_is_a_non_empty_string() {
         assert!(!kit_version().is_empty());
+    }
+
+    /// Pins the phase-4 convergence (batch 19 T1 fix round 1): `dist plan
+    /// --tag=v<package.json version>` only resolves when
+    /// `crates/houserules/Cargo.toml`'s own `version` carries that same
+    /// value, since `CARGO_PKG_VERSION` is dist's only source for the crate
+    /// version. release-please's `extra-files` config keeps the two in sync
+    /// at every future release; this test is what a drift between them
+    /// would break first.
+    #[test]
+    fn kit_version_matches_the_crate_s_own_cargo_pkg_version() {
+        assert_eq!(kit_version(), env!("CARGO_PKG_VERSION"));
     }
 
     /// `RETIRED` holds real paths now (this module's own "Deletion" doc

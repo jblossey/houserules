@@ -1,13 +1,16 @@
 [package]
 name = "houserules"
-# 0.1.0 is cargo's default, and intentional: this binary's version tracks its
-# own release cadence, not the kit's 0.2.0-alpha line. The two converge at the
-# release-please wiring in Tier-2 phase 4 (docs/specs/2026-09-04-batch-15-tier2-spec.md §5).
-# Do not "fix" this to match package.json before then.
-version = "0.1.0"
+# Tracks package.json's version, not cargo's own default. dist plan/build
+# resolve a release-please tag by this field alone (CARGO_PKG_VERSION), so a
+# drift here breaks every future release (batch 19 T1 fix round 1, review
+# issue 2). release-please-config.json's extra-files entry keeps the two in
+# sync at every release from here; never hand-edit this field except to
+# repair a drift, and never edit it without updating package.json to match.
+version = "0.2.0-alpha"
 edition = "2024"
 description = "A reusable knowledge-management and agent-workflow kit for AI-assisted repositories."
 license = "MIT"
+repository = "https://github.com/jblossey/houserules"
 
 [dependencies]
 clap = { version = "=4.6.6", features = ["derive"] }
@@ -20,3 +23,13 @@ serde_json = { version = "=1.0.151", features = ["preserve_order"] }
 
 [dev-dependencies]
 tempfile = "=3.27.0"
+
+# dist ships every archive with the whole crate's binaries otherwise (the four
+# dev tools under src/bin/ alongside houserules itself). Restrict every dist
+# target to the one binary adopters install; the dev tools stay cargo-only.
+[package.metadata.dist.binaries]
+x86_64-unknown-linux-musl = ["houserules"]
+aarch64-unknown-linux-musl = ["houserules"]
+x86_64-apple-darwin = ["houserules"]
+aarch64-apple-darwin = ["houserules"]
+x86_64-pc-windows-msvc = ["houserules"]
