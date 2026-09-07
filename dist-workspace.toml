@@ -1,0 +1,63 @@
+# Config for 'dist' (https://opensource.axo.dev/cargo-dist/). This file is
+# the SOURCE for .github/workflows/release.yml: never hand-edit that file.
+# Edit this file, then run `dist generate` (or `dist init` again) to
+# regenerate it. Verified round-trip-safe: running `dist generate` twice with
+# no config change produced a byte-identical release.yml
+# (.superpowers/sdd/2026-09-06-batch-19/t1-evidence/dist-generate-round-trip.log).
+
+[workspace]
+members = ["cargo:."]
+
+# Config for 'dist'
+[dist]
+# The preferred dist version to use in CI (Cargo.toml SemVer syntax). Exact
+# pin (security-hygiene.exact-pins): `dist init`/`dist migrate` are the only
+# sanctioned way to bump this value; never hand-type a new one.
+cargo-dist-version = "0.32.0"
+# CI backends to support
+ci = "github"
+# The installers to generate for each app
+installers = ["shell", "powershell"]
+# Target platforms to build apps for (Rust target-triple syntax): the five
+# target families spec 2 names (linux x64/arm64, macOS x64/arm64, Windows
+# x64). The Linux legs are musl, not gnu -- this task's own choice, not an
+# owner ruling (design.md 5.37 rules cargo-dist and unsigned macOS, no
+# targets): ubi's libc filter (picker.rs's libc_matches, verified against
+# ubi's current source) passes a musl-only asset name unfiltered on a glibc
+# host but drops any glibc-named asset on a musl host, so musl-only installs
+# on both, where gnu-only would fail on musl. The musl legs ship one
+# statically linked binary (t1-evidence/dist-build-binary-file.log,
+# -binary-ldd.log, x86_64-unknown-linux-musl only); macOS and Windows link
+# their platform runtimes.
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "x86_64-unknown-linux-musl", "x86_64-pc-windows-msvc"]
+# Path that installers should place binaries in: stays at dist's own
+# CARGO_HOME default. The shell/powershell installers add it to PATH
+# themselves (houserules-installer.sh calls add_install_dir_to_path for
+# .profile, .zshrc/.zshenv and fish's conf.d unless HOUSERULES_NO_MODIFY_PATH
+# is set; t1-evidence/houserules-installer.sh,
+# houserules-installer-path-excerpt.log), and the mise/ubi channel never
+# reads this setting at all, so nothing here needs a non-Rust-toolchain-
+# shaped path.
+install-path = "CARGO_HOME"
+# Where to host releases
+hosting = "github"
+# Whether to install an updater program
+install-updater = false
+# Explicit for the record (already dist's own default): a sha256 file per
+# archive plus a unified sha256.sum.
+checksum = "sha256"
+# The closest live dry run 0.32 supports without abandoning the tag-push
+# trigger release-please drives (spec §2): PRs build and upload real
+# per-target archives, not just run `dist plan`. This still never creates,
+# uploads to, or announces a GitHub Release — the host/create/announce jobs
+# stay gated to a real tag push either way (`publishing` is
+# `!github.event.pull_request` in the generated workflow). `dispatch-releases`
+# is 0.32's only lever that reaches a draft release pre-tag, and it replaces
+# tag-push outright, which the ruled trigger rules out. It also switches on
+# swatinem/rust-cache@v2 in the generated workflow (dist's own cache-builds
+# default), vetted in the task report's dependency_vetting alongside
+# cargo-dist for exactly that reason.
+# Exit criterion (ruled, batch 19 T1 fix round 1): flips to "plan" at the
+# first config-touching task after the first real release proves the
+# pipeline end to end; regenerate when it does. Scheduled as HR-069.
+pr-run-mode = "upload"
