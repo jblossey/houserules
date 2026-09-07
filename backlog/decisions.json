@@ -124,6 +124,26 @@
     {
       "date": "2026-09-05",
       "text": "Spec before plan, strictly: a plan written before its approved spec is nil - deleted and the planning phase redone from the spec, never re-anchored. Applied as a process.brainstorm-first body bullet in both copies; the batch 18 plan was voided and rewritten under the ruling. docs/design.md §5.32."
+    },
+    {
+      "date": "2026-09-06",
+      "text": "Shipped prose that states a measurement is a claim: process.claims-match-artifacts' body extends to shipped doc and comment sentences - a retained capture at a durable path, and a fix round's sweep re-opens every doc sentence the round touched. The batch 18 dominant failure class; the checker cannot see shipped files. Applied in both copies at batch 19. docs/design.md §5.33."
+    },
+    {
+      "date": "2026-09-06",
+      "text": "TDD mode labels are measurements: process.tdd's body gains the two batch-18 shapes - a mutation RED shows the test FAILING under the mutation, and a post-commit recapture is reconstructed regardless of what also ran earlier. Applied in both copies at batch 19. docs/design.md §5.34."
+    },
+    {
+      "date": "2026-09-06",
+      "text": "make-corpus.mjs interim exception confirmed: the one Node dev tool until it retires with the corpus and bin/houserules.mjs at Tier-2 phase 5, where the mandatory no-Node sweep runs. docs/design.md §5.35 confirming §5.30's pending note."
+    },
+    {
+      "date": "2026-09-06",
+      "text": "Batch 18 accepted (Tier-2 phase 3, main a20a179); the next batch gates phase 4 - HR-048 delivery channels, HR-049's pinned tag, macOS signing, unblocking HR-063/064. docs/design.md §5.36."
+    },
+    {
+      "date": "2026-09-06",
+      "text": "Phase-4 gate: the batch 19 spec approved as drafted; cargo-dist ruled for the release pipeline (active through 2026, pinned exactly at adoption) over taiki-e's action and a hand-rolled matrix; macOS binaries ship unsigned with the documented quarantine note, signing revisited at 1.0. docs/design.md §5.37."
     }
   ],
   "notes": []

@@ -143,7 +143,8 @@
         "Never fabricate a cycle: an empty `tdd` with named gates is honest evidence; a manufactured RED is not.",
         "A fix round that narrows or widens matching behavior carries its own RED or counter-example test. A cycle captured after the commit says so in the report's tdd entry and presents the runs in the order they really happened.",
         "When no assertion can change (an output-noise or report-only fix), disclosed before/after captures of the observable difference are the honest evidence, presented in the order they ran.",
-        "The `mode` label follows when the shown run happened, not the failure's flavor: `natural` only when the shown RED ran pre-commit; a post-hoc recapture is `reconstructed` and the tdd entry says so; a disclosed-mutation proof is `mutation`."
+        "The `mode` label follows when the shown run happened, not the failure's flavor: `natural` only when the shown RED ran pre-commit; a post-hoc recapture is `reconstructed` and the tdd entry says so; a disclosed-mutation proof is `mutation`.",
+        "Two label failures are ruled (batch 18): a mutation proof's RED shows the test FAILING under the mutation — a capture showing the tests passing proves nothing; and a post-commit recapture is `reconstructed` regardless of what also ran earlier — the label follows the shown run, and one report uses one label for one procedure."
       ],
       "tags": ["testing"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
@@ -379,6 +380,7 @@
         "The recurring failure is not fabrication but drift: the work is right while the sentence describing it cites a capture that is not there, quotes a line the capture lost, or keeps a rationale a later verification overturned (batch 16 tasks 2 and 5).",
         "The check is mechanical: for each named file, open it; for each quoted line, grep it; for each number, recompute it from the artifact. A reviewer does exactly this, so a report that skips it converts Minor findings into review rounds.",
         "A reversed trend is worth recording too: name the pattern in the review when it appears, and name its reversal when a later round demonstrates it (batch 16 task 2 round 2).",
+        "A SHIPPED doc or comment sentence stating a measurement is a claim like a report sentence (ruled batch 18): it cites a retained capture at a durable path, and a fix round's sweep re-opens every doc sentence the round touched. The report-claims checker cannot see shipped files — the manual sweep is the only net there.",
         "Close every report by running the report-claims checker (`cargo run --quiet --bin check-report-claims -- <REPORT_FILE>`) over the report file after the last edit, and paste its clean run as the final tests entry. The checker is a floor, not a substitute for the manual sweep: its Limits section names what only the sweep catches. Dev tools are Rust-native (owner ruling, batch 17 report; HR-061 ported the checker). The checker gates gitignored workspace reports, never a tracked artifact a CI job could see, so it carries no CI job of its own -- the implementer template's closing-act mandate (HR-060) is the whole mechanism."
       ],
       "tags": ["reports", "evidence", "review"],
@@ -421,6 +423,18 @@
       ],
       "tags": ["verification", "measurement", "review"],
       "source": { "date": "2026-09-06", "by": "review", "ref": "batch 18 T2 fix round 2 correction; task-2-review-r3.json re-derivation" }
+    },
+    {
+      "id": "process.wiring-checks-run-the-resolution",
+      "kind": "rule",
+      "area": "tools",
+      "summary": "A trigger, pin, or wiring check runs the resolution end to end - feed the produced value to its consumer; a string, glob, or schema match proves nothing.",
+      "body": [
+        "The batch-19 shape: release.yml's tag glob matched v0.2.0-alpha, and dist plan --tag=v0.2.0-alpha still exited 255 because CARGO_PKG_VERSION could not resolve the tag - the pattern check passed while the pipeline was broken on every tag the flow would produce (batch 19 task-1-review.json issue 2).",
+        "The proof is the consumer's own run, captured: dist plan for a tag wiring, the updater's replacement count for a pin wiring, the as-CI shell for a workflow step. The match check stays as the cheap first gate, never the verdict."
+      ],
+      "tags": ["verification", "wiring", "release", "ci"],
+      "source": { "date": "2026-09-07", "by": "review", "ref": "batch 19 branch review; task-1-review.json issue 2" }
     }
   ]
 }

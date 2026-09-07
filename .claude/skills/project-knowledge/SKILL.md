@@ -50,9 +50,9 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 ## Topics
 
-houserules  20  Working in the houserules kit repository
+houserules  22  Working in the houserules kit repository
 knowledge-base  4  Authoring knowledge entries
-process  28  How work runs: batches, dispatch, reviews, rulings
+process  29  How work runs: batches, dispatch, reviews, rulings
 quality  5  Quality principles
 security-hygiene  5  Dependency, commit, and test hygiene
 writing-style  4  Writing style for docs, comments, commits, reports

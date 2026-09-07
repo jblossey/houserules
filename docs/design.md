@@ -531,3 +531,39 @@ Each item records the ruling with its date, or stays marked open.
     and rewritten from the approved spec. Applied as a
     process.brainstorm-first body bullet in both copies. Source:
     owner, 2026-09-05, batch 18 gate.
+33. **Shipped prose that states a measurement is a claim — ruled
+    2026-09-06.** process.claims-match-artifacts' body extends: a
+    shipped doc or comment sentence stating a measurement cites a
+    retained capture at a durable path, exactly as a report
+    sentence does, and a fix round's sweep re-opens every doc
+    sentence the round touched. The batch's dominant failure
+    class (T4 install.rs, T5 mapping table, T6 frozen-sha
+    comment); the claims checker cannot see shipped files, so the
+    manual sweep is the net. Source: owner, 2026-09-06, batch 18
+    report.
+34. **TDD mode labels are measurements — ruled 2026-09-06.**
+    process.tdd's body gains: a mutation proof's RED shows the
+    test FAILING under the mutation (a capture showing passes
+    proves nothing), and a post-commit recapture is
+    `reconstructed` regardless of what also ran earlier. Both
+    shapes were round-0 criticals at batch 18 (T2, T1). Source:
+    owner, 2026-09-06, batch 18 report.
+35. **make-corpus.mjs interim exception confirmed — ruled
+    2026-09-06.** The owner confirms decision 30's recorded
+    exception: tools/make-corpus.mjs stays the one Node dev tool
+    until it retires with the corpus and bin/houserules.mjs at
+    Tier-2 phase 5, where the mandatory no-Node sweep runs.
+    Source: owner, 2026-09-06, batch 18 report.
+36. **Batch 18 accepted; phase 4 gated next — ruled 2026-09-06.**
+    Tier-2 phase 3 accepted as merged (main a20a179). The next
+    batch gates phase 4: HR-048 delivery channels, HR-049's
+    pinned tag, macOS signing — unblocking HR-063/064. Source:
+    owner, 2026-09-06, batch 18 report.
+37. **Phase-4 gate rulings — ruled 2026-09-06.** The batch 19
+    spec approved as drafted. Release pipeline: cargo-dist
+    (0.32.0 at research; active through 2026, absorbed Astral's
+    fork upstream) over taiki-e's quieter action and a
+    hand-rolled matrix — pinned exactly at adoption with the
+    full vet. macOS binaries ship unsigned with the documented
+    quarantine note; signing revisits at 1.0. Source: owner,
+    2026-09-06, batch 19 gate.
