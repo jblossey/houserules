@@ -63,14 +63,14 @@ and lint first.
    houserules version, restamp the kit version.** Skip this step for
    every other merge. `.houserules.json` records the houserules version
    this project runs. That stamp goes stale when the version changes: a
-   release does this in the kit repository itself; a houserules
-   dependency bump does it elsewhere. In a project that installs the
-   kit, install first — otherwise the command below still runs the old
-   copy and reads no drift.
+   release does this in the kit repository itself; a newer `houserules`
+   binary on `PATH` does it elsewhere. In a project that installs the
+   kit, install the new release first — through whichever channel you
+   installed houserules with (the shell installer, mise, or a direct
+   download) — otherwise the command below still runs the old binary
+   and reads no drift.
    ```sh
-   pnpm install                                           # a project that installs the kit
-   pnpm exec houserules update --dir .                    # a project that installs the kit
-   houserules update --dir .                              # the kit repository itself
+   houserules update --dir .
    ```
    Read the drift line the command prints, `kit <old> -> <new>`. Equal
    sides mean nothing to commit. Different sides mean the stamp changed:

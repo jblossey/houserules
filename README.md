@@ -64,54 +64,105 @@ the codebase in the exact style which you deem perfect.
 
 ## Install
 
-houserules is not on npm yet. Until it is, install the pinned release
-tag straight from GitHub:
+houserules ships one dependency-free binary: no local clone, no Rust
+toolchain, no Node. Install it through any of these channels, then run
+`houserules init` in your project.
+
+### The shell installer
+
+<!-- x-release-please-start-version -->
+```sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-installer.sh | sh
+```
+<!-- x-release-please-end -->
+
+cargo-dist's own installer (the same [release pipeline](docs/runbook.md#cutting-a-release)
+publishes it): it picks your platform's archive, checks its sha256, and
+installs to `$CARGO_HOME/bin` (falling back to `~/.cargo/bin`), adding
+that directory to `PATH` itself (`.profile`, `.zshrc`/`.zshenv`, fish's
+`conf.d`, or `$GITHUB_PATH` under CI — no shell restart needed there).
+
+PENDING the first release with assets (HR-048): `jblossey/houserules`
+carries one release so far (`houserules-v0.2.0-alpha`, 2026-09-03), and
+it ships zero assets; the tag this URL names has no release of
+its own. Either way, the URL 404s today. Verified live
+2026-09-07 (the releases API listing,
+`.superpowers/sdd/2026-09-06-batch-19/t2-evidence/releases-api-listing.json`;
+the 404,
+`.superpowers/sdd/2026-09-06-batch-19/t2-evidence/curl-installer-404.log`).
+Re-run this block once the pipeline cuts a release with assets, and
+again once HR-049 re-verifies live (the two-step reality,
+docs/specs/2026-09-06-batch-19-phase4.md §7).
+
+### mise
 
 ```sh
-pnpm add -D git+https://github.com/jblossey/houserules.git#houserules-v0.2.0-alpha
+mise use ubi:jblossey/houserules
 ```
 
-A git spec already pins the exact ref, so there is no `--save-exact` for
-`pnpm add` to add. Once houserules is on npm:
+Resolves the latest GitHub release's archive for your platform through
+mise's `ubi` backend, with no registry entry needed; `mise use` with no
+`@version` defaults to `@latest` and records that spec in `mise.toml`.
+mise's own current docs mark the `ubi` backend deprecated in favor of
+`github:owner/repo`, removed in mise 2027.1.0 — `ubi` still resolves and
+installs today (HR-070 tracks the migration).
+
+PENDING the first release with assets: the one release that exists
+ships no asset for mise's `ubi` backend to resolve. mise's own
+diagnostic names a different symptom, `no versions found ... matching
+date filter`, not an absent release. Verified live 2026-09-07,
+`.superpowers/sdd/2026-09-06-batch-19/t2-evidence/mise-ubi-control-run.log`.
+
+### Direct download
+
+<!-- x-release-please-start-version -->
+| Target | Archive |
+|---|---|
+| Apple Silicon macOS | [houserules-aarch64-apple-darwin.tar.xz](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-aarch64-apple-darwin.tar.xz) |
+| Intel macOS | [houserules-x86_64-apple-darwin.tar.xz](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-x86_64-apple-darwin.tar.xz) |
+| x64 Windows | [houserules-x86_64-pc-windows-msvc.zip](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-x86_64-pc-windows-msvc.zip) |
+| ARM64 Linux (musl) | [houserules-aarch64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-aarch64-unknown-linux-musl.tar.xz) |
+| x64 Linux (musl) | [houserules-x86_64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-x86_64-unknown-linux-musl.tar.xz) |
+<!-- x-release-please-end -->
+
+Each archive carries a `.sha256` checksum beside it (append `.sha256` to
+the archive's own URL); extract the archive and put the `houserules`
+binary on `PATH` yourself.
+
+macOS ships unsigned (docs/specs/2026-09-06-batch-19-phase4.md §3's
+ruling: zero cost, revisit at 1.0). A browser download sets the
+quarantine flag, and Gatekeeper then refuses to run an unsigned binary;
+clear it once:
 
 ```sh
-pnpm add -D --save-exact houserules
+xattr -d com.apple.quarantine /path/to/houserules
 ```
 
-## Building the `houserules` binary
+Verified against the documented `xattr -d <attribute> <file>` form
+(ss64.com/mac/xattr.html, checked 2026-09-07); this block cannot run
+live in this Linux development environment — no macOS host is available
+here, a permanent constraint, not a pending-release one.
 
-Every command below the `pnpm exec houserules init`/`update` pair runs the
-compiled `houserules` binary directly, and no release of it exists yet
-(HR-048, phase 4: binary delivery channels). Until HR-048 ships, build it
-from this repository's own source once and put it on `PATH`:
-
-```sh
-git clone https://github.com/jblossey/houserules.git
-cd houserules && mise exec -- cargo install --path crates/houserules --bin houserules
-cd ..
-```
-
-`cargo install` places the binary at `~/.cargo/bin/houserules`, already on
-`PATH` for the usual rustup/mise setup. HR-048 retires this step.
+PENDING the first release with assets: all five listed archives 404
+today. Verified live 2026-09-07,
+`.superpowers/sdd/2026-09-06-batch-19/t2-evidence/direct-download-404.log`.
 
 ## Quick start
 
 ```sh
 mkdir my-project && cd my-project && git init
-pnpm add -D git+https://github.com/jblossey/houserules.git#houserules-v0.2.0-alpha
-pnpm exec houserules init
-houserules update --dir .
+houserules init
 houserules check-knowledge && houserules check-backlog
 git add -A && git commit -m 'chore: install houserules knowledge setup'
 ```
 
-`pnpm add` writes `package.json` itself; no separate `pnpm init` is
-needed. `init` writes the kit-owned machinery, seeds your starting
-knowledge topics, backlog, schemas, and CI workflow, then runs `render`
-and stamps `.houserules.json`. The `houserules update --dir .` right after
-brings the generated files to the binary's own stamp and drops any kit
-file the binary has since retired; safe and idempotent to run every time,
-whichever engine seeded the project. Look at what you got:
+`init` writes the kit-owned machinery, seeds your starting knowledge
+topics, backlog, schemas, and CI workflow, then runs `render` and stamps
+`.houserules.json` with the binary's own version — no drift to correct
+right after. `houserules update --dir .` stays safe and idempotent to
+run any time later; it brings the generated files to whatever binary you
+currently have on `PATH` and drops any kit file that binary has since
+retired. Look at what you got:
 
 ```sh
 houserules topics            # the seeded topics: process, quality, ...
@@ -126,8 +177,7 @@ config core.hooksPath .githooks` to activate the commit-msg trailer gate.
 
 ```sh
 cd my-project
-pnpm add -D git+https://github.com/jblossey/houserules.git#houserules-v0.2.0-alpha
-pnpm exec houserules init --id-prefix ABC
+houserules init --id-prefix ABC
 ```
 
 - `--id-prefix ABC` sets your backlog id prefix (`ABC-001`); default `WI`.
@@ -204,7 +254,7 @@ just asserted.
 ## Updating an installation
 
 ```sh
-pnpm exec houserules update
+houserules update
 ```
 
 `update` overwrites only kit-owned machinery and re-renders; it never
@@ -220,10 +270,10 @@ your stamp had and the version the run just synced to, `kit <old> -> <new>`
 from before the version field prints `kit none -> <new>`. When houserules
 ships a new release, adopt it this way:
 
-1. Bump the `houserules` dependency to the new release and install it
-   (`pnpm install`, or your package manager's equivalent).
-2. Run `pnpm exec houserules update --dir .` (or your package manager's
-   exec equivalent).
+1. Install the new release through whichever [Install](#install) channel
+   you used originally (the shell installer, `mise`, or a fresh direct
+   download over the old binary).
+2. Run `houserules update --dir .`.
 3. Review the diff (`git diff`). The drift line is your check: it confirms
    the version you moved from and the version you landed on.
 
@@ -258,5 +308,7 @@ and `.claude/skills/` are the installed copy. Edit `template/`, then run
 
 MIT — see [LICENSE](LICENSE). The files that `init` and `update` write into
 your project are yours under the same terms; the kit-owned scripts carry an
-SPDX header, so vendored copies keep the notice. Not published to npm or any
-plugin marketplace yet (owner decision pending, `docs/design.md` §5.3).
+SPDX header, so vendored copies keep the notice. Distribution is
+binary-only (GitHub Releases, mise via ubi, a curl-to-sh installer);
+houserules will not publish to npm or any plugin marketplace (ruled
+2026-09-04, docs/design.md §5.22).
