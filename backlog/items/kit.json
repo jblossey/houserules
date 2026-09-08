@@ -1230,6 +1230,22 @@
       "status": "open",
       "batch": null,
       "see": ["HR-071"]
+    },
+    {
+      "id": "HR-073",
+      "type": "fix",
+      "title": "release-please's release-type still needs the package.json HR-047 retired",
+      "body": [
+        "PRE-MERGE: this fires on the next push to main, not at a later release attempt. Batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2) retires package.json along with the rest of the JS toolchain. release-please-config.json's packages['.'].release-type is still \"node\", with no package-name override, and .github/workflows/release-please.yml runs release-please-action@v5.0.0 on every push to main -- not only when cutting a release.",
+        "Derived from the pinned v17.11.2 source (release-please-action@v5.0.0 resolves release-please ^17.6.0), not a config-string reading, per process.wiring-checks-run-the-resolution: BaseStrategy.buildReleasePullRequest calls getBranchComponent() to name the release branch. Unlike its sibling getComponent(), getBranchComponent() is NOT guarded by includeComponentInTag -- it always calls getDefaultComponent(), which falls through to `this.packageName ?? getDefaultPackageName()` since no package-name is configured. The Node strategy's getDefaultPackageName() reads package.json through getPkgJsonContents(); a missing file makes getPkgJsonContents() catch FileNotFoundError and throw MissingRequiredFileError naming package.json, 'node', and this repository.",
+        "HR-068 (the tag-push token gap) does NOT shield this: HR-068 is about release.yml never starting after a tag pushes, which happens strictly later in the pipeline than this failure. Once T3's branch merges, release-please-action throws on that very push, before any PR opens -- not gated behind HR-068/HR-069's step-two release track, and not something a later release attempt discovers first.",
+        "Re-scoped as a pre-merge owner decision (fix round 1, task-3-review.json important finding 4 -- the original wording hedged the impact as 'may fail ... or error outright' and scheduled it behind HR-068/HR-069, which the derived call path above shows is wrong on both counts). The choice among a different release-type (rust: needs the workspace root to carry a [package]; simple: needs a version.txt this repository does not have) or node with an explicit package-name pointing at a file that still exists is a config ruling this checkout cannot close: it needs a real release-please run against the chosen config, not a source reading alone.",
+        "Source: batch 20 T3 (HR-047) implementation, discovered while removing package.json per spec §2; re-derived and re-scoped in fix round 1 (task-3-review.json, important finding 4)."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": ["HR-068", "HR-069"]
     }
   ]
 }

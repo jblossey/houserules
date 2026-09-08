@@ -1,6 +1,6 @@
 //! `checkBase` and the `check-knowledge` command: `tools/kb.mjs`'s
 //! knowledge-base validator, ported byte-for-byte (HR-054 task 4; the
-//! frozen fixture corpus under `tests/corpus/check/` is the parity gate --
+//! reviewed goldens under `tests/goldens/check/` are the parity gate --
 //! see `crates/houserules/tests/check_parity.rs`).
 //!
 //! `checkBase`'s own JSON-Schema-subset validator is

@@ -1,0 +1,7 @@
+{
+  "command": "houserules topics --dir tests/fixtures/mini",
+  "cwd": "tests/fixtures/mini",
+  "stdout": "[\n  {\n    \"topic\": \"mini\",\n    \"entries\": 6,\n    \"title\": \"Mini fixture knowledge\"\n  }\n]\n",
+  "stderr": "",
+  "exit": 0
+}

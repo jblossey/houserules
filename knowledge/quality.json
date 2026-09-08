@@ -51,7 +51,7 @@
       ],
       "tags": ["tests", "sync"],
       "source": { "date": "2026-09-02", "by": "review", "ref": "batch 8 branch review, uncovered finding 1" },
-      "verify": ["tests/dogfood.test.mjs"]
+      "verify": ["crates/houserules/tests/dogfood.rs"]
     },
     {
       "id": "quality.absence-is-designed",

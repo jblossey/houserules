@@ -1,0 +1,7 @@
+{
+  "command": "houserules check-backlog --dir <frozen-worktree>",
+  "cwd": "<frozen-worktree>",
+  "stdout": "backlog: ok\n",
+  "stderr": "",
+  "exit": 0
+}

@@ -2,8 +2,9 @@
 //! task 3): a handle on the compiled binary, this checkout's repository
 //! root, a portable recursive directory copy (no external `cp -r`, so the
 //! Windows leg of the CI matrix behaves the same as Linux and macOS), the
-//! generated-file listing the corpus parity tests compare, and a detached
-//! git worktree at a frozen sha, always removed on drop.
+//! generated-file listing the parity tests compare, the frozen sha those
+//! same tests check out a worktree at, and a detached git worktree at
+//! that sha, always removed on drop.
 //!
 //! `tests/common/mod.rs` (not `tests/common.rs`) is Cargo's convention for
 //! a module shared between integration test binaries without becoming a
@@ -13,6 +14,24 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
+
+/// The frozen sha every parity test's own `FrozenWorktree::checkout` call
+/// resolves against -- through batch 20 T2 this lived at `tests/corpus/
+/// manifest.json`'s `frozen_sha` field, read at test runtime by five
+/// files, each keeping its own small `read_frozen_sha`/`frozen_sha`
+/// wrapper (`tests/common/mod.rs`'s own module doc explains why a helper
+/// only some binaries need stays duplicated rather than shared: this is
+/// the one exception, promoted here once its source file retired).
+/// `tests/corpus/**` retired whole at batch 20 T3 (HR-047, docs/specs/
+/// 2026-09-07-batch-20-phase5.md §2): every captured-output slice moved
+/// to a reviewed golden, but `check_parity.rs` and `render_parity.rs`
+/// still need a stable, historical commit to check out a worktree at
+/// (the point-in-time content their own goldens were captured against),
+/// so the sha itself needed a new, permanent home rather than retiring
+/// with the file that used to carry it. Each of the five readers' own
+/// wrapper now returns this constant instead of re-reading a file that no
+/// longer exists.
+pub const FROZEN_SHA: &str = "a73a8c6b1c511217ceafa0bdaf6df8acdaaa1b71";
 
 /// Serializes `git worktree add`/`remove` across this test binary's
 /// threads. `git worktree` mutates shared metadata under `.git/worktrees/`,

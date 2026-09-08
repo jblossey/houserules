@@ -1,6 +1,6 @@
 {
-  "command": "houserules check-knowledge --dir tests/corpus/fixtures/mini",
-  "cwd": "tests/corpus/fixtures/mini",
+  "command": "houserules check-knowledge --dir tests/fixtures/mini",
+  "cwd": "tests/fixtures/mini",
   "stdout": "knowledge: ok\n",
   "stderr": "",
   "exit": 0

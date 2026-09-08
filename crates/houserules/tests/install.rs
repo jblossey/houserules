@@ -49,16 +49,14 @@ fn scratch_git_repo() -> tempfile::TempDir {
     dir
 }
 
-/// Every `KIT_OWNED` path, `bin/houserules.mjs`'s own array, verified live
-/// against `node bin/houserules.mjs files` at this task's start (frozen
-/// here as the expected shape both engines must agree on).
+/// Every `KIT_OWNED` path -- `install.rs`'s own copy, which this file
+/// cannot import (a bare CLI binary crate, no `pub` library surface):
+/// `tools/kb.mjs`, `tools/backlog.mjs`, `tools/lib/cli.mjs`, and
+/// `tools/lib/json-store.mjs` left this list at batch 20 T3 (HR-047,
+/// docs/specs/2026-09-07-batch-20-phase5.md §2), joining `RETIRED`.
 const KIT_OWNED: &[&str] = &[
-    "tools/kb.mjs",
-    "tools/backlog.mjs",
     "tools/claude-session-start.sh",
     ".githooks/commit-msg",
-    "tools/lib/cli.mjs",
-    "tools/lib/json-store.mjs",
     ".claude/agents/implementer.md",
     ".claude/agents/task-reviewer.md",
     ".claude/agents/branch-reviewer.md",
@@ -92,17 +90,12 @@ const SEED_ONCE: &[&str] = &[
     "CLAUDE.md",
 ];
 
-/// `package.json`'s `version` field at this checkout -- the same value
-/// `bin/houserules.mjs`'s own `VERSION` constant reads at runtime, and the
-/// value `install::kit_version` bakes in at compile time (that function's
-/// own doc has the parity account).
+/// `env!("CARGO_PKG_VERSION")` at THIS test binary's own compile time --
+/// the same value `install::kit_version` bakes in for the binary under
+/// test (that function's own doc has the account: batch 20 T3, HR-047,
+/// retired the earlier package.json-reading form both copies used).
 fn kit_version() -> String {
-    let text = fs::read_to_string(repo_root().join("package.json")).expect("read package.json");
-    let value: serde_json::Value = serde_json::from_str(&text).expect("parse package.json");
-    value["version"]
-        .as_str()
-        .expect("package.json has a string version")
-        .to_string()
+    env!("CARGO_PKG_VERSION").to_string()
 }
 
 #[test]
@@ -252,7 +245,7 @@ fn init_with_no_dir_flag_seeds_the_current_working_directory() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(dir.path().join("tools/kb.mjs").is_file());
+    assert!(dir.path().join(".githooks/commit-msg").is_file());
 }
 
 /// Batch 18 T5 (spec §1): `tools/kb.sh` and `tools/backlog.sh` left
@@ -276,6 +269,34 @@ fn init_no_longer_seeds_the_retired_shell_tools() {
     assert!(!stdout.contains("kb.sh"), "got:\n{stdout}");
     assert!(!dir.path().join("tools/kb.sh").exists());
     assert!(!dir.path().join("tools/backlog.sh").exists());
+}
+
+/// Batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2): the
+/// four JS engines the shell wrappers above used to front left `KIT_OWNED`
+/// too, in the same commit -- a fresh `init` no longer seeds any of them.
+#[test]
+fn init_no_longer_seeds_the_retired_js_engines() {
+    let dir = scratch_git_repo();
+    let output = houserules()
+        .args(["init", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run init");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    for file in [
+        "tools/kb.mjs",
+        "tools/backlog.mjs",
+        "tools/lib/cli.mjs",
+        "tools/lib/json-store.mjs",
+    ] {
+        assert!(!stdout.contains(file), "got:\n{stdout}");
+        assert!(!dir.path().join(file).exists(), "{file} was seeded");
+    }
 }
 
 #[test]
@@ -326,8 +347,8 @@ fn init_marks_shell_scripts_and_the_git_hook_executable() {
     }
     // A KIT_OWNED file the JS writer never chmods stays at the plain,
     // non-executable mode `writeFileSync` produces.
-    let plain_mode = fs::metadata(dir.path().join("tools/kb.mjs"))
-        .expect("stat tools/kb.mjs")
+    let plain_mode = fs::metadata(dir.path().join(".claude/agents/implementer.md"))
+        .expect("stat .claude/agents/implementer.md")
         .permissions()
         .mode();
     assert_eq!(plain_mode & 0o111, 0);

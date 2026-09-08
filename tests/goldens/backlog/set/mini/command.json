@@ -1,0 +1,7 @@
+{
+  "command": "houserules set HR-901 status=done batch=2 --dir tests/fixtures/mini",
+  "cwd": "tests/fixtures/mini",
+  "stdout": "HR-901: status=done batch=2\n",
+  "stderr": "",
+  "exit": 0
+}

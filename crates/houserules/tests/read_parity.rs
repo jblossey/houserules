@@ -1,18 +1,21 @@
-//! The knowledge read-command parity tests (batch 17 T4): the frozen
-//! fixture corpus's `knowledge/` slices (`topics`/`index`/`standing`/`get`),
-//! on both the frozen worktree and the `mini` fixture, byte-compared
-//! verbatim against the compiled binary, plus the CLI's usage-error arms
-//! these five commands add to the flat surface.
+//! The knowledge read-command parity tests (batch 17 T4): five commands
+//! (`topics`/`index`/`standing`/`get`/`for`), on both the frozen worktree
+//! and the `mini` fixture, byte-compared verbatim against the compiled
+//! binary, plus the CLI's usage-error arms these five commands add to the
+//! flat surface.
 //!
 //! `for` (bare and `--full`) moved to reviewed, Rust-generated goldens
 //! under `tests/goldens/read-parity/` at batch 18 T5 fix round 1 (spec §3
 //! boundary clarification, commit 878265b): its `"standing"` field embeds
 //! `STANDING_COMMAND`, which the rewrite flips from `tools/kb.sh standing`
-//! to `houserules standing`, so the frozen JS at `tests/corpus/
-//! manifest.json`'s `frozen_sha` can no longer produce its bytes.
-//! `cargo run --bin gen-goldens` regenerates them; `diff-shape-gate`
-//! (`cargo run --bin diff-shape-gate`) proves the re-baseline changed
-//! only the command string.
+//! to `houserules standing`, so the frozen JS at the (now retired)
+//! `tests/corpus/manifest.json`'s `frozen_sha` could no longer produce
+//! its bytes. The other four commands joined it at batch 20 T3 (HR-047,
+//! docs/specs/2026-09-07-batch-20-phase5.md §2's boundary correction;
+//! design.md §5.42): `tests/corpus/**` retires with the rest of the
+//! vitest layer this same batch. `cargo run --bin gen-goldens` regenerates
+//! every slice here; `diff-shape-gate` (`cargo run --bin diff-shape-gate`)
+//! proves the batch 18 T5 re-baseline changed only the command string.
 
 mod common;
 
@@ -21,31 +24,21 @@ use std::path::Path;
 
 use common::{FrozenWorktree, copy_dir_recursive, houserules, repo_root};
 
-/// One frozen capture: `stdout`, `stderr`, and `exit`, read directly from
-/// its file so a corpus regeneration is the only way a test's expectation
-/// can drift.
+/// One reviewed capture: `stdout`, `stderr`, and `exit`, read directly
+/// from its golden file so a golden regeneration is the only way a
+/// test's expectation can drift.
 struct CorpusRun {
     stdout: String,
     stderr: String,
     exit: i32,
 }
 
-/// Reads one frozen `tests/corpus/knowledge/<relative>` capture.
-fn corpus_run(relative: &str) -> CorpusRun {
-    read_run(&format!("tests/corpus/knowledge/{relative}"))
-}
-
-/// Reads one reviewed `tests/goldens/read-parity/<relative>` capture --
-/// `corpus_run`'s own sibling for the slices batch 18 T5 fix round 1 moved
-/// out of the frozen corpus (this module's own doc has the account).
+/// Reads one reviewed `tests/goldens/read-parity/<relative>` capture.
 fn golden_run(relative: &str) -> CorpusRun {
-    read_run(&format!("tests/goldens/read-parity/{relative}"))
-}
-
-fn read_run(relative_path: &str) -> CorpusRun {
-    let text = fs::read_to_string(repo_root().join(relative_path))
+    let relative_path = format!("tests/goldens/read-parity/{relative}");
+    let text = fs::read_to_string(repo_root().join(&relative_path))
         .unwrap_or_else(|error| panic!("read {relative_path}: {error}"));
-    let value: serde_json::Value = serde_json::from_str(&text).expect("parse frozen/golden slice");
+    let value: serde_json::Value = serde_json::from_str(&text).expect("parse golden slice");
     CorpusRun {
         stdout: value["stdout"].as_str().expect("stdout").to_string(),
         stderr: value["stderr"].as_str().expect("stderr").to_string(),
@@ -53,7 +46,8 @@ fn read_run(relative_path: &str) -> CorpusRun {
     }
 }
 
-fn assert_matches(args: &[&str], dir: &Path, expected: &CorpusRun, slice: &str) {
+fn assert_run_matches(args: &[&str], dir: &Path, slice: &str) {
+    let expected = golden_run(slice);
     let output = houserules()
         .args(args)
         .args(["--dir"])
@@ -77,43 +71,25 @@ fn assert_matches(args: &[&str], dir: &Path, expected: &CorpusRun, slice: &str) 
     );
 }
 
-fn assert_run_matches(args: &[&str], dir: &Path, slice: &str) {
-    assert_matches(args, dir, &corpus_run(slice), slice);
-}
-
-fn assert_run_matches_golden(args: &[&str], dir: &Path, slice: &str) {
-    assert_matches(args, dir, &golden_run(slice), slice);
-}
-
-fn read_frozen_sha() -> String {
-    let text = fs::read_to_string(repo_root().join("tests/corpus/manifest.json"))
-        .expect("read corpus manifest");
-    let manifest: serde_json::Value = serde_json::from_str(&text).expect("parse corpus manifest");
-    manifest["frozen_sha"]
-        .as_str()
-        .expect("manifest.frozen_sha is a string")
-        .to_string()
-}
-
 /// Parity gate, the frozen worktree ("the live tree" as of the corpus
 /// freeze): `topics`, `index` (bare and `--standing`), `standing`, `get
 /// houserules.template-is-the-source`, `for tools/kb.mjs` (bare and
 /// `--full`).
 #[test]
 fn topics_matches_the_frozen_corpus_on_the_worktree() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     assert_run_matches(&["topics"], &worktree.path, "topics.json");
 }
 
 #[test]
 fn index_matches_the_frozen_corpus_on_the_worktree() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     assert_run_matches(&["index"], &worktree.path, "index.json");
 }
 
 #[test]
 fn index_standing_matches_the_frozen_corpus_on_the_worktree() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     assert_run_matches(
         &["index", "--standing"],
         &worktree.path,
@@ -123,13 +99,13 @@ fn index_standing_matches_the_frozen_corpus_on_the_worktree() {
 
 #[test]
 fn standing_matches_the_frozen_corpus_on_the_worktree() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     assert_run_matches(&["standing"], &worktree.path, "standing.json");
 }
 
 #[test]
 fn get_matches_the_frozen_corpus_on_the_worktree() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     assert_run_matches(
         &["get", "houserules.template-is-the-source"],
         &worktree.path,
@@ -139,8 +115,8 @@ fn get_matches_the_frozen_corpus_on_the_worktree() {
 
 #[test]
 fn for_matches_the_frozen_corpus_on_the_worktree() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
-    assert_run_matches_golden(
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
+    assert_run_matches(
         &["for", "tools/kb.mjs"],
         &worktree.path,
         "for-tools-kb-mjs.json",
@@ -149,8 +125,8 @@ fn for_matches_the_frozen_corpus_on_the_worktree() {
 
 #[test]
 fn for_full_matches_the_frozen_corpus_on_the_worktree() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
-    assert_run_matches_golden(
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
+    assert_run_matches(
         &["for", "tools/kb.mjs", "--full"],
         &worktree.path,
         "for-tools-kb-mjs-full.json",
@@ -158,11 +134,11 @@ fn for_full_matches_the_frozen_corpus_on_the_worktree() {
 }
 
 /// Parity gate, the `mini` fixture -- the same commands, over a fresh copy
-/// of the small synthetic knowledge base `tests/corpus/fixtures/mini`
+/// of the small synthetic knowledge base `tests/fixtures/mini`
 /// commits.
 fn mini_copy() -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
-    copy_dir_recursive(&repo_root().join("tests/corpus/fixtures/mini"), dir.path());
+    copy_dir_recursive(&repo_root().join("tests/fixtures/mini"), dir.path());
     dir
 }
 
@@ -201,7 +177,7 @@ fn get_matches_the_frozen_corpus_on_the_mini_fixture() {
 
 #[test]
 fn for_matches_the_frozen_corpus_on_the_mini_fixture() {
-    assert_run_matches_golden(
+    assert_run_matches(
         &["for", "mini-tools/build.sh"],
         mini_copy().path(),
         "mini/for-mini-tools-build-sh.json",
@@ -210,7 +186,7 @@ fn for_matches_the_frozen_corpus_on_the_mini_fixture() {
 
 #[test]
 fn for_full_matches_the_frozen_corpus_on_the_mini_fixture() {
-    assert_run_matches_golden(
+    assert_run_matches(
         &["for", "mini-tools/build.sh", "--full"],
         mini_copy().path(),
         "mini/for-mini-tools-build-sh-full.json",
@@ -257,7 +233,7 @@ fn get_with_no_ids_in_a_repository_with_neither_domain_prints_the_usage_message_
 /// one path')`, exit 2.
 #[test]
 fn for_with_no_paths_prints_the_frozen_usage_message_and_exits_2() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     let output = houserules()
         .args(["for", "--dir"])
         .arg(&worktree.path)
@@ -297,7 +273,7 @@ fn a_missing_knowledge_directory_prints_a_named_error_and_exits_2() {
 #[test]
 fn invalid_json_in_a_knowledge_file_prints_a_named_error_and_exits_2() {
     let dir = tempfile::tempdir().expect("tempdir");
-    copy_dir_recursive(&repo_root().join("tests/corpus/fixtures/mini"), dir.path());
+    copy_dir_recursive(&repo_root().join("tests/fixtures/mini"), dir.path());
     fs::write(dir.path().join("knowledge/mini.json"), "{").expect("corrupt mini.json");
 
     let output = houserules()
@@ -325,7 +301,7 @@ fn invalid_json_in_a_knowledge_file_prints_a_named_error_and_exits_2() {
 /// the binary reports it as an unexpected argument, exit 2.
 #[test]
 fn index_with_an_unknown_flag_exits_2_where_js_ignored_it_and_succeeded() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     let output = houserules()
         .args(["index", "--bogus", "--dir"])
         .arg(&worktree.path)
@@ -343,7 +319,7 @@ fn index_with_an_unknown_flag_exits_2_where_js_ignored_it_and_succeeded() {
 /// the binary reports it as an unexpected argument, exit 2.
 #[test]
 fn topics_with_an_unknown_flag_exits_2_where_js_ignored_it_and_succeeded() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     let output = houserules()
         .args(["topics", "--bogus", "--dir"])
         .arg(&worktree.path)
@@ -361,7 +337,7 @@ fn topics_with_an_unknown_flag_exits_2_where_js_ignored_it_and_succeeded() {
 /// the binary reports it as an unexpected argument, exit 2.
 #[test]
 fn standing_with_an_unknown_flag_exits_2_where_js_ignored_it_and_succeeded() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     let output = houserules()
         .args(["standing", "--bogus", "--dir"])
         .arg(&worktree.path)
@@ -380,7 +356,7 @@ fn standing_with_an_unknown_flag_exits_2_where_js_ignored_it_and_succeeded() {
 /// argument, exit 2.
 #[test]
 fn for_with_an_unknown_flag_exits_2_where_js_ignored_it_and_succeeded() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     let output = houserules()
         .args(["for", "tools/kb.mjs", "--bogus", "--dir"])
         .arg(&worktree.path)
@@ -398,7 +374,7 @@ fn for_with_an_unknown_flag_exits_2_where_js_ignored_it_and_succeeded() {
 /// 0); the binary reports it as an unexpected argument, exit 2.
 #[test]
 fn topics_with_an_unexpected_positional_exits_2_where_js_ignored_it_and_succeeded() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     let output = houserules()
         .args(["topics", "extra", "--dir"])
         .arg(&worktree.path)
@@ -416,7 +392,7 @@ fn topics_with_an_unexpected_positional_exits_2_where_js_ignored_it_and_succeede
 /// 0); the binary reports it as an unexpected argument, exit 2.
 #[test]
 fn standing_with_an_unexpected_positional_exits_2_where_js_ignored_it_and_succeeded() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     let output = houserules()
         .args(["standing", "extra", "--dir"])
         .arg(&worktree.path)
@@ -434,7 +410,7 @@ fn standing_with_an_unexpected_positional_exits_2_where_js_ignored_it_and_succee
 /// the binary reports it as an unexpected argument, exit 2.
 #[test]
 fn index_with_an_unexpected_positional_exits_2_where_js_ignored_it_and_succeeded() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     let output = houserules()
         .args(["index", "extra", "--dir"])
         .arg(&worktree.path)
@@ -453,7 +429,7 @@ fn index_with_an_unexpected_positional_exits_2_where_js_ignored_it_and_succeeded
 /// the binary refuses the duplicate, exit 2.
 #[test]
 fn index_with_a_duplicated_area_flag_exits_2_where_js_let_the_last_value_win() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     let output = houserules()
         .args(["index", "--area", "process", "--area", "global", "--dir"])
         .arg(&worktree.path)
@@ -472,7 +448,7 @@ fn index_with_a_duplicated_area_flag_exits_2_where_js_let_the_last_value_win() {
 /// duplicate, exit 2.
 #[test]
 fn for_with_a_duplicated_full_flag_exits_2_where_js_let_the_repeat_be_a_no_op() {
-    let worktree = FrozenWorktree::checkout(&repo_root(), &read_frozen_sha());
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     let output = houserules()
         .args(["for", "tools/kb.mjs", "--full", "--full", "--dir"])
         .arg(&worktree.path)

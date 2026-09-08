@@ -9,7 +9,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 ## Standing rules
 
-- [houserules.pnpm-only] Use pnpm for every package operation in this repository (`pnpm install`, `pnpm add --save-exact`, `pnpm test`, `pnpm dlx`); never `npm` or `npx`.
+- [houserules.pnpm-only] Use cargo for every package operation in this repository (`cargo add <crate>@=<version>`); pnpm, npm, and npx left the toolchain at batch 20 T3.
 - [houserules.tag-pilot-is-read-only] Treat `~/projects/tag-pilot` as a read-only reference: never modify it, commit there, run its agents, or run `init` or `update` against it.
 - [houserules.template-is-the-source] Edit the kit in `template/`, then run `houserules update --dir .`; never hand-edit the root copies or the generated rules and skill.
 - [process.ask-when-missing] Ask the user when information is missing. Do not assume.

@@ -1,20 +1,17 @@
 [tools]
-node = "24.18.1"
-pnpm = "11.18.0"
 rust = { version = "1.98.1", components = ["clippy", "rustfmt"] }
 shellcheck = "0.11.0"
 
 [tasks.setup]
-description = "One-command dev setup: install, the commit-msg hook, and the houserules binary on PATH"
+description = "One-command dev setup: the commit-msg hook and the houserules binary on PATH"
 run = [
-  "pnpm install",
   "git config core.hooksPath .githooks",
   "cargo install --path crates/houserules --bin houserules",
 ]
 
 [tasks.test]
-description = "Run all tests with coverage"
-run = "pnpm test"
+description = "Run the cargo test suite"
+run = "cargo test"
 
 [tasks.houserules]
 description = "Front the houserules binary (built from crates/houserules); pass its subcommand after --"
