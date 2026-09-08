@@ -211,6 +211,48 @@ fn init_into_a_fresh_repo_writes_every_kit_owned_and_seed_once_file_then_renders
         assert!(dir.path().join(file).is_file(), "{file} was not written");
     }
     assert!(dir.path().join(".claude/settings.json").is_file());
+
+    // Ports tests/init.test.mjs:226's "seeds a start hook for startup,
+    // resume, clear, and fork sessions, and a compact hook" (batch 20 T1
+    // fix round 2, review r2 new_breakage 4): the fresh-seed arm, with no
+    // pre-existing settings.json to merge into, had no cargo assertion on
+    // TEMPLATE_MATCHERS -- only the three merge-scenario tests below did.
+    let settings: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(dir.path().join(".claude/settings.json")).expect("read settings.json"),
+    )
+    .expect("parse settings.json");
+    let matchers: Vec<&str> = settings["hooks"]["SessionStart"]
+        .as_array()
+        .expect("hooks.SessionStart is an array")
+        .iter()
+        .map(|entry| entry["matcher"].as_str().expect("matcher is a string"))
+        .collect();
+    assert_eq!(matchers, TEMPLATE_MATCHERS);
+}
+
+/// Ports `tests/init.test.mjs`'s `describe('init')`, "defaults the target
+/// to the given cwd" (batch 20 T1 fix round 1, HR-047; review finding 4):
+/// with `--dir` omitted entirely, `cmd_init` resolves `dir.as_deref().
+/// unwrap_or_else(|| Path::new("."))` against the PROCESS's own working
+/// directory, not an ancestor -- the arm `crates/houserules/tests/
+/// install.rs`'s other tests never exercise, since every other test here
+/// passes `--dir` explicitly. `Command::current_dir` is this file's own
+/// equivalent of the JS test's `main(['init'], capture(), dir)`, whose
+/// third argument overrides `process.cwd()` the same way.
+#[test]
+fn init_with_no_dir_flag_seeds_the_current_working_directory() {
+    let dir = scratch_git_repo();
+    let output = houserules()
+        .arg("init")
+        .current_dir(dir.path())
+        .output()
+        .expect("run init");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(dir.path().join("tools/kb.mjs").is_file());
 }
 
 /// Batch 18 T5 (spec §1): `tools/kb.sh` and `tools/backlog.sh` left
@@ -386,6 +428,40 @@ fn init_rejects_a_malformed_id_prefix_flag_exit_2() {
         .map(|entry| entry.unwrap().file_name())
         .collect();
     assert_eq!(entries, vec![std::ffi::OsString::from(".git")]);
+}
+
+/// Ports `tests/init.test.mjs`'s `describe('init')`, "reports a render
+/// failure on broken project data as one usage error" (batch 20 T1 fix
+/// round 2, HR-047; review r2 new_breakage 3): a pre-existing `knowledge/
+/// process.json` holding invalid JSON is a `SEED_ONCE` file already
+/// present, so `seed`'s own write loop `kept`s it unmodified and
+/// `render_and_report` (`install.rs`, the `seed` arm's own call site) is
+/// the first and only step that ever reads its content -- proved by
+/// mutation (round-2 review): neutering only this call site's `?` (`let _
+/// = crate::rules::render_and_report(target);`) leaves the rest of this
+/// suite green and turns this one test's exit-2 assertion into a silent
+/// exit 0. No earlier `install.rs` test reaches this arm: every other
+/// error-path test here fails before any file write, at the target's
+/// `.git` check, the id-prefix flag, or a pre-existing `.houserules.json`
+/// -- none of them plants broken data under `knowledge/` first.
+#[test]
+fn init_reports_a_render_failure_on_broken_project_data_as_one_usage_error() {
+    let dir = scratch_git_repo();
+    fs::create_dir_all(dir.path().join("knowledge")).expect("mkdir knowledge");
+    fs::write(dir.path().join("knowledge/process.json"), "{").expect("write broken process.json");
+    let output = houserules()
+        .args(["init", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run init");
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    let broken_path = dir.path().join("knowledge/process.json");
+    assert!(
+        stderr.starts_with(&format!("{}: invalid JSON (", broken_path.display())),
+        "got {stderr:?}"
+    );
+    assert_eq!(stderr.trim().split('\n').count(), 1, "got {stderr:?}");
 }
 
 #[test]

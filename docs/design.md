@@ -602,3 +602,15 @@ Each item records the ruling with its date, or stays marked open.
     shared evals rerun, and the §5.24+§5.31 closing sweep with
     the permanent residue gate. Source: owner, 2026-09-07,
     batch 20 gate.
+42. **The corpus boundary correction — ruled 2026-09-07.** The
+    batch-20 spec's replacement claim was wrong: the goldens
+    cover check/render/read-for only. The remaining corpus
+    slices leave the frozen contract per the batch-18 §3
+    criterion — re-baselined as reviewed Rust-generated goldens
+    via gen-goldens as T3's first act, the parity suites
+    flipping to golden-reading in the same commit as the corpus
+    deletion; a reading test never outlives, nor precedes the
+    replacement of, the artifact it reads. Found by the T1 r2
+    review's deletion-derivation (22 cargo tests broke under
+    the trial deletion). Source: controller under the approved
+    spec's own criterion, 2026-09-07.
