@@ -6,7 +6,10 @@
 //! to `check-report-claims.mjs`, and no interim label like `tools/
 //! make-corpus.mjs`'s is available for a script this batch adds from
 //! scratch. Dev-only: not shipped in `template/` or the payload, the same
-//! status `check-report-claims.rs` and `gen-goldens.rs` have.
+//! status `gen-goldens.rs` has (batch 20 T2, HR-066: `check-report-
+//! claims.rs` left this list when it moved behind the flat surface as a
+//! shipped subcommand -- `crate::report_claims`'s own module doc has the
+//! full account).
 //!
 //! Diffs the OLD frozen-corpus slices, read from git history at `OLD_REF`
 //! (the corpus's own `tests/corpus/render/`, `tests/corpus/check/`, and

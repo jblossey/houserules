@@ -1147,7 +1147,7 @@
         "Durable fix: ship the check as a `houserules` subcommand (or make the shipped clause name the project's report-claims checker abstractly) and re-point template/.claude/agents/implementer.md's step 4 at the binary form; the template edit pays the evals rerun that batch owes anyway. Rides Tier-2 phase 4/5 with HR-048's delivery work."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 20
     },
     {
@@ -1215,8 +1215,21 @@
         "The fix is a bounded lint with NO execution: flag command fields carrying angle-bracket placeholders, prose appended after the command, or a failed shlex-style parse. A few dozen lines in crates/houserules/src/bin/check-report-claims.rs; the checker stays a floor and the manual sweep stays the net for semantics. An honest Limits bullet states what the lint cannot see (a retyped command that still parses)."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 20
+    },
+    {
+      "id": "HR-072",
+      "type": "feat",
+      "title": "Narrow check-report-claims' paste-run lint: quote-aware placeholder, $(...)-aware tokenizer",
+      "body": [
+        "Batch 20 T2 fix round 1 review, important findings 3-4: the paste-run lint (HR-071) ships with two measured false-positive vehicles, both disclosed as Limits bullets in crates/houserules/src/report_claims.rs rather than narrowed. (1) The appended-annotation check's subshell exemption only covers a `(...)` wrapping the WHOLE command; a chained `cmd1 && (cmd2)` reads as an appended annotation instead — .superpowers/sdd/2026-09-04-batch-17/task-2-report.json live_run[8] is a real instance the shipped checker flags. (2) The placeholder check ignores quote_mask's state entirely, so a quoted angle-bracket literal that is command DATA (an HTML-comment probe, or a `Co-Authored-By: ... <email>` trailer this repository's own standing no-coauthor rule guarantees will keep generating) misreads as a placeholder — the lint's most frequent false positive at filing time: 5 instances across 4 workspace reports.",
+        "The narrowing: (a) a quote-aware placeholder arm in find_placeholder, skipping any span quote_mask already marks as inside a quoted string; (b) a $(...)-aware tokenizer arm in quote_mask, tracking that a same-character quote re-opened inside a `$(...)`/`` `...` `` command substitution starts a fresh, independent quoted region rather than closing the one around the whole substitution (the vehicle report_claims.rs's own Limits section discloses from batch 20 T2's first pass, 2 instances in that same review's own corpus sweep). Deferred per process.no-tech-debt: both are bounded, well-scoped engineering — quote_mask already carries the byte-level state the placeholder check would need to consult, and the $(...) arm needs a small quote-context stack, not a rewrite — not a correctness blocker for HR-071's shipped form, which already discloses both gaps with their measured instances rather than shipping them silently."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": ["HR-071"]
     }
   ]
 }

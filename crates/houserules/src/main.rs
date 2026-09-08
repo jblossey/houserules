@@ -40,13 +40,20 @@
 //! (`install::cmd_update`): the `KIT_OWNED` sync, the version-drift line,
 //! and the new deletion capability for kit files the payload has retired
 //! (`install.rs`'s own "update"/"Deletion" doc sections have the full
-//! account).
+//! account). Batch 20 T2 (HR-066, HR-071, docs/specs/2026-09-07-batch-20-
+//! phase5.md §§3-4) adds `check-report-claims`
+//! (`report_claims::cmd_check_report_claims`): the deliverable-claims
+//! checker, moved here from a dev-only `src/bin/` target so the seeded
+//! implementer template's closing act runs in every adopter repo, not
+//! only this one (`report_claims.rs`'s own module doc has the full
+//! account, including the paste-run lint HR-071 adds in the same move).
 
 mod backlog;
 mod emit;
 mod get;
 mod install;
 mod node_path;
+mod report_claims;
 mod root;
 mod rules;
 #[cfg(test)]
@@ -110,7 +117,9 @@ struct Cli {
 /// surface (§3). `check-commit` (batch 18 T2, HR-062, spec §6) is the first
 /// command with no frozen-JS predecessor at all; `init` and `files`
 /// (batch 18 T3) and `update` (batch 18 T4) round out spec §1's install
-/// surface. `get`'s own dispatch (below) is `crate::get::cmd_get`, not a
+/// surface. `check-report-claims` (batch 20 T2, HR-066/HR-071) is the
+/// second: moved from a dev-only `src/bin/` target, not ported from any
+/// frozen JS. `get`'s own dispatch (below) is `crate::get::cmd_get`, not a
 /// `backlog`/`rules` function directly -- see that module's doc for why.
 #[derive(Subcommand)]
 enum Command {
@@ -340,6 +349,22 @@ enum Command {
         #[arg(long)]
         id_prefix: Option<String>,
     },
+    /// Cross-checks one deliverable report's claims against the artifacts
+    /// and git history it cites: redirected captures, truncation markers,
+    /// listed commit shas, self-audit narrative, and the bounded
+    /// no-execution paste-run lint over every captured command field.
+    CheckReportClaims {
+        /// The report file to check.
+        report_path: PathBuf,
+        /// Repository root the report's cited artifacts and commit shas
+        /// resolve against; defaults to the enclosing git repository's
+        /// top level, resolved from the current directory. Independent of
+        /// `report_path`, which always resolves against the real current
+        /// directory (`report_claims.rs`'s own module doc has the full
+        /// account).
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -414,5 +439,8 @@ fn main() -> ExitCode {
         Some(Command::Init { dir, id_prefix }) => install::cmd_init(dir, id_prefix),
         Some(Command::Files) => install::cmd_files(),
         Some(Command::Update { dir, id_prefix }) => install::cmd_update(dir, id_prefix),
+        Some(Command::CheckReportClaims { report_path, dir }) => {
+            report_claims::cmd_check_report_claims(dir, report_path)
+        }
     }
 }

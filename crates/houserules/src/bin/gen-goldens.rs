@@ -2,8 +2,10 @@
 //! CURRENT, compiled `houserules` binary -- batch 18 T5 (HR-047,
 //! docs/specs/2026-09-05-batch-18-phase3.md §3). Dev tooling: not part of
 //! the flat command surface `crate::main` dispatches, not shipped in
-//! `template/` or the payload (the same status `check-report-claims.rs`
-//! and `tools/make-corpus.mjs` have).
+//! `template/` or the payload (the same status `tools/make-corpus.mjs`
+//! has; batch 20 T2, HR-066: `check-report-claims.rs` left this list when
+//! it moved behind the flat surface as a shipped subcommand --
+//! `crate::report_claims`'s own module doc has the full account).
 //!
 //! # Why these slices left the frozen corpus
 //!

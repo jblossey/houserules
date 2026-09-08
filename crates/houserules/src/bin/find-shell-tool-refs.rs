@@ -7,7 +7,10 @@
 //! same as it did to `check-report-claims.mjs`, and no interim label like
 //! `tools/make-corpus.mjs`'s is available for a script this batch adds
 //! from scratch. Dev-only: not shipped in `template/` or the payload, the
-//! same status `check-report-claims.rs` and `gen-goldens.rs` have.
+//! same status `gen-goldens.rs` has (batch 20 T2, HR-066: `check-report-
+//! claims.rs` left this list when it moved behind the flat surface as a
+//! shipped subcommand -- `crate::report_claims`'s own module doc has the
+//! full account).
 //!
 //! Bounds the reference rewrite's closure claim
 //! (process.closure-claims-carry-enumeration): the pre-rewrite run is the
