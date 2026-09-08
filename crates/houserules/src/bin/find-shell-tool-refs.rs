@@ -41,9 +41,12 @@
 //! Named here, not hidden in a blanket file skip -- the "zero remaining"
 //! claim means "zero UNEXPECTED", not "the search saw nothing":
 //!   - `template/tools/kb.mjs` (whole file): the frozen-but-shipped JS
-//!     engine, still live-invoked by this repository's own dev tests and
-//!     by `tools/make-corpus.mjs`'s frozen-worktree regeneration; stays
-//!     shipped-but-inert through phase 4, retires at phase 5.
+//!     engine this exception named through phase 4, while it stayed
+//!     shipped-but-inert, live-invoked only by this repository's own dev
+//!     tests and by `tools/make-corpus.mjs`'s frozen-worktree
+//!     regeneration. Retired at phase 5 (batch 20 T3, HR-047) along with
+//!     every caller named above; the exception matches nothing now that
+//!     the file is gone, kept as the record of why it once did.
 //!   - `crates/houserules/src/rules/read.rs` (whole file): its one
 //!     remaining hit narrates a batch 17 fix's measured JS behaviour, not
 //!     an adopter-facing instruction. STANDING_COMMAND itself no longer
@@ -74,8 +77,12 @@ const PATTERNS: [&str; 2] = ["kb.sh", "backlog.sh"];
 /// for -- named exactly, not matched by substring (fix round 2, review
 /// new_breakage: a bare `contains("retired")` also opened a window over
 /// the production `delete_retired` and its three `delete_retired_*` unit
-/// tests, none of which this file's own doc names).
-const RETIRED_TEST_FN: &str = "retired_holds_the_shell_tools_moved_at_t5";
+/// tests, none of which this file's own doc names). Batch 20 T3 (HR-047)
+/// renamed the test from `retired_holds_the_shell_tools_moved_at_t5`
+/// once it grew to pin the four JS engines alongside the two shell
+/// wrappers; this constant renames with it, or its own window silently
+/// stops opening.
+const RETIRED_TEST_FN: &str = "retired_holds_the_shell_tools_and_the_js_engines_they_fronted";
 
 /// The Rust source files holding literals the CLI prints or embeds in
 /// generated output -- this module's own doc has the full account of why
@@ -170,11 +177,38 @@ fn install_rs_exempt_lines(text: &str) -> HashSet<usize> {
     let mut exempt = HashSet::new();
 
     if let Some(decl_index) = lines.iter().position(|line| line.contains("const RETIRED")) {
-        exempt.insert(decl_index + 1);
         let mut above = decl_index;
         while above > 0 && lines[above - 1].trim_start().starts_with("///") {
             exempt.insert(above); // 1-based line number for 0-based index above-1
             above -= 1;
+        }
+        // Batch 20 T3 reflowed `RETIRED` from a single line to one path per
+        // line (HR-047): tracking `[`/`]` depth from the declaration's own
+        // line, the same technique `RETIRED_TEST_FN`'s body window uses
+        // below, keeps every element line -- and the array's own closing
+        // `];` -- exempt regardless of how many lines the literal spans.
+        let mut depth = 0i32;
+        let mut opened = false;
+        let mut cursor = decl_index;
+        loop {
+            for ch in lines[cursor].chars() {
+                match ch {
+                    '[' => {
+                        depth += 1;
+                        opened = true;
+                    }
+                    ']' => depth -= 1,
+                    _ => {}
+                }
+            }
+            exempt.insert(cursor + 1);
+            if opened && depth <= 0 {
+                break;
+            }
+            cursor += 1;
+            if cursor >= lines.len() {
+                break;
+            }
         }
     }
 
@@ -235,10 +269,12 @@ fn exceptions() -> Vec<Exception> {
     vec![
         Exception {
             label: "template/tools/kb.mjs",
-            reason: "the frozen-but-shipped JS engine, still live-invoked by this repo's own dev \
-                tests (tests/kb.test.mjs, tests/backlog.test.mjs, tests/entry.test.mjs) and by \
-                tools/make-corpus.mjs's frozen-worktree regeneration; stays shipped-but-inert \
-                through phase 4 (spec §4), retires at phase 5.",
+            reason: "the frozen-but-shipped JS engine this exception named through phase 4, \
+                while it stayed shipped-but-inert (spec §4), live-invoked only by this repo's own \
+                dev tests (tests/kb.test.mjs, tests/backlog.test.mjs, tests/entry.test.mjs) and by \
+                tools/make-corpus.mjs's frozen-worktree regeneration. Retired at phase 5 (batch 20 \
+                T3, HR-047) along with every caller named above; matches nothing now that the file \
+                is gone, kept as the record of why it once did.",
             matches: |hit, _file_text| hit.file == "template/tools/kb.mjs",
         },
         Exception {
@@ -348,7 +384,16 @@ mod tests {
     const FIXTURE: &str = "\
 /// The two paths `update` deletes from an existing install, in call
 /// order (`delete_retired`'s own doc explains why the order matters).
-const RETIRED: &[&str] = &[\"tools/kb.sh\", \"tools/backlog.sh\"];
+/// Batch 20 T3 widened this to six paths, one per line, across the JS
+/// retirement (HR-047) -- the multi-line shape this fixture now matches.
+const RETIRED: &[&str] = &[
+    \"tools/kb.sh\",
+    \"tools/backlog.sh\",
+    \"tools/kb.mjs\",
+    \"tools/backlog.mjs\",
+    \"tools/lib/cli.mjs\",
+    \"tools/lib/json-store.mjs\",
+];
 
 /// Deletes every path in `retired` that exists under `target`, in call
 /// order, and returns the ones actually removed.
@@ -368,8 +413,8 @@ fn delete_retired(target: &Path, retired: &[&str]) -> Result<Vec<String>, String
 mod tests {
     /// Pins `RETIRED`'s own contents and call order.
     #[test]
-    fn retired_holds_the_shell_tools_moved_at_t5() {
-        assert_eq!(RETIRED, [\"tools/kb.sh\", \"tools/backlog.sh\"]);
+    fn retired_holds_the_shell_tools_and_the_js_engines_they_fronted() {
+        assert_eq!(RETIRED, [\"tools/kb.sh\", \"tools/backlog.sh\", \"tools/kb.mjs\", \"tools/backlog.mjs\", \"tools/lib/cli.mjs\", \"tools/lib/json-store.mjs\"]);
     }
 }
 ";
@@ -419,12 +464,36 @@ mod tests {
             "RETIRED's own declaration must stay exempt"
         );
 
-        let first_line = line_of(FIXTURE, "fn retired_holds_the_shell_tools_moved_at_t5(");
+        let first_line = line_of(
+            FIXTURE,
+            "fn retired_holds_the_shell_tools_and_the_js_engines_they_fronted(",
+        );
         let last_line = line_of(FIXTURE, "assert_eq!(RETIRED,") + 1; // the test's closing brace
         for line in first_line..=last_line {
             assert!(
                 exempt.contains(&line),
                 "line {line} of the named test must stay exempt, got: {exempt:?}"
+            );
+        }
+    }
+
+    /// Batch 20 T3 reflowed `RETIRED` from a single line to six, one path
+    /// per line (HR-047) -- the shape `FIXTURE`'s own `RETIRED` above now
+    /// matches. Every element line and the closing `];` are still
+    /// `RETIRED`'s own array literal, the same FILE-PATH content the
+    /// single-line declaration's exemption already covered before T3,
+    /// only reflowed across more lines: none of them is a command
+    /// instruction a rewrite could flip.
+    #[test]
+    fn retired_array_continuation_lines_stay_exempt() {
+        let exempt = install_rs_exempt_lines(FIXTURE);
+
+        let open_line = line_of(FIXTURE, "const RETIRED");
+        let close_line = line_of(FIXTURE, "tools/lib/json-store.mjs") + 1; // the array's own "];"
+        for line in open_line..=close_line {
+            assert!(
+                exempt.contains(&line),
+                "line {line} of RETIRED's own multi-line array must stay exempt, got: {exempt:?}"
             );
         }
     }

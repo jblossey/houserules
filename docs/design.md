@@ -614,3 +614,77 @@ Each item records the ruling with its date, or stays marked open.
     review's deletion-derivation (22 cargo tests broke under
     the trial deletion). Source: controller under the approved
     spec's own criterion, 2026-09-07.
+43. **HR-073 — release-please goes rust — ruled 2026-09-08.**
+    The config's `release-type: node` reads the package.json
+    Tier 2 retired and throws MissingRequiredFileError on the
+    first push to main after batch 20 merges (v17.11.2 source,
+    getBranchComponent → getPkgJsonContents). Ruled: switch to
+    `release-type: rust` at crates/houserules on the batch-20
+    branch before the merge — plain v-tags kept, extra-files
+    re-derived — validated locally as far as possible (config
+    schema, the pinned action's source, dist plan); the live
+    proof stays the owner-attended first release (HR-068 step
+    two). Source: owner, 2026-09-08, batch 20 report.
+44. **Batch 20's T3 standing amendments adopted — ruled
+    2026-09-08.** Both standing-entry changes the retirement
+    forced are adopted as applied in-tree:
+    `houserules.pnpm-only` re-grounds on cargo (`cargo add
+    <crate>@=<version>`) with the prior pnpm ruling recorded as
+    history, and `houserules.template-is-the-source` moves its
+    byte-pin's named home to crates/houserules/tests/dogfood.rs
+    with the frozen bin/houserules.mjs stated retired; ids
+    permanent, policies unchanged. Source: owner, 2026-09-08,
+    batch 20 report.
+45. **The cli area's home — ruled 2026-09-08.** The cli
+    knowledge area points at `crates/houserules/src/**` (was
+    `bin/**`, dead after the JS entrypoint retired);
+    quality.absence-is-designed and houserules.live-run-recipe
+    load there. HR-074 files the dead-glob gate that catches
+    this class. Source: owner, 2026-09-08, batch 20 report.
+46. **quality.well-maintained-libraries's sweep bullet — ruled
+    2026-09-08.** Body[2] restated past tense per the T4
+    review's draft: the mandatory whole-codebase sweep ran at
+    batch 20 T4 (§5.24), named one candidate, adopted none
+    under spec §8; completed with the §5.47 outcome. Source:
+    owner, 2026-09-08, batch 20 report.
+47. **walkdir adopted — ruled 2026-09-08.** The owner weighed
+    maturity (BurntSushi, 607M downloads, finished scope) over
+    the include_dir staleness precedent: walkdir enters
+    exact-pinned in a future batch and replaces the duplicated
+    dev-bin walkers. HR-079 carries the work. Source: owner,
+    2026-09-08, batch 20 report.
+48. **security-hygiene.exact-pins's examples — ruled
+    2026-09-08.** The root copy's summary reorders its CLI
+    examples cargo-first (`cargo add <crate>@=<version>`,
+    `pnpm add --save-exact`); the template copy stays
+    ecosystem-agnostic as shipped. Found by the T4 sweep,
+    applied under this ruling. Source: owner, 2026-09-08,
+    batch 20 report.
+49. **claims-match gains the commit-message bullet — ruled
+    2026-09-08.** A commit message body is a claim like a
+    report sentence: counts recomputed from the artifact before
+    committing; a post-commit error is recorded in the report
+    for aggregation to carry, never amended, never silent.
+    Both knowledge copies. Source: owner, 2026-09-08, batch 20
+    report.
+50. **closure-claims gains the executable-enumeration bullet —
+    ruled 2026-09-08.** The enumeration artifact is executable:
+    a script whose own run prints the counts the claim cites,
+    not a static dump or a hand-asserted mapping. Both
+    knowledge copies. Source: owner, 2026-09-08, batch 20
+    report.
+51. **The escape hatch's upstream destination — ruled
+    2026-09-08.** The seeded closing-act false-positive branch
+    names where upstream is: an issue at
+    github.com/jblossey/houserules. Template edit; rides the
+    next template-touching batch with HR-078 (HR-080 carries
+    it). Source: owner, 2026-09-08, batch 20 report.
+52. **Source-comment citations — ruled 2026-09-08.** A
+    long-lived source comment states the rerunnable command and
+    its measured counts inline, self-contained; a
+    batch-workspace path may ride as provenance, never as the
+    only evidence — a clone carries no workspace. Bullet on
+    process.evidence-outlives-the-session, both copies; the
+    shipped Limits bullets already satisfy it (commands and
+    counts inline), so no code edit is owed. Source: owner,
+    2026-09-08, batch 20 report.

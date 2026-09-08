@@ -10,8 +10,14 @@
       "standing": true,
       "summary": "Ask the user when information is missing. Do not assume.",
       "body": [],
-      "tags": ["users"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "users"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     },
     {
       "id": "process.backlog-drives-work",
@@ -22,9 +28,17 @@
       "body": [
         "The backlog lives in `backlog/` (JSON). Read it with `houserules list --open`, `get <id>`, `batch <n>`; tick items with `set <id> status=done batch=<n>`."
       ],
-      "tags": ["backlog"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
-      "verify": ["backlog/schema.json"]
+      "tags": [
+        "backlog"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
+      "verify": [
+        "backlog/schema.json"
+      ]
     },
     {
       "id": "process.brief-carries-the-spec",
@@ -56,8 +70,15 @@
         "Use the superpowers brainstorming and spec skills when the plugin is installed; otherwise write the spec by hand. Specs live in `docs/specs/`.",
         "The order is strict: spec, then plan. A plan written before its approved spec is nil - deleted and the planning phase redone from the spec, never re-anchored."
       ],
-      "tags": ["batch", "design"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "batch",
+        "design"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     },
     {
       "id": "process.conventional-commits",
@@ -68,8 +89,14 @@
       "body": [
         "Start the subject in lowercase; a subject that starts with an uppercase token fails common commitlint configurations."
       ],
-      "tags": ["git"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
+      "tags": [
+        "git"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
       "check": {
         "type": "commits",
         "level": "fail",
@@ -87,9 +114,17 @@
         "Aggregate with `git reset --soft $(git merge-base main HEAD)` and recommit in one to five Conventional Commits when interactive rebase is not available.",
         "The project skill `finishing-a-feature` is the procedure."
       ],
-      "tags": ["git"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
-      "verify": [".claude/skills/finishing-a-feature/SKILL.md"]
+      "tags": [
+        "git"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
+      "verify": [
+        ".claude/skills/finishing-a-feature/SKILL.md"
+      ]
     },
     {
       "id": "process.knowledge-first",
@@ -98,9 +133,20 @@
       "standing": true,
       "summary": "Before you change a file, read its knowledge: the ids in your task and `houserules for <path>`. Cite the ids you relied on in your report.",
       "body": [],
-      "tags": ["knowledge"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
-      "check": { "type": "report-field", "level": "warn", "if": "**", "field": "knowledge_used" }
+      "tags": [
+        "knowledge"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
+      "check": {
+        "type": "report-field",
+        "level": "warn",
+        "if": "**",
+        "field": "knowledge_used"
+      }
     },
     {
       "id": "process.rulings-to-file",
@@ -115,8 +161,15 @@
         "An accepted implementer deviation is a ruling. Home it (a spec amendment or a backlog item) in the turn it is accepted, before the next dispatch.",
         "A code comment is not a home file: a sanctioned deviation homes in the spec's deviations section or the design record the turn it is accepted; the comment may cite that home, never substitute for it (batch 16 task 4)."
       ],
-      "tags": ["rulings", "compaction"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "rulings",
+        "compaction"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     },
     {
       "id": "process.sequential-agents",
@@ -127,8 +180,14 @@
       "body": [
         "Parallel dispatches conflict in the working tree and hide which run produced a change."
       ],
-      "tags": ["dispatch"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "dispatch"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     },
     {
       "id": "process.tdd",
@@ -146,8 +205,14 @@
         "The `mode` label follows when the shown run happened, not the failure's flavor: `natural` only when the shown RED ran pre-commit; a post-hoc recapture is `reconstructed` and the tdd entry says so; a disclosed-mutation proof is `mutation`.",
         "Two label failures are ruled (batch 18): a mutation proof's RED shows the test FAILING under the mutation — a capture showing the tests passing proves nothing; and a post-commit recapture is `reconstructed` regardless of what also ran earlier — the label follows the shown run, and one report uses one label for one procedure."
       ],
-      "tags": ["testing"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "testing"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     },
     {
       "id": "process.model-policy",
@@ -160,8 +225,15 @@
         "Scoped re-reviews follow the same bar as first reviews: the fix diff's size never lowers the reviewer's tier.",
         "Name the model on every dispatch; an omitted model inherits the session's most expensive one."
       ],
-      "tags": ["dispatch", "models"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "dispatch",
+        "models"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     },
     {
       "id": "process.no-tech-debt",
@@ -174,17 +246,40 @@
         "The only way to defer: a backlog item that states the reason and the follow-up; the finding names the item. A ledger line or a chat note is not a deferral.",
         "No `TODO`, `FIXME`, or `HACK` marker in source files; the deterministic check fails the audit on a new one. Todos live in `backlog/`."
       ],
-      "tags": ["review", "debt"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
-      "see": ["quality.principles"],
+      "tags": [
+        "review",
+        "debt"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
+      "see": [
+        "quality.principles"
+      ],
       "check": {
         "type": "grep-absent",
         "level": "fail",
         "scope": "changed",
         "files": [
-          "**/*.ts", "**/*.tsx", "**/*.mts", "**/*.mjs", "**/*.js", "**/*.jsx",
-          "**/*.rs", "**/*.py", "**/*.go", "**/*.rb", "**/*.java", "**/*.kt",
-          "**/*.swift", "**/*.sh", "**/*.toml", "**/*.yml", "**/*.yaml"
+          "**/*.ts",
+          "**/*.tsx",
+          "**/*.mts",
+          "**/*.mjs",
+          "**/*.js",
+          "**/*.jsx",
+          "**/*.rs",
+          "**/*.py",
+          "**/*.go",
+          "**/*.rb",
+          "**/*.java",
+          "**/*.kt",
+          "**/*.swift",
+          "**/*.sh",
+          "**/*.toml",
+          "**/*.yml",
+          "**/*.yaml"
         ],
         "pattern": "\\b(TODO|FIXME|HACK)\\b"
       }
@@ -203,9 +298,21 @@
         "The scan's output is part of the plan: a Code health section naming the findings, what the plan fixes, and what goes to the backlog and why. A clean scan states what was checked.",
         "This rule never justifies over-engineering: no abstraction for one caller, no configurability without a second use, no rewrite of working code the batch does not touch. Speculative generality is itself a smell."
       ],
-      "tags": ["planning", "refactoring", "code-health"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
-      "see": ["quality.principles", "process.no-tech-debt", "process.brainstorm-first"]
+      "tags": [
+        "planning",
+        "refactoring",
+        "code-health"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
+      "see": [
+        "quality.principles",
+        "process.no-tech-debt",
+        "process.brainstorm-first"
+      ]
     },
     {
       "id": "process.deliverables-json",
@@ -219,11 +326,27 @@
         "The implementer's `self_audit` starts as `null` and holds the audit's `summary` and deterministic rows after the audit; the check below fails until it does. `self_audit` always covers the whole task (`BASE..HEAD` at report time); a fix round's audit over the fix diff goes into that `fix_rounds` entry's `tests`.",
         "`houserules stats` and the branch retrospective read these files; prose is invisible to them."
       ],
-      "tags": ["reports", "deliverables"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
-      "see": ["process.knowledge-first"],
-      "verify": [".claude/schemas/deliverables.json"],
-      "check": { "type": "report-field", "level": "fail", "if": "**", "field": "self_audit" }
+      "tags": [
+        "reports",
+        "deliverables"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
+      "see": [
+        "process.knowledge-first"
+      ],
+      "verify": [
+        ".claude/schemas/deliverables.json"
+      ],
+      "check": {
+        "type": "report-field",
+        "level": "fail",
+        "if": "**",
+        "field": "self_audit"
+      }
     },
     {
       "id": "process.evals-rerun",
@@ -235,12 +358,27 @@
         "Run every scenario in a detached scratch worktree at the branch head before the branch review; the orchestrating skill holds the procedure. Keep nothing from a worktree; workspace artifacts carry the `eval-` prefix.",
         "A run set in the record names `date`, `templates` (the git blob id of each template under test from `git rev-parse HEAD:<path>`; blob ids survive commit aggregation, commit SHAs do not), and one row per scenario: `scenario`, `agent`, `model`, `pass`, `of`, `notes`. The branch reviewer compares the latest blob ids with `HEAD`.",
         "No scenario covers `branch-reviewer` or the orchestrating skill; a change there needs no run. The `houserules render` command's own retrieval-protocol text shapes the generated skill the implementer loads; run the scenarios after a change there too — the check cannot see it.",
-        "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns; the branch does not merge before the record commit lands, and the branch-range audit is the row that must pass (batches 7-11, 14)."
+        "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns; the branch does not merge before the record commit lands, and the branch-range audit is the row that must pass (batches 7-11, 14).",
+        "A template-touching batch may book ONE shared rerun at the final template state instead of a rerun per task (the ledgered economy); each interim task audit's deterministic fail is then recorded plan-mandated, citing the spec section that books the rerun, and the branch-range audit after the record commit is the row that must pass."
       ],
-      "tags": ["evals", "templates", "agents"],
-      "source": { "date": "2026-08-31", "by": "user", "ref": "tag-pilot fc3241b" },
-      "see": ["process.deliverables-json", "process.keep-knowledge-current"],
-      "verify": [".claude/evals/record.json", ".claude/skills/orchestrating/SKILL.md"],
+      "tags": [
+        "evals",
+        "templates",
+        "agents"
+      ],
+      "source": {
+        "date": "2026-08-31",
+        "by": "user",
+        "ref": "tag-pilot fc3241b"
+      },
+      "see": [
+        "process.deliverables-json",
+        "process.keep-knowledge-current"
+      ],
+      "verify": [
+        ".claude/evals/record.json",
+        ".claude/skills/orchestrating/SKILL.md"
+      ],
       "check": {
         "type": "co-change",
         "level": "fail",
@@ -261,8 +399,15 @@
       "body": [
         "CI and deploy runs cost money and time; a live run catches what unit tests cannot. Record the project's live-run recipe as a `procedure` entry."
       ],
-      "tags": ["live-run", "ci"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "live-run",
+        "ci"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     },
     {
       "id": "process.keep-knowledge-current",
@@ -272,10 +417,20 @@
       "body": [
         "Write the entry in the same turn you learn the fact. Then run `houserules render` and commit the generated files with it."
       ],
-      "tags": ["knowledge"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
-      "verify": ["knowledge/schema.json"],
-      "see": ["process.rulings-to-file"]
+      "tags": [
+        "knowledge"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
+      "verify": [
+        "knowledge/schema.json"
+      ],
+      "see": [
+        "process.rulings-to-file"
+      ]
     },
     {
       "id": "process.skills-for-procedures",
@@ -283,8 +438,14 @@
       "area": "process",
       "summary": "Create a project skill (`.claude/skills/`) for a repeatable procedure. Author it with the writing-skills skill when available.",
       "body": [],
-      "tags": ["skills"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "skills"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     },
     {
       "id": "process.contract-refresh-sweep",
@@ -297,8 +458,16 @@
         "Controller verification replaces a further review round only for reviewer-prescribed mechanical edits whose expected outcome the reviewer pre-verified; it is scripted (byte-equal audit rows, field presence), gated with && chains, and logged in the ledger. Judged findings always get a real review round.",
         "The branch review reads the full workspace regardless, so the sweep is auditable end to end."
       ],
-      "tags": ["process", "reviews", "contract"],
-      "source": { "date": "2026-09-02", "by": "review", "ref": "batch 7 branch review, retrospective" }
+      "tags": [
+        "process",
+        "reviews",
+        "contract"
+      ],
+      "source": {
+        "date": "2026-09-02",
+        "by": "review",
+        "ref": "batch 7 branch review, retrospective"
+      }
     },
     {
       "id": "process.eval-fixture-procedure",
@@ -311,8 +480,15 @@
         "Keep the undoctored audit output outside the workspace the reviewer reads (batch 7: the session scratchpad), so the judge can score expected_behavior against ground truth.",
         "The reviewer dispatch carries the identical Knowledge:/Backlog:/--ids block as a real task review; artifacts carry the eval- prefix in the batch workspace and the record append names both template blob ids."
       ],
-      "tags": ["evals", "fixtures"],
-      "source": { "date": "2026-09-02", "by": "review", "ref": "batch 7 branch review, retrospective" }
+      "tags": [
+        "evals",
+        "fixtures"
+      ],
+      "source": {
+        "date": "2026-09-02",
+        "by": "review",
+        "ref": "batch 7 branch review, retrospective"
+      }
     },
     {
       "id": "process.gate-shell-chains",
@@ -327,8 +503,15 @@
         "A zero-count probe (grep -c) exits nonzero on zero matches and breaks the chain even when zero is the expected answer; gate count probes on their output, not their exit (batch 9).",
         "A before/after evidence bracket (snapshot, action, snapshot, diff) is one && chain in one call; snapshots captured across separate calls prove nothing about order. Re-run the whole bracket, never splice it, and check the artifact mtimes increase in chain order (batch 10)."
       ],
-      "tags": ["shell", "evidence"],
-      "source": { "date": "2026-09-02", "by": "review", "ref": "batch 7 branch review, retrospective" }
+      "tags": [
+        "shell",
+        "evidence"
+      ],
+      "source": {
+        "date": "2026-09-02",
+        "by": "review",
+        "ref": "batch 7 branch review, retrospective"
+      }
     },
     {
       "id": "process.main-wins-backlog-collisions",
@@ -340,8 +523,16 @@
         "Verify overlap yourself with git diff --name-only on both sides; another agent's no-overlap claim is a claim, not evidence.",
         "Record the old-to-new sha map in a workspace file and the batch report: closed tasks' deliverables keep pre-rebuild shas, and gc can prune those objects."
       ],
-      "tags": ["backlog", "collision", "rebuild"],
-      "source": { "date": "2026-09-03", "by": "review", "ref": "batch 13 branch review; the HR-047/048 collision" }
+      "tags": [
+        "backlog",
+        "collision",
+        "rebuild"
+      ],
+      "source": {
+        "date": "2026-09-03",
+        "by": "review",
+        "ref": "batch 13 branch review; the HR-047/048 collision"
+      }
     },
     {
       "id": "process.owner-content-mid-batch",
@@ -353,8 +544,16 @@
         "Verify the interleave position with git log before writing the ledger line: state which task commits sit below and above it. A wrong containment claim forces a ledger correction and changes which range the task review must read (batch 14 T1).",
         "At aggregation the commit stays its own commit; no task diff absorbs it, and the task-review dispatch names it as owner content to be judged as such."
       ],
-      "tags": ["owner-content", "ledger", "aggregation"],
-      "source": { "date": "2026-09-04", "by": "review", "ref": "batch 14 branch review" }
+      "tags": [
+        "owner-content",
+        "ledger",
+        "aggregation"
+      ],
+      "source": {
+        "date": "2026-09-04",
+        "by": "review",
+        "ref": "batch 14 branch review"
+      }
     },
     {
       "id": "process.evidence-outlives-the-session",
@@ -365,10 +564,19 @@
       "body": [
         "A report or workspace doc that cites a capture must name a file under the batch workspace (or the repository) that a later reader can open. A session scratchpad path is dead the moment the session ends; a citation into it is a claim nobody can collect on.",
         "Copy small captures into the workspace beside the doc that cites them (batch 16 task 5: 59 files under t5-evidence/). An artifact too large to retain is disclosed as not retained, with its decisive excerpt quoted inline - never cited at a path that no longer exists.",
-        "Truncation markers count as citations: a marker naming a full log must point at a durable file whose content is a byte-prefix match of the retained excerpt."
+        "Truncation markers count as citations: a marker naming a full log must point at a durable file whose content is a byte-prefix match of the retained excerpt.",
+        "A long-lived SOURCE comment states the rerunnable command and its measured counts inline, self-contained; a batch-workspace path may ride along as provenance but never as the only evidence, because a clone carries no workspace (ruled at the batch 20 report, docs/design.md 5.52)."
       ],
-      "tags": ["evidence", "reports", "workspace"],
-      "source": { "date": "2026-09-04", "by": "review", "ref": "batch 16 task 5 review finding 5; owner ruling at the batch 16 report" }
+      "tags": [
+        "evidence",
+        "reports",
+        "workspace"
+      ],
+      "source": {
+        "date": "2026-09-04",
+        "by": "review",
+        "ref": "batch 16 task 5 review finding 5; owner ruling at the batch 16 report"
+      }
     },
     {
       "id": "process.claims-match-artifacts",
@@ -382,10 +590,19 @@
         "A reversed trend is worth recording too: name the pattern in the review when it appears, and name its reversal when a later round demonstrates it (batch 16 task 2 round 2).",
         "A SHIPPED doc or comment sentence stating a measurement is a claim like a report sentence (ruled batch 18): it cites a retained capture at a durable path, and a fix round's sweep re-opens every doc sentence the round touched. The report-claims checker cannot see shipped files — the manual sweep is the only net there.",
         "A command field is the literal command copied from the terminal — never retyped, never annotated inline; labels and notes go beside the field (ruled batch 19: the class failed four review rounds). A reviewer paste-runs command fields; a field that cannot paste-run is a finding by itself.",
-        "Close every report by running the report-claims checker (`houserules check-report-claims <REPORT_FILE>`) over the report file after the last edit, and paste its clean run as the final tests entry. The checker is a floor, not a substitute for the manual sweep: its Limits section (crates/houserules/src/report_claims.rs, reachable only where this kit's own source lives) names what only the sweep catches; an adopter repo carries no such source, so there a false positive is disclosed per report and reported upstream instead. It ships as a `houserules` subcommand (HR-066, batch 20 T2), so the closing act runs in every adopter repo, not only the one that built it. The checker gates gitignored workspace reports, never a tracked artifact a CI job could see, so it carries no CI job of its own -- the implementer template's closing-act mandate (HR-060) is the whole mechanism."
+        "Close every report by running the report-claims checker (`houserules check-report-claims <REPORT_FILE>`) over the report file after the last edit, and paste its clean run as the final tests entry. The checker is a floor, not a substitute for the manual sweep: its Limits section (crates/houserules/src/report_claims.rs, reachable only where this kit's own source lives) names what only the sweep catches; an adopter repo carries no such source, so there a false positive is disclosed per report and reported upstream instead. It ships as a `houserules` subcommand (HR-066, batch 20 T2), so the closing act runs in every adopter repo, not only the one that built it. The checker gates gitignored workspace reports, never a tracked artifact a CI job could see, so it carries no CI job of its own -- the implementer template's closing-act mandate (HR-060) is the whole mechanism.",
+        "A commit message body is a claim like a report sentence: recompute its counts from the artifact before committing; a wrong count found post-commit is recorded in the report for aggregation to carry, never amended and never left silent (batch 20 carried five such corrections; commit prose was the largest surviving drift surface once the checker gated reports)."
       ],
-      "tags": ["reports", "evidence", "review"],
-      "source": { "date": "2026-09-04", "by": "review", "ref": "batch 16 task 2 re-review r1 trend note; owner ruling at the batch 16 report" }
+      "tags": [
+        "reports",
+        "evidence",
+        "review"
+      ],
+      "source": {
+        "date": "2026-09-04",
+        "by": "review",
+        "ref": "batch 16 task 2 re-review r1 trend note; owner ruling at the batch 16 report"
+      }
     },
     {
       "id": "process.closure-claims-carry-enumeration",
@@ -396,10 +613,19 @@
       "body": [
         "Born from the batch 17 argv-closure arc: every unenumerated closure sentence was false in at least one direction, and each fix was a script whose output the sentence could then cite.",
         "The enumeration lives at a path that outlives the session and reruns cleanly; its own summary line states the counts the claim cites, so a reader checks the artifact, not the prose.",
-        "A migration or flip closure names its zero-hit sweep of the RETIRED form (the grep pattern and its variants), rerunnable at HEAD; the enumeration is of the old form's residue, not the new form's presence (ruled batch 19: presence enumerations confirm known work, only residue sweeps falsify closure — batch 18 T6 and batch 19 T2 both failed this way)."
+        "A migration or flip closure names its zero-hit sweep of the RETIRED form (the grep pattern and its variants), rerunnable at HEAD; the enumeration is of the old form's residue, not the new form's presence (ruled batch 19: presence enumerations confirm known work, only residue sweeps falsify closure — batch 18 T6 and batch 19 T2 both failed this way).",
+        "The enumeration artifact is executable: a script whose own run prints the counts the claim cites, not a static dump or a hand-asserted mapping (batch 20: an asserted mapping hid a live coverage drop; grep dumps matched no command at HEAD until an executable sweep replaced them; a /tmp list failed durability until the comparison reran from git history)."
       ],
-      "tags": ["reports", "evidence", "review"],
-      "source": { "date": "2026-09-05", "by": "user", "ref": "batch 17 report ruling; branch review retrospective" }
+      "tags": [
+        "reports",
+        "evidence",
+        "review"
+      ],
+      "source": {
+        "date": "2026-09-05",
+        "by": "user",
+        "ref": "batch 17 report ruling; branch review retrospective"
+      }
     },
     {
       "id": "process.review-findings-are-claims-too",
@@ -411,8 +637,15 @@
         "Batch 17 caught the reviewer wrong twice (a prescribed device that provably did not work; a divergence tally measured with the wrong command names) and the controller's dispatch premises wrong twice - each caught only because someone re-ran the thing. The discipline that binds the implementer's report binds the review's findings and the dispatch's diagnosis alike.",
         "The paired task-reviewer template clause lands with HR-060."
       ],
-      "tags": ["review", "evidence"],
-      "source": { "date": "2026-09-05", "by": "user", "ref": "batch 17 report ruling; branch review retrospective" }
+      "tags": [
+        "review",
+        "evidence"
+      ],
+      "source": {
+        "date": "2026-09-05",
+        "by": "user",
+        "ref": "batch 17 report ruling; branch review retrospective"
+      }
     }
   ]
 }

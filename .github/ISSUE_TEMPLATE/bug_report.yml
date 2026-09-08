@@ -20,7 +20,7 @@ body:
     id: version
     attributes:
       label: houserules version
-      description: From `.houserules.json`'s `version` field, or your `package.json`.
+      description: From `.houserules.json`'s `version` field, or `houserules --version`.
       placeholder: 0.2.0-alpha
     validations:
       required: true

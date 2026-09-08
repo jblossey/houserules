@@ -3,19 +3,20 @@
 Operational steps for maintaining this repository. Each section covers
 one recurring task.
 
-## Known gap: release-please breaks on the next push to main (HR-073)
+## release-please's release-type: rust at crates/houserules (HR-073)
 
 `.github/workflows/release-please.yml` runs `googleapis/
 release-please-action@v5.0.0` on every push to `main` (`on: push:
 branches: [main]`) — not only when a release is being cut. That action
 resolves release-please `^17.6.0`; `release-please-config.json` declares
-the `v17.11.2` schema, and `packages["."].release-type` there still
-names `"node"`, with no `package-name` override set.
+the `v17.11.2` schema.
 
-Verified against the pinned `v17.11.2` source (not a config-string
-reading alone, per process.wiring-checks-run-the-resolution):
-`BaseStrategy.buildReleasePullRequest` calls `getBranchComponent()` to
-name the release branch. Unlike its sibling `getComponent()`,
+Through batch 20 T4, `packages["."].release-type` there still named
+`"node"`, with no `package-name` override set. Verified against the
+pinned `v17.11.2` source (not a config-string reading alone, per
+process.wiring-checks-run-the-resolution): `BaseStrategy.
+buildReleasePullRequest` calls `getBranchComponent()` to name the
+release branch. Unlike its sibling `getComponent()`,
 `getBranchComponent()` is NOT guarded by `includeComponentInTag` — it
 always calls `getDefaultComponent()`, which falls through to
 `this.packageName ?? getDefaultPackageName()` since no `package-name` is
@@ -23,22 +24,148 @@ configured. The Node strategy's `getDefaultPackageName()` reads
 `package.json` through `getPkgJsonContents()`; when that file is
 missing, `getPkgJsonContents()` catches the resulting `FileNotFoundError`
 and throws `MissingRequiredFileError` naming `package.json`, `'node'`,
-and this repository.
+and this repository. Batch 20 T3 (HR-047) retired `package.json`, so the
+next push to `main` after that batch merged — not a later release
+attempt — would have run `buildReleasePullRequest` against a repository
+with no `package.json` and thrown before any PR opened. HR-068 (the
+tag-push token gap) does not shield this: that gap is about
+`release.yml` never starting after a tag pushes, strictly later in the
+pipeline than this failure.
 
-Batch 20 T3 (HR-047) retired `package.json` from this repository. The
-next push to `main` — the merge of that batch's own branch, not a later
-release attempt — runs `buildReleasePullRequest` against a repository
-with no `package.json`, and the call path above throws before any PR is
-opened. HR-068 (the tag-push token gap) does not shield this: that gap
-is about `release.yml` never starting after a tag pushes, which happens
-strictly later in the pipeline than this failure. This is a PRE-MERGE
-owner decision, not one riding HR-068 or HR-069's step-two release
-track: meet it before merging batch 20's branch to `main`, since the
-break fires on that merge itself. HR-073 names the choice (a
-release-type other than `"node"`, or `"node"` with an explicit
-`package-name` pointing at a file that still exists) without
-prescribing it — the replacement needs a real release-please run to
-close, which this checkout cannot perform.
+**Closed pre-merge, batch 20 T5 (HR-073, ruled design.md §5.43).**
+`packages["."]` moved to `packages["crates/houserules"]` with
+`release-type: "rust"`. Re-derived against the pinned `v17.11.2` source,
+not carried over from the `node` shape:
+
+- **The crate's own `Cargo.toml` becomes the package manifest.**
+  `Rust.getDefaultPackageName()` (`src/strategies/rust.ts:137-141`) reads
+  it through `getPackageManifest()` (`:148-153`), which resolves
+  `addPath('Cargo.toml')` against the package's own path — no
+  `package.json` anywhere in the call path.
+- **The tag stays plain.** `include-component-in-tag: false` short-
+  circuits `getComponent()` to `''` before it ever calls
+  `getDefaultComponent()` (`src/strategies/base.ts:178-183`), and
+  `buildReleasePullRequest`'s `TagName` construction
+  (`base.ts:299-304`) receives `undefined` for the component whenever
+  `includeComponentInTag` is false — unaffected by which path the
+  package config names. `dist plan --tag=v0.2.0-alpha` still exits 0
+  (`.superpowers/sdd/2026-09-07-batch-20/t5-evidence/
+  dist-plan-v0.2.0-alpha.log`).
+- **`extra-files` needed a leading `/` on every entry.**
+  `BaseStrategy.addPath` (`base.ts:770-784`) prefixes a non-absolute
+  file with the package's own path unless that package sits at
+  `ROOT_PROJECT_PATH` (`"."`) — true for every extra-file, string or
+  object, since `extraFileUpdates` (`base.ts:411-520`) calls it
+  unconditionally. Moving the package off root turned `README.md` and
+  `template/.github/workflows/knowledge.yml` into paths under
+  `crates/houserules/` that do not exist; `github.ts:850-861`'s
+  `buildChangeSet` treats a missing `createIfMissing: false` file as a
+  silent no-op, never a failure, so this class of break has no error to
+  notice it by. Both entries now read `/README.md` and
+  `/template/.github/workflows/knowledge.yml`. The redundant
+  `crates/houserules/Cargo.toml` `toml`/`jsonpath` extra-file entry is
+  gone too: the `Rust` strategy already emits that same update natively
+  (`rust.ts:112-120`), and unprefixed it would have doubled the path
+  the same way.
+- **The changelog stays at the repository root.** Left unconfigured,
+  the `Rust` strategy's changelog update targets `addPath(this.
+  changelogPath)` (`rust.ts:37-44`, default `CHANGELOG.md`), which
+  would create a second, empty changelog under `crates/houserules/`
+  instead of continuing the root `CHANGELOG.md`'s real release history.
+  `changelog-path: "/CHANGELOG.md"` keeps it at the existing file, via
+  the same leading-`/` root anchor as the `extra-files` fix.
+- **A real, permanent gap this ruling accepts, tracked as HR-081, not
+  blessed as correct:** moving the package path off `"."` also moves
+  commit attribution. `CommitSplit.split()` (`src/util/
+  commit-split.ts:78-108`) only attributes a commit to a configured
+  `packagePaths` entry when one of the commit's touched files sits
+  under that path (`:99`); the special case that assigns every commit
+  to a package regardless of what it touched applies only to
+  `ROOT_PROJECT_PATH` itself (`commit-split.ts:63`,
+  `manifest.ts:700-701`). From this release onward, release-please
+  considers a commit toward `crates/houserules`'s next version only if
+  it touches `crates/houserules/**`. That is not the same boundary as
+  "shipped code": `install.rs:232-234`'s `#[derive(RustEmbed)]
+  #[folder = "../../template/"]` compiles the whole repository-root
+  `template/` tree into the released binary, so a commit that changes
+  only `template/`, `README.md`, or another root-level path changes
+  shipped code and now produces no release PR at all. Measured over
+  `v0.2.0-alpha..9e4bf91` (batch 20 T5 fix round 1 review): 82 of 119
+  commits touch no path under `crates/houserules/`, and 7 of 27
+  `feat`/`fix` commits are unattributed under the new package path —
+  four of them (`9a3d697 feat(template)`, `523da2f fix(template)`,
+  `1537d89 fix(tools)`, `6fb46ca fix(template)`) change the embedded
+  payload directly, enumerated by what each commit actually touches,
+  not by subject scope — a subject-scoped read of this same range
+  missed `1537d89` (`fix(tools): validate rejects incomplete terminal
+  reports`, no `crates/houserules/` path, two `template/` files)
+  (`.superpowers/sdd/2026-09-07-batch-20/t5-evidence/
+  hr081-template-payload-commits.sh`,
+  `hr081-template-payload-commits.log`).
+  Reversing the package path is not the fix: `release-type: rust` at
+  `"."` would take the workspace branch and push a `CargoToml` update
+  for the root manifest, which `cargo-toml.ts:37-40` throws on ("is not
+  a package manifest") since this workspace's root `Cargo.toml` carries
+  no `[package]` section. HR-081 tracks the gap and carries the
+  candidate remedies without choosing one.
+- **Schema conformance, checked locally against the pinned v17.11.2
+  schema** (no `ajv-cli`/Node validator survives batch 20 T3's
+  retirement of that toolchain):
+  `.superpowers/sdd/2026-09-07-batch-20/t5-evidence/
+  config-schema-conformance-check.py` and its captured
+  `config-schema-conformance-check.log`.
+- **`Cargo.lock`'s own recorded version for the local package needs no
+  extra-files entry.** The `Rust` strategy already tries to bump it
+  (`rust.ts:123-126`), but at `addPath('Cargo.lock')` under this
+  package's own path — `crates/houserules/Cargo.lock`, which does not
+  exist, since this repository's real `Cargo.lock` sits at the
+  workspace root. That update silently no-ops the same way the
+  `extra-files` entries above used to. Left as is: any subsequent
+  `cargo build`/`check`/`test` invocation resolves the local package's
+  entry in `Cargo.lock` from `Cargo.toml` directly and rewrites it,
+  verified live by bumping the crate's version, running `cargo check`,
+  and observing exactly that line change, then reverting both files
+  (`.superpowers/sdd/2026-09-07-batch-20/t5-evidence/
+  cargo-check-version-bump-self-heal.log`,
+  `cargo-lock-after-self-heal.diff`). That rewrite needs no `--locked`
+  gate to object: a bounded, rerunnable sweep
+  (`.superpowers/sdd/2026-09-07-batch-20/t5-evidence/
+  ci-lock-flag-sweep.sh`, `ci-lock-flag-sweep.log`) finds zero
+  `--locked`/`--frozen`/`--offline` flags across this repository's own
+  CI surface (`.github/`, `mise.toml`, `dist-workspace.toml`) and
+  across cargo-dist v0.32.0's own build path (`cargo-dist/src/build/
+  cargo.rs`, the function that constructs the `cargo build`/`check`
+  command `dist build` runs, plus its sibling files in that module) —
+  the only `--locked` in cargo-dist v0.32.0's Rust source is the
+  from-git `cargo install ... --locked cargo-dist` command, emitted
+  twice by `DistInstallStrategy::GitBranch`'s `dash`/`powershell`
+  methods (`backend/ci/mod.rs:131`, `:143`) — a strategy this
+  repository's config never selects (`release.yml`'s own "Install
+  dist" step uses the plain curl/irm `Installer` strategy instead).
+  `CARGO_PKG_VERSION` and `dist`'s own package-version resolution read
+  `Cargo.toml` directly and never consult `Cargo.lock` for a local
+  workspace member, so a stale line there is cosmetic to those three
+  verified consumers specifically — not a general claim: a `--locked`
+  consumer would fail outright, reproduced live by bumping the crate's
+  version in place and reverting
+  (`.superpowers/sdd/2026-09-07-batch-20/t5-evidence/
+  cargo-check-locked-fails.log`): `cargo check --locked` errors with
+  "cannot update the lock file ... because --locked was passed". No
+  consumer in this repository's own
+  pipeline runs `--locked` today, so this is a latent residue, not an
+  active break, but HR-073's own tick is not its owner: HR-082 tracks
+  it.
+
+**What stays unproven until the first live release (queued at HR-068
+step two, the two-step reality in docs/specs/
+2026-09-06-batch-19-phase4.md §7):** every check above is a schema or
+source-code proof, not a release-please run. Whether `Rust.
+buildUpdates()` actually opens a mergeable PR against `main` with this
+exact config — the version bump, the changelog entry, every extra-file
+edit landing together — needs release-please's own GitHub App
+credentials and a real repository, neither available in this checkout.
+That first run is the live proof this section's local verification
+cannot substitute for.
 
 ## Cutting a release
 
@@ -51,17 +178,20 @@ release runs:
 
 1. **Merge the release-please PR.** release-please keeps a PR open
    against `main` that bumps `crates/houserules/Cargo.toml`'s version
-   (the `toml` `extra-files` entry), and — from batch 19 — every pinned
-   install URL in README.md and the seeded `template/.github/workflows/
-   knowledge.yml`'s own install step (the `x-release-please-version`/
-   `-start-version`/`-end` annotations; HR-049's measured mechanism,
-   `.superpowers/sdd/2026-09-06-batch-19/t2-evidence/
-   generic-updater-check-green.log` and
+   (the `rust` release-type's own native update, HR-073) and every
+   pinned install URL in README.md and the seeded `template/.github/
+   workflows/knowledge.yml`'s own install step (the
+   `x-release-please-version`/`-start-version`/`-end` annotations;
+   HR-049's measured mechanism, `.superpowers/sdd/2026-09-06-batch-19/
+   t2-evidence/generic-updater-check-green.log` and
    `generic-updater-check-knowledge-yml-green.log`). Merging this PR is
    the release trigger, and it lands the seeded workflow's own pin
    already current for the release it is about to trigger. This step
-   presupposes the known gap above is already resolved; release-please
-   cannot open this PR at all otherwise.
+   presupposes the release-type fix above landed already (HR-073,
+   closed on this branch pre-merge); release-please could not open this
+   PR at all otherwise. Whether it actually does, with this exact
+   config, is this release's own live proof — the section above names
+   what stays unverified until it runs.
 2. **Meet HR-068 before merging, not after.** `release-please-action`
    tags and releases on the default `GITHUB_TOKEN`, and GitHub does not
    start a workflow from a tag that token pushes
@@ -92,8 +222,13 @@ release runs:
    — referenced here, not repeated.
 6. **Three acts fall due once the pipeline is proven.** The first real
    release with assets is step two of the spec's two-step reality
-   (docs/specs/2026-09-06-batch-19-phase4.md §7). Once the host/create/
-   announce jobs succeed against it:
+   (docs/specs/2026-09-06-batch-19-phase4.md §7). HR-073's own live
+   proof lands earlier than these three, on this procedure's first run
+   of step 1 above: a release-please PR opening under the `rust`
+   release-type with no `MissingRequiredFileError` or other config-shape
+   failure is the run the section above's local schema and source checks
+   could not substitute for. Once the host/create/announce jobs succeed
+   against the resulting release:
    - **HR-069's revert**: `pr-run-mode` back to `"plan"` in
      `dist-workspace.toml`, dropping the `swatinem/rust-cache@v2` step
      it drags in, at the next config-touching task.
@@ -123,7 +258,7 @@ above), then again only when the registration itself needs an update
 ## After a release-please merge, restamp the kit version
 
 release-please opens a PR that bumps `crates/houserules/Cargo.toml`'s
-version (HR-073's known gap above applies here too, until it resolves).
+version (the `rust` release-type's own native update, HR-073).
 The merge does not update `.houserules.json`. The stale stamp fails
 `crates/houserules/tests/dogfood.rs`'s `houserules_json_stamps_the_
 installed_version_and_the_hr_id_prefix` test on main, because that test

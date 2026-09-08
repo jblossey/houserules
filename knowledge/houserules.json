@@ -252,11 +252,11 @@
       "id": "houserules.release-please-schema-gap",
       "kind": "gotcha",
       "area": "global",
-      "summary": "release-please's config JSON schema omits prerelease-type and skip-snapshot from its root; keep those settings under packages['.'].",
+      "summary": "release-please's config JSON schema omits prerelease-type and skip-snapshot from its root; keep those settings under the package entry.",
       "body": [
         "The schema at https://raw.githubusercontent.com/googleapis/release-please/v17.11.2/schemas/config.json sets `additionalProperties: false` on the config root. The root's own `properties` list omits `prerelease-type` and `skip-snapshot`. `src/manifest.ts` reads both at the top level, like `versioning` and `release-type`. The project's docs show a top-level example with `prerelease-type`. The omission is a gap in the schema, not the runtime.",
-        "Verified with `ajv-cli validate`. A root-level `prerelease-type` key fails with `params.additionalProperty: 'prerelease-type'` (`must NOT have additional properties`). The identical key nested under `packages['.']` validates cleanly: that path's value schema (`ReleaserConfigOptions`, reached through `allOf`) carries no such restriction.",
-        "Put `prerelease-type`, `skip-snapshot`, and the other release settings under `packages['.']` in `release-please-config.json`, not at the config root. `src/manifest.ts` merges each package's config over the root default per key, so a single-package repository behaves identically either way. Only the nested placement passes the schema the file's own `$schema` points at."
+        "Verified with `ajv-cli validate`. A root-level `prerelease-type` key fails with `params.additionalProperty: 'prerelease-type'` (`must NOT have additional properties`). The identical key nested under a `packages` entry validates cleanly: that path's value schema (`ReleaserConfigOptions`, reached through `allOf`) carries no such restriction.",
+        "Put `prerelease-type`, `skip-snapshot`, and the other release settings under the package's own entry in `release-please-config.json` (`packages['crates/houserules']` as of HR-073, batch 20 T5; `packages['.']` before it), not at the config root. `src/manifest.ts` merges each package's config over the root default per key, so a single-package repository behaves identically either way. Only the nested placement passes the schema the file's own `$schema` points at."
       ],
       "tags": [
         "release-please",
@@ -302,7 +302,7 @@
       "area": "docs",
       "summary": "After a release-please PR merge, run update --dir ., commit the restamp, and push; see docs/runbook.md.",
       "body": [
-        "release-please bumps crates/houserules/Cargo.toml's version in its PR (batch 20 T3, HR-047: package.json, the earlier bumped manifest, retired -- HR-073 tracks release-please-config.json's own release-type catching up, still \"node\" and still expecting a package.json). Merging the PR does not update .houserules.json. The stale stamp fails crates/houserules/tests/dogfood.rs's houserules_json_stamps_the_installed_version_and_the_hr_id_prefix test on main (HR-044), which pins the stamp to CARGO_PKG_VERSION.",
+        "release-please bumps crates/houserules/Cargo.toml's version in its PR (the release-type: rust config's own native update, HR-073, batch 20 T5, closing the gap package.json's batch 20 T3 (HR-047) retirement had opened). Merging the PR does not update .houserules.json. The stale stamp fails crates/houserules/tests/dogfood.rs's houserules_json_stamps_the_installed_version_and_the_hr_id_prefix test on main (HR-044), which pins the stamp to CARGO_PKG_VERSION.",
         "After you merge a release-please PR: run `houserules update --dir .` (it prints the drift line, for example `kit 0.1.0 -> 0.2.0-alpha`); commit the restamped `.houserules.json` as `chore(release): restamp the kit version`; push to main.",
         "Full steps and rationale: docs/runbook.md.",
         "In a project that installs the kit: install the newer `houserules` binary first (whichever channel the project used -- the shell installer, mise, or a direct download; otherwise the command below still runs the old binary and reads no drift), then run `houserules update --dir .` the same way the kit repository itself does, and commit `.houserules.json` only when the drift line's sides differ. The finishing-a-feature skill ships this unified form (batch 19 T2 fix round 1: npm retirement removed the earlier pnpm-exec-only path this bullet used to describe)."
@@ -468,7 +468,7 @@
       "summary": "Dev tooling is a cargo bin under crates/houserules/src/bin/; never a new Node script.",
       "body": [
         "Owner ruling at the batch 17 report, applied at batch 18 T5 fix round 1 when find-shell-tool-refs.mjs and diff-shape-gate.mjs were ported to cargo bins in the same round that added them.",
-        "tools/make-corpus.mjs is the one ruled interim exception (docs/design.md decision 30) and retires with the frozen JS at Tier-2 phase 5.",
+        "tools/make-corpus.mjs was the one ruled interim exception (docs/design.md decision 30); it retired with the frozen JS at Tier-2 phase 5 (batch 20 T3, HR-047).",
         "The ruling previously had no loading path for tools/**; this entry gives it one so a dispatch touching tools/ carries it without --ids."
       ],
       "tags": [
@@ -516,6 +516,20 @@
       ],
       "tags": ["github-actions", "ci", "shell"],
       "source": { "date": "2026-09-07", "by": "review", "ref": "batch 19 task-2-review.json issue 5; fix round 1" }
+    },
+    {
+      "id": "houserules.path-pins-mirror-the-code",
+      "kind": "gotcha",
+      "area": "rust",
+      "summary": "A test that pins a path the binary prints builds it component by component: Path::join keeps an embedded slash, and Windows alone shows the divergence.",
+      "body": [
+        "rustc 1.98.1's library/std/src/path.rs (PathBuf::_push) appends a relative path verbatim after one MAIN_SEPARATOR_STR. It re-joins components with that separator only behind a verbatim (\\\\?\\) prefix. So on Windows dir.join(\"knowledge/process.json\") displays as ...\\knowledge/process.json, while rules::model::load_base's own root.join(\"knowledge\") then dir.join(name) displays as ...\\knowledge\\process.json.",
+        "Batch 20 T6 fix round 2 (HR-085): that one character was the whole windows-latest failure of crates/houserules/tests/install.rs's init_reports_a_render_failure_on_broken_project_data_as_one_usage_error (run 34220012072, job 102040656623). Linux and macOS never show it, because / is their own separator. tempfile paths are the exposed case; repo_root() canonicalizes, and the verbatim prefix that produces normalizes the join away.",
+        "Two controls in that same file pin the correct shape, and both passed in that same Windows run. Each compares a printed path against the binary's own stderr. The marker pin is init_reports_an_unparsable_pre_existing_marker_as_a_named_error_exit_2: a one-component dir.path().join(\".houserules.json\"), which proves the tempdir prefix round-trips exactly. The settings pin is init_reports_a_scalar_hooks_value_as_a_named_error_exit_2 and init_reports_a_scalar_session_start_value_as_a_named_error_exit_2: they assert_eq! stderr against format!(\"{}: ...\", settings_path.display()), where the test's dir.path().join(\".claude/settings.json\") and the binary's target.join(SETTINGS_PATH) build the path from the identical string, which proves an identical-string join interoperates. Mirror the construction the code uses. Never loosen the assertion to a substring instead."
+      ],
+      "tags": ["windows", "paths", "tests", "ci"],
+      "source": { "date": "2026-09-08", "by": "controller", "ref": "batch 20 T6 fix round 2; HR-085" },
+      "verify": ["crates/houserules/tests/install.rs"]
     }
   ]
 }

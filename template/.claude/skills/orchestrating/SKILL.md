@@ -40,9 +40,11 @@ You are the controller. Subagents get knowledge through their templates; you get
 - The audit `--ids` value is the dispatch's `Knowledge:` list, generated from it, never typed separately — true for round 0 and every re-review alike.
 - A re-review dispatch carries the identical `Knowledge:`/`Backlog:`/`--ids` block as the round-0 dispatch. A narrowed block narrows the audit package silently.
 - A fix-round dispatch names `FIX_BASE`; the fix-diff audit goes into the report's `fix_rounds` entry, and `self_audit` stays the `BASE..HEAD` audit (`process.deliverables-json`).
+- A fix-round dispatch quotes a finding's premise only with the review's own named verification run beside it; a premise with no such run gets no free pass — the dispatch tells the implementer to measure it first, before acting on it (HR-067: a batch 18 T6 fix round relayed an unverified hook-history premise as fact, and the correction it produced was itself false).
 - The branch review dispatch names `WORKSPACE`, `BASE` (the merge base), `HEAD`, the plan and spec paths, and `REVIEW_FILE: <workspace>/branch-review.json`, through `branch-reviewer`; its audit runs `--workspace <WORKSPACE>` in place of `--report`.
 - A brief names no version number for a tool, action, or package (`security-hygiene.exact-pins`); it names the verification the implementer runs and records in `docs_verified`, and shows placeholders such as `jdx/mise-action@<current major>`.
 - A brief names every test, gate, and file its spec task lists, verbatim or by pointer (`process.brief-carries-the-spec`); an implementer who cannot satisfy one flags it instead of dropping it.
+- A brief's claim about a file's current contents is measured at brief-writing time — grepped or read, never restated from memory or an earlier document (HR-067: a batch 19 T2 brief asserted a second knowledge copy that did not exist, and the implementer paid the disproof).
 - When a batch edits an agent template or skill, the dispatch message carries the changed instruction verbatim: templates load at session start, so the running session's copy is stale until a restart.
 
 ## Handling reviews

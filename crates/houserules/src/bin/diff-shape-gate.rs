@@ -2,25 +2,28 @@
 //! ONLY the flat-command rewrite -- ported from `tools/diff-shape-gate.mjs`
 //! (batch 18 T5 fix round 1, HR-062, review finding "no-Node ruling"): the
 //! owner's standing "no Node tools in this codebase" ruling
-//! (docs/design.md decision 30) applies to this script the same as it did
+//! (docs/design.md decision 30) applied to this script the same as it did
 //! to `check-report-claims.mjs`, and no interim label like `tools/
-//! make-corpus.mjs`'s is available for a script this batch adds from
-//! scratch. Dev-only: not shipped in `template/` or the payload, the same
-//! status `gen-goldens.rs` has (batch 20 T2, HR-066: `check-report-
-//! claims.rs` left this list when it moved behind the flat surface as a
-//! shipped subcommand -- `crate::report_claims`'s own module doc has the
-//! full account).
+//! make-corpus.mjs`'s was available for a script that batch (18 T5) added
+//! from scratch; `tools/make-corpus.mjs` itself retired at phase 5 (batch
+//! 20 T3, HR-047), same as `check-report-claims.mjs` did earlier. Dev-only:
+//! not shipped in `template/` or the payload, the same status
+//! `gen-goldens.rs` has (batch 20 T2, HR-066: `check-report-claims.rs`
+//! left this list when it moved behind the flat surface as a shipped
+//! subcommand -- `crate::report_claims`'s own module doc has the full
+//! account).
 //!
 //! Diffs the OLD frozen-corpus slices, read from git history at `OLD_REF`
 //! (the corpus's own `tests/corpus/render/`, `tests/corpus/check/`, and
 //! the four `tests/corpus/knowledge/*for*.json` read-parity files, all of
-//! which this task's commits delete from the working tree -- reading them
-//! via `git show`/`git ls-tree` instead of the filesystem is what keeps
-//! this script rerunnable after that deletion lands), against their
-//! replacements on disk today (`tests/goldens/render/`, `tests/goldens/
-//! check/`, `tests/goldens/read-parity/`), and asserts every changed line
-//! differs from its old counterpart ONLY by substituting entries from
-//! `MAPPING_TABLE` below -- no other byte moves. The read-parity extension
+//! which batch 18 T5's own commits deleted from the working tree --
+//! reading them via `git show`/`git ls-tree` instead of the filesystem is
+//! what has kept this script rerunnable ever since that deletion landed),
+//! against their replacements on disk today (`tests/goldens/render/`,
+//! `tests/goldens/check/`, `tests/goldens/read-parity/`), and asserts
+//! every changed line differs from its old counterpart ONLY by
+//! substituting entries from `MAPPING_TABLE` below -- no other byte
+//! moves. The read-parity extension
 //! is fix round 1's own addition (spec §3 boundary clarification, commit
 //! 878265b: `standing`'s command string reaches `for`'s JSON, so its
 //! slices join the same rewrite boundary render and check-knowledge
@@ -259,7 +262,7 @@ fn check_check_category(root: &Path) -> Vec<Problem> {
         .filter(|name| name.ends_with(".json"))
         .collect();
     old_names.sort();
-    check_named_json_captures(root, old_prefix, "check", &old_names)
+    check_named_json_captures(root, old_prefix, "check", &old_names, true)
 }
 
 /// Checks the `read-parity` category: `for`'s four slices (root and
@@ -267,7 +270,13 @@ fn check_check_category(root: &Path) -> Vec<Problem> {
 /// moved out of `tests/corpus/knowledge/` -- an EXPLICIT list, not that
 /// whole directory's contents, since most of `tests/corpus/knowledge/`
 /// (topics/index/standing/get) carries no command reference and stays
-/// frozen (this module's own doc has the full account).
+/// frozen (this module's own doc has the full account). Non-strict
+/// (`check_named_json_captures`'s own doc has the reason): unlike `check`,
+/// which moved as one whole directory, `tests/goldens/read-parity/` is a
+/// shared home other, later, unrelated work also writes captures into
+/// (batch 20 T1's `gen-goldens` regeneration added ten more) -- this
+/// category owns proving its own four slices, not policing the directory's
+/// membership.
 fn check_read_parity_category(root: &Path) -> Vec<Problem> {
     let old_prefix = "tests/corpus/knowledge/";
     let old_names = [
@@ -276,20 +285,67 @@ fn check_read_parity_category(root: &Path) -> Vec<Problem> {
         "mini/for-mini-tools-build-sh.json".to_string(),
         "mini/for-mini-tools-build-sh-full.json".to_string(),
     ];
-    check_named_json_captures(root, old_prefix, "read-parity", &old_names)
+    check_named_json_captures(root, old_prefix, "read-parity", &old_names, false)
 }
 
-/// Shared two-stage contract for a named list of JSON captures: the SET of
-/// `old_names` (each resolved at `OLD_REF` under `old_prefix`) must exist,
-/// unchanged in membership, under `tests/goldens/<new_dir_name>/` first (a
-/// missing or extra golden is its own problem, reported once, without
-/// opening a single file); only once the sets agree does this parse each
-/// pair and compare `stdout`/`stderr` line by line and `exit` as a scalar.
+/// One capture-set outcome: `None` when `expected_names` passes the
+/// category's own membership rule against `new_names`, `Some` naming the
+/// mismatch otherwise. `strict` (the `check` category: the whole directory
+/// moved as one unit at batch 18 T5) requires the two sets equal -- a
+/// missing OR an extra name is a problem. Non-strict (`read-parity`:
+/// `tests/goldens/read-parity/` is a shared home later, unrelated work
+/// also writes captures into) requires only that every `expected_names`
+/// entry is present; an extra name already there for other work is not
+/// this category's problem to report.
+fn capture_set_problem(
+    new_dir_name: &str,
+    expected_names: &[String],
+    new_names: &[String],
+    strict: bool,
+) -> Option<Problem> {
+    if strict {
+        if expected_names == new_names {
+            return None;
+        }
+        return Some(Problem {
+            file: format!("({new_dir_name} file set)"),
+            index: -1,
+            old_line: expected_names.join(", "),
+            new_line: new_names.join(", "),
+            mapped: "<the golden file set itself differs from the frozen corpus file set>"
+                .to_string(),
+        });
+    }
+    let missing: Vec<&str> = expected_names
+        .iter()
+        .filter(|name| !new_names.contains(name))
+        .map(String::as_str)
+        .collect();
+    if missing.is_empty() {
+        return None;
+    }
+    Some(Problem {
+        file: format!("({new_dir_name} file set)"),
+        index: -1,
+        old_line: expected_names.join(", "),
+        new_line: new_names.join(", "),
+        mapped: format!(
+            "<expected capture(s) missing from the goldens directory: {}>",
+            missing.join(", ")
+        ),
+    })
+}
+
+/// Shared two-stage contract for a named list of JSON captures: `strict`
+/// governs the SET check (`capture_set_problem`'s own doc has the rule);
+/// only once it passes does this parse each of `old_names`' pairs and
+/// compare `stdout`/`stderr` line by line and `exit` as a scalar.
 fn check_named_json_captures(
     root: &Path,
     old_prefix: &str,
     new_dir_name: &str,
     old_names: &[String],
+    strict: bool,
 ) -> Vec<Problem> {
     let new_dir = root.join("tests/goldens").join(new_dir_name);
     let mut new_names = Vec::new();
@@ -298,15 +354,8 @@ fn check_named_json_captures(
     new_names.sort();
     let mut expected_names = old_names.to_vec();
     expected_names.sort();
-    if expected_names != new_names {
-        return vec![Problem {
-            file: format!("({new_dir_name} file set)"),
-            index: -1,
-            old_line: expected_names.join(", "),
-            new_line: new_names.join(", "),
-            mapped: "<the golden file set itself differs from the frozen corpus file set>"
-                .to_string(),
-        }];
+    if let Some(problem) = capture_set_problem(new_dir_name, &expected_names, &new_names, strict) {
+        return vec![problem];
     }
     let mut problems = Vec::new();
     for name in old_names {
@@ -364,4 +413,64 @@ fn main() {
     println!(
         "summary: every changed render/check-knowledge/read-parity line (old content read from {OLD_REF}) is explained by the command-mapping table -- PASS"
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn names(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    /// Strict mode (the `check` category): an exact set match is not a
+    /// problem.
+    #[test]
+    fn strict_exact_match_is_not_a_problem() {
+        let expected = names(&["a.json", "b.json"]);
+        let actual = names(&["a.json", "b.json"]);
+        assert!(capture_set_problem("check", &expected, &actual, true).is_none());
+    }
+
+    /// Strict mode: an extra file the frozen corpus never had IS a
+    /// problem -- `check` moved as one whole directory, so a stray file
+    /// is real drift, not other work sharing the home.
+    #[test]
+    fn strict_extra_file_is_a_problem() {
+        let expected = names(&["a.json"]);
+        let actual = names(&["a.json", "b.json"]);
+        assert!(capture_set_problem("check", &expected, &actual, true).is_some());
+    }
+
+    /// Non-strict mode (`read-parity`): every expected name still present
+    /// is not a problem, regardless of what else the directory holds --
+    /// the batch 20 T1 regression this fix closes (ten unrelated goldens
+    /// landed in `tests/goldens/read-parity/` after this gate's four
+    /// names were fixed, and a strict set check flagged all ten as
+    /// "unexplained" even though none of them touch what this category
+    /// proves).
+    #[test]
+    fn non_strict_extra_files_are_not_a_problem() {
+        let expected = names(&["for-tools-kb-mjs.json", "for-tools-kb-mjs-full.json"]);
+        let actual = names(&[
+            "for-tools-kb-mjs.json",
+            "for-tools-kb-mjs-full.json",
+            "index.json",
+            "standing.json",
+            "topics.json",
+        ]);
+        assert!(capture_set_problem("read-parity", &expected, &actual, false).is_none());
+    }
+
+    /// Non-strict mode: a genuinely missing expected name is still a
+    /// problem -- loosening the extra-file case must not also stop
+    /// catching a real regression.
+    #[test]
+    fn non_strict_missing_file_is_still_a_problem() {
+        let expected = names(&["for-tools-kb-mjs.json", "for-tools-kb-mjs-full.json"]);
+        let actual = names(&["for-tools-kb-mjs.json"]);
+        let problem = capture_set_problem("read-parity", &expected, &actual, false)
+            .expect("a missing expected name must be a problem");
+        assert!(problem.mapped.contains("for-tools-kb-mjs-full.json"));
+    }
 }

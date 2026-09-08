@@ -20,9 +20,18 @@
         "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test; an auto-restore setting covers only spies, so a mock created in a module-mock factory gets its own explicit afterEach reset.",
         "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided (batch 16: the glob translator missed nested braces and panicked; the regex scan flipped four verdicts against V8)."
       ],
-      "tags": ["quality"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
-      "see": ["process.no-tech-debt", "security-hygiene.dependency-vetting"]
+      "tags": [
+        "quality"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
+      "see": [
+        "process.no-tech-debt",
+        "security-hygiene.dependency-vetting"
+      ]
     },
     {
       "id": "quality.no-compat-softening",
@@ -35,9 +44,18 @@
         "Do not keep a deprecated field, alias, fallback, or optional-for-compat setting alive for old callers; the migration is part of the change, not a later batch.",
         "A genuinely optional concept stays optional on its merits; optionality is never a compatibility device."
       ],
-      "tags": ["quality", "compatibility"],
-      "source": { "date": "2026-09-02", "by": "user", "ref": "owner instruction of 2026-09-02, batch 7" },
-      "see": ["process.no-tech-debt"]
+      "tags": [
+        "quality",
+        "compatibility"
+      ],
+      "source": {
+        "date": "2026-09-02",
+        "by": "user",
+        "ref": "owner instruction of 2026-09-02, batch 7"
+      },
+      "see": [
+        "process.no-tech-debt"
+      ]
     },
     {
       "id": "quality.pin-copies-byte-exact",
@@ -49,9 +67,18 @@
         "Assert copyA equals transform(copyB) with the transform the production code applies (batch 8: the id-prefix replaceAll), so the test and the shipped rewrite cannot drift apart.",
         "When the copies are already in sync, prove the test can fail with a disclosed mutation and label the cycle mode mutation."
       ],
-      "tags": ["tests", "sync"],
-      "source": { "date": "2026-09-02", "by": "review", "ref": "batch 8 branch review, uncovered finding 1" },
-      "verify": ["crates/houserules/tests/dogfood.rs"]
+      "tags": [
+        "tests",
+        "sync"
+      ],
+      "source": {
+        "date": "2026-09-02",
+        "by": "review",
+        "ref": "batch 8 branch review, uncovered finding 1"
+      },
+      "verify": [
+        "crates/houserules/tests/dogfood.rs"
+      ]
     },
     {
       "id": "quality.absence-is-designed",
@@ -64,8 +91,16 @@
         "A leaked `undefined` or `NaN` in output is always a finding, even when disclosed and tested; the test moves to the designed output, never pins the leak.",
         "Root-only entry: the seed ships no cli area, so this loads here through area cli and is not seeded."
       ],
-      "tags": ["output", "absence", "cli"],
-      "source": { "date": "2026-09-03", "by": "review", "ref": "batch 11 branch review, uncovered finding; task 2 review r0" }
+      "tags": [
+        "output",
+        "absence",
+        "cli"
+      ],
+      "source": {
+        "date": "2026-09-03",
+        "by": "review",
+        "ref": "batch 11 branch review, uncovered finding; task 2 review r0"
+      }
     },
     {
       "id": "quality.well-maintained-libraries",
@@ -76,11 +111,40 @@
       "body": [
         "The orchestrator researches candidate libraries or packages AT SPEC TIME with maintenance evidence, and presents them for the owner's ruling - never delegated to implementers, never deferred to plan time. The choice is ultimately the owner's.",
         "Wherever the codebase is touched, existing custom code that a well-maintained library should replace is refactored in that batch: the refactor folds into the spec and plan. Deferring the rewrite is not an option.",
-        "After the Rust rewrite completes (no node, TypeScript, or vitest traces remain), a mandatory whole-codebase sweep verifies that code untouched since this ruling abides by the rule; it rides the phase-5 repository sweep (docs/design.md §5.24).",
+        "The mandatory whole-codebase sweep ran at batch 20 T4 with the phase-5 repository sweep (docs/design.md 5.24). It named one candidate - the recursive directory walker duplicated across the dev-only gate bins, against the walkdir crate - and adopted none, spec section 8 having forbidden adoption in that batch; the owner ruled adoption at the batch 20 report (docs/design.md 5.47): walkdir enters exact-pinned in a future batch and replaces the copies (HR-079).",
         "quality.principles carries the underlying preference (also present in tag-pilot); security-hygiene.dependency-vetting and exact-pins govern each adoption."
       ],
-      "tags": ["libraries", "dependencies", "process"],
-      "source": { "date": "2026-09-05", "by": "user", "ref": "owner ruling at the batch 18 spec gate; docs/design.md §5.31" }
+      "tags": [
+        "libraries",
+        "dependencies",
+        "process"
+      ],
+      "source": {
+        "date": "2026-09-05",
+        "by": "user",
+        "ref": "owner ruling at the batch 18 spec gate; docs/design.md §5.31"
+      }
+    },
+    {
+      "id": "quality.gates-derive-their-scope",
+      "kind": "rule",
+      "area": "rust",
+      "summary": "A permanent gate derives its scope (tracked files minus declared, reasoned exclusions) and fails loudly on unreadable input; a hand-typed list is ungated.",
+      "body": [
+        "A hand-typed inclusion list cannot cover a file that does not exist yet, and batch 20 T4 showed it already missed ones that did: two seeded violations passed the first shipped residue gate because neither file was ever added to its list. A gate declared permanent has to default to gated, not to remembering.",
+        "Derive the walk set (git ls-files minus an EXCLUDED_PREFIXES-style constant whose doc names the reason for each entry) so a newly tracked file is gated the moment it lands; pin the boundary with a test that classifies every real tracked path.",
+        "An input the gate cannot read is a named, fatal error, never a continue: the silent-skip version under-counted and passed a seeded violation hiding behind a rename. A readable-but-binary input may be a counted, printed skip."
+      ],
+      "tags": [
+        "gates",
+        "tooling",
+        "dev-bins"
+      ],
+      "source": {
+        "date": "2026-09-08",
+        "by": "review",
+        "ref": "batch 20 branch review; task-4-review.json important findings 1-2; residue-gate.rs module doc"
+      }
     }
   ]
 }

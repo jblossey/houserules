@@ -60,7 +60,7 @@ succeeds, runs `houserules check-commit` against the rest of the message.
 ## Before you open a pull request
 
 ```sh
-mise run lint    # shellcheck, houserules check-knowledge, check-backlog, render --check
+mise run lint    # shellcheck, check-knowledge, check-backlog, render --check, the residue gate
 cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 ```
 

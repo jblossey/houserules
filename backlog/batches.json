@@ -289,8 +289,8 @@
       "summary": "Tier-2 phase 5 (HR-047 closes): nothing JS survives - bin/houserules.mjs, the frozen corpus, make-corpus, the vitest layer, package.json/pnpm and the node pins retire with every test ported to cargo or retired with its subject; the checker ships through the binary (HR-066) with the paste-run lint (HR-071); the orchestrating-skill clauses land (HR-067); the ruled closing sweep (5.24 + 5.31) with the mechanical residue gate ends the batch.",
       "kickoff": "docs/specs/2026-09-07-batch-20-phase5.md",
       "status": {
-        "state": "planned",
-        "text": "Gated 2026-09-07 (design.md 5.40, controller selection); spec approved 2026-09-07 (5.41); in development."
+        "state": "done",
+        "text": "Done 2026-09-08: nothing JS survives - all four items delivered plus the ruled HR-073 config (release-please goes rust at crates/houserules, design.md 5.43). Five tasks, 17 review rounds, zero behavioral defects surviving any round; the mapping licensed all 32 deletions; 24 goldens re-baselined byte-identical with gen-goldens regenerating them; the permanent residue gate walks tracked-minus-excluded in mise run lint; the evals record at the final template state (14/14); acceptance green in the package.json-free tree (spec section 10). Tier 2 COMPLETE - HR-047 done. Owner rulings 5.43-5.52 homed; HR-072/074-082 filed; step-two release set still owner-attended (HR-068 first)."
       }
     }
   ]
