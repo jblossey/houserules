@@ -567,3 +567,38 @@ Each item records the ruling with its date, or stays marked open.
     full vet. macOS binaries ship unsigned with the documented
     quarantine note; signing revisits at 1.0. Source: owner,
     2026-09-06, batch 19 gate.
+38. **Command fields are literal — ruled 2026-09-07.**
+    process.claims-match-artifacts' body gains: a command field
+    is the literal command copied from the terminal — never
+    retyped, never annotated inline; labels and notes go beside
+    the field; a reviewer paste-runs command fields, and a field
+    that cannot paste-run is a finding by itself. The class
+    failed four review rounds at batch 19 (T1 r1/r2, T2 r1/r3);
+    HR-071's checker lint catches the mechanical shapes, the
+    rule names the discipline. Source: owner, 2026-09-07,
+    batch 19 report.
+39. **A flip closure sweeps the retired form — ruled
+    2026-09-07.** process.closure-claims-carry-enumeration's
+    body gains: a migration or flip closure names its zero-hit
+    sweep of the RETIRED form (the grep pattern and its
+    variants), rerunnable at HEAD; the enumeration is of the old
+    form's residue, not the new form's presence. Ruled with the
+    full context of the batch-18 T6 and batch-19 T2 failures —
+    presence enumerations confirm known work, only residue
+    sweeps falsify closure. Source: owner, 2026-09-07, batch 19
+    report.
+40. **Batch 19 accepted — ruled 2026-09-07.** Phase 4 accepted
+    as merged (main 6a79ace) under the two-step reality; the
+    step-two queue stands (HR-068 token → first release →
+    runbook step 6). The controller selects the next batch and
+    presents its gate. Source: owner, 2026-09-07, batch 19
+    report.
+41. **Phase-5 gate — ruled 2026-09-07.** The batch 20 spec
+    approved as drafted: the complete JS retirement closing
+    HR-047 (every test mapped ported-or-retired under a closure
+    enumeration; the parity net retires with its purpose
+    complete), HR-066/071 shipping the checker through the
+    binary with the paste-run lint, HR-067's skill clauses, one
+    shared evals rerun, and the §5.24+§5.31 closing sweep with
+    the permanent residue gate. Source: owner, 2026-09-07,
+    batch 20 gate.

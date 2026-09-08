@@ -277,6 +277,21 @@
         "state": "planned",
         "text": "Done 2026-09-07: phase 4 wired whole under the two-step reality (spec section 7) - the cargo-dist pipeline pinned with the tag both matching and resolving, the crate version converged and lockstepped, every consumer flipped to the real channels with dated PENDING control runs, the pins wired via release-please, the seeded install step fallible, the release runbook with the owner-attended checklist. ALL FOUR ITEMS STAY OPEN by design: HR-049/063/064/070 close at the first release with assets (runbook step 6), behind HR-068 (the owner token decision) and HR-069 (the pr-run-mode revert). Step one proven; step two owner-attended."
       }
+    },
+    {
+      "number": 20,
+      "items": [
+        "HR-047",
+        "HR-066",
+        "HR-067",
+        "HR-071"
+      ],
+      "summary": "Tier-2 phase 5 (HR-047 closes): nothing JS survives - bin/houserules.mjs, the frozen corpus, make-corpus, the vitest layer, package.json/pnpm and the node pins retire with every test ported to cargo or retired with its subject; the checker ships through the binary (HR-066) with the paste-run lint (HR-071); the orchestrating-skill clauses land (HR-067); the ruled closing sweep (5.24 + 5.31) with the mechanical residue gate ends the batch.",
+      "kickoff": "docs/specs/2026-09-07-batch-20-phase5.md",
+      "status": {
+        "state": "planned",
+        "text": "Gated 2026-09-07 (design.md 5.40, controller selection); spec approved 2026-09-07 (5.41); in development."
+      }
     }
   ]
 }
