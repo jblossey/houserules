@@ -4,10 +4,10 @@ name = "houserules"
 # earlier lockstep partner, retired with the rest of the JS toolchain).
 # dist plan/build resolve a release-please tag by this field alone
 # (CARGO_PKG_VERSION), so a drift here breaks every future release (batch
-# 19 T1 fix round 1, review issue 2). release-please-config.json still
-# names "node" as its release-type, which expects a package.json to bump
-# -- HR-073 tracks flipping that config now that the file it targets is
-# gone; never hand-edit this field except to repair that gap once ruled.
+# 19 T1 fix round 1, review issue 2). release-please-config.json's one
+# package now names this path with release-type "rust" (HR-073, batch 20
+# T5): release-please bumps this field itself, in its own PR, the same
+# way "node" once bumped package.json; never hand-edit it otherwise.
 version = "0.2.0-alpha"
 edition = "2024"
 description = "A reusable knowledge-management and agent-workflow kit for AI-assisted repositories."

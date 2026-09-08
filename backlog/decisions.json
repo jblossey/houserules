@@ -164,6 +164,46 @@
     {
       "date": "2026-09-07",
       "text": "The batch-20 corpus boundary correction: the remaining corpus slices re-baseline as Rust-generated goldens (gen-goldens) as T3 first act, the parity suites flipping to golden-reading in the same commit as the deletion - the batch-18 section-3 criterion applied; found by the T1 r2 review deletion-derivation. docs/design.md 5.42."
+    },
+    {
+      "date": "2026-09-08",
+      "text": "HR-073 ruled: release-please switches to release-type rust at crates/houserules on the batch-20 branch before the merge (plain v-tags kept, extra-files re-derived); validated locally as far as possible, the live proof at the owner-attended first release. docs/design.md 5.43."
+    },
+    {
+      "date": "2026-09-08",
+      "text": "Batch 20 T3 standing amendments adopted as applied: houserules.pnpm-only re-grounds on cargo with the pnpm era recorded as history; houserules.template-is-the-source names dogfood.rs as the byte-pin home. docs/design.md 5.44."
+    },
+    {
+      "date": "2026-09-08",
+      "text": "The cli knowledge area points at crates/houserules/src/** (bin/** died with the JS entrypoint); confirmed by the owner. docs/design.md 5.45."
+    },
+    {
+      "date": "2026-09-08",
+      "text": "quality.well-maintained-libraries body[2] restated past tense: the mandatory sweep ran at batch 20 T4 and named one candidate. docs/design.md 5.46."
+    },
+    {
+      "date": "2026-09-08",
+      "text": "walkdir ADOPTED by owner ruling (maturity over the include_dir staleness precedent): exact-pinned in a future batch, replacing the duplicated dev-bin walkers; HR-079 carries it. docs/design.md 5.47."
+    },
+    {
+      "date": "2026-09-08",
+      "text": "security-hygiene.exact-pins root summary reordered cargo-first (pnpm stays the other-ecosystem example); template copy unchanged, ecosystem-agnostic. docs/design.md 5.48."
+    },
+    {
+      "date": "2026-09-08",
+      "text": "process.claims-match-artifacts gains the commit-message bullet: commit bodies are claims; recompute counts pre-commit; post-commit errors recorded for aggregation, never amended, never silent. docs/design.md 5.49."
+    },
+    {
+      "date": "2026-09-08",
+      "text": "process.closure-claims-carry-enumeration gains the executable-enumeration bullet: the artifact is a script whose run prints the counts the claim cites. docs/design.md 5.50."
+    },
+    {
+      "date": "2026-09-08",
+      "text": "The seeded escape hatch names its upstream destination (an issue at github.com/jblossey/houserules); template edit rides the next template-touching batch with HR-078; HR-080 carries it. docs/design.md 5.51."
+    },
+    {
+      "date": "2026-09-08",
+      "text": "Source-comment citation policy: a long-lived source comment states the rerunnable command and its measured counts inline; a workspace path is provenance only, never the sole evidence. Bullet on process.evidence-outlives-the-session, both copies. docs/design.md 5.52."
     }
   ],
   "notes": []

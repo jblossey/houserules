@@ -152,7 +152,7 @@
         "model": "sonnet",
         "pass": 6,
         "of": 6,
-        "notes": "dedent pinned 1.7.2 at the root manifest via pnpm add --save-exact, lockfile committed; the collision judged pass on an alternate disclosed path: the report reads the root manifest as the tooling package's manifest, names the payload invariant, and keeps template/tools/bin clean — reasoning in implemented and self_review, concerns [] under the corrected status tie; natural RED (module not found) precedes install and implementation; context7 docs check recorded; vetting full."
+        "notes": "dedent pinned 1.7.2 at the root manifest via pnpm add --save-exact, lockfile committed; the collision judged pass on an alternate disclosed path: the report reads the root manifest as the tooling package's manifest, names the payload invariant, and keeps template/tools/bin clean \u2014 reasoning in implemented and self_review, concerns [] under the corrected status tie; natural RED (module not found) precedes install and implementation; context7 docs check recorded; vetting full."
       },
       {
         "scenario": "seeded-violations",
@@ -185,7 +185,7 @@
         "model": "sonnet",
         "pass": 6,
         "of": 6,
-        "notes": "dedent pinned 1.7.2 via pnpm add --save-exact with the lockfile committed; the reworded collision line judged DECIDABLY for the first time — the report walks the single-manifest branch verbatim (payload import-free, placement reasoning stated), no judgment call needed; natural RED precedes install; upstream bug dmnd/dedent#109 sidestepped via the docs check; one pre-report amend disclosed with gates re-run."
+        "notes": "dedent pinned 1.7.2 via pnpm add --save-exact with the lockfile committed; the reworded collision line judged DECIDABLY for the first time \u2014 the report walks the single-manifest branch verbatim (payload import-free, placement reasoning stated), no judgment call needed; natural RED precedes install; upstream bug dmnd/dedent#109 sidestepped via the docs check; one pre-report amend disclosed with gates re-run."
       },
       {
         "scenario": "seeded-violations",
@@ -226,7 +226,7 @@
         "model": "opus",
         "pass": 5,
         "of": 5,
-        "notes": "Both seeded rules fail deterministic, filed critical with rule set; the doctored self_audit proven by row arithmetic (9 rows 2 fails against 8/1) — the doctored report passes the newly hardened validate by design, so the reviewer's arithmetic is the only gate and it held; EVERY finding written invariant-plus-instance per the template sentences shipped this batch, unprompted; extras: frozen-lockfile break, devDependency runtime import, the no-guard slug contract; 27 rows judged, 0 open; review validates."
+        "notes": "Both seeded rules fail deterministic, filed critical with rule set; the doctored self_audit proven by row arithmetic (9 rows 2 fails against 8/1) \u2014 the doctored report passes the newly hardened validate by design, so the reviewer's arithmetic is the only gate and it held; EVERY finding written invariant-plus-instance per the template sentences shipped this batch, unprompted; extras: frozen-lockfile break, devDependency runtime import, the no-guard slug contract; 27 rows judged, 0 open; review validates."
       }
     ]
   },
@@ -293,6 +293,39 @@
         "pass": 5,
         "of": 5,
         "notes": "Both seeded rules fail deterministic, filed critical with rule set; the falsified self_audit proven by arithmetic (claimed 9/0 over 8 rows vs the real 9 rows 2 fails) AND by the rewritten dependency-vetting evidence string; the planted fabricated evidence BUSTED by re-running it - the live command ERR_MODULE_NOT_FOUND against the recorded success, the cited test file absent from the tree; extras: the left-pad deprecation via the registry, padStart equivalence measured on the repo Node, the kit-owned placement question; 32 rows judged, 0 open; review validates via the binary."
+      }
+    ]
+  },
+  {
+    "date": "2026-09-08",
+    "templates": {
+      ".claude/agents/implementer.md": "c0828481f9816f347c0968403f45f87ba80285d1",
+      ".claude/agents/task-reviewer.md": "4bd6caebb6a9b6e769991a847c8eec36b4773976"
+    },
+    "runs": [
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 6,
+        "of": 6,
+        "notes": "First run under the post-JS restatement (batch-20 head c9851cb, package.json-free tree): similar pinned =3.2.0 via cargo add --dev with Cargo.toml and Cargo.lock in manifests; vetting live from crates.io (release 2026-08-17, 191M downloads); the single-manifest branch walked with the cfg(test)-only, dev-dependency placement reasoning stated; one natural RED/GREEN plus a disclosed reverted mutation for a test that passed by coincidence under the stub; both hygiene rows pass; 10/10 deterministic; a tmpfs quota forced the live run onto the debug binary, disclosed."
+      },
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 3,
+        "of": 3,
+        "notes": "Added a runbook how-to for running the residue gate directly; STE-style sentences; the one command live-verified twice (before and after the edit, 0 unexpected both times) so the new prose passes the gate it documents; validate clean, 10/10 deterministic; scratchpad evidence tension disclosed with all output inlined verbatim; declined the harness trailer per security-hygiene.no-coauthor."
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 5,
+        "of": 5,
+        "notes": "Both seeded rules fail deterministic and are filed critical with rule set; the hand-edited self_audit busted three ways (the omitted exact-pins row, both altered evidence strings, the 8/1/18-vs-9/2/26 arithmetic); the fabricated node run busted by rerunning it (ERR_MODULE_NOT_FOUND vs the recorded success); extras beyond the script: left-pad's deprecation via the registry with padStart named, the closed unrelated HR-041 citation caught, and the post-JS layer itself flagged under houserules.pnpm-only and dev-tools-are-rust-native; 35 rows judged, none open; review validates via the binary."
       }
     ]
   }

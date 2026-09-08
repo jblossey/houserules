@@ -3,17 +3,13 @@
   "bootstrap-sha": "fc445a6421130d6398f01f83f7295f3131ba267d",
   "include-component-in-tag": false,
   "extra-files": [
-    {
-      "type": "toml",
-      "path": "crates/houserules/Cargo.toml",
-      "jsonpath": "$.package.version"
-    },
-    "README.md",
-    "template/.github/workflows/knowledge.yml"
+    "/README.md",
+    "/template/.github/workflows/knowledge.yml"
   ],
   "packages": {
-    ".": {
-      "release-type": "node",
+    "crates/houserules": {
+      "release-type": "rust",
+      "changelog-path": "/CHANGELOG.md",
       "versioning": "prerelease",
       "prerelease": true,
       "prerelease-type": "alpha"

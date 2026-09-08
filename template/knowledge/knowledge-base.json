@@ -12,9 +12,18 @@
         "Dates live in `source.date` and in `kind: history` entries linked by `see`.",
         "The summary is the only text that renders into rule files and indexes."
       ],
-      "tags": ["knowledge", "authoring"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
-      "verify": ["knowledge/schema.json"]
+      "tags": [
+        "knowledge",
+        "authoring"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
+      "verify": [
+        "knowledge/schema.json"
+      ]
     },
     {
       "id": "knowledge-base.state-only-the-source",
@@ -25,10 +34,19 @@
         "Invented claims read plausibly; that is what makes them dangerous.",
         "When two sources disagree, read the code and record which one the entry follows.",
         "A shipped template or seed names no root-only id, path, or command; verify every reference resolves in a fresh install before syncing the root copy (batch 7 task 3).",
-        "Run every command block you ship exactly as printed, top to bottom, in the environment the reader will have (a fresh directory for a quick start). A block that needs unstated context, or that resolves differently than printed (an unpinned git spec), fails this rule (batch 13: a quick start that exited 1 as printed, an install form floating to the default branch, a kit-only mechanism shipped as generic)."
+        "Run every command block you ship exactly as printed, top to bottom, in the environment the reader will have (a fresh directory for a quick start). A block that needs unstated context, or that resolves differently than printed (an unpinned git spec), fails this rule (batch 13: a quick start that exited 1 as printed, an install form floating to the default branch, a kit-only mechanism shipped as generic).",
+        "An amendment re-derives the entry's summary from the amended body before filing - the summary is the half that renders into the loaded rules files, so a stale summary ships wider than the body it contradicts (batch 20 T3: two amended entries kept summaries their own new bodies had overturned; batch 20 T4: two shipped doc comments stated non-facts their own commits made false)."
       ],
-      "tags": ["knowledge", "authoring", "fidelity"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "knowledge",
+        "authoring",
+        "fidelity"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     },
     {
       "id": "knowledge-base.ids-are-permanent",
@@ -38,8 +56,16 @@
       "body": [
         "Dispatches, reports, audits, and `see` lists cite ids; a rename breaks every one of them silently."
       ],
-      "tags": ["knowledge", "authoring", "ids"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "knowledge",
+        "authoring",
+        "ids"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     }
   ]
 }

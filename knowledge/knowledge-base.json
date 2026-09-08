@@ -12,9 +12,18 @@
         "Dates live in `source.date` and in `kind: history` entries linked by `see`.",
         "The summary is the only text that renders into rule files and indexes."
       ],
-      "tags": ["knowledge", "authoring"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
-      "verify": ["knowledge/schema.json"]
+      "tags": [
+        "knowledge",
+        "authoring"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
+      "verify": [
+        "knowledge/schema.json"
+      ]
     },
     {
       "id": "knowledge-base.state-only-the-source",
@@ -27,10 +36,19 @@
         "A shipped template or seed names no root-only id, path, or command; verify every reference resolves in a fresh install before syncing the root copy (batch 7 task 3).",
         "Run every command block you ship exactly as printed, top to bottom, in the environment the reader will have (a fresh directory for a quick start). A block that needs unstated context, or that resolves differently than printed (an unpinned git spec), fails this rule (batch 13: a quick start that exited 1 as printed, an install form floating to the default branch, a kit-only mechanism shipped as generic).",
         "The walk includes a control: when a line looks optional, re-run the block without it and confirm the block then fails — that proves the line load-bearing instead of decorative (batch 18 T6 r2: the quick start's `houserules update --dir .` line was proven load-bearing by exactly this control). Sweeps keyed on deleted-tool names miss claims keyed on surviving names (batch 18 branch review: a design-doc aside naming `bin/houserules.mjs` escaped a sweep that grepped for the deleted wrappers); sweep for the claim's subject too.",
-        "A corrected measurement sweeps its dependents: when a sentence is corrected, re-open every sentence that cites, paraphrases, or leans on it — not only the lines the round edited; antecedents drift when their referent is repaired (batch 19 T2 r2, README:110)."
+        "A corrected measurement sweeps its dependents: when a sentence is corrected, re-open every sentence that cites, paraphrases, or leans on it — not only the lines the round edited; antecedents drift when their referent is repaired (batch 19 T2 r2, README:110).",
+        "An amendment re-derives the entry's summary from the amended body before filing - the summary is the half that renders into the loaded rules files, so a stale summary ships wider than the body it contradicts (batch 20 T3: two amended entries kept summaries their own new bodies had overturned; batch 20 T4: two shipped doc comments stated non-facts their own commits made false)."
       ],
-      "tags": ["knowledge", "authoring", "fidelity"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "knowledge",
+        "authoring",
+        "fidelity"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     },
     {
       "id": "knowledge-base.ids-are-permanent",
@@ -40,8 +58,16 @@
       "body": [
         "Dispatches, reports, audits, and `see` lists cite ids; a rename breaks every one of them silently."
       ],
-      "tags": ["knowledge", "authoring", "ids"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "knowledge",
+        "authoring",
+        "ids"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     },
     {
       "id": "knowledge-base.rules-need-a-loading-path",
@@ -53,9 +79,20 @@
         "After filing, run `houserules for <a file the rule governs>` and confirm the entry appears.",
         "A `check` needs an audit loading path too: it joins the package when its entry is `standing`, sits in a touched or global area (any kind, not only rule and invariant), or is named in `--ids`."
       ],
-      "tags": ["knowledge", "authoring", "areas", "standing"],
-      "source": { "date": "2026-09-02", "by": "review", "ref": "batch 5 branch review, issue 1" },
-      "verify": ["knowledge/areas.json"]
+      "tags": [
+        "knowledge",
+        "authoring",
+        "areas",
+        "standing"
+      ],
+      "source": {
+        "date": "2026-09-02",
+        "by": "review",
+        "ref": "batch 5 branch review, issue 1"
+      },
+      "verify": [
+        "knowledge/areas.json"
+      ]
     }
   ]
 }

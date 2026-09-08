@@ -14,3 +14,42 @@ tests/corpus/** -text
 # run 34056471594). Same fix, same reason: `-text` keeps the committed
 # bytes exact on every checkout.
 tests/goldens/** -text
+
+# The fixture directories (mini, mini-bad, mini-stale, batch14-workspace,
+# invalid-deliverable, skipped-report, stats-workspace) lived under
+# tests/corpus/fixtures/ and so carried the first `-text` rule above
+# until batch 20 T3 relocated them to tests/fixtures/ (commit 850559c)
+# without a matching .gitattributes update -- a rename `.gitattributes`
+# path rules do not follow. Every check_parity.rs comparison against
+# tests/fixtures/mini and tests/fixtures/mini-stale is exact-string
+# (check.rs's stale-generated-file compare and its byte/line budget
+# checks), so the windows-latest leg's autocrlf checkout re-broke them
+# the same way, once cargo test could finally reach that leg (batch 20
+# T6, HR-084): check_knowledge_matches_the_frozen_mini_stale_corpus's
+# stderr gained a spurious extra stale-file finding and an inflated
+# byte count, and check_knowledge_matches_the_frozen_mini_corpus's own
+# clean run (no findings expected) picked up a real one from its own
+# CRLF-inflated generated files, which flips check-knowledge's stdout
+# from "knowledge: ok" to empty (this repository's own mini-bad golden
+# shows the same empty-stdout shape for every other "problems found"
+# run). Restoring the original tests/corpus/** width at the new path
+# fixes both.
+tests/fixtures/** -text
+
+# This repository's own generated knowledge surface -- render_all()'s
+# entire output set (render.rs: RULE_KINDS's per-area .claude/rules/*.md
+# files, standing-rules.md, and the one fixed SKILL_PATH) -- carried no
+# `-text` protection at all, unlike the frozen/reviewed test corpora
+# above. The consumer is what is new, not the leg: `windows-latest` has
+# run `cargo test` in this repository's own ci.yml since 8c3cc15
+# (2026-09-04, before batch 20), but dogfood.rs -- and its
+# `generated_files_are_fresh_relative_to_knowledge` case, which has no
+# JS predecessor -- arrived with batch 20 T1's test port (f7833f3), so
+# no Windows run had reached that comparison until batch 20 T6 fix
+# round 1 cleared the two gaps above. There, `houserules render --check`
+# against this checkout's own live root reported all eight generated
+# files "would change" -- the identical CRLF-vs-freshly-rendered-LF
+# exact-string-compare mismatch, this time on files this repository
+# ships and reads dogfooded, not a test fixture.
+.claude/rules/** -text
+.claude/skills/project-knowledge/** -text

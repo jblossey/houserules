@@ -465,11 +465,23 @@ fn init_rejects_a_malformed_id_prefix_flag_exit_2() {
 /// error-path test here fails before any file write, at the target's
 /// `.git` check, the id-prefix flag, or a pre-existing `.houserules.json`
 /// -- none of them plants broken data under `knowledge/` first.
+///
+/// The expected path is built one component at a time, the way
+/// `rules::model::load_base` builds the name it prints: it joins
+/// `"knowledge"` onto the root, then joins each topic file name onto
+/// that. A single `join("knowledge/process.json")` fails on Windows
+/// alone: rustc 1.98.1's `library/std/src/path.rs` (`PathBuf::_push`)
+/// appends a relative path verbatim after one `MAIN_SEPARATOR_STR`, so
+/// the expectation keeps its embedded `/` while the binary prints `\`.
+/// That one character was the whole of the `windows-latest` failure in
+/// run 34220012072, job 102040656623 (HR-085).
 #[test]
 fn init_reports_a_render_failure_on_broken_project_data_as_one_usage_error() {
     let dir = scratch_git_repo();
-    fs::create_dir_all(dir.path().join("knowledge")).expect("mkdir knowledge");
-    fs::write(dir.path().join("knowledge/process.json"), "{").expect("write broken process.json");
+    let knowledge_dir = dir.path().join("knowledge");
+    fs::create_dir_all(&knowledge_dir).expect("mkdir knowledge");
+    let broken_path = knowledge_dir.join("process.json");
+    fs::write(&broken_path, "{").expect("write broken process.json");
     let output = houserules()
         .args(["init", "--dir"])
         .arg(dir.path())
@@ -477,10 +489,10 @@ fn init_reports_a_render_failure_on_broken_project_data_as_one_usage_error() {
         .expect("run init");
     assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
-    let broken_path = dir.path().join("knowledge/process.json");
+    let expected_prefix = format!("{}: invalid JSON (", broken_path.display());
     assert!(
-        stderr.starts_with(&format!("{}: invalid JSON (", broken_path.display())),
-        "got {stderr:?}"
+        stderr.starts_with(&expected_prefix),
+        "expected prefix {expected_prefix:?}, got {stderr:?}"
     );
     assert_eq!(stderr.trim().split('\n').count(), 1, "got {stderr:?}");
 }

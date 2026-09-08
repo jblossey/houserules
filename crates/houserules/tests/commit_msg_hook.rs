@@ -18,20 +18,23 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// This checkout's repository root, resolved at compile time -- this
-/// file's own copy of the pattern `install.rs`/`check_commit.rs`/
-/// `dogfood.rs` each keep independently (their own docs explain why: a
-/// file needing none of `mod common;`'s other helpers still warns the
-/// rest of that module dead if pulled in just for this one function).
-fn repo_root() -> PathBuf {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    root.canonicalize()
-        .unwrap_or_else(|error| panic!("canonicalize {}: {error}", root.display()))
-}
-
-/// The shipped commit-msg hook under test.
+/// The shipped commit-msg hook under test -- built directly from
+/// `CARGO_MANIFEST_DIR`, deliberately never through `Path::canonicalize`
+/// (the `repo_root()` every sibling file in this crate keeps its own
+/// copy of): this path becomes an `sh` command-line argument
+/// (`run_hook`, below), and `canonicalize`'s own current docs state that
+/// on Windows it "converts the path to use extended length path syntax
+/// ... [which] may be incompatible with other applications ... passed to
+/// the application on the command-line" -- confirmed live: Git-for-
+/// Windows' `sh` cannot open a `\\?\`-prefixed path, so every case here
+/// failed with exit 127 and stderr opening `/usr/bin/bash:` (batch 20 T6
+/// fix round 1, windows-latest run 34217792336, job 102033559639) until
+/// this file stopped canonicalizing. The leading `..` components stay
+/// unresolved in the returned path; both Windows' and POSIX's own file
+/// APIs resolve `..` while opening a file, so `sh` (and every other
+/// non-Rust reader) still finds it.
 fn hook_path() -> PathBuf {
-    repo_root().join("template/.githooks/commit-msg")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../template/.githooks/commit-msg")
 }
 
 /// `true` when `dir` holds a file named `houserules` (`houserules.exe` on

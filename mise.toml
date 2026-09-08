@@ -18,12 +18,13 @@ description = "Front the houserules binary (built from crates/houserules); pass 
 run = "cargo run --quiet --bin houserules --"
 
 [tasks.lint]
-description = "shellcheck, then the knowledge and backlog gates, then a stale-render check"
+description = "shellcheck, the knowledge/backlog gates, a stale-render check, then the residue gate"
 run = [
   "shellcheck tools/*.sh template/tools/*.sh .githooks/commit-msg template/.githooks/commit-msg",
   "mise run houserules -- check-knowledge",
   "mise run houserules -- check-backlog",
   "mise run houserules -- render --check",
+  "cargo run --quiet --bin residue-gate",
 ]
 
 [tasks.audit]

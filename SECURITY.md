@@ -8,8 +8,8 @@ a vulnerability**, or go directly to
 <https://github.com/jblossey/houserules/security/advisories/new>.
 
 Include the version you found the issue in (`.houserules.json`'s
-`version` field, or the `houserules` version in your `package.json`), the
-steps to reproduce it, and its impact.
+`version` field, or the output of `houserules --version`), the steps to
+reproduce it, and its impact.
 
 We aim to acknowledge a report within a week and to agree a disclosure
 timeline with you before any public discussion.

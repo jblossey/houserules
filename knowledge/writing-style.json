@@ -18,8 +18,15 @@
         "Keep subject and verb adjacent.",
         "End on the emphasis."
       ],
-      "tags": ["docs", "style"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "docs",
+        "style"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     },
     {
       "id": "writing-style.code-comments",
@@ -30,8 +37,14 @@
       "body": [
         "A comment asserting measured or cross-engine behavior is a claim: run the measurement before committing the sentence, and state where it was verified (batch 17 task 3: three false comments shipped, one licensing a real defect, and the fix introduced a fourth)."
       ],
-      "tags": ["comments"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+      "tags": [
+        "comments"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
     },
     {
       "id": "writing-style.doc-comments",
@@ -45,9 +58,20 @@
         "Self-documenting code first: full words, verbs for functions, `is`/`has` for booleans, no abbreviation a newcomer must decode, one meaning per name. A comment that explains a name means the name is wrong.",
         "Comments inside a body still follow writing-style.code-comments: only for a constraint the code cannot show."
       ],
-      "tags": ["docs", "comments", "naming"],
-      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
-      "see": ["writing-style.code-comments", "writing-style.principles"]
+      "tags": [
+        "docs",
+        "comments",
+        "naming"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
+      "see": [
+        "writing-style.code-comments",
+        "writing-style.principles"
+      ]
     },
     {
       "id": "writing-style.instructions-cover-the-state-space",
@@ -59,10 +83,19 @@
         "Before shipping a conditional instruction into a template or skill, enumerate the conditioned field's full value set and read the sentence once per value it must not change.",
         "Root-only entry: the seed ships no template area, so this loads here through area template (template/**) and is not seeded.",
         "After enumerating the conditioned field's values, enumerate each population's hidden environmental state too, and treat a command output the instruction interprets as itself a conditioned field: read the sentence once per output the command can print in each population. Batch 13's residual: an installed copy older than the merged declaration made the drift line read equal, so the equal-sides reassurance misled in exactly the fired-trigger case.",
-        "A gate is an instruction too: when a check is added to a tool, the surrounding protocol's own intermediate artifact states are part of the conditioned state space. Batch 14 T1's hardened validate rejected the retrieval protocol's own write-then-fill draft (terminal status, self_audit null); the fix migrated the flow to audit, fill, validate once, instead of special-casing the draft."
+        "A gate is an instruction too: when a check is added to a tool, the surrounding protocol's own intermediate artifact states are part of the conditioned state space. Batch 14 T1's hardened validate rejected the retrieval protocol's own write-then-fill draft (terminal status, self_audit null); the fix migrated the flow to audit, fill, validate once, instead of special-casing the draft.",
+        "A shipped instruction that names a repo-local resource states what every other population does instead (batch 20 T2: the closing act's false-positive arm named a Limits-file edit only the kit repository can make; the fix branches on source-present vs installed-binary populations)."
       ],
-      "tags": ["templates", "instructions", "enums"],
-      "source": { "date": "2026-09-03", "by": "review", "ref": "batch 10 task 2 review, round 0 Important; HR-036" }
+      "tags": [
+        "templates",
+        "instructions",
+        "enums"
+      ],
+      "source": {
+        "date": "2026-09-03",
+        "by": "review",
+        "ref": "batch 10 task 2 review, round 0 Important; HR-036"
+      }
     }
   ]
 }
