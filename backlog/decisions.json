@@ -160,6 +160,10 @@
     {
       "date": "2026-09-07",
       "text": "Phase-5 gate: the batch 20 spec approved as drafted - the complete JS retirement closing HR-047, the checker through the binary with the paste-run lint, the skill clauses, and the ruled closing sweep with the permanent residue gate. docs/design.md 5.41."
+    },
+    {
+      "date": "2026-09-07",
+      "text": "The batch-20 corpus boundary correction: the remaining corpus slices re-baseline as Rust-generated goldens (gen-goldens) as T3 first act, the parity suites flipping to golden-reading in the same commit as the deletion - the batch-18 section-3 criterion applied; found by the T1 r2 review deletion-derivation. docs/design.md 5.42."
     }
   ],
   "notes": []
