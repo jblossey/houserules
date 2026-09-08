@@ -131,15 +131,13 @@ fn update_over_a_never_init_ed_target_is_a_named_error_exit_2() {
     assert_eq!(stderr, expected);
 }
 
-/// Every `KIT_OWNED` path -- `install.rs`'s own copy, itself pinned against
-/// a live `node bin/houserules.mjs files` capture.
+/// Every `KIT_OWNED` path -- `install.rs`'s own copy. `tools/kb.mjs`,
+/// `tools/backlog.mjs`, `tools/lib/cli.mjs`, and `tools/lib/json-store.mjs`
+/// left this list at batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-
+/// phase5.md §2), joining `RETIRED`.
 const KIT_OWNED: &[&str] = &[
-    "tools/kb.mjs",
-    "tools/backlog.mjs",
     "tools/claude-session-start.sh",
     ".githooks/commit-msg",
-    "tools/lib/cli.mjs",
-    "tools/lib/json-store.mjs",
     ".claude/agents/implementer.md",
     ".claude/agents/task-reviewer.md",
     ".claude/agents/branch-reviewer.md",
@@ -172,15 +170,12 @@ const SEED_ONCE: &[&str] = &[
     "CLAUDE.md",
 ];
 
-/// `package.json`'s `version` field at this checkout -- `install.rs`'s own
-/// copy of `kit_version`.
+/// `env!("CARGO_PKG_VERSION")` at THIS test binary's own compile time --
+/// `install.rs`'s own copy of `kit_version` (that function's own doc has
+/// the account of batch 20 T3's retirement of the earlier package.json-
+/// reading form).
 fn kit_version() -> String {
-    let text = fs::read_to_string(repo_root().join("package.json")).expect("read package.json");
-    let value: serde_json::Value = serde_json::from_str(&text).expect("parse package.json");
-    value["version"]
-        .as_str()
-        .expect("package.json has a string version")
-        .to_string()
+    env!("CARGO_PKG_VERSION").to_string()
 }
 
 #[test]
@@ -188,10 +183,17 @@ fn update_syncs_every_kit_owned_file_reports_the_drift_line_and_leaves_adopter_f
     let dir = seeded_repo();
     // Corrupt a KIT_OWNED file and an unrelated adopter file the same way,
     // so the assertions below can tell "update overwrote this" from "update
-    // never touched this" by content alone. `tools/kb.mjs`, not
-    // `tools/kb.sh`: the shell wrapper left `KIT_OWNED` at batch 18 T5 and
-    // is now a `RETIRED` deletion target, covered by its own test below.
-    fs::write(dir.path().join("tools/kb.mjs"), b"corrupted").expect("corrupt tools/kb.mjs");
+    // never touched this" by content alone. `.claude/agents/implementer.md`,
+    // not `tools/kb.mjs`: batch 20 T3 (HR-047) moved the four JS engines
+    // from `KIT_OWNED` to `RETIRED`, so a fresh `seeded_repo()` no longer
+    // carries `tools/kb.mjs` at all -- an old install still holding one is
+    // its own, separate scenario, covered by `update_deletes_retired_
+    // js_engines_from_an_old_install` below.
+    fs::write(
+        dir.path().join(".claude/agents/implementer.md"),
+        b"corrupted",
+    )
+    .expect("corrupt .claude/agents/implementer.md");
     fs::write(dir.path().join("adopter-notes.md"), b"mine").expect("write adopter file");
 
     let output = houserules()
@@ -215,15 +217,73 @@ fn update_syncs_every_kit_owned_file_reports_the_drift_line_and_leaves_adopter_f
     let actual_lines: Vec<&str> = stdout.lines().collect();
     assert_eq!(actual_lines, expected_lines);
 
-    let restored =
-        fs::read(dir.path().join("tools/kb.mjs")).expect("read tools/kb.mjs after update");
-    let template = fs::read(repo_root().join("template/tools/kb.mjs")).expect("read template");
-    assert_eq!(restored, template, "tools/kb.mjs was not resynced");
+    let restored = fs::read(dir.path().join(".claude/agents/implementer.md"))
+        .expect("read .claude/agents/implementer.md after update");
+    let template = fs::read(repo_root().join("template/.claude/agents/implementer.md"))
+        .expect("read template");
+    assert_eq!(
+        restored, template,
+        ".claude/agents/implementer.md was not resynced"
+    );
     assert_eq!(
         fs::read(dir.path().join("adopter-notes.md")).expect("read adopter file"),
         b"mine",
         "update touched an adopter-owned file"
     );
+}
+
+/// Batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2): the
+/// four JS engines the shell wrappers used to front (`update_deletes_
+/// retired_shell_tools_from_an_old_install`'s own doc explains why
+/// `tools/kb.sh`/`tools/backlog.sh` get their own, separate test) are
+/// `RETIRED` too now -- an install seeded before this batch still carries
+/// them, and `update` deletes all four in the same run.
+#[test]
+fn update_deletes_retired_js_engines_from_an_old_install() {
+    let dir = seeded_repo();
+    fs::create_dir_all(dir.path().join("tools/lib")).expect("mkdir tools/lib");
+    for file in [
+        "tools/kb.mjs",
+        "tools/backlog.mjs",
+        "tools/lib/cli.mjs",
+        "tools/lib/json-store.mjs",
+    ] {
+        fs::write(dir.path().join(file), b"old\n")
+            .unwrap_or_else(|error| panic!("write a pre-T3 {file}: {error}"));
+    }
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let removed: Vec<&str> = stdout
+        .lines()
+        .filter(|line| line.starts_with("removed "))
+        .collect();
+    assert_eq!(
+        removed,
+        [
+            "removed tools/kb.mjs",
+            "removed tools/backlog.mjs",
+            "removed tools/lib/cli.mjs",
+            "removed tools/lib/json-store.mjs",
+        ]
+    );
+    for file in [
+        "tools/kb.mjs",
+        "tools/backlog.mjs",
+        "tools/lib/cli.mjs",
+        "tools/lib/json-store.mjs",
+    ] {
+        assert!(!dir.path().join(file).exists(), "{file} still present");
+    }
 }
 
 #[test]

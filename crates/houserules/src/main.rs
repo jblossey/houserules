@@ -67,10 +67,11 @@ use clap::{Parser, Subcommand};
 /// The `houserules` command line.
 ///
 /// `--help` and `--version` come from clap; `--version` reports the crate
-/// version (`CARGO_PKG_VERSION`), which tracks the kit's own version:
-/// release-please's `extra-files` config keeps `Cargo.toml`'s `version`
-/// field in lockstep with `package.json`'s at every release (see the
-/// package comment in `Cargo.toml`).
+/// version (`CARGO_PKG_VERSION`), which IS the kit's own version --
+/// `Cargo.toml`'s own comment has the full account, including HR-073, the
+/// known gap batch 20 T3 (HR-047) left behind when `package.json` (the
+/// earlier lockstep partner release-please's `extra-files` config kept in
+/// sync) retired from this repository.
 ///
 /// `arg_required_else_help = true` (HR-056): a bare `houserules`, no
 /// subcommand and no flag, prints help on stderr and exits 2, instead of

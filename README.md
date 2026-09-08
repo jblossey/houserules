@@ -220,7 +220,7 @@ Every path houserules writes falls into one of three buckets:
 
 | kit-owned (update overwrites) | seed-once (yours after init) |
 |---|---|
-| `tools/` .mjs engines, `tools/lib/`, session hook | `knowledge/` schema, areas, topics |
+| `tools/claude-session-start.sh` | `knowledge/` schema, areas, topics |
 | `.claude/agents/*.md` | `backlog/` schema and data |
 | `.claude/skills/orchestrating`, `finishing-a-feature`, `migrating-knowledge` | `.claude/schemas/deliverables.json`, evals |
 | `.githooks/commit-msg` | `.github/workflows/knowledge.yml`, `CLAUDE.md`, settings |
@@ -290,19 +290,19 @@ houserules list --open | get WI-001 | batch 1 | set WI-001 status=done batch=1 |
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor workflow.
 
 ```sh
-mise run setup    # pnpm install, activates the commit-msg hook (trailer gate + check-commit)
-mise run test     # vitest with coverage
+mise run setup    # activates the commit-msg hook (trailer gate + check-commit)
 mise run lint     # shellcheck, check-knowledge, check-backlog, render --check
 cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 ```
 
-Package operations go through pnpm only (`pnpm add --save-exact …`); tool
-versions are pinned in `mise.toml`. This repository runs its own kit (id
+Package operations go through cargo only (`cargo add <crate>@=<version>`);
+tool versions are pinned in `mise.toml`. This repository runs its own kit (id
 prefix `HR`): `template/` is the source, the root `tools/`, `.claude/agents/`,
 and `.claude/skills/` are the installed copy. Edit `template/`, then run
 `houserules update --dir .` (`mise run houserules -- update --dir .`);
-`tests/dogfood.test.mjs` pins the copies to their sources. `knowledge/` and
-`backlog/` at the root are this repository's own rules and work items.
+`crates/houserules/tests/dogfood.rs` pins the copies to their sources.
+`knowledge/` and `backlog/` at the root are this repository's own rules
+and work items.
 
 ## License
 

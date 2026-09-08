@@ -1,6 +1,6 @@
 ---
 paths:
-  - "bin/**"
+  - "crates/houserules/src/**"
 ---
 Generated from knowledge/ by houserules render. Do not edit.
 

@@ -1,0 +1,7 @@
+{
+  "command": "houserules standing --dir tests/fixtures/mini",
+  "cwd": "tests/fixtures/mini",
+  "stdout": "[\n  {\n    \"id\": \"mini.standing-example\",\n    \"summary\": \"Always run the mini fixture's own regeneration before trusting its output.\"\n  }\n]\n",
+  "stderr": "",
+  "exit": 0
+}

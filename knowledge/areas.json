@@ -3,8 +3,8 @@
   "process": { "paths": [] },
   "docs": { "paths": ["docs/**", "README.md", "CLAUDE.md", "knowledge/**", "backlog/**", ".claude/**"] },
   "tools": { "paths": ["tools/**", ".github/**", "mise.toml"] },
-  "cli": { "paths": ["bin/**"] },
+  "cli": { "paths": ["crates/houserules/src/**"] },
   "template": { "paths": ["template/**"] },
-  "tests": { "paths": ["tests/**", "vitest.config.mts", "vitest.shared.mts", "vitest.kb-coverage.config.mts"] },
+  "tests": { "paths": ["tests/**"] },
   "rust": { "paths": ["crates/**", "Cargo.toml", "Cargo.lock"] }
 }

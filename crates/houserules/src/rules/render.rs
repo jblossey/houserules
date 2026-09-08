@@ -1,6 +1,6 @@
 //! `renderAll` and the `render` command: `tools/kb.mjs`'s generated-file
-//! writer, ported byte-for-byte (HR-054 task 3; the frozen fixture corpus
-//! under `tests/corpus/` is the parity gate — see
+//! writer, ported byte-for-byte (HR-054 task 3; the reviewed goldens
+//! under `tests/goldens/render/` are the parity gate — see
 //! `crates/houserules/tests/`).
 //!
 //! `render_and_report` (batch 18 T3) is `cmd_render`'s own non-`--check`

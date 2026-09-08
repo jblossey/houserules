@@ -47,11 +47,19 @@ fn repo_root() -> PathBuf {
 
 /// Formerly-`KIT_OWNED` paths `update` deletes from an install if present
 /// -- `install.rs`'s own private `RETIRED`, whose exact contents that
-/// module's own `retired_holds_the_shell_tools_moved_at_t5` test already
-/// pins; duplicated here (not exported by the binary, and the CLI has no
-/// subcommand that echoes it) only so this file's own assertions below can
-/// name the two paths without hand-writing them a second time inline.
-const RETIRED: &[&str] = &["tools/kb.sh", "tools/backlog.sh"];
+/// module's own `retired_holds_the_shell_tools_and_the_js_engines_they_
+/// fronted` test already pins; duplicated here (not exported by the
+/// binary, and the CLI has no subcommand that echoes it) only so this
+/// file's own assertions below can name the paths without hand-writing
+/// them a second time inline.
+const RETIRED: &[&str] = &[
+    "tools/kb.sh",
+    "tools/backlog.sh",
+    "tools/kb.mjs",
+    "tools/backlog.mjs",
+    "tools/lib/cli.mjs",
+    "tools/lib/json-store.mjs",
+];
 
 /// Runs `houserules files` and returns its `kitOwned`/`seedOnce` arrays as
 /// owned strings -- the one CLI-exposed form of the binary's own manifest
@@ -128,7 +136,7 @@ fn eval_scenarios(seed_once: &[String]) -> Vec<String> {
 fn kit_owned_manifest_separates_from_seed_once_and_has_no_overlap() {
     let (kit_owned, seed_once) = kit_files();
     for expected in [
-        "tools/kb.mjs",
+        "tools/claude-session-start.sh",
         ".claude/agents/implementer.md",
         ".claude/skills/orchestrating/SKILL.md",
         ".claude/skills/migrating-knowledge/SKILL.md",
@@ -236,9 +244,11 @@ fn retired_paths_are_absent_from_both_root_and_template() {
 
 /// Ports `tests/dogfood.test.mjs`'s `describe('dogfood')`, "stamps the
 /// installed version and the HR id prefix": this repository's own
-/// `.houserules.json` names its own `package.json` version and the `HR`
+/// `.houserules.json` names `env!("CARGO_PKG_VERSION")` and the `HR`
 /// backlog id prefix -- proof this repository dogfoods its own `init`/
-/// `update` output rather than a hand-written stamp.
+/// `update` output rather than a hand-written stamp. Read from
+/// `package.json` before batch 20 T3 (HR-047) retired that file;
+/// `install::kit_version`'s own doc has the account.
 #[test]
 fn houserules_json_stamps_the_installed_version_and_the_hr_id_prefix() {
     let root = repo_root();
@@ -246,13 +256,9 @@ fn houserules_json_stamps_the_installed_version_and_the_hr_id_prefix() {
         &fs::read_to_string(root.join(".houserules.json")).expect("read .houserules.json"),
     )
     .expect("parse .houserules.json");
-    let package: serde_json::Value = serde_json::from_str(
-        &fs::read_to_string(root.join("package.json")).expect("read package.json"),
-    )
-    .expect("parse package.json");
     assert_eq!(
         stamp,
-        serde_json::json!({"version": package["version"], "idPrefix": "HR"})
+        serde_json::json!({"version": env!("CARGO_PKG_VERSION"), "idPrefix": "HR"})
     );
 }
 

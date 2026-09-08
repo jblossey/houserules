@@ -233,18 +233,18 @@ use crate::node_path::resolve_like_node;
 #[folder = "../../template/"]
 struct Payload;
 
-/// Machinery files houserules owns: `init` writes them and (T4) `update`
-/// overwrites them. `bin/houserules.mjs`'s own `KIT_OWNED`, ported
-/// verbatim -- `tests/install.rs`'s own copy pins this list against a live
-/// `node bin/houserules.mjs files` capture, so the two cannot silently
-/// drift apart.
+/// Machinery files houserules owns: `init` writes them and `update`
+/// overwrites them. `bin/houserules.mjs`'s own `KIT_OWNED`, originally
+/// ported verbatim -- `tests/install.rs`'s own copy pins this list, so
+/// the two cannot silently drift apart. `tools/kb.mjs`, `tools/backlog.mjs`,
+/// `tools/lib/cli.mjs`, and `tools/lib/json-store.mjs` left this list at
+/// batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2): the
+/// shipped-but-inert JS engines (`houserules.payload-runs-on-builtins`
+/// already made every reference to them dead code) retired from the
+/// payload outright, joining `RETIRED` below.
 const KIT_OWNED: &[&str] = &[
-    "tools/kb.mjs",
-    "tools/backlog.mjs",
     "tools/claude-session-start.sh",
     ".githooks/commit-msg",
-    "tools/lib/cli.mjs",
-    "tools/lib/json-store.mjs",
     ".claude/agents/implementer.md",
     ".claude/agents/task-reviewer.md",
     ".claude/agents/branch-reviewer.md",
@@ -291,8 +291,18 @@ const PREFIXED: &[&str] = &[
 /// mechanism and why it is new rather than ported). Batch 18 T5 moved
 /// `tools/kb.sh` and `tools/backlog.sh` here, in the same commit that
 /// rewrote every shipped reference to them off the flat `houserules`
-/// command surface.
-const RETIRED: &[&str] = &["tools/kb.sh", "tools/backlog.sh"];
+/// command surface. Batch 20 T3 (HR-047) adds the four JS engines those
+/// two shims used to front -- `tools/kb.mjs`, `tools/backlog.mjs`,
+/// `tools/lib/cli.mjs`, `tools/lib/json-store.mjs` -- the mechanism's
+/// second use (this module's own doc, "Deletion", names the first).
+const RETIRED: &[&str] = &[
+    "tools/kb.sh",
+    "tools/backlog.sh",
+    "tools/kb.mjs",
+    "tools/backlog.mjs",
+    "tools/lib/cli.mjs",
+    "tools/lib/json-store.mjs",
+];
 
 /// Path, relative to a target repository, `.claude/settings.json` seeds or merges at.
 const SETTINGS_PATH: &str = ".claude/settings.json";
@@ -325,26 +335,20 @@ fn is_id_prefix(value: &str) -> bool {
 }
 
 /// The kit version stamped into `.houserules.json`'s `version` field --
-/// the same value `bin/houserules.mjs`'s own `VERSION` constant reads at
-/// runtime from `package.json`, baked in here at compile time via
-/// `include_str!` instead: a release binary carries no `package.json` on
-/// disk to read at runtime (the whole point of embedding), and a
-/// hand-copied literal constant would drift silently the next time
-/// `package.json`'s `version` changes without this file being touched.
-/// A separate read from `CARGO_PKG_VERSION` (`houserules --version`,
-/// `tests/version.rs`) by construction, not by value: release-please's
-/// `extra-files` config keeps `Cargo.toml`'s `version` field equal to
-/// `package.json`'s at every release (`Cargo.toml`'s own comment), and
-/// `kit_version_matches_the_crate_s_own_cargo_pkg_version` pins the two
-/// answers equal.
+/// `env!("CARGO_PKG_VERSION")`, the same value `houserules --version`
+/// reports (`tests/version.rs`), baked in by cargo itself at compile
+/// time. Before batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-
+/// phase5.md §2) this read `package.json` instead, via `include_str!`,
+/// as an independent cross-check against `CARGO_PKG_VERSION`:
+/// release-please's `extra-files` config kept `Cargo.toml`'s and
+/// `package.json`'s `version` fields in lockstep at every release, and a
+/// dedicated test pinned the two answers equal. `package.json` retired
+/// with the rest of the JS toolchain at T3 (HR-073 tracks release-please's
+/// own config catching up), so `Cargo.toml` is now the only version
+/// source in this repository and the cross-check collapses to this one
+/// field.
 fn kit_version() -> String {
-    const PACKAGE_JSON: &str = include_str!("../../../package.json");
-    let value: Value = serde_json::from_str(PACKAGE_JSON)
-        .expect("this repository's own package.json is valid JSON");
-    value["version"]
-        .as_str()
-        .expect("this repository's own package.json has a string version")
-        .to_string()
+    env!("CARGO_PKG_VERSION").to_string()
 }
 
 /// Reads one payload file, rewriting the backlog id prefix where it
@@ -777,26 +781,18 @@ mod tests {
 
     /// `tests/install.rs`'s `init_stamps_the_marker_with_the_kit_version_and_
     /// the_default_id_prefix` is the real cross-check, comparing a fresh
-    /// `.houserules.json` stamp against an independent, runtime
-    /// `fs::read_to_string` of `package.json` -- this unit test only pins
-    /// that `kit_version` extracts a non-empty `version` string at all,
-    /// since `include_str!` bakes the same file in at the same path either
-    /// way and cannot itself prove the extraction is correct.
+    /// `.houserules.json` stamp against that test's own, independent
+    /// `env!("CARGO_PKG_VERSION")` -- this unit test only pins that
+    /// `kit_version` extracts a non-empty string at all. Batch 20 T3
+    /// removed the sibling `kit_version_matches_the_crate_s_own_cargo_pkg_
+    /// version` test this doc used to point to: since `kit_version` now IS
+    /// `env!("CARGO_PKG_VERSION").to_string()` (that function's own doc has
+    /// the account), asserting the two equal had become a tautology, true
+    /// by construction and unable to ever fail -- dead weight, not
+    /// coverage.
     #[test]
     fn kit_version_is_a_non_empty_string() {
         assert!(!kit_version().is_empty());
-    }
-
-    /// Pins the phase-4 convergence (batch 19 T1 fix round 1): `dist plan
-    /// --tag=v<package.json version>` only resolves when
-    /// `crates/houserules/Cargo.toml`'s own `version` carries that same
-    /// value, since `CARGO_PKG_VERSION` is dist's only source for the crate
-    /// version. release-please's `extra-files` config keeps the two in sync
-    /// at every future release; this test is what a drift between them
-    /// would break first.
-    #[test]
-    fn kit_version_matches_the_crate_s_own_cargo_pkg_version() {
-        assert_eq!(kit_version(), env!("CARGO_PKG_VERSION"));
     }
 
     /// `RETIRED` holds real paths now (this module's own "Deletion" doc
@@ -847,13 +843,25 @@ mod tests {
     /// from_an_old_install` (tests/update.rs) covers the CLI-visible half;
     /// this is the one place a hand edit widening or reordering `RETIRED`
     /// shows up as a conscious diff to this exact list, not a silent pass.
-    /// Batch 18 T5 (this commit) moves `tools/kb.sh` and `tools/backlog.sh`
-    /// here together (this module's own "Deletion" doc): every shipped
-    /// reference to the shell wrappers is rewritten to the flat `houserules`
-    /// command in the same commit, so an install that still carries either
-    /// file has it deleted, not resynced, at its next `update`.
+    /// Batch 18 T5 moved `tools/kb.sh` and `tools/backlog.sh` here first
+    /// (every shipped reference to the shell wrappers rewritten to the flat
+    /// `houserules` command in that same commit); batch 20 T3 (HR-047)
+    /// adds the four JS engines those wrappers used to front, in the same
+    /// commit that drops them from `KIT_OWNED` (this module's own
+    /// "Deletion" doc). An install that still carries any of the six has
+    /// it deleted, not resynced, at its next `update`.
     #[test]
-    fn retired_holds_the_shell_tools_moved_at_t5() {
-        assert_eq!(RETIRED, ["tools/kb.sh", "tools/backlog.sh"]);
+    fn retired_holds_the_shell_tools_and_the_js_engines_they_fronted() {
+        assert_eq!(
+            RETIRED,
+            [
+                "tools/kb.sh",
+                "tools/backlog.sh",
+                "tools/kb.mjs",
+                "tools/backlog.mjs",
+                "tools/lib/cli.mjs",
+                "tools/lib/json-store.mjs",
+            ]
+        );
     }
 }

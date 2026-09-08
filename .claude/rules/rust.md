@@ -14,6 +14,6 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 ## Gotchas
 
-- [houserules.glob-union-matcher] globMatch in tools/kb.mjs is a union: matchesGlob for the full vocabulary, globToRegExp only for `**`/`*` with dot-segments; combining both matches neither.
+- [houserules.glob-union-matcher] RETIRED at batch 20 T3: tools/kb.mjs's own globMatch union is gone; crates/houserules/src/rules/glob.rs's globset engine is the only matcher left.
 
 Detail: houserules get <id>

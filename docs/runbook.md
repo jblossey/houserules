@@ -3,6 +3,43 @@
 Operational steps for maintaining this repository. Each section covers
 one recurring task.
 
+## Known gap: release-please breaks on the next push to main (HR-073)
+
+`.github/workflows/release-please.yml` runs `googleapis/
+release-please-action@v5.0.0` on every push to `main` (`on: push:
+branches: [main]`) — not only when a release is being cut. That action
+resolves release-please `^17.6.0`; `release-please-config.json` declares
+the `v17.11.2` schema, and `packages["."].release-type` there still
+names `"node"`, with no `package-name` override set.
+
+Verified against the pinned `v17.11.2` source (not a config-string
+reading alone, per process.wiring-checks-run-the-resolution):
+`BaseStrategy.buildReleasePullRequest` calls `getBranchComponent()` to
+name the release branch. Unlike its sibling `getComponent()`,
+`getBranchComponent()` is NOT guarded by `includeComponentInTag` — it
+always calls `getDefaultComponent()`, which falls through to
+`this.packageName ?? getDefaultPackageName()` since no `package-name` is
+configured. The Node strategy's `getDefaultPackageName()` reads
+`package.json` through `getPkgJsonContents()`; when that file is
+missing, `getPkgJsonContents()` catches the resulting `FileNotFoundError`
+and throws `MissingRequiredFileError` naming `package.json`, `'node'`,
+and this repository.
+
+Batch 20 T3 (HR-047) retired `package.json` from this repository. The
+next push to `main` — the merge of that batch's own branch, not a later
+release attempt — runs `buildReleasePullRequest` against a repository
+with no `package.json`, and the call path above throws before any PR is
+opened. HR-068 (the tag-push token gap) does not shield this: that gap
+is about `release.yml` never starting after a tag pushes, which happens
+strictly later in the pipeline than this failure. This is a PRE-MERGE
+owner decision, not one riding HR-068 or HR-069's step-two release
+track: meet it before merging batch 20's branch to `main`, since the
+break fires on that merge itself. HR-073 names the choice (a
+release-type other than `"node"`, or `"node"` with an explicit
+`package-name` pointing at a file that still exists) without
+prescribing it — the replacement needs a real release-please run to
+close, which this checkout cannot perform.
+
 ## Cutting a release
 
 The pipeline (docs/specs/2026-09-06-batch-19-phase4.md §2, T1): a plain
@@ -13,17 +50,18 @@ and run `dist generate`; never hand-edit the generated workflow. One
 release runs:
 
 1. **Merge the release-please PR.** release-please keeps a PR open
-   against `main` that bumps `package.json`'s version,
-   `crates/houserules/Cargo.toml`'s version in lockstep (the `toml`
-   `extra-files` entry), and — from this batch — every pinned install
-   URL in README.md and the seeded `template/.github/workflows/
+   against `main` that bumps `crates/houserules/Cargo.toml`'s version
+   (the `toml` `extra-files` entry), and — from batch 19 — every pinned
+   install URL in README.md and the seeded `template/.github/workflows/
    knowledge.yml`'s own install step (the `x-release-please-version`/
    `-start-version`/`-end` annotations; HR-049's measured mechanism,
    `.superpowers/sdd/2026-09-06-batch-19/t2-evidence/
    generic-updater-check-green.log` and
    `generic-updater-check-knowledge-yml-green.log`). Merging this PR is
    the release trigger, and it lands the seeded workflow's own pin
-   already current for the release it is about to trigger.
+   already current for the release it is about to trigger. This step
+   presupposes the known gap above is already resolved; release-please
+   cannot open this PR at all otherwise.
 2. **Meet HR-068 before merging, not after.** `release-please-action`
    tags and releases on the default `GITHUB_TOKEN`, and GitHub does not
    start a workflow from a tag that token pushes
@@ -84,10 +122,12 @@ above), then again only when the registration itself needs an update
 
 ## After a release-please merge, restamp the kit version
 
-release-please opens a PR that bumps `package.json`'s version. The merge
-does not update `.houserules.json`. The stale stamp fails
-`tests/dogfood.test.mjs` on main, because that test pins the stamp to
-the running version.
+release-please opens a PR that bumps `crates/houserules/Cargo.toml`'s
+version (HR-073's known gap above applies here too, until it resolves).
+The merge does not update `.houserules.json`. The stale stamp fails
+`crates/houserules/tests/dogfood.rs`'s `houserules_json_stamps_the_
+installed_version_and_the_hr_id_prefix` test on main, because that test
+pins the stamp to the running version (`CARGO_PKG_VERSION`).
 
 After you merge a release-please PR, restamp the kit:
 
