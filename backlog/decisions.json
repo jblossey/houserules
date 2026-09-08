@@ -144,6 +144,22 @@
     {
       "date": "2026-09-06",
       "text": "Phase-4 gate: the batch 19 spec approved as drafted; cargo-dist ruled for the release pipeline (active through 2026, pinned exactly at adoption) over taiki-e's action and a hand-rolled matrix; macOS binaries ship unsigned with the documented quarantine note, signing revisited at 1.0. docs/design.md §5.37."
+    },
+    {
+      "date": "2026-09-07",
+      "text": "Command fields are literal: claims-match-artifacts gains the copied-never-retyped bullet with reviewer paste-runs; a field that cannot paste-run is a finding by itself. Four failed rounds at batch 19; HR-071 pairs the checker lint. Applied in both copies at batch 20. docs/design.md 5.38."
+    },
+    {
+      "date": "2026-09-07",
+      "text": "A flip closure sweeps the retired form: closure-claims-carry-enumeration gains the zero-hit residue-sweep bullet - the enumeration is of the old form's residue, not the new form's presence. Applied in both copies at batch 20. docs/design.md 5.39."
+    },
+    {
+      "date": "2026-09-07",
+      "text": "Batch 19 accepted (phase 4, main 6a79ace) under the two-step reality; the step-two queue stands and the controller selects the next gate. docs/design.md 5.40."
+    },
+    {
+      "date": "2026-09-07",
+      "text": "Phase-5 gate: the batch 20 spec approved as drafted - the complete JS retirement closing HR-047, the checker through the binary with the paste-run lint, the skill clauses, and the ruled closing sweep with the permanent residue gate. docs/design.md 5.41."
     }
   ],
   "notes": []

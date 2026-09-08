@@ -1148,7 +1148,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null
+      "batch": 20
     },
     {
       "id": "HR-067",
@@ -1161,7 +1161,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null
+      "batch": 20
     },
     {
       "id": "HR-068",
@@ -1216,7 +1216,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null
+      "batch": 20
     }
   ]
 }
