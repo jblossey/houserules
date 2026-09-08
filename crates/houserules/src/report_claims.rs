@@ -1,14 +1,34 @@
-//! Cross-checks one deliverable report's claims against the artifacts and
-//! git history it cites -- `tools/check-report-claims.mjs`, ported to a
-//! `src/bin/` target in this crate (batch 18 T1, HR-061,
-//! docs/specs/2026-09-05-batch-18-phase3.md §7). Dev tooling: not part of
-//! the flat command surface `crate::main` dispatches, not shipped in
-//! `template/` or the payload. A single-file bin, not a `src/bin/<name>/`
-//! directory or a separate workspace member: the checker needs none of
-//! `crate::rules`' or `crate::backlog`'s modules (only `serde_json`, `std`,
-//! and a `git` subprocess for the same plumbing every other command in
-//! this crate already shells out to), so a second workspace member would
-//! buy nothing but a second `Cargo.toml` to keep pinned.
+//! The `check-report-claims` flat-surface subcommand: cross-checks one
+//! deliverable report's claims against the artifacts and git history it
+//! cites (batch 20 T2, HR-066, docs/specs/2026-09-07-batch-20-phase5.md
+//! §3). Ported first to a dev-only `src/bin/check-report-claims.rs` target
+//! in this crate (batch 18 T1, HR-061, docs/specs/2026-09-05-batch-18-
+//! phase3.md §7: `tools/check-report-claims.mjs`, ported byte-for-check,
+//! not byte-for-byte -- see this module's own "Port notes" below for why
+//! that distinction matters here); moved here and wired into
+//! `crate::main`'s dispatch in the same commit the dev bin retires, no
+//! thin wrapper left behind: the crate carries no `[lib]` target, so a
+//! second binary sharing this module's code would need one purely to keep
+//! an invocation shape (`cargo run --bin check-report-claims`) that only
+//! this repository could ever run -- exactly the gap this move exists to
+//! close (`quality.no-compat-softening`; every doc naming that invocation
+//! now names `houserules check-report-claims` instead -- the tree-wide
+//! residue sweep bounding that closure is retained at
+//! `.superpowers/sdd/2026-09-07-batch-20/t2-evidence/residue-sweep-bin-
+//! check-report-claims.txt` and cited in this task's own report's
+//! `fix_rounds[0].tests[0]`; every hit it finds is historical prose, not
+//! a live instruction). The dev bin's `cargo run --bin
+//! check-report-claims` command could run only inside this repository;
+//! `houserules check-report-claims` runs anywhere the shipped binary
+//! does, so `template/.claude/agents/implementer.md`'s seeded closing act
+//! (HR-060) now runs in every adopter repo `houserules init` seeds, not
+//! only this one (`houserules.payload-runs-on-builtins`'s second
+//! known-gap bullet, retired at this same commit). Lives at the crate
+//! root, like `emit`, `get`, `install`, `node_path`, and `root`, for the
+//! reason each of those gives: this module needs none of `crate::rules`'
+//! or `crate::backlog`'s modules (only `serde_json`, `std`, and a `git`
+//! subprocess for the same plumbing every other command in this crate
+//! already shells out to), so nesting it under either would buy nothing.
 //!
 //! Born from batch 17 task 1 (HR-059): four fix rounds in a row each
 //! closed on one `process.claims-match-artifacts` finding, and each
@@ -93,6 +113,73 @@
 //!   marks as replaced, like a pre-review amend) reads as unresolvable,
 //!   and this tool cannot yet tell that shape of "correct but aged"
 //!   report from a genuinely broken one.
+//! - `check_paste_run_lint` (HR-071, batch 20 T2, spec §4) flags a command
+//!   field carrying an angle-bracket placeholder, text appended after the
+//!   command that a shell would run as a second, separate command, or
+//!   quoting that does not balance -- the three shapes recurring across
+//!   batch 19's four review rounds (T1 r1/r2, T2 r1/r3). It cannot see a
+//!   retyped command that still parses cleanly: batch 19 T2 round 3's own
+//!   review found a command field carrying two literal backslashes before
+//!   a quote (`python3 -c \"import yaml; ...\"`) that every real shell
+//!   parses -- differently from what was intended, but without error --
+//!   which is exactly the shape no quote-balance check can catch, named
+//!   here rather than silently missed.
+//! - `check_paste_run_lint`'s appended-text check exempts a parenthesized
+//!   subshell wrapping the WHOLE command (`( cmd )`, an idiom this
+//!   project's own history uses live) but not one chained after the
+//!   command's first token (`cmd1 && (cmd2)`, also legitimate shell):
+//!   `.superpowers/sdd/2026-09-04-batch-17/task-2-report.json`'s own
+//!   `live_run[8]` (`d=$(mktemp -d) && cp -r ... && git init -q "$d" &&
+//!   (cd "$d" && ...)`) is exactly that shape, and the shipped checker
+//!   flags it -- a real, measured false-positive vehicle (a full sweep of
+//!   this project's own 65 workspace reports, retained at
+//!   `t2-evidence/corpus-sweep-full.txt`, is where this instance surfaced),
+//!   disclosed rather than special-cased away. Narrowing this arm is
+//!   deferred to HR-072, filed against this measurement.
+//! - `check_paste_run_lint`'s placeholder check also fires on command
+//!   DATA that only looks like a placeholder, since it applies regardless
+//!   of `quote_mask`'s state: a literal `<...>` sitting inside a quoted
+//!   string (an HTML-comment probe, an email address) is real,
+//!   paste-runnable text, not a substitution point, but the check cannot
+//!   tell the two apart. This is the lint's most frequent false-positive
+//!   vehicle in this project's own history: the same corpus sweep finds
+//!   it 5 times across 4 reports --
+//!   `.superpowers/sdd/2026-09-01-batch-4/task-4-report.json` `tests[10]`
+//!   (an HTML-comment probe, `<!-- probe: ... -->`),
+//!   `.superpowers/sdd/2026-09-02-batch-6/task-4-report.json` `tests[13]`
+//!   and `fix_rounds[0].tests[18]`,
+//!   `.superpowers/sdd/2026-09-05-batch-18/task-2-report.json`
+//!   `live_run[4]`, and
+//!   `.superpowers/sdd/2026-09-07-batch-20/task-1-report.json`
+//!   `live_run[11]` (the last three of these four a `git commit -m
+//!   "... Co-Authored-By: ... <a@b.com>"` shape this repository's own
+//!   standing no-coauthor rule guarantees will keep recurring as literal
+//!   test data). Narrowing this arm (a quote-aware placeholder check) is
+//!   deferred to HR-072 alongside the subshell narrowing above.
+//! - `check_paste_run_lint`'s placeholder check reads any `<...>` span
+//!   with no whitespace touching either bracket as a placeholder,
+//!   excluding only `<(`/`>(` process substitution -- verified against
+//!   the same corpus sweep, which never misreads a real process
+//!   substitution (`diff <(cmd1) <(cmd2)`, seen live in this project's
+//!   own history) as one. A command legitimately using bare `< file`
+//!   stdin redirection immediately followed later on the same line by a
+//!   `>` output redirect would still misread as a placeholder; no report
+//!   in the swept corpus does this, so it stays a theoretical,
+//!   undemonstrated vehicle, not one this project's own history can point
+//!   an instance at.
+//! - `quote_mask` has no notion of `$(...)` command substitution
+//!   resetting quote context: real bash parses a same-character quote
+//!   opened again inside a `$(...)` (or `` `...` ``) as starting a fresh,
+//!   independent quoted region, not as closing the one around the whole
+//!   substitution. This walk does not track that: `bash -c "$(python3 -c
+//!   "import yaml; d=yaml.safe_load(open('...')); ...")"` (batch 19 task
+//!   2's own `fix_rounds[0].tests[4]`/`fix_rounds[2].tests[0]`, a real,
+//!   valid command) reads the inner `"import yaml...` quote as closing
+//!   the outer one, so by the time the walk reaches `open(...)` it
+//!   believes itself outside any quote -- a false positive, surfaced live
+//!   by this lint's first run against real report history (this task's
+//!   own `live_run`), not one a walker this project deliberately keeps
+//!   below full shell grammar (see the port notes above) can rule out.
 //!
 //! Port notes (batch 18 T1, disclosed divergences from the frozen JS --
 //! this tool carries no frozen-corpus parity contract, unlike the flat
@@ -109,13 +196,13 @@
 //!   absolute-target cases the ported suite exercises (verified live by
 //!   that suite), but it does not collapse a `.`/`..` segment the way
 //!   `path.resolve` does; no ported test names a path containing one.
-//! - A usage error (no report path given) is a named stderr line and exit
-//!   code 2, this crate's own CLI-failure-path convention
-//!   (`houserules.crash-paths-are-named`), not JS's thrown `UsageError`.
-//!   A `git` failure (not a repository, `git` missing) is likewise a
-//!   named error rather than an uncaught crash.
+//! - A usage error (no report path given) is clap's own required-argument
+//!   message, exit 2, once this tool became a flat-surface subcommand
+//!   (batch 20 T2) -- neither JS's thrown `UsageError` nor the dev bin's
+//!   own hand-written `usage:` line, both retired with it. A `git`
+//!   failure (not a repository, `git` missing) is likewise a named error
+//!   rather than an uncaught crash (`houserules.crash-paths-are-named`).
 
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 
@@ -606,12 +693,240 @@ fn check_self_audit_narrative(
     }
 }
 
+/// A reason `quote_mask` could not finish walking a command string to the
+/// end -- the "failed shlex-style parse" shape `check_paste_run_lint`
+/// (HR-071) flags. Both cases are exactly what a real shell's own
+/// word-splitter also refuses: an unterminated quote leaves the shell
+/// waiting for more input (`> ` on an interactive prompt), and a trailing
+/// backslash with nothing to escape is a syntax error.
+enum QuoteParseError {
+    /// A `'` or `"` opened by the command is never closed.
+    UnterminatedQuote(char),
+    /// The command ends in a single, unescaped `\` with no following
+    /// character for it to escape.
+    TrailingBackslash,
+}
+
+impl std::fmt::Display for QuoteParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            QuoteParseError::UnterminatedQuote(quote) => {
+                write!(f, "an unterminated {quote} quote")
+            }
+            QuoteParseError::TrailingBackslash => write!(f, "a trailing, unescaped backslash"),
+        }
+    }
+}
+
+/// Walks `command` the way a POSIX shell splits it into words far enough
+/// to answer two questions: does the quoting balance, and which byte
+/// offsets sit inside an open quote? Single quotes (`'...'`) admit no
+/// escapes, matching the POSIX shell grammar's own "a single-quote cannot
+/// occur within single-quotes" (IEEE Std 1003.1-2024 §2.2.2, verified
+/// live). Outside any quote, POSIX has a bare backslash escape exactly
+/// the next character; this walk matches that. Inside double quotes,
+/// POSIX escapes a backslash only before five characters (`$`, `` ` ``,
+/// `"`, `\`, a literal newline); this walk instead escapes ANY following
+/// byte the same way, a deliberate over-approximation verified not to
+/// change either check `check_paste_run_lint` builds on this mask:
+/// treating `\p` as one escaped pair rather than two independent literal
+/// bytes never flips whether a quote later balances or whether a given
+/// byte reads as "inside a quote" -- it only matters for a backslash
+/// immediately before the closing quote itself, which POSIX escapes too
+/// (`\"`), so the two readings never diverge in practice. That is the
+/// whole grammar this walk implements -- no globs, no
+/// `$(...)`/`` `...` `` substitution (see the module doc's limits for the
+/// one false positive this omission produces), no parameter expansion --
+/// because `check_paste_run_lint`'s two other checks need nothing more
+/// than the quote/escape state to run safely.
+///
+/// A hand-rolled walk, not a crate (`shlex`, `shell-words`, `shellwords`):
+/// none is already a dependency of this crate, spec §8
+/// (docs/specs/2026-09-07-batch-20-phase5.md) bounds this task to std plus
+/// the crate's existing dependencies, and every one of those crates
+/// implements the full POSIX word-splitting grammar this lint has no use
+/// for (`security-hygiene.dependency-vetting`,
+/// `quality.well-maintained-libraries`: reasoning stated per the task,
+/// since this repository carries no maintained, std-only, no-execution
+/// tokenizer today).
+fn quote_mask(command: &str) -> Result<Vec<bool>, QuoteParseError> {
+    let bytes = command.as_bytes();
+    let mut mask = vec![false; bytes.len()];
+    let mut open_quote: Option<u8> = None;
+    let mut i = 0;
+    while i < bytes.len() {
+        let byte = bytes[i];
+        match open_quote {
+            Some(quote) if byte == quote => {
+                mask[i] = true;
+                open_quote = None;
+            }
+            Some(b'"') if byte == b'\\' && i + 1 < bytes.len() => {
+                mask[i] = true;
+                mask[i + 1] = true;
+                i += 1;
+            }
+            Some(_) => mask[i] = true,
+            None if byte == b'\'' || byte == b'"' => open_quote = Some(byte),
+            None if byte == b'\\' => {
+                if i + 1 >= bytes.len() {
+                    return Err(QuoteParseError::TrailingBackslash);
+                }
+                mask[i + 1] = true;
+                i += 1;
+            }
+            None => {}
+        }
+        i += 1;
+    }
+    match open_quote {
+        Some(quote) => Err(QuoteParseError::UnterminatedQuote(quote as char)),
+        None => Ok(mask),
+    }
+}
+
+/// The longest angle-bracket placeholder body this check will read as one
+/// -- long enough for every placeholder this project's own reports use
+/// (`<REPORT_FILE>`, `<pinned url>`, `<scratch-clone-of-repo>`), short
+/// enough that a stray `<` far from any real `>` cannot force a long,
+/// pointless scan.
+const PLACEHOLDER_SCAN_LIMIT: usize = 80;
+
+/// Finds the first angle-bracket placeholder in `command`: a `<...>` span
+/// with no whitespace touching either bracket from the inside (a real
+/// placeholder in this project's own history is always packed text,
+/// `<scratch-target>`/`<pinned url>`; a bare `< file` or `> file` is a
+/// shell redirection, not a placeholder) and no nested `<`/`>` inside.
+/// `<(`/`>(` (bash process substitution, seen live in this project's own
+/// history: `diff <(git show ...) <(git show ...)`) is excluded up front,
+/// since it never has whitespace at that boundary either and process
+/// substitution is unambiguous shell syntax, never a placeholder.
+/// Returns the placeholder's inner text (without its brackets). Applies
+/// regardless of `quote_mask`'s state: a placeholder still needs manual
+/// substitution whether or not it sits inside quotes.
+fn find_placeholder(command: &str) -> Option<&str> {
+    let bytes = command.as_bytes();
+    let mut search_from = 0;
+    while let Some(relative_open) = command[search_from..].find('<') {
+        let open = search_from + relative_open;
+        let after = open + 1;
+        let starts_boundary = match bytes.get(after) {
+            None => true,
+            Some(byte) => *byte == b'(' || byte.is_ascii_whitespace(),
+        };
+        if starts_boundary {
+            search_from = after;
+            continue;
+        }
+        let scan_end = bytes.len().min(after + PLACEHOLDER_SCAN_LIMIT);
+        let mut close = None;
+        for (offset, byte) in bytes[after..scan_end].iter().enumerate() {
+            match byte {
+                b'>' => {
+                    close = Some(after + offset);
+                    break;
+                }
+                b'<' | b'\n' => break,
+                _ => {}
+            }
+        }
+        if let Some(close) = close
+            && close > after
+            && !bytes[close - 1].is_ascii_whitespace()
+        {
+            return Some(&command[after..close]);
+        }
+        search_from = after;
+    }
+    None
+}
+
+/// Finds the byte offset of text after `command`'s first token that a
+/// shell would run as its own, separate command if the field were pasted:
+/// an unquoted `#` comment marker at the start of a word (POSIX begins a
+/// comment only there, never mid-word -- verified live, see the
+/// implementation's own doc), or an unquoted `(` that opens neither a
+/// `$(...)` command substitution nor an escaped `\(` literal (`find`'s own
+/// `\( -name a -o -name b \)` idiom, seen live in this project's own
+/// history) nor process substitution's own `<(`/`>(`. A `(` that is
+/// itself the command's first token -- a subshell wrapping the WHOLE
+/// command (`( cmd; echo "EXIT=$?" )`, also seen live) -- is exempt too:
+/// only text appended AFTER a command that has already started counts
+/// (see the module doc's limits for the one shape of chained, legitimate
+/// parenthetical this does not exempt). `mask` (from `quote_mask`)
+/// excludes both markers from consideration while inside a quoted string,
+/// where they are ordinary text, not shell syntax.
+fn find_appended_annotation(command: &str, mask: &[bool]) -> Option<usize> {
+    let bytes = command.as_bytes();
+    let mut seen_token = false;
+    for (i, &byte) in bytes.iter().enumerate() {
+        if !mask[i] {
+            let word_initial = i == 0 || bytes[i - 1].is_ascii_whitespace();
+            match byte {
+                // POSIX (IEEE Std 1003.1-2024 §2.3, verified live): '#' begins a
+                // comment only as the first character of a word, never mid-word
+                // (`foo#bar` is one literal token, not `foo` plus a comment).
+                b'#' if seen_token && word_initial => return Some(i),
+                b'(' if seen_token => {
+                    let preceding = if i == 0 { None } else { Some(bytes[i - 1]) };
+                    if !matches!(
+                        preceding,
+                        Some(b'$') | Some(b'\\') | Some(b'<') | Some(b'>')
+                    ) {
+                        return Some(i);
+                    }
+                }
+                _ => {}
+            }
+        }
+        if !byte.is_ascii_whitespace() {
+            seen_token = true;
+        }
+    }
+    None
+}
+
+/// The bounded, no-execution paste-run lint (HR-071, batch 20 T2, spec
+/// §4): flags a command field carrying an angle-bracket placeholder, text
+/// appended after the command that a shell would run as a second command,
+/// or quoting that does not balance -- the three shapes recurring across
+/// batch 19's four review rounds (see the module doc's limits for what
+/// none of the three can see). A command whose quoting fails to parse
+/// skips the other two checks: without a reliable quote mask,
+/// `find_appended_annotation` cannot safely tell quoted text from shell
+/// syntax, and one finding per broken command is enough.
+fn check_paste_run_lint(runs: &[(String, Run)], errors: &mut Vec<String>) {
+    for (label, run) in runs {
+        let mask = match quote_mask(&run.command) {
+            Ok(mask) => mask,
+            Err(error) => {
+                errors.push(format!(
+                    "{label}: command's quoting does not parse ({error}) and cannot paste-run as written"
+                ));
+                continue;
+            }
+        };
+        if let Some(placeholder) = find_placeholder(&run.command) {
+            errors.push(format!(
+                "{label}: command carries the placeholder \"<{placeholder}>\" and cannot paste-run as written"
+            ));
+        }
+        if let Some(position) = find_appended_annotation(&run.command, &mask) {
+            errors.push(format!(
+                "{label}: command has \"{}\" appended after it, which a shell would run as a second, separate command if pasted",
+                run.command[position..].trim_end()
+            ));
+        }
+    }
+}
+
 /// Reads and parses `path` as a JSON report, naming the file in any read
 /// or parse error -- `tools/lib/json-store.mjs`'s `readJson`, collapsed to
 /// one named-error shape (`houserules.crash-paths-are-named`): JS raises a
 /// plain `Error` for a missing file and a `UsageError` for invalid JSON,
-/// kept apart only so its `main` can choose an exit code, but this
-/// binary's one caller (`run`) treats both the same way, exit 2.
+/// kept apart only so its `main` can choose an exit code, but
+/// `cmd_check_report_claims`, the one caller that maps this function's
+/// errors to an exit code, treats both the same way, exit 2.
 fn load_report(path: &Path) -> Result<Value, String> {
     let text =
         std::fs::read_to_string(path).map_err(|error| format!("{}: {error}", path.display()))?;
@@ -621,8 +936,9 @@ fn load_report(path: &Path) -> Result<Value, String> {
 /// Runs every check above against the report at `report_path` and returns
 /// its errors, each a one-line, self-contained description naming the
 /// field and the mismatch. An empty vec is a clean run: every capture,
-/// marker, and narrative claim this tool knows how to check matched its
-/// artifact. `Err` only when `report_path` could not be read as JSON.
+/// marker, narrative claim, and command field this tool knows how to
+/// check matched its artifact and could paste-run. `Err` only when
+/// `report_path` could not be read as JSON.
 fn check_report_claims(report_path: &Path, root: &Path) -> Result<Vec<String>, String> {
     let report = load_report(report_path)?;
     let runs = collect_runs(&report);
@@ -633,80 +949,50 @@ fn check_report_claims(report_path: &Path, root: &Path) -> Result<Vec<String>, S
     check_self_audit_head_is_current(root, &report, &mut errors);
     check_narrative_shas_resolve(root, &narrative, &mut errors);
     check_self_audit_narrative(&narrative, &report, &mut errors);
+    check_paste_run_lint(&runs, &mut errors);
     Ok(errors)
 }
 
-/// Resolves the enclosing git repository's top level from `cwd` -- `git
-/// rev-parse --show-toplevel`, `tools/lib/json-store.mjs`'s `repoRoot`. A
-/// failure (not inside a repository, or `git` itself missing) is a named
-/// error, never an uncaught crash (`houserules.crash-paths-are-named`).
-fn repo_root(cwd: &Path) -> Result<PathBuf, String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--show-toplevel"])
-        .current_dir(cwd)
-        .output()
-        .map_err(|error| format!("could not run git: {error}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "not inside a git repository: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    Ok(PathBuf::from(
-        String::from_utf8_lossy(&output.stdout).trim(),
-    ))
-}
-
-/// Parses `args`, runs the checks, and writes the result to `out`/`err` --
-/// `tools/check-report-claims.mjs`'s `main(argv, io, cwd)`. Exit code 0
-/// (clean), 1 (mismatches found; one line per mismatch on `err`), or 2 (no
-/// report path given, or `report_path` could not be resolved or read --
-/// see the module doc's port notes for why this is a named line rather
-/// than JS's thrown `UsageError`).
-fn run(args: &[String], cwd: &Path, out: &mut impl Write, err: &mut impl Write) -> u8 {
-    let Some(report_arg) = args.first() else {
-        let _ = writeln!(err, "usage: check-report-claims <report.json>");
-        return 2;
-    };
-    let root = match repo_root(cwd) {
+/// The `check-report-claims` subcommand (`crate::main`'s dispatch):
+/// `dir`/`--dir` resolves the artifact-and-git root the same way every
+/// other flat-surface command does (`crate::root::resolve_root`), and
+/// `report_path` resolves against the real process working directory the
+/// way `validate`'s own file arguments do (`crate::node_path::
+/// resolve_like_node`) -- the two are independent by design, since a
+/// report can live under a subdirectory `--dir` has no reason to name.
+/// Exit 0 (clean; prints `no claim mismatches found`), 1 (one line per
+/// mismatch on stderr), or 2 (the root could not be resolved, or
+/// `report_path` could not be resolved, read, or parsed as JSON -- see the
+/// module doc's port notes for the missing-argument case, which clap's
+/// own required-positional check now owns instead of this function).
+pub(crate) fn cmd_check_report_claims(dir: Option<PathBuf>, report_path: PathBuf) -> ExitCode {
+    let root = match crate::root::resolve_root(dir) {
         Ok(root) => root,
-        Err(message) => {
-            let _ = writeln!(err, "{message}");
-            return 2;
-        }
+        Err(code) => return code,
     };
-    let report_path = cwd.join(report_arg);
-    match check_report_claims(&report_path, &root) {
-        Ok(errors) if errors.is_empty() => {
-            let _ = writeln!(out, "{report_arg}: no claim mismatches found");
-            0
-        }
-        Ok(errors) => {
-            for error in &errors {
-                let _ = writeln!(err, "{error}");
-            }
-            1
-        }
-        Err(message) => {
-            let _ = writeln!(err, "{message}");
-            2
-        }
-    }
-}
-
-fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    let cwd = match std::env::current_dir() {
-        Ok(dir) => dir,
+    let resolved = match crate::node_path::resolve_like_node(&report_path) {
+        Ok(path) => path,
         Err(error) => {
-            eprintln!("could not read the current directory: {error}");
+            eprintln!("{}: {error}", report_path.display());
             return ExitCode::from(2);
         }
     };
-    let stdout = std::io::stdout();
-    let stderr = std::io::stderr();
-    let code = run(&args, &cwd, &mut stdout.lock(), &mut stderr.lock());
-    ExitCode::from(code)
+    match check_report_claims(&resolved, &root) {
+        Ok(errors) if errors.is_empty() => {
+            println!("{}: no claim mismatches found", report_path.display());
+            ExitCode::SUCCESS
+        }
+        Ok(errors) => {
+            for error in &errors {
+                eprintln!("{error}");
+            }
+            ExitCode::from(1)
+        }
+        Err(message) => {
+            eprintln!("{message}");
+            ExitCode::from(2)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1142,48 +1428,104 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    /// Mapping 16/18: "main: exits 0 and reports no mismatches for a clean report".
-    #[test]
-    fn main_exits_0_and_reports_no_mismatches_for_a_clean_report() {
-        let (dir, head) = init_scratch_repo("check-report-claims-main-clean-");
-        write_json(&dir.path().join("report.json"), &base_report(&head));
-        let mut out = Vec::new();
-        let mut err = Vec::new();
-        let code = run(&["report.json".to_string()], dir.path(), &mut out, &mut err);
-        assert_eq!(code, 0);
-        assert_eq!(
-            String::from_utf8(out).unwrap(),
-            "report.json: no claim mismatches found\n"
-        );
-    }
+    // ---- HR-071: the bounded, no-execution paste-run lint ----
 
-    /// Mapping 17/18: "main: exits 1 and prints one line per mismatch for a broken report".
+    /// Natural RED (pre-fix: `check_report_claims` called only the
+    /// original five checks; this shape was invisible). One of the three
+    /// batch-19 shapes: an angle-bracket placeholder.
     #[test]
-    fn main_exits_1_and_prints_one_line_per_mismatch_for_a_broken_report() {
-        let (dir, head) = init_scratch_repo("check-report-claims-main-broken-");
+    fn flags_a_command_carrying_an_angle_bracket_placeholder() {
+        let (dir, head) = init_scratch_repo("check-report-claims-lint-placeholder-");
         let mut report = base_report(&head);
-        report["self_review"] = json!(["see commit deadbeef1 for context"]);
-        write_json(&dir.path().join("report.json"), &report);
-        let mut out = Vec::new();
-        let mut err = Vec::new();
-        let code = run(&["report.json".to_string()], dir.path(), &mut out, &mut err);
-        assert_eq!(code, 1);
-        assert!(String::from_utf8(err).unwrap().contains("deadbeef1"));
+        report["tests"] =
+            json!([{"command": "houserules check-report-claims <REPORT_FILE>", "output": ""}]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(
+            errors,
+            vec![
+                "tests[0]: command carries the placeholder \"<REPORT_FILE>\" and cannot paste-run as written".to_string()
+            ]
+        );
     }
 
-    /// Mapping 18/18 (reconstructed shape): "main: throws a UsageError when no report path is given"
-    /// becomes "reports usage on stderr and exits 2" -- this binary's own
-    /// CLI-failure-path convention (`houserules.crash-paths-are-named`),
-    /// not JS's thrown `UsageError` (see the module doc's port notes).
+    /// One of the three batch-19 shapes: prose (here, a parenthetical
+    /// label, batch 19 T2 round 3's own recurrence) appended after the
+    /// command's closing quote.
     #[test]
-    fn main_reports_usage_and_exits_2_when_no_report_path_is_given() {
-        let mut out = Vec::new();
-        let mut err = Vec::new();
-        let code = run(&[], Path::new("."), &mut out, &mut err);
-        assert_eq!(code, 2);
+    fn flags_a_command_with_a_parenthetical_label_appended_after_it() {
+        let (dir, head) = init_scratch_repo("check-report-claims-lint-annotation-");
+        let mut report = base_report(&head);
+        report["tests"] = json!([{
+            "command": "curl -sSL \"https://example.invalid/install.sh\" | sh (expect exit 22)",
+            "output": "",
+        }]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
         assert_eq!(
-            String::from_utf8(err).unwrap(),
-            "usage: check-report-claims <report.json>\n"
+            errors,
+            vec![
+                "tests[0]: command has \"(expect exit 22)\" appended after it, which a shell would run as a second, separate command if pasted".to_string()
+            ]
         );
+    }
+
+    /// One of the three batch-19 shapes: a failed shlex-style parse (an
+    /// unterminated double quote).
+    #[test]
+    fn flags_a_command_whose_quoting_does_not_parse() {
+        let (dir, head) = init_scratch_repo("check-report-claims-lint-unbalanced-");
+        let mut report = base_report(&head);
+        report["tests"] = json!([{
+            "command": "python3 -c \"import sys; print(sys.argv[1]",
+            "output": "",
+        }]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(
+            errors,
+            vec![
+                "tests[0]: command's quoting does not parse (an unterminated \" quote) and cannot paste-run as written".to_string()
+            ]
+        );
+    }
+
+    /// A clean report using real, legitimate shell shapes from this
+    /// project's own history must not flag: process substitution
+    /// (`diff <(...) <(...)`, batch 8 task 2), a subshell wrapping the
+    /// WHOLE command (`( cmd; echo "EXIT=$?" )`, batch 9 task 2), and an
+    /// escaped `find`-style parenthesis group (batch 10 task 1) all stay
+    /// clean.
+    #[test]
+    fn does_not_flag_legitimate_process_substitution_subshells_or_escaped_parens() {
+        let (dir, head) = init_scratch_repo("check-report-claims-lint-clean-");
+        let mut report = base_report(&head);
+        report["tests"] = json!([
+            {"command": "diff <(git show b9e7b9a:template/tools/kb.mjs) <(git show b9e7b9a:tools/kb.mjs)", "output": ""},
+            {"command": "( mise x -- pnpm exec vitest run tests/dogfood.test.mjs --coverage.enabled=false; echo \"EXIT=$?\" )", "output": ""},
+            {"command": "find /tmp -maxdepth 1 -type d \\( -name 'a' -o -name 'b' \\)", "output": ""},
+        ]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// POSIX begins a comment only at the start of a word (verified live
+    /// against IEEE Std 1003.1-2024 §2.3); a mid-word `#`, like a GitHub
+    /// issue reference glued onto a path, is one literal token, not a
+    /// comment.
+    #[test]
+    fn does_not_flag_a_mid_word_hash_that_is_not_a_comment_marker() {
+        let (dir, head) = init_scratch_repo("check-report-claims-lint-midword-hash-");
+        let mut report = base_report(&head);
+        report["tests"] = json!([{"command": "grep -n pattern notes#1.txt", "output": ""}]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
     }
 }
