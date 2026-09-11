@@ -216,6 +216,10 @@
     {
       "date": "2026-09-11",
       "text": "HR-086's 7-of-9 minLength scoping ratified: measured over 2360 corpus items; the two task-number lists keep the old floor. docs/design.md 5.55."
+    },
+    {
+      "date": "2026-09-11",
+      "text": "The batch-21 spec section 2 four-part amendment approved: primary derivation, fallbacks, the cliff, the undecodable skip. docs/design.md 5.56."
     }
   ],
   "notes": []
