@@ -61,6 +61,10 @@ checksum = "sha256"
 # first config-touching task after the first real release proves the
 # pipeline end to end; regenerate when it does. Scheduled as HR-069.
 pr-run-mode = "upload"
+# Dependabot maintains the action pins inside the generated release.yml
+# (HR-092): dist must not fail `plan` on that drift. The table below stays the
+# regeneration seed; after a `dist generate`, Dependabot re-bumps what moved.
+allow-dirty = ["ci"]
 # SLSA build provenance for every release artifact (Scorecard Signed-Releases).
 github-attestations = true
 
