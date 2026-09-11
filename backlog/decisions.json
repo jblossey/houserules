@@ -212,6 +212,10 @@
     {
       "date": "2026-09-08",
       "text": "Batch 21 spec approved as drafted: the gate cluster HR-074/075/076/077/086 (HR-086 resolved as a textList minLength in the deliverables schema, both copies) plus the walkdir adoption HR-079. docs/design.md 5.54."
+    },
+    {
+      "date": "2026-09-11",
+      "text": "HR-086's 7-of-9 minLength scoping ratified: measured over 2360 corpus items; the two task-number lists keep the old floor. docs/design.md 5.55."
     }
   ],
   "notes": []
