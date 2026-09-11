@@ -1540,11 +1540,12 @@
         "Owner request 2026-09-11 after a settings review against the OpenSSF SCM best practices and the Scorecard checks. Finding that drove it: the main ruleset targeted no branch at all (its ref_name include list was empty; /rules/branches/main returned []), so main was unprotected despite the ruleset existing.",
         "Repository settings (applied through the REST API, no file): main ruleset now targets ~DEFAULT_BRANCH, requires the five ci jobs as status checks (strict), dismisses stale reviews, and requires thread resolution; a tags ruleset blocks deletion, update, and non-fast-forward on every tag; merge commits and squash merges are off, head branches auto-delete, update-branch is on; wiki and projects are off, Discussions is on; Dependabot alerts and security updates are on; CodeQL runs as an advanced setup (.github/workflows/codeql.yml, rust and actions) because the default-setup REST API rejects `rust` although the UI supports it, so default setup is off; the Actions policy is selected actions (GitHub-owned, verified, plus jdx/mise-action, googleapis/release-please-action, swatinem/rust-cache) with full-SHA pinning required, a read-only default token, and no PR approval by workflows.",
         "Tracked-tree changes: .github/dependabot.yml (cargo and github-actions, chore prefix with scope); .github/CODEOWNERS; every uses: in ci.yml and release-please.yml pinned to a full commit SHA with the version as a comment, top-level permissions read-only with write scopes at job level; dist-workspace.toml gains github-attestations and the github-action-commits table so the regenerated release.yml is pinned and attests every artifact; deny.toml plus cargo deny check in mise run lint; cargo test --locked and clippy --locked; rust-version in crates/houserules/Cargo.toml declares the major.minor of the mise pin as the floor (an exact patch broke the macOS dist legs, whose runner ships the .0 patch).",
-        "Not done, by ruling: required signed commits (the owner does not sign today). Not available: secret scanning non-provider patterns and validity checks stay disabled on a user-owned public repository (the REST PATCH returns 200 and leaves them off; both belong to the paid Secret Protection tier)."
+        "Not done, by ruling: required signed commits (the owner does not sign today). Not available: secret scanning non-provider patterns and validity checks stay disabled on a user-owned public repository (the REST PATCH returns 200 and leaves them off; both belong to the paid Secret Protection tier).",
+        "Batch attribution (owner ruling, 2026-09-11, batch 21 report): this item landed as an owner-driven side PR during batch 21's window, not as batch-21 task work; batch=21 records the window so the done state carries a batch (the check-backlog warns retire)."
       ],
       "milestone": null,
       "status": "done",
-      "batch": null,
+      "batch": 21,
       "see": [
         "HR-083"
       ]
@@ -1556,11 +1557,12 @@
       "body": [
         "Owner request 2026-09-11 on the first Dependabot PRs (#10 merged by hand, #11 open). Two structural failures and one policy: (1) Dependabot's generated body carries a compare link over 100 characters, so process.conventional-commits fails in both check-commit and the audit; (2) a bump inside the generated release.yml fails dist's `plan` job, which checks the file against its own generation; (3) the owner wants minor and patch updates merged without a human, and major updates reviewed by the code owner.",
         "Fixes: `commits_in` now reads the author name (%an) and `CommitsCheck::violation` exempts a `[bot]`-authored commit from body_line_max alone (subject and body_absent still apply; tests in audit.rs and check_commit.rs). The ruling is recorded in process.conventional-commits (root and template). dist-workspace.toml sets allow-dirty = [\"ci\"] so Dependabot may maintain the pins inside release.yml; the github-action-commits table stays the regeneration seed. .github/workflows/dependabot-auto-merge.yml enables GitHub auto-merge (rebase, the ruleset's only method) for semver-minor and semver-patch through dependabot/fetch-metadata; repository allow_auto_merge is on and the action is on the Actions allow-list.",
-        "Known limit, deliberate: auto-merge acts with GITHUB_TOKEN, so the resulting push to main starts no workflow (houserules.default-token-tags-start-no-workflows); release-please catches up on the next human push. HR-068's token decision can lift this later. PR #11 (a major, actions/checkout in release.yml) stays for the owner's review; a `@dependabot rebase` after this lands re-runs its checks."
+        "Known limit, deliberate: auto-merge acts with GITHUB_TOKEN, so the resulting push to main starts no workflow (houserules.default-token-tags-start-no-workflows); release-please catches up on the next human push. HR-068's token decision can lift this later. PR #11 (a major, actions/checkout in release.yml) stays for the owner's review; a `@dependabot rebase` after this lands re-runs its checks.",
+        "Batch attribution (owner ruling, 2026-09-11, batch 21 report): this item landed as an owner-driven side PR during batch 21's window, not as batch-21 task work; batch=21 records the window so the done state carries a batch (the check-backlog warns retire)."
       ],
       "milestone": null,
       "status": "done",
-      "batch": null,
+      "batch": 21,
       "see": [
         "HR-091",
         "HR-068"
@@ -1609,6 +1611,17 @@
       "title": "Limits sentence: cite-into-artifact is the ephemeral-narrative pattern",
       "body": [
         "RULED 2026-09-11 (design.md 5.57): one sentence in report_claims.rs's HR-075 Limits section records the standing answer - a narrative names an ephemeral path's class and cites the literal in a retained workspace capture; no checker escape. Rides the next implementation branch."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null
+    },
+    {
+      "id": "HR-096",
+      "type": "chore",
+      "title": "Restate the nine unreachable historical SHA markers to event locators",
+      "body": [
+        "RULED 2026-09-11 (batch 21 report, 'Fix both'): the nine pre-batch-21 'verified live at commit X' markers whose SHAs no clone can resolve restate to durable event locators per knowledge-base.cite-durable-refs. The enumeration is retained at the batch-21 workspace's branch-fix-evidence/sweep-unreachable-shas.sh (12 rows; the two in-scope fixed at batch 21; these nine are the remainder). Rides a future batch; each restatement preserves the historical claim and names the event instead of the dead SHA."
       ],
       "milestone": null,
       "status": "open",

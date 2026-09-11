@@ -735,3 +735,10 @@ Each item records the ruling with its date, or stays marked open.
     Both knowledge copies where shared; each cites its
     measured batch-21 incident. Source: owner, 2026-09-11,
     batch 21 report.
+59. **Record dispositions — ruled 2026-09-11 ("Fix both").**
+    HR-091/HR-092 attribute to batch 21's window with a
+    disclosed side-PR note (the check-backlog warns retire);
+    HR-096 files the restatement of the nine pre-batch-21
+    unreachable SHA markers to event locators per
+    cite-durable-refs, riding a future batch. Source: owner,
+    2026-09-11, batch 21 report.
