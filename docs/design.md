@@ -712,3 +712,10 @@ Each item records the ruling with its date, or stays marked open.
     class is fully covered by the seven). The spec gains the
     recording amendment. Source: owner, 2026-09-11, batch 21
     report.
+56. **The dead-glob gate's spec account — ruled 2026-09-11.**
+    The batch-21 spec §2 gains the four-part amendment: the
+    git-tracked primary derivation, the two documented
+    fallbacks, the zero-to-one cliff, and the undecodable-entry
+    skip — the gate's whole behavior lives in the spec, not
+    only in doc comments. Source: owner, 2026-09-11, batch 21
+    report.
