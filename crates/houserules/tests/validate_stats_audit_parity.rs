@@ -191,8 +191,8 @@ fn redact_strips_a_verbatim_prefixed_windows_path_from_plain_unescaped_text() {
 /// still-passing case, unaffected by either new candidate.
 #[test]
 fn redact_still_handles_a_plain_forward_slash_path_with_no_prefix() {
-    let from = Path::new("/home/jblossey/houserules/tests/fixtures/batch14-workspace");
-    let text = r#"[{"file": "/home/jblossey/houserules/tests/fixtures/batch14-workspace/branch-review.json"}]"#;
+    let from = Path::new("/home/maintainer/houserules/tests/fixtures/batch14-workspace");
+    let text = r#"[{"file": "/home/maintainer/houserules/tests/fixtures/batch14-workspace/branch-review.json"}]"#;
     assert_eq!(
         redact(text, from, "<fixtures>/batch14-workspace"),
         r#"[{"file": "<fixtures>/batch14-workspace/branch-review.json"}]"#
