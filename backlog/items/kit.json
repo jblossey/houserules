@@ -1266,7 +1266,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null
+      "batch": 21
     },
     {
       "id": "HR-075",
@@ -1279,7 +1279,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 21,
       "see": [
         "HR-072"
       ]
@@ -1294,7 +1294,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null
+      "batch": 21
     },
     {
       "id": "HR-077",
@@ -1306,7 +1306,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null
+      "batch": 21
     },
     {
       "id": "HR-078",
@@ -1330,7 +1330,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null
+      "batch": 21
     },
     {
       "id": "HR-080",
@@ -1458,7 +1458,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 21,
       "see": [
         "HR-085"
       ]

@@ -688,3 +688,19 @@ Each item records the ruling with its date, or stays marked open.
     shipped Limits bullets already satisfy it (commands and
     counts inline), so no code edit is owed. Source: owner,
     2026-09-08, batch 20 report.
+53. **Batch 20 accepted — ruled 2026-09-08.** Tier-2 phase 5
+    accepted as merged (main d0cc286): the repository and kit
+    are one static binary plus POSIX shell; HR-047 closes the
+    Tier-2 rewrite; release-please live-proven under the §5.43
+    rust config on the merge push itself. The controller
+    selects the next batch and presents its gate; the step-two
+    release set stays owner-attended (HR-068 first). Source:
+    owner, 2026-09-08, batch 20 acceptance.
+54. **Batch-21 gate — ruled 2026-09-08.** The spec approved as
+    drafted: the gate cluster (HR-074 dead-glob, HR-075
+    ephemeral-path, HR-076 emitter round-trip, HR-077 audit
+    sanctioned-fail annotation, HR-086 resolved as a textList
+    minLength in the deliverables schema, both copies) plus the
+    §5.47 walkdir adoption (HR-079). Each gate proves itself on
+    a seeded instance of its own batch-20 incident. Source:
+    owner, 2026-09-08, batch 21 gate.

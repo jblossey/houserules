@@ -292,6 +292,23 @@
         "state": "done",
         "text": "Done 2026-09-08: nothing JS survives - all four items delivered plus the ruled HR-073 config (release-please goes rust at crates/houserules, design.md 5.43). Five tasks, 17 review rounds, zero behavioral defects surviving any round; the mapping licensed all 32 deletions; 24 goldens re-baselined byte-identical with gen-goldens regenerating them; the permanent residue gate walks tracked-minus-excluded in mise run lint; the evals record at the final template state (14/14); acceptance green in the package.json-free tree (spec section 10). Tier 2 COMPLETE - HR-047 done. Owner rulings 5.43-5.52 homed; HR-072/074-082 filed; step-two release set still owner-attended (HR-068 first)."
       }
+    },
+    {
+      "number": 21,
+      "items": [
+        "HR-074",
+        "HR-075",
+        "HR-076",
+        "HR-077",
+        "HR-086",
+        "HR-079"
+      ],
+      "summary": "The gates catch what batch 20 caught by hand: the dead-glob gate in check-knowledge (HR-074), the ephemeral-path check in check-report-claims (HR-075), the backlog emitter round-trip in check-backlog (HR-076), the audit sanctioned-fail annotation (HR-077), the degenerate-textList guard (HR-086); plus the ruled walkdir adoption replacing the duplicated dev-bin walkers (HR-079, design.md 5.47).",
+      "kickoff": "docs/specs/2026-09-08-batch-21-gates.md",
+      "status": {
+        "state": "planned",
+        "text": "Selected 2026-09-08 (design.md 5.53); spec approved as drafted 2026-09-08 (5.54); in planning."
+      }
     }
   ]
 }
