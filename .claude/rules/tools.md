@@ -10,6 +10,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 ## Rules
 
+- [houserules.actions-pinned-by-sha] Pin every workflow `uses:` to a full commit SHA, version tag as a comment; the Actions policy rejects a tag ref; release.yml pins live in dist-workspace.toml.
 - [houserules.dev-tools-are-rust-native] Dev tooling is a cargo bin under crates/houserules/src/bin/; never a new Node script.
 - [houserules.release-workflow-is-generated] release.yml is generated from dist-workspace.toml; never hand-edit it — edit the config and run `dist generate` (`dist generate --check` is the gate).
 - [process.wiring-checks-run-the-resolution] A trigger, pin, or wiring check runs the resolution end to end - feed the produced value to its consumer; a string, glob, or schema match proves nothing.

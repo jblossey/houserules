@@ -514,8 +514,16 @@
         "GitHub's own workflow-syntax doc (jobs.<job_id>.steps[*].shell) documents the asymmetry: the unspecified default and the explicit shell: bash differ exactly by -o pipefail (and --noprofile --norc).",
         "Batch 19 T2: the seeded curl|sh install step returned green on a live 404 until shell: bash was named; reproduced both ways and as an Actions-resolved run at exit 22 (t2-evidence/pipeline-no-pipefail.log, pipeline-with-pipefail.log, seeded-install-step-live-r3-paste.log). Applies to every piped run step, this repository's workflows and the seeded template's alike."
       ],
-      "tags": ["github-actions", "ci", "shell"],
-      "source": { "date": "2026-09-07", "by": "review", "ref": "batch 19 task-2-review.json issue 5; fix round 1" }
+      "tags": [
+        "github-actions",
+        "ci",
+        "shell"
+      ],
+      "source": {
+        "date": "2026-09-07",
+        "by": "review",
+        "ref": "batch 19 task-2-review.json issue 5; fix round 1"
+      }
     },
     {
       "id": "houserules.path-pins-mirror-the-code",
@@ -527,9 +535,41 @@
         "Batch 20 T6 fix round 2 (HR-085): that one character was the whole windows-latest failure of crates/houserules/tests/install.rs's init_reports_a_render_failure_on_broken_project_data_as_one_usage_error (run 34220012072, job 102040656623). Linux and macOS never show it, because / is their own separator. tempfile paths are the exposed case; repo_root() canonicalizes, and the verbatim prefix that produces normalizes the join away.",
         "Two controls in that same file pin the correct shape, and both passed in that same Windows run. Each compares a printed path against the binary's own stderr. The marker pin is init_reports_an_unparsable_pre_existing_marker_as_a_named_error_exit_2: a one-component dir.path().join(\".houserules.json\"), which proves the tempdir prefix round-trips exactly. The settings pin is init_reports_a_scalar_hooks_value_as_a_named_error_exit_2 and init_reports_a_scalar_session_start_value_as_a_named_error_exit_2: they assert_eq! stderr against format!(\"{}: ...\", settings_path.display()), where the test's dir.path().join(\".claude/settings.json\") and the binary's target.join(SETTINGS_PATH) build the path from the identical string, which proves an identical-string join interoperates. Mirror the construction the code uses. Never loosen the assertion to a substring instead."
       ],
-      "tags": ["windows", "paths", "tests", "ci"],
-      "source": { "date": "2026-09-08", "by": "controller", "ref": "batch 20 T6 fix round 2; HR-085" },
-      "verify": ["crates/houserules/tests/install.rs"]
+      "tags": [
+        "windows",
+        "paths",
+        "tests",
+        "ci"
+      ],
+      "source": {
+        "date": "2026-09-08",
+        "by": "controller",
+        "ref": "batch 20 T6 fix round 2; HR-085"
+      },
+      "verify": [
+        "crates/houserules/tests/install.rs"
+      ]
+    },
+    {
+      "id": "houserules.actions-pinned-by-sha",
+      "kind": "rule",
+      "area": "tools",
+      "summary": "Pin every workflow `uses:` to a full commit SHA, version tag as a comment; the Actions policy rejects a tag ref; release.yml pins live in dist-workspace.toml.",
+      "body": [
+        "The repository setting `sha_pinning_required` (Settings > Actions > General) fails any workflow run that references an action by tag or branch, and the allowed-actions policy is `selected`: GitHub-owned, verified creators, and the explicit patterns jdx/mise-action, googleapis/release-please-action, swatinem/rust-cache. A new action needs its pattern added there before its first run.",
+        "Resolve a pin with the CLI, never from memory: `gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`, then the precise tag for the comment from `repos/<owner>/<repo>/tags`. Dependabot (github-actions ecosystem) moves the SHA and the comment together on its weekly run.",
+        "release.yml is generated (dist-workspace.toml is the source): add or bump a pin in `[dist.github-action-commits]` and run `dist generate`; `dist` picks the action version itself, so after a `cargo-dist-version` bump grep the regenerated file for any `uses:` without a 40-hex ref and pin it there."
+      ],
+      "tags": [
+        "github-actions",
+        "supply-chain",
+        "release"
+      ],
+      "source": {
+        "date": "2026-09-11",
+        "by": "user",
+        "ref": "HR-091"
+      }
     }
   ]
 }
