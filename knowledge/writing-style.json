@@ -56,7 +56,8 @@
         "A doc comment states what the item is for, its invariants, and what it returns or raises when the signature does not say so. It never restates the signature.",
         "Conventions: TSDoc in TypeScript, JSDoc in JavaScript, rustdoc in Rust, docstrings in Python — the language's standard form.",
         "Self-documenting code first: full words, verbs for functions, `is`/`has` for booleans, no abbreviation a newcomer must decode, one meaning per name. A comment that explains a name means the name is wrong.",
-        "Comments inside a body still follow writing-style.code-comments: only for a constraint the code cannot show."
+        "Comments inside a body still follow writing-style.code-comments: only for a constraint the code cannot show.",
+        "A doc comment stating a behavior ('returns tracked files', 'exits 0 on clean') is a claim under process.claims-match-artifacts - re-read it against the symbol at HEAD in the same pass that edits the symbol (batch 21 T1: a function documented as the tracked-file list walked the whole disk)."
       ],
       "tags": [
         "docs",

@@ -727,3 +727,11 @@ Each item records the ruling with its date, or stays marked open.
     Limits sentence in report_claims.rs records the pattern on
     the next implementation branch. Source: owner, 2026-09-11,
     batch 21 report.
+58. **Batch-21 standing bullets — ruled 2026-09-11.** Four
+    bullets applied: claims-match gains re-derive-after-any-
+    world-change and observed-vs-inferred; closure-claims
+    gains subject-derived-patterns-with-a-spelling-probe;
+    doc-comments gains doc-behavior-statements-are-claims.
+    Both knowledge copies where shared; each cites its
+    measured batch-21 incident. Source: owner, 2026-09-11,
+    batch 21 report.
