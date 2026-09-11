@@ -209,19 +209,48 @@ fn show_file(root: &Path, head: &str, path: &str) -> Result<String, String> {
     run_git(root, &["show", &format!("{head}:{path}")]).map_err(|e| stderr_headline(&e))
 }
 
-/// Every commit's `(subject, body)` strictly between `base` and `head`
-/// (two-dot range -- not `range()`'s three-dot merge-base form) --
-/// `tools/kb.mjs`'s `commitsIn`. `pub(super)`: `check_commit`'s own range
-/// arm reads a git range through this same function, not a second `git
-/// log` invocation of its own.
-pub(super) fn commits_in(
-    root: &Path,
-    base: &str,
-    head: &str,
-) -> Result<Vec<(String, String)>, String> {
+/// One commit as the `commits` checks read it: its subject, its body, and
+/// its author name (`%an`), the last so a check can tell a generated
+/// message from a human one (see [`CommitsCheck::violation`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Commit {
+    pub(super) subject: String,
+    pub(super) body: String,
+    pub(super) author: String,
+}
+
+impl Commit {
+    /// A message with no author on record: the `check-commit` hook arm,
+    /// which reads a message file before git has attached an author.
+    pub(super) fn unattributed(subject: String, body: String) -> Self {
+        Self {
+            subject,
+            body,
+            author: String::new(),
+        }
+    }
+
+    /// GitHub App and Dependabot commits carry an author name ending in
+    /// `[bot]`; their bodies are generated (release links, metadata) and
+    /// are not wrapped by a human.
+    fn is_bot_authored(&self) -> bool {
+        self.author.ends_with("[bot]")
+    }
+}
+
+/// Every commit strictly between `base` and `head` (two-dot range -- not
+/// `range()`'s three-dot merge-base form) -- `tools/kb.mjs`'s `commitsIn`,
+/// plus the author name. `pub(super)`: `check_commit`'s own range arm
+/// reads a git range through this same function, not a second `git log`
+/// invocation of its own.
+pub(super) fn commits_in(root: &Path, base: &str, head: &str) -> Result<Vec<Commit>, String> {
     let output = run_git(
         root,
-        &["log", "--format=%s%x00%b%x1e", &format!("{base}..{head}")],
+        &[
+            "log",
+            "--format=%an%x00%s%x00%b%x1e",
+            &format!("{base}..{head}"),
+        ],
     )
     .map_err(|e| stderr_headline(&e))?;
     Ok(output
@@ -229,10 +258,15 @@ pub(super) fn commits_in(
         .map(|record| record.strip_prefix('\n').unwrap_or(record))
         .filter(|record| !record.is_empty())
         .map(|record| {
-            let mut parts = record.splitn(2, '\u{0}');
+            let mut parts = record.splitn(3, '\u{0}');
+            let author = parts.next().unwrap_or_default().to_string();
             let subject = parts.next().unwrap_or_default().to_string();
             let body = parts.next().unwrap_or_default().to_string();
-            (subject, body)
+            Commit {
+                subject,
+                body,
+                author,
+            }
         })
         .collect())
 }
@@ -343,13 +377,17 @@ impl<'a> CommitsCheck<'a> {
         })
     }
 
-    /// Evaluates one commit's `(subject, body)` against this check, in the
-    /// same subject/body_absent/body_line_max order `run_check`'s own
-    /// commit loop tests them: `Some(evidence)` for the first rule this
-    /// commit breaks, its text identical to what `run_check` used to build
-    /// inline (the audit command's own output must not change), `None`
-    /// when `subject`/`body` satisfy every rule this check declares.
-    pub(super) fn violation(&self, subject: &str, body: &str) -> Option<String> {
+    /// Evaluates one commit against this check, in the same
+    /// subject/body_absent/body_line_max order `run_check`'s own commit
+    /// loop tests them: `Some(evidence)` for the first rule this commit
+    /// breaks, its text identical to what `run_check` used to build inline
+    /// (the audit command's own output must not change), `None` when the
+    /// commit satisfies every rule this check declares. A bot-authored
+    /// commit (`[bot]` author suffix) is exempt from `body_line_max` alone:
+    /// Dependabot's generated body carries compare links no human wraps
+    /// (HR-092); its subject and `body_absent` rules still apply.
+    pub(super) fn violation(&self, commit: &Commit) -> Option<String> {
+        let (subject, body) = (commit.subject.as_str(), commit.body.as_str());
         if let Some(re) = &self.subject_re
             && re.find(subject).is_none()
         {
@@ -367,6 +405,7 @@ impl<'a> CommitsCheck<'a> {
             ));
         }
         if let Some(limit) = self.check.body_line_max.filter(|&limit| limit > 0)
+            && !commit.is_bot_authored()
             && body
                 .split('\n')
                 .any(|line| line.encode_utf16().count() as u64 > limit)
@@ -423,7 +462,7 @@ struct AuditContext<'a> {
     reports: Option<&'a [(String, Value)]>,
     show_cache: RefCell<HashMap<String, String>>,
     tree_cache: RefCell<Option<Vec<String>>>,
-    commits_cache: RefCell<Option<Vec<(String, String)>>>,
+    commits_cache: RefCell<Option<Vec<Commit>>>,
 }
 
 impl AuditContext<'_> {
@@ -447,7 +486,7 @@ impl AuditContext<'_> {
         Ok(files)
     }
 
-    fn commits(&self) -> Result<Vec<(String, String)>, String> {
+    fn commits(&self) -> Result<Vec<Commit>, String> {
         if let Some(cached) = self.commits_cache.borrow().as_ref() {
             return Ok(cached.clone());
         }
@@ -508,8 +547,8 @@ fn run_check(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result<Valu
         CheckType::Commits => {
             let compiled = CommitsCheck::compile(check)?;
             let commits = ctx.commits()?;
-            for (subject, body) in &commits {
-                if let Some(evidence) = compiled.violation(subject, body) {
+            for commit in &commits {
+                if let Some(evidence) = compiled.violation(commit) {
                     return Ok(violate(evidence));
                 }
             }
@@ -953,7 +992,12 @@ mod tests {
 
     /// `tests/kb.test.mjs`'s `commit`.
     fn commit(root: &Path, message: &str, body: Option<&str>) -> String {
+        commit_as(root, "t <t@t.t>", message, body)
+    }
+
+    fn commit_as(root: &Path, author: &str, message: &str, body: Option<&str>) -> String {
         git(root, &["add", "-A"]);
+        let author_flag = format!("--author={author}");
         let mut args = vec![
             "-c",
             "user.name=t",
@@ -965,6 +1009,7 @@ mod tests {
             "-q",
             "--no-verify",
             "--allow-empty",
+            &author_flag,
             "-m",
             message,
         ];
@@ -1948,6 +1993,49 @@ mod tests {
         );
     }
 
+    #[test]
+    fn exempts_a_bot_authored_commit_from_body_line_max() {
+        let dir = make_repo(&[entry(json!({
+            "id": "process.bodylimit", "summary": "Wrapped commit bodies.",
+            "check": {"type": "commits", "level": "fail", "body_line_max": 100},
+        }))]);
+        let root = dir.path();
+        let base_sha = commit(root, "chore: base", None);
+        let compare_link = "- [Commits](https://github.com/actions/checkout/compare/v6.1.0...3d3c42e5aac5ba805825da76410c181273ba90b1)";
+        assert!(compare_link.len() > 100);
+        commit_as(
+            root,
+            "dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+            "chore(deps): bump actions/checkout from 6.1.0 to 7.0.1",
+            Some(compare_link),
+        );
+        let base = load_base(root).unwrap();
+        let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
+        let row = &outcome.result["rules"][0];
+        assert_eq!(row["id"], json!("process.bodylimit"));
+        assert_eq!(row["result"], json!("pass"), "{row}");
+    }
+
+    #[test]
+    fn a_bot_authored_commit_still_fails_the_subject_rule() {
+        let dir = make_repo(&[entry(json!({
+            "id": "process.subject", "summary": "Conventional subjects.",
+            "check": {"type": "commits", "level": "fail", "subject": "^(feat|fix|chore)(\\([^)]+\\))?: .+"},
+        }))]);
+        let root = dir.path();
+        let base_sha = commit(root, "chore: base", None);
+        commit_as(
+            root,
+            "dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+            "Bump actions/checkout from 6.1.0 to 7.0.1",
+            None,
+        );
+        let base = load_base(root).unwrap();
+        let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
+        let row = &outcome.result["rules"][0];
+        assert_eq!(row["id"], json!("process.subject"));
+        assert_eq!(row["result"], json!("fail"), "{row}");
+    }
     #[test]
     fn reports_a_report_field_check_as_not_triggered_when_its_trigger_files_do_not_change() {
         let dir = make_repo(&[entry(json!({
