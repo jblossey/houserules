@@ -34,7 +34,7 @@
 //! ## Reuse, not reimplementation
 //!
 //! `super::audit::CommitsCheck` is the one place `subject`/`body_absent`/
-//! `body_line_max` are evaluated against a `(subject, body)` pair; both
+//! `body_line_max` are evaluated against one `Commit`; both
 //! `run_check`'s `CheckType::Commits` arm and this file's own `check_commit`
 //! call it, so the two commands can never independently drift on what
 //! counts as a violation (`audit.rs`'s own module doc has that struct's
@@ -45,7 +45,7 @@
 //! of its own on the raw message -- a repository-local `core.commentChar`
 //! lookup, then `git stripspace` (the Measured-parity section below has the
 //! full account) -- and `split_message` then turns the stripped result into
-//! the same `(subject, body)` shape `commits_in` reads back off real
+//! the same `Commit` shape `commits_in` reads back off real
 //! history (see that function's own doc for the deliberately simple split
 //! it uses).
 //!
@@ -92,7 +92,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 
-use super::audit::{CommitsCheck, commits_in, rev};
+use super::audit::{Commit, CommitsCheck, commits_in, rev};
 use super::check_shape::{CheckLevel, CheckType};
 use super::model::{Base, CheckField, load_base};
 
@@ -290,7 +290,8 @@ fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<(Vec<String>, Vec
             let raw =
                 fs::read_to_string(path).map_err(|error| format!("{}: {error}", path.display()))?;
             let cleaned = strip_verbose_and_comments(&base.root, &raw)?;
-            vec![split_message(&cleaned)]
+            let (subject, body) = split_message(&cleaned);
+            vec![Commit::unattributed(subject, body)]
         }
         (None, Some(from)) => {
             let base_sha = rev(&base.root, from)?;
@@ -317,9 +318,9 @@ fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<(Vec<String>, Vec
 
     let mut fails = Vec::new();
     let mut warns = Vec::new();
-    for (subject, body) in &commits {
+    for commit in &commits {
         for (id, compiled) in &checks {
-            if let Some(evidence) = compiled.violation(subject, body) {
+            if let Some(evidence) = compiled.violation(commit) {
                 let line = format!("{id}: {evidence}");
                 match compiled.level() {
                     CheckLevel::Fail => fails.push(line),
@@ -437,7 +438,12 @@ mod tests {
 
     /// `audit.rs`'s own `commit` helper.
     fn commit(root: &Path, message: &str, body: Option<&str>) -> String {
+        commit_as(root, "t <t@t.t>", message, body)
+    }
+
+    fn commit_as(root: &Path, author: &str, message: &str, body: Option<&str>) -> String {
         git(root, &["add", "-A"]);
+        let author_flag = format!("--author={author}");
         let mut args = vec![
             "-c",
             "user.name=t",
@@ -449,6 +455,7 @@ mod tests {
             "-q",
             "--no-verify",
             "--allow-empty",
+            &author_flag,
             "-m",
             message,
         ];
@@ -853,6 +860,32 @@ mod tests {
             fails,
             vec![
                 "process.conventional-commits: commit \"bad subject\" does not match ^(feat|fix|chore|docs|test): .+"
+                    .to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn exempts_a_bot_authored_commit_in_a_range_from_the_body_line_limit() {
+        let dir = make_repo(&[conventional_commits_entry()]);
+        let root = dir.path();
+        let base_sha = commit(root, "chore: base", None);
+        let compare_link = "- [Commits](https://github.com/actions/checkout/compare/v6.1.0...3d3c42e5aac5ba805825da76410c181273ba90b1)";
+        assert!(compare_link.len() > 100);
+        commit_as(
+            root,
+            "dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+            "chore: bump actions/checkout from 6.1.0 to 7.0.1",
+            Some(compare_link),
+        );
+        commit(root, "feat: human", Some(compare_link));
+        let base = load_base(root).expect("load base");
+        let (fails, _warns) =
+            check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
+        assert_eq!(
+            fails,
+            vec![
+                "process.conventional-commits: commit \"feat: human\" has a body line over 100 characters"
                     .to_string()
             ]
         );

@@ -87,7 +87,8 @@
       "standing": true,
       "summary": "Commits use Conventional Commits (feat, fix, chore, test, ci, docs, refactor). Header at most 100 characters, body lines at most 100.",
       "body": [
-        "Start the subject in lowercase; a subject that starts with an uppercase token fails common commitlint configurations."
+        "Start the subject in lowercase; a subject that starts with an uppercase token fails common commitlint configurations.",
+        "A commit whose author name ends in `[bot]` (Dependabot, any GitHub App) is exempt from the body-line limit alone: its body is generated and carries compare links no human wraps. Its subject and the trailer rules still apply."
       ],
       "tags": [
         "git"
