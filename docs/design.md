@@ -719,3 +719,11 @@ Each item records the ruling with its date, or stays marked open.
     skip — the gate's whole behavior lives in the spec, not
     only in doc comments. Source: owner, 2026-09-11, batch 21
     report.
+57. **Ephemeral paths in narrative — ruled 2026-09-11.**
+    Cite-into-artifact is the standing answer: a report that
+    must discuss an ephemeral path names its class in prose and
+    cites the literal in a retained workspace capture; no
+    checker escape (an escape is what drift hides behind). One
+    Limits sentence in report_claims.rs records the pattern on
+    the next implementation branch. Source: owner, 2026-09-11,
+    batch 21 report.

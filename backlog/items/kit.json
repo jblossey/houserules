@@ -1602,6 +1602,17 @@
         "HR-080",
         "HR-090"
       ]
+    },
+    {
+      "id": "HR-095",
+      "type": "docs",
+      "title": "Limits sentence: cite-into-artifact is the ephemeral-narrative pattern",
+      "body": [
+        "RULED 2026-09-11 (design.md 5.57): one sentence in report_claims.rs's HR-075 Limits section records the standing answer - a narrative names an ephemeral path's class and cites the literal in a retained workspace capture; no checker escape. Rides the next implementation branch."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null
     }
   ]
 }
