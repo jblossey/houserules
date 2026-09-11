@@ -220,6 +220,10 @@
     {
       "date": "2026-09-11",
       "text": "The batch-21 spec section 2 four-part amendment approved: primary derivation, fallbacks, the cliff, the undecodable skip. docs/design.md 5.56."
+    },
+    {
+      "date": "2026-09-11",
+      "text": "Ephemeral paths in narrative: cite-into-artifact is the standing answer; no checker escape; a Limits sentence records the pattern. docs/design.md 5.57."
     }
   ],
   "notes": []
