@@ -68,6 +68,8 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use walkdir::WalkDir;
+
 /// The two literal substrings a shipped reference to either shell wrapper
 /// always contains, whether or not the sentence spells out the leading
 /// `tools/` directory.
@@ -113,19 +115,31 @@ fn repo_root() -> PathBuf {
 }
 
 /// Every regular file under `dir`, recursed, sorted by name at each level
-/// (matching the JS original's `readdirSync(...).toSorted()` order).
+/// (matching the JS original's `readdirSync(...).toSorted()` order) --
+/// walkdir (HR-079) sorts each directory's own entries before descending,
+/// the same per-level sort the hand-rolled walker did, and follows a
+/// symlinked directory the way `Path::is_dir` (metadata, not the link
+/// itself) always did here. An entry walkdir cannot read is a named,
+/// fatal error, never a silent skip (houserules.crash-paths-are-named) --
+/// a narrower posture than the walker this replaces on two counts: the old
+/// code pushed every non-directory entry regardless of type, where this
+/// one pushes only `entry.file_type().is_file()` and so now skips a
+/// non-regular entry (a socket, FIFO, or device file) it once counted as
+/// scanned; and the old code's `filter_map(|entry| entry.ok())` counted a
+/// broken symlink as a scanned entry and let `find_matches` skip it
+/// downstream with no error at all, where walkdir's `follow_links(true)`
+/// turns that same broken link into an `Err` this function now panics on
+/// (batch 21 T3 fix round 1, review issue 5; neither tree this binary
+/// walks holds a symlink or a non-regular file today, so no pinned
+/// capture exercises either difference).
 fn walk_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    let mut entries: Vec<_> = fs::read_dir(dir)
-        .unwrap_or_else(|error| panic!("read_dir {}: {error}", dir.display()))
-        .filter_map(|entry| entry.ok())
-        .collect();
-    entries.sort_by_key(|entry| entry.file_name());
-    for entry in entries {
-        let path = entry.path();
-        if path.is_dir() {
-            walk_files(&path, out);
-        } else {
-            out.push(path);
+    for entry in WalkDir::new(dir)
+        .follow_links(true)
+        .sort_by(|a, b| a.file_name().cmp(b.file_name()))
+    {
+        let entry = entry.unwrap_or_else(|error| panic!("walk {}: {error}", dir.display()));
+        if entry.file_type().is_file() {
+            out.push(entry.into_path());
         }
     }
 }

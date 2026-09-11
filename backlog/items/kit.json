@@ -1326,7 +1326,8 @@
       "title": "Adopt walkdir exact-pinned and replace the duplicated dev-bin walkers",
       "body": [
         "RULED by the owner 2026-09-08 (batch 20 report, design.md 5.47): adopt the walkdir crate despite its 30-month publish gap (BurntSushi, 607M downloads, finished scope - the owner weighed maturity over the include_dir staleness precedent). Add it exact-pinned via `cargo add walkdir@=<resolved>` as a dev-dependency and replace the recursive walker copies in find-shell-tool-refs.rs (fn walk_files) and diff-shape-gate.rs (the variant); the residue gate already walks git ls-files and needs nothing.",
-        "Vetting per security-hygiene.dependency-vetting recorded at adoption time; the batch that takes this refactors per quality.well-maintained-libraries."
+        "Vetting per security-hygiene.dependency-vetting recorded at adoption time; the batch that takes this refactors per quality.well-maintained-libraries.",
+        "CORRECTION (batch 21 T3 fix round 1, review-ruled sound): the 'as a dev-dependency' instruction above cannot compile. A `src/bin/*.rs` target never links `[dev-dependencies]` -- Cargo makes those visible only to test/bench/example builds -- so walkdir lands under `[dependencies]` instead. It was already a normal transitive dependency of rust-embed (via rust-embed-utils) at the same pinned version, so the shipped `houserules` binary's footprint does not change. For the record: an `examples/` target does see `[dev-dependencies]` (verified), a larger restructure nobody licensed here."
       ],
       "milestone": null,
       "status": "open",

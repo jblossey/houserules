@@ -51,6 +51,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use walkdir::WalkDir;
+
 /// This checkout's repository root, resolved at compile time -- every
 /// other `src/bin/*.rs` file's own copy of this helper.
 fn repo_root() -> PathBuf {
@@ -149,25 +151,27 @@ fn list_at_old_ref(root: &Path, dir_path: &str) -> Vec<String> {
 }
 
 /// Every regular file under `dir` on disk today, recursed, repo-relative
-/// POSIX paths, sorted.
+/// POSIX paths, sorted -- walkdir (HR-079) sorts each directory's own
+/// entries before descending, the same per-level sort the hand-rolled
+/// walker did, and follows a symlinked directory the way `Path::is_dir`
+/// (metadata, not the link itself) always did here. An entry walkdir
+/// cannot read is a named, fatal error, never a silent skip.
 fn walk_files(root: &Path, dir: &Path, out: &mut Vec<String>) {
-    let mut entries: Vec<_> = std::fs::read_dir(dir)
-        .unwrap_or_else(|error| panic!("read_dir {}: {error}", dir.display()))
-        .filter_map(|entry| entry.ok())
-        .collect();
-    entries.sort_by_key(|entry| entry.file_name());
-    for entry in entries {
-        let path = entry.path();
-        if path.is_dir() {
-            walk_files(root, &path, out);
-        } else {
-            let rel = path
-                .strip_prefix(root)
-                .expect("path is under root")
-                .to_string_lossy()
-                .replace('\\', "/");
-            out.push(rel);
+    for entry in WalkDir::new(dir)
+        .follow_links(true)
+        .sort_by(|a, b| a.file_name().cmp(b.file_name()))
+    {
+        let entry = entry.unwrap_or_else(|error| panic!("walk {}: {error}", dir.display()));
+        if !entry.file_type().is_file() {
+            continue;
         }
+        let rel = entry
+            .path()
+            .strip_prefix(root)
+            .expect("path is under root")
+            .to_string_lossy()
+            .replace('\\', "/");
+        out.push(rel);
     }
 }
 
