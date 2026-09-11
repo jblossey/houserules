@@ -1462,6 +1462,23 @@
       "see": [
         "HR-085"
       ]
+    },
+    {
+      "id": "HR-091",
+      "type": "chore",
+      "title": "Harden the public repository: rulesets, Dependabot, CodeQL, SHA-pinned actions, cargo deny, attestations",
+      "body": [
+        "Owner request 2026-09-11 after a settings review against the OpenSSF SCM best practices and the Scorecard checks. Finding that drove it: the main ruleset targeted no branch at all (its ref_name include list was empty; /rules/branches/main returned []), so main was unprotected despite the ruleset existing.",
+        "Repository settings (applied through the REST API, no file): main ruleset now targets ~DEFAULT_BRANCH, requires the five ci jobs as status checks (strict), dismisses stale reviews, and requires thread resolution; a tags ruleset blocks deletion, update, and non-fast-forward on every tag; merge commits and squash merges are off, head branches auto-delete, update-branch is on; wiki and projects are off, Discussions is on; Dependabot alerts and security updates are on; CodeQL runs as an advanced setup (.github/workflows/codeql.yml, rust and actions) because the default-setup REST API rejects `rust` although the UI supports it, so default setup is off; the Actions policy is selected actions (GitHub-owned, verified, plus jdx/mise-action, googleapis/release-please-action, swatinem/rust-cache) with full-SHA pinning required, a read-only default token, and no PR approval by workflows.",
+        "Tracked-tree changes: .github/dependabot.yml (cargo and github-actions, chore prefix with scope); .github/CODEOWNERS; every uses: in ci.yml and release-please.yml pinned to a full commit SHA with the version as a comment, top-level permissions read-only with write scopes at job level; dist-workspace.toml gains github-attestations and the github-action-commits table so the regenerated release.yml is pinned and attests every artifact; deny.toml plus cargo deny check in mise run lint; cargo test --locked and clippy --locked; rust-version in crates/houserules/Cargo.toml declares the major.minor of the mise pin as the floor (an exact patch broke the macOS dist legs, whose runner ships the .0 patch).",
+        "Not done, by ruling: required signed commits (the owner does not sign today). Not available: secret scanning non-provider patterns and validity checks stay disabled on a user-owned public repository (the REST PATCH returns 200 and leaves them off; both belong to the paid Secret Protection tier)."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": null,
+      "see": [
+        "HR-083"
+      ]
     }
   ]
 }

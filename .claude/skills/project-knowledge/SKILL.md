@@ -50,7 +50,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 ## Topics
 
-houserules  23  Working in the houserules kit repository
+houserules  24  Working in the houserules kit repository
 knowledge-base  4  Authoring knowledge entries
 process  30  How work runs: batches, dispatch, reviews, rulings
 quality  6  Quality principles
