@@ -103,7 +103,7 @@ use serde_json::{Value, json};
 /// files but missed this sixth reader, so `main` below still tried to read
 /// a file the same commit set had already deleted -- `cargo run --bin
 /// gen-goldens` panicked, exit 101, before writing anything.
-const FROZEN_SHA: &str = "af13303c5c2a7aa2b40b6676f52d9a1f730c20f9";
+const FROZEN_SHA: &str = "5f14727b4adeeb347a8d1f0c8f98d929f62bc7f4";
 
 /// A fresh, empty directory under the OS temp root, removed by its own
 /// `Drop`. `tempfile` (this crate's `[dev-dependencies]`) is unavailable to
