@@ -1,0 +1,19 @@
+# cargo-deny policy, run by `mise run lint`: RustSec advisories, a license
+# allow-list, duplicate-version bans, and a crates.io-only source policy.
+
+[advisories]
+ignore = []
+
+[licenses]
+# Every license found in the tree at the time of adoption (`cargo deny list`).
+allow = ["MIT", "Apache-2.0", "Unicode-3.0", "Unlicense"]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
