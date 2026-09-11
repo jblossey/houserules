@@ -2,6 +2,12 @@ name: dependabot-auto-merge
 # Minor and patch Dependabot updates merge on their own once the required
 # checks pass (rebase, the only merge method the main ruleset allows).
 # A major update gets no auto-merge: the code owner reviews it.
+#
+# The merge is enabled with the owner's fine-grained token, not GITHUB_TOKEN
+# (HR-098): the approval ruleset exempts the repository admin alone, and a
+# merge performed as the owner also starts the push workflows on main.
+# A workflow that a Dependabot event triggers reads Dependabot secrets, so
+# the token lives there: `gh secret set DEPENDABOT_AUTOMERGE_TOKEN --app dependabot`.
 on:
   pull_request:
 
@@ -12,9 +18,6 @@ jobs:
   auto-merge:
     if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'jblossey/houserules'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - id: metadata
         uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2.5.0
@@ -23,5 +26,5 @@ jobs:
           steps.metadata.outputs.update-type == 'version-update:semver-patch'
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
         run: gh pr merge --auto --rebase "$PR_URL"
