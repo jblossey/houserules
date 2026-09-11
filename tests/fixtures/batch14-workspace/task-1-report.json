@@ -23,7 +23,7 @@
   "tests": [
     {
       "command": "mise exec -- pnpm test",
-      "output": "$ vitest run --coverage\n\n RUN  v4.1.11 /home/jblossey/projects/houserules\n      Coverage enabled with v8\n\n \u2713 |houserules| tests/scratch-dir.test.mjs (1 test) 6ms\n \u2713 |houserules| tests/commit-msg-hook.test.mjs (3 tests) 37ms\n \u2713 |houserules| tests/cli.test.mjs (9 tests) 14ms\n \u2713 |houserules| tests/dogfood.test.mjs (20 tests) 16ms\n \u2713 |houserules| tests/json-store.test.mjs (11 tests) 33ms\n \u2713 |houserules| tests/entry.test.mjs (3 tests) 145ms\n \u2713 |houserules| tests/backlog.test.mjs (10 tests) 131ms\n \u2713 |houserules| tests/init.test.mjs (36 tests) 1712ms\n \u2713 |houserules| tests/kb.test.mjs (107 tests) 5634ms\n\n Test Files  9 passed (9)\n      Tests  200 passed (200)\n   Start at  01:23:29\n   Duration  6.17s (transform 992ms, setup 0ms, import 1.57s, tests 7.73s, environment 1ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\nAll files          |   98.94 |    99.28 |   96.64 |    98.8 |                   \n bin               |    96.7 |     98.5 |   81.81 |   96.42 |                   \n  houserules.mjs   |    96.7 |     98.5 |   81.81 |   96.42 | 256-258           \n template/tools    |   99.11 |    99.26 |   97.31 |   98.97 |                   \n  backlog.mjs      |   98.22 |    98.92 |   92.85 |   97.91 | 258-262           \n  kb.mjs           |    99.4 |    99.36 |   98.34 |   99.32 | 1052-1056         \n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 98.94% ( 848/857 )\nBranches     : 99.28% ( 554/558 )\nFunctions    : 96.64% ( 173/179 )\nLines        : 98.8% ( 744/753 )\n================================================================================\n",
+      "output": "$ vitest run --coverage\n\n RUN  v4.1.11 /home/maintainer/projects/houserules\n      Coverage enabled with v8\n\n \u2713 |houserules| tests/scratch-dir.test.mjs (1 test) 6ms\n \u2713 |houserules| tests/commit-msg-hook.test.mjs (3 tests) 37ms\n \u2713 |houserules| tests/cli.test.mjs (9 tests) 14ms\n \u2713 |houserules| tests/dogfood.test.mjs (20 tests) 16ms\n \u2713 |houserules| tests/json-store.test.mjs (11 tests) 33ms\n \u2713 |houserules| tests/entry.test.mjs (3 tests) 145ms\n \u2713 |houserules| tests/backlog.test.mjs (10 tests) 131ms\n \u2713 |houserules| tests/init.test.mjs (36 tests) 1712ms\n \u2713 |houserules| tests/kb.test.mjs (107 tests) 5634ms\n\n Test Files  9 passed (9)\n      Tests  200 passed (200)\n   Start at  01:23:29\n   Duration  6.17s (transform 992ms, setup 0ms, import 1.57s, tests 7.73s, environment 1ms)\n\n % Coverage report from v8\n-------------------|---------|----------|---------|---------|-------------------\nFile               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s \n-------------------|---------|----------|---------|---------|-------------------\nAll files          |   98.94 |    99.28 |   96.64 |    98.8 |                   \n bin               |    96.7 |     98.5 |   81.81 |   96.42 |                   \n  houserules.mjs   |    96.7 |     98.5 |   81.81 |   96.42 | 256-258           \n template/tools    |   99.11 |    99.26 |   97.31 |   98.97 |                   \n  backlog.mjs      |   98.22 |    98.92 |   92.85 |   97.91 | 258-262           \n  kb.mjs           |    99.4 |    99.36 |   98.34 |   99.32 | 1052-1056         \n-------------------|---------|----------|---------|---------|-------------------\n\n=============================== Coverage summary ===============================\nStatements   : 98.94% ( 848/857 )\nBranches     : 99.28% ( 554/558 )\nFunctions    : 96.64% ( 173/179 )\nLines        : 98.8% ( 744/753 )\n================================================================================\n",
       "exit": 0
     },
     {
@@ -37,12 +37,12 @@
       "exit": 0
     },
     {
-      "command": "diff /home/jblossey/projects/houserules/template/tools/kb.mjs /home/jblossey/projects/houserules/tools/kb.mjs",
+      "command": "diff /home/maintainer/projects/houserules/template/tools/kb.mjs /home/maintainer/projects/houserules/tools/kb.mjs",
       "output": "",
       "exit": 0
     },
     {
-      "command": "diff /home/jblossey/projects/houserules/template/.claude/agents/implementer.md /home/jblossey/projects/houserules/.claude/agents/implementer.md",
+      "command": "diff /home/maintainer/projects/houserules/template/.claude/agents/implementer.md /home/maintainer/projects/houserules/.claude/agents/implementer.md",
       "output": "",
       "exit": 0
     },
@@ -53,7 +53,7 @@
     },
     {
       "command": "tools/kb.sh validate .superpowers/sdd/2026-09-04-batch-14/task-1-report.json",
-      "output": "[\n  {\n    \"file\": \"/home/jblossey/projects/houserules/.superpowers/sdd/2026-09-04-batch-14/task-1-report.json\",\n    \"kind\": \"task-report\",\n    \"errors\": []\n  }\n]\n",
+      "output": "[\n  {\n    \"file\": \"/home/maintainer/projects/houserules/.superpowers/sdd/2026-09-04-batch-14/task-1-report.json\",\n    \"kind\": \"task-report\",\n    \"errors\": []\n  }\n]\n",
       "exit": 0
     }
   ],
@@ -95,7 +95,7 @@
       },
       "green": {
         "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
-        "output": " RUN  v4.1.11 /home/jblossey/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (106 tests | 83 skipped) 696ms\n\n Test Files  1 passed (1)\n      Tests  23 passed | 83 skipped (106)\n"
+        "output": " RUN  v4.1.11 /home/maintainer/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (106 tests | 83 skipped) 696ms\n\n Test Files  1 passed (1)\n      Tests  23 passed | 83 skipped (106)\n"
       }
     },
     {
@@ -108,7 +108,7 @@
       },
       "green": {
         "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
-        "output": " RUN  v4.1.11 /home/jblossey/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (106 tests | 83 skipped) 696ms\n\n Test Files  1 passed (1)\n      Tests  23 passed | 83 skipped (106)\n"
+        "output": " RUN  v4.1.11 /home/maintainer/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (106 tests | 83 skipped) 696ms\n\n Test Files  1 passed (1)\n      Tests  23 passed | 83 skipped (106)\n"
       }
     },
     {
@@ -121,7 +121,7 @@
       },
       "green": {
         "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
-        "output": " RUN  v4.1.11 /home/jblossey/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (106 tests | 83 skipped) 696ms\n\n Test Files  1 passed (1)\n      Tests  23 passed | 83 skipped (106)\n"
+        "output": " RUN  v4.1.11 /home/maintainer/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (106 tests | 83 skipped) 696ms\n\n Test Files  1 passed (1)\n      Tests  23 passed | 83 skipped (106)\n"
       }
     },
     {
@@ -134,7 +134,7 @@
       },
       "green": {
         "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
-        "output": "\n RUN  v4.1.11 /home/jblossey/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (107 tests | 83 skipped) 752ms\n\n Test Files  1 passed (1)\n      Tests  24 passed | 83 skipped (107)\n   Start at  01:11:29\n   Duration  1.04s (transform 130ms, setup 0ms, import 163ms, tests 752ms, environment 0ms)\n\n"
+        "output": "\n RUN  v4.1.11 /home/maintainer/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (107 tests | 83 skipped) 752ms\n\n Test Files  1 passed (1)\n      Tests  24 passed | 83 skipped (107)\n   Start at  01:11:29\n   Duration  1.04s (transform 130ms, setup 0ms, import 163ms, tests 752ms, environment 0ms)\n\n"
       }
     },
     {
@@ -147,7 +147,7 @@
       },
       "green": {
         "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
-        "output": "\n RUN  v4.1.11 /home/jblossey/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (107 tests | 83 skipped) 752ms\n\n Test Files  1 passed (1)\n      Tests  24 passed | 83 skipped (107)\n   Start at  01:11:29\n   Duration  1.04s (transform 130ms, setup 0ms, import 163ms, tests 752ms, environment 0ms)\n\n"
+        "output": "\n RUN  v4.1.11 /home/maintainer/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (107 tests | 83 skipped) 752ms\n\n Test Files  1 passed (1)\n      Tests  24 passed | 83 skipped (107)\n   Start at  01:11:29\n   Duration  1.04s (transform 130ms, setup 0ms, import 163ms, tests 752ms, environment 0ms)\n\n"
       }
     },
     {
@@ -160,7 +160,7 @@
       },
       "green": {
         "command": "mise exec -- pnpm vitest run tests/kb.test.mjs -t validate",
-        "output": "\n RUN  v4.1.11 /home/jblossey/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (107 tests | 83 skipped) 752ms\n\n Test Files  1 passed (1)\n      Tests  24 passed | 83 skipped (107)\n   Start at  01:11:29\n   Duration  1.04s (transform 130ms, setup 0ms, import 163ms, tests 752ms, environment 0ms)\n\n"
+        "output": "\n RUN  v4.1.11 /home/maintainer/projects/houserules\n\n \u2713 |houserules| tests/kb.test.mjs (107 tests | 83 skipped) 752ms\n\n Test Files  1 passed (1)\n      Tests  24 passed | 83 skipped (107)\n   Start at  01:11:29\n   Duration  1.04s (transform 130ms, setup 0ms, import 163ms, tests 752ms, environment 0ms)\n\n"
       }
     }
   ],
