@@ -1479,6 +1479,23 @@
       "see": [
         "HR-083"
       ]
+    },
+    {
+      "id": "HR-092",
+      "type": "fix",
+      "title": "Dependabot PRs fail check-commit and dist plan; auto-merge minor and patch updates",
+      "body": [
+        "Owner request 2026-09-11 on the first Dependabot PRs (#10 merged by hand, #11 open). Two structural failures and one policy: (1) Dependabot's generated body carries a compare link over 100 characters, so process.conventional-commits fails in both check-commit and the audit; (2) a bump inside the generated release.yml fails dist's `plan` job, which checks the file against its own generation; (3) the owner wants minor and patch updates merged without a human, and major updates reviewed by the code owner.",
+        "Fixes: `commits_in` now reads the author name (%an) and `CommitsCheck::violation` exempts a `[bot]`-authored commit from body_line_max alone (subject and body_absent still apply; tests in audit.rs and check_commit.rs). The ruling is recorded in process.conventional-commits (root and template). dist-workspace.toml sets allow-dirty = [\"ci\"] so Dependabot may maintain the pins inside release.yml; the github-action-commits table stays the regeneration seed. .github/workflows/dependabot-auto-merge.yml enables GitHub auto-merge (rebase, the ruleset's only method) for semver-minor and semver-patch through dependabot/fetch-metadata; repository allow_auto_merge is on and the action is on the Actions allow-list.",
+        "Known limit, deliberate: auto-merge acts with GITHUB_TOKEN, so the resulting push to main starts no workflow (houserules.default-token-tags-start-no-workflows); release-please catches up on the next human push. HR-068's token decision can lift this later. PR #11 (a major, actions/checkout in release.yml) stays for the owner's review; a `@dependabot rebase` after this lands re-runs its checks."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": null,
+      "see": [
+        "HR-091",
+        "HR-068"
+      ]
     }
   ]
 }
