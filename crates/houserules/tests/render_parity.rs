@@ -111,9 +111,11 @@ fn renders_byte_identical_to_the_frozen_root_corpus_and_preserves_area_order() {
         vec![
             ".claude/rules/standing-rules.md",
             ".claude/rules/docs.md",
+            ".claude/rules/tools.md",
             ".claude/rules/cli.md",
             ".claude/rules/template.md",
             ".claude/rules/tests.md",
+            ".claude/rules/rust.md",
             ".claude/skills/project-knowledge/SKILL.md",
         ],
         "area file order must follow areas.json's declared order, not alphabetical"

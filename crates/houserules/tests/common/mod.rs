@@ -30,8 +30,10 @@ use std::sync::Mutex;
 /// so the sha itself needed a new, permanent home rather than retiring
 /// with the file that used to carry it. Each of the five readers' own
 /// wrapper now returns this constant instead of re-reading a file that no
-/// longer exists.
-pub const FROZEN_SHA: &str = "af13303c5c2a7aa2b40b6676f52d9a1f730c20f9";
+/// longer exists. Moved to the author-identity rewrite commit on
+/// 2026-09-11 (HR-093): the earlier pin's tree still named a local path in
+/// a standing rule, and the goldens rendered from it kept that text public.
+pub const FROZEN_SHA: &str = "5f14727b4adeeb347a8d1f0c8f98d929f62bc7f4";
 
 /// Serializes `git worktree add`/`remove` across this test binary's
 /// threads. `git worktree` mutates shared metadata under `.git/worktrees/`,
