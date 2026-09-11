@@ -49,7 +49,7 @@
       "mode": "judged",
       "level": null,
       "result": "pass",
-      "evidence": "diff touches template/tools/kb.mjs, tools/kb.mjs, tests/kb.test.mjs only; no path under ~/projects/tag-pilot"
+      "evidence": "diff touches template/tools/kb.mjs, tools/kb.mjs, tests/kb.test.mjs only; no path under the tag-pilot checkout"
     },
     {
       "id": "houserules.template-is-the-source",

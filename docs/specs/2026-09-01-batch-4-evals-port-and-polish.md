@@ -101,7 +101,7 @@ and the two dispatch-protocol gaps.
 - `template/knowledge/process.json` and `knowledge/process.json`:
   `process.evals-rerun`, adapted from tag-pilot fc3241b verbatim except the
   rename map (`implementer.md`, `task-reviewer.md`, unprefixed agents; read
-  the entry in `~/projects/tag-pilot/knowledge/process.json` and keep its
+  the entry in `<tag-pilot>/knowledge/process.json` and keep its
   `check` object's shape exactly).
 - `template/.claude/evals/record.json` seeded as `[]`; `SEED_ONCE` in
   `bin/houserules.mjs` gains `.claude/evals/record.json` (RED first: the
