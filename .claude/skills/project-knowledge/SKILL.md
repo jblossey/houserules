@@ -10,7 +10,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 ## Standing rules
 
 - [houserules.pnpm-only] Use cargo for every package operation in this repository (`cargo add <crate>@=<version>`); pnpm, npm, and npx left the toolchain at batch 20 T3.
-- [houserules.tag-pilot-is-read-only] Treat `~/projects/tag-pilot` as a read-only reference: never modify it, commit there, run its agents, or run `init` or `update` against it.
+- [houserules.tag-pilot-is-read-only] Treat the tag-pilot checkout outside this repository as read-only: never modify it, commit there, run its agents, or run `init` or `update` against it.
 - [houserules.template-is-the-source] Edit the kit in `template/`, then run `houserules update --dir .`; never hand-edit the root copies or the generated rules and skill.
 - [process.ask-when-missing] Ask the user when information is missing. Do not assume.
 - [process.backlog-drives-work] The backlog drives all work. Select backlog items before you start; every requirement traces to an item.

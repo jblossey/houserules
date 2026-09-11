@@ -60,7 +60,7 @@
       "mode": "judged",
       "level": null,
       "result": "pass",
-      "evidence": "the fix commit touches six paths, all inside this repository; no path under ~/projects/tag-pilot"
+      "evidence": "the fix commit touches six paths, all inside this repository; no path under the tag-pilot checkout"
     },
     {
       "id": "houserules.template-is-the-source",

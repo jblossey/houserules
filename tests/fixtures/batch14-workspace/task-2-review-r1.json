@@ -60,7 +60,7 @@
       "mode": "judged",
       "level": null,
       "result": "pass",
-      "evidence": "No ~/projects/tag-pilot path in the fix diff, the fix-round gates, or my own checks."
+      "evidence": "No the tag-pilot checkout path in the fix diff, the fix-round gates, or my own checks."
     },
     {
       "id": "houserules.template-is-the-source",
