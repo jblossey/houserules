@@ -946,7 +946,7 @@
       "title": "Default starter rule set: docs and code-quality style adopters begin with",
       "body": [
         "Owner intent (2026-09-04): adopters should start with a curated default set of rules — docs style and code-quality style in tag-pilot's vein — instead of a near-empty seed. Today template/knowledge/ ships 36 entries that are process-heavy (23 process entries) while quality carries 2 and writing-style 3; no docs-style or language-agnostic code-quality starter content exists.",
-        "Shape: curate a default entry set for the quality and writing-style topics (and a docs area if warranted), modeled on ~/projects/tag-pilot's rules as a READ-ONLY reference (houserules.tag-pilot-is-read-only). Content work, independent of the Tier-2 binary; interacts with HR-053 (a starter set is what a modular rules-only install would seed). Curation choices and any new areas go to the batch spec when gated.",
+        "Shape: curate a default entry set for the quality and writing-style topics (and a docs area if warranted), modeled on the tag-pilot checkout's rules as a READ-ONLY reference (houserules.tag-pilot-is-read-only). Content work, independent of the Tier-2 binary; interacts with HR-053 (a starter set is what a modular rules-only install would seed). Curation choices and any new areas go to the batch spec when gated.",
         "Source: owner, 2026-09-04, mid batch 16."
       ],
       "tags": [
@@ -1495,6 +1495,23 @@
       "see": [
         "HR-091",
         "HR-068"
+      ]
+    },
+    {
+      "id": "HR-093",
+      "type": "chore",
+      "title": "Public-surface sweep: no private paths, emails, or attribution anywhere public",
+      "body": [
+        "Owner ruling 2026-09-11 after a sweep of every PR (all states), comment, review, issue, release, commit message on every remote branch, and tracked file on main. Cleaned the same day: session links and tool-attribution lines in the descriptions of PRs #3, #4, #5, #9, #12; a git+file URL under the maintainer's home directory in docs/plans/2026-09-01-batch-2.md.",
+        "Fixed in this item: the batch-14 fixture reports and crates/houserules/tests/validate_stats_audit_parity.rs carried the generating machine's /home/<user>/... prefix (26 lines, 6 files, plus the two test assertions); neutralized to /home/maintainer/... (houserules.corpus-batch14-fixtures-are-committed updated). The standing rule houserules.tag-pilot-is-read-only, one backlog body, two plan/spec documents, and the fixture review evidence named a local path for the tag-pilot checkout; they now name the checkout without a path (render and gen-goldens regenerated the rules, skill, and read-parity goldens).",
+        "PENDING: the commit author identity. 308 commits on main carry the maintainer's personal email; the ruling is to rewrite them to the GitHub noreply address (a mailmap rewrite of every ref, force-push under a temporarily disabled ruleset, the old-to-new commit map committed under docs/ so every cited sha stays resolvable). The repository-local git identity already uses the noreply address for every commit from 2026-09-11 on. Status flips to done when the rewrite lands."
+      ],
+      "milestone": null,
+      "status": "partial",
+      "batch": null,
+      "see": [
+        "HR-091",
+        "HR-092"
       ]
     }
   ]

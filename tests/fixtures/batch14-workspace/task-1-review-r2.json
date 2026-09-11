@@ -55,7 +55,7 @@
       "mode": "judged",
       "level": null,
       "result": "pass",
-      "evidence": "2fde017 touches two paths, both in this repository; no path under ~/projects/tag-pilot"
+      "evidence": "2fde017 touches two paths, both in this repository; no path under the tag-pilot checkout"
     },
     {
       "id": "houserules.template-is-the-source",

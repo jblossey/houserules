@@ -34,7 +34,7 @@
       "kind": "rule",
       "area": "global",
       "standing": true,
-      "summary": "Treat `~/projects/tag-pilot` as a read-only reference: never modify it, commit there, run its agents, or run `init` or `update` against it.",
+      "summary": "Treat the tag-pilot checkout outside this repository as read-only: never modify it, commit there, run its agents, or run `init` or `update` against it.",
       "body": [
         "tag-pilot (branch `knowledge-management`, PR #42) is the origin of this kit and, until the adoption ruling in docs/design.md §5.4, the upstream of every kit-owned file.",
         "Before every release, diff its `tools/`, `.claude/agents/`, and `.claude/skills/` against `template/` and port the drift; the first port is `process.evals-rerun` with its `co-change` check (HR-003)."
@@ -327,11 +327,11 @@
       "id": "houserules.corpus-batch14-fixtures-are-committed",
       "kind": "gotcha",
       "area": "tests",
-      "summary": "tests/fixtures/batch14-workspace/ commits gitignored .superpowers/ batch-14 deliverables verbatim, host paths included.",
+      "summary": "tests/fixtures/batch14-workspace/ commits gitignored .superpowers/ batch-14 deliverables verbatim, host paths neutralized.",
       "body": [
         ".gitignore excludes .superpowers/, so CI never checks it out; the validate/stats/audit parity tests need the twelve batch-14 deliverables' real content, not scalar values, so they are committed copies under tests/fixtures/, not live reads of the gitignored workspace.",
         "The batch 16 task 1 review checked all twelve files for public-tree fitness: no credential, token, API key, email address, session URL, or third-party data.",
-        "Their embedded absolute host paths (the generating machine's /home/... prefixes) stay verbatim: the fixture freezes inputs unchanged, byte for byte, so redacting them would misrepresent the frozen behavior.",
+        "Their embedded absolute host paths were neutralized to a /home/maintainer/... prefix on 2026-09-11 (owner ruling, public-surface sweep, HR-093); the fixture otherwise freezes its inputs unchanged, and crates/houserules/tests/validate_stats_audit_parity.rs asserts the neutralized prefix.",
         "Relocated from tests/corpus/fixtures/ at batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2): tests/corpus/ (the frozen JS-parity captures and manifest) retired with the rest of the vitest layer, but this directory is input data, not JS parity output, so it moved rather than re-baselined -- crates/houserules/tests/validate_stats_audit_parity.rs remains its largest reader."
       ],
       "tags": [

@@ -52,7 +52,7 @@
       "mode": "judged",
       "level": null,
       "result": "pass",
-      "evidence": "No ~/projects/tag-pilot path in the diff, the tests, or the live run; the live run installs into a scratchpad directory."
+      "evidence": "No the tag-pilot checkout path in the diff, the tests, or the live run; the live run installs into a scratchpad directory."
     },
     {
       "id": "houserules.template-is-the-source",
