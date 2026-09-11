@@ -224,6 +224,10 @@
     {
       "date": "2026-09-11",
       "text": "Ephemeral paths in narrative: cite-into-artifact is the standing answer; no checker escape; a Limits sentence records the pattern. docs/design.md 5.57."
+    },
+    {
+      "date": "2026-09-11",
+      "text": "Four batch-21 standing bullets applied: claims-match x2 (world-change re-derive; observed-vs-inferred), closure-claims (subject-derived patterns), doc-comments (behavior statements are claims). docs/design.md 5.58."
     }
   ],
   "notes": []
