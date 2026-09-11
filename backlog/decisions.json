@@ -204,6 +204,14 @@
     {
       "date": "2026-09-08",
       "text": "Source-comment citation policy: a long-lived source comment states the rerunnable command and its measured counts inline; a workspace path is provenance only, never the sole evidence. Bullet on process.evidence-outlives-the-session, both copies. docs/design.md 5.52."
+    },
+    {
+      "date": "2026-09-08",
+      "text": "Batch 20 accepted as merged (main d0cc286); Tier 2 complete; controller selects the next batch. docs/design.md 5.53."
+    },
+    {
+      "date": "2026-09-08",
+      "text": "Batch 21 spec approved as drafted: the gate cluster HR-074/075/076/077/086 (HR-086 resolved as a textList minLength in the deliverables schema, both copies) plus the walkdir adoption HR-079. docs/design.md 5.54."
     }
   ],
   "notes": []
