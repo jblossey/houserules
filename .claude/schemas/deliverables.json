@@ -272,6 +272,10 @@
         },
         "empty_range": {
           "enum": [true]
+        },
+        "sanctioned_fail": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },

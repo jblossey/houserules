@@ -695,7 +695,9 @@ fn run_check(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result<Valu
 
 // ---- the audit engine -----------------------------------------------------------------
 
-/// `audit`'s inputs -- `tools/kb.mjs`'s `audit` options object.
+/// `audit`'s inputs -- `tools/kb.mjs`'s `audit` options object, extended by
+/// `sanctioned` (HR-077, no frozen-JS counterpart; see this module's own
+/// "sanctioned-fail annotation" section below).
 #[derive(Default)]
 pub(crate) struct AuditOptions {
     pub base_ref: Option<String>,
@@ -704,6 +706,9 @@ pub(crate) struct AuditOptions {
     pub report: Option<PathBuf>,
     pub workspace: Option<PathBuf>,
     pub json: Option<PathBuf>,
+    /// Each `--sanctioned <rule>=<ref>` as a `(rule id, reference)` pair,
+    /// in the order given; a rule id may repeat (unusual, not rejected).
+    pub sanctioned: Vec<(String, String)>,
 }
 
 /// `audit`'s result: the full JSON result value, and whether any row's
@@ -836,6 +841,55 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
         rows.push(row);
     }
 
+    // ---- HR-077: the sanctioned-fail annotation ----
+    //
+    // A `--sanctioned <rule>=<ref>` declares a spec-booked interim fail once
+    // per dispatch (batch 20's own evals red was re-narrated by hand in 14
+    // audits and review rounds). Semantics, defended against the row shape
+    // above: the sanctioned rule's row keeps its TRUE `result` -- a fail
+    // stays "fail", never silently becomes "pass" -- and gains the
+    // declaration in its `evidence` text alone, so `auditRow`'s schema
+    // shape (id/kind/mode/level/result/evidence, unchanged) needs no
+    // change at all. `parse_sanctioned` already ruled out an empty
+    // reference and a repeated rule id, so every remaining case names a
+    // real row: absent from the package entirely (a typo `--ids` itself
+    // would reject) is this function's own named error, the same
+    // "unknown id" shape `--ids` already uses one flag over; present but
+    // not `result: "fail"` is a stale booking, reported in
+    // `stale_sanctions` and folded into `failed`, never a silent no-op --
+    // that discipline is what keeps bookings honest (fix round 1, review
+    // minor issue 2 distinguishes the two: reading "did not fail" for a
+    // rule that never ran sent an author to un-book a typo instead of
+    // fixing it).
+    let mut stale_sanctions: Vec<String> = Vec::new();
+    let mut sanctioned_fail = 0usize;
+    for (rule, reference) in &opts.sanctioned {
+        let Some(row) = rows
+            .iter_mut()
+            .find(|row| row.get("id").and_then(Value::as_str) == Some(rule.as_str()))
+        else {
+            return Err(format!("unknown id \"{rule}\" for --sanctioned"));
+        };
+        let result = row
+            .get("result")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        if result == "fail" {
+            let evidence = row
+                .get("evidence")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            row["evidence"] = Value::String(format!("{evidence} (sanctioned: {reference})"));
+            sanctioned_fail += 1;
+        } else {
+            stale_sanctions.push(format!(
+                "--sanctioned {rule}={reference}: row result is \"{result}\", not fail"
+            ));
+        }
+    }
+
     let deterministic_count = rows.iter().filter(|r| is_deterministic(r)).count();
     let count_where = |result: &str| {
         rows.iter()
@@ -870,15 +924,32 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
     if empty_range {
         summary["empty_range"] = Value::Bool(true);
     }
+    // Additive, like `empty_range` above: omitted entirely rather than
+    // printed as 0, so an audit run with no `--sanctioned` at all keeps its
+    // pre-HR-077 summary shape byte for byte (the two frozen goldens under
+    // tests/goldens/audit/ pin exactly this: neither names --sanctioned, and
+    // gen-goldens reproduces both unchanged after this change).
+    if sanctioned_fail > 0 {
+        summary["sanctioned_fail"] = json!(sanctioned_fail);
+    }
 
+    // A sanctioned fail still counts in `fail` above (its `result` never
+    // changed) and still fails the run; a stale booking fails the run too,
+    // even though every real row passed, since "a stale booking is a
+    // finding, not a no-op" (HR-077, docs/specs/2026-09-08-batch-21-gates.md
+    // §5).
     let failed = rows
         .iter()
-        .any(|row| row.get("result").and_then(Value::as_str) == Some("fail"));
-    let result = json!({
+        .any(|row| row.get("result").and_then(Value::as_str) == Some("fail"))
+        || !stale_sanctions.is_empty();
+    let mut result = json!({
         "base": base_sha, "head": head_sha, "ids": opts.ids, "changed_files": changed,
         "areas": areas, "area_files": area_files_json(&area_file_map),
         "rules": rows, "summary": summary,
     });
+    if !stale_sanctions.is_empty() {
+        result["stale_sanctions"] = json!(stale_sanctions);
+    }
 
     if let Some(json_path) = &opts.json {
         std::fs::write(json_path, emit(&result))
@@ -890,10 +961,52 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
 
 // ---- CLI --------------------------------------------------------------------------
 
+/// Parses each `--sanctioned` value as `<rule>=<ref>` (HR-077): clap's own
+/// grammar (`main.rs`'s `Audit::sanctioned: Vec<String>`) admits any
+/// string, so a value missing the separator, naming an empty rule id or an
+/// empty reference, or repeating a rule id an earlier value already named,
+/// is this command's own usage error -- checked after `cmd_audit` resolves
+/// `root` and loads the knowledge base, but before any audit work starts
+/// (corrected at batch 21 T2 fix round 1, review critical issue 1: the
+/// prior doc claimed this ran before either, which `cmd_audit`'s own
+/// `resolve_root`-then-`load_base` order does not). An empty reference
+/// would book a sanction naming no reference at all, and a repeated rule
+/// id would let `sanctioned_fail` count past the one row it can ever
+/// annotate (fix round 1, review minor issue 1) -- both are this
+/// function's business, not the apply loop's, so a malformed
+/// `--sanctioned` is caught before any row is even read. Splits on the
+/// FIRST `=` only, so a reference itself containing `=` (a URL query
+/// string, say) survives whole.
+fn parse_sanctioned(raw: Vec<String>) -> Result<Vec<(String, String)>, String> {
+    let mut seen_rules: Vec<String> = Vec::new();
+    let mut pairs = Vec::with_capacity(raw.len());
+    for item in raw {
+        let Some((rule, reference)) = item.split_once('=') else {
+            return Err(format!(
+                "--sanctioned \"{item}\" needs the shape <rule>=<ref>"
+            ));
+        };
+        if rule.is_empty() || reference.is_empty() {
+            return Err(format!(
+                "--sanctioned \"{item}\" needs the shape <rule>=<ref>"
+            ));
+        }
+        if seen_rules.iter().any(|seen| seen == rule) {
+            return Err(format!(
+                "--sanctioned \"{rule}\" is already sanctioned; declare it once"
+            ));
+        }
+        seen_rules.push(rule.to_string());
+        pairs.push((rule.to_string(), reference.to_string()));
+    }
+    Ok(pairs)
+}
+
 /// Runs the `audit` subcommand: resolves `root` (`--dir`, or the enclosing
 /// git repository's top level), loads the knowledge base there, parses
 /// `--ids` as a comma-separated, trimmed, non-empty list (`tools/kb.mjs`'s
-/// `main`'s own `audit` case), and prints the JSON result.
+/// `main`'s own `audit` case) and `--sanctioned` per `parse_sanctioned`
+/// (HR-077), and prints the JSON result.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_audit(
     dir: Option<PathBuf>,
@@ -903,6 +1016,7 @@ pub(crate) fn cmd_audit(
     report: Option<PathBuf>,
     workspace: Option<PathBuf>,
     json: Option<PathBuf>,
+    sanctioned: Vec<String>,
 ) -> ExitCode {
     let root = match crate::root::resolve_root(dir) {
         Ok(root) => root,
@@ -924,6 +1038,13 @@ pub(crate) fn cmd_audit(
             .collect(),
         None => Vec::new(),
     };
+    let sanctioned = match parse_sanctioned(sanctioned) {
+        Ok(pairs) => pairs,
+        Err(message) => {
+            eprintln!("{message}");
+            return ExitCode::from(2);
+        }
+    };
     let outcome = audit(
         &base,
         AuditOptions {
@@ -933,6 +1054,7 @@ pub(crate) fn cmd_audit(
             report,
             workspace,
             json,
+            sanctioned,
         },
     );
     match outcome {
@@ -2504,5 +2626,158 @@ mod tests {
         let error =
             git_diff(&missing_root, "main", "main", &["--name-only"]).expect_err("git diff");
         assert!(!error.is_empty());
+    }
+
+    // ---- HR-077: the sanctioned-fail annotation ----
+
+    /// A commit whose subject violates `process.commits`' pattern, with no
+    /// other file change -- every OTHER deterministic check in
+    /// `audit_entries()` reads "not triggered"/"0 files checked" (pass or
+    /// skip) on an empty file diff, isolating `process.commits` as the
+    /// one row `--sanctioned` can act on.
+    fn make_repo_with_one_bad_commit_subject() -> (tempfile::TempDir, String) {
+        let dir = make_repo(&audit_entries());
+        let root = dir.path();
+        let base_sha = commit(root, "chore: base", None);
+        commit(root, "bad subject line", None);
+        (dir, base_sha)
+    }
+
+    #[test]
+    fn a_sanctioned_rules_row_keeps_its_true_fail_result_and_gains_the_declaration_in_evidence() {
+        let (dir, base_sha) = make_repo_with_one_bad_commit_subject();
+        let base = load_base(dir.path()).unwrap();
+        let outcome = audit(
+            &base,
+            AuditOptions {
+                base_ref: Some(base_sha),
+                sanctioned: vec![("process.commits".to_string(), "spec section 6".to_string())],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let rows = outcome.result["rules"].as_array().unwrap();
+        let row = rows.iter().find(|r| r["id"] == "process.commits").unwrap();
+        assert_eq!(row["result"], json!("fail"));
+        assert_eq!(
+            row["evidence"],
+            json!(
+                "commit \"bad subject line\" does not match ^(feat|fix|chore|docs|test): .+ (sanctioned: spec section 6)"
+            )
+        );
+        assert_eq!(outcome.result["summary"]["sanctioned_fail"], json!(1));
+        assert!(outcome.result.get("stale_sanctions").is_none());
+        assert!(outcome.failed, "a sanctioned fail still fails the run");
+    }
+
+    /// Fix round 1, review minor issue 2: a rule that RAN and passed is a
+    /// stale booking, distinguished by wording from a rule the package
+    /// never carried at all (`reports_an_unknown_sanctioned_id_as_a_named_
+    /// error_not_a_stale_booking`).
+    #[test]
+    fn reports_a_stale_sanction_naming_a_rule_that_ran_and_passed() {
+        let dir = make_repo(&audit_entries());
+        let root = dir.path();
+        let base_sha = commit(root, "chore: base", None);
+        commit(root, "feat: change", None);
+        let base = load_base(root).unwrap();
+        let outcome = audit(
+            &base,
+            AuditOptions {
+                base_ref: Some(base_sha),
+                sanctioned: vec![("process.commits".to_string(), "spec section 6".to_string())],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            outcome.result["stale_sanctions"],
+            json!([
+                "--sanctioned process.commits=spec section 6: row result is \"pass\", not fail"
+            ])
+        );
+        assert!(outcome.result["summary"].get("sanctioned_fail").is_none());
+        assert!(outcome.failed, "a stale booking still fails the run");
+    }
+
+    /// Fix round 1, review minor issue 2: a rule id absent from this
+    /// audit's package (never a row at all, typically a typo) is this
+    /// function's own named error -- the same "unknown id" shape `--ids`
+    /// already uses one flag over -- never folded into `stale_sanctions`
+    /// alongside a rule that genuinely ran and passed.
+    #[test]
+    fn reports_an_unknown_sanctioned_id_as_a_named_error_not_a_stale_booking() {
+        let (dir, base_sha) = make_repo_with_one_bad_commit_subject();
+        let base = load_base(dir.path()).unwrap();
+        let error = audit(
+            &base,
+            AuditOptions {
+                base_ref: Some(base_sha),
+                sanctioned: vec![(
+                    "process.totally-made-up".to_string(),
+                    "spec section 6".to_string(),
+                )],
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            "unknown id \"process.totally-made-up\" for --sanctioned"
+        );
+    }
+
+    #[test]
+    fn omits_sanctioned_fail_and_stale_sanctions_when_no_sanction_is_given() {
+        let (dir, base_sha) = make_repo_with_one_bad_commit_subject();
+        let base = load_base(dir.path()).unwrap();
+        let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
+        assert!(outcome.result["summary"].get("sanctioned_fail").is_none());
+        assert!(outcome.result.get("stale_sanctions").is_none());
+    }
+
+    #[test]
+    fn parse_sanctioned_rejects_a_value_missing_the_equals_separator() {
+        assert_eq!(
+            parse_sanctioned(vec!["process.commits".to_string()]),
+            Err("--sanctioned \"process.commits\" needs the shape <rule>=<ref>".to_string())
+        );
+    }
+
+    /// Fix round 1, review minor issue 1: an empty reference books a
+    /// sanction naming nothing to check against later.
+    #[test]
+    fn parse_sanctioned_rejects_an_empty_reference() {
+        assert_eq!(
+            parse_sanctioned(vec!["process.commits=".to_string()]),
+            Err("--sanctioned \"process.commits=\" needs the shape <rule>=<ref>".to_string())
+        );
+    }
+
+    /// Fix round 1, review minor issue 1: a repeated rule id would let
+    /// `sanctioned_fail` count past the one row it can ever annotate.
+    #[test]
+    fn parse_sanctioned_rejects_a_repeated_rule_id() {
+        assert_eq!(
+            parse_sanctioned(vec![
+                "process.commits=spec 6".to_string(),
+                "process.commits=spec 7".to_string(),
+            ]),
+            Err(
+                "--sanctioned \"process.commits\" is already sanctioned; declare it once"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn parse_sanctioned_splits_on_the_first_equals_only_so_a_reference_keeps_its_own() {
+        assert_eq!(
+            parse_sanctioned(vec!["process.commits=https://x.test/?a=b".to_string()]),
+            Ok(vec![(
+                "process.commits".to_string(),
+                "https://x.test/?a=b".to_string()
+            )])
+        );
     }
 }

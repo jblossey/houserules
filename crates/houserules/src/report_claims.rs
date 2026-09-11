@@ -167,6 +167,47 @@
 //!   in the swept corpus does this, so it stays a theoretical,
 //!   undemonstrated vehicle, not one this project's own history can point
 //!   an instance at.
+//! - `check_ephemeral_paths` (HR-075, batch 21 T2, docs/specs/2026-09-08-
+//!   batch-21-gates.md §3) flags an absolute `/tmp/`-rooted path or a
+//!   `scratchpad/`-named directory segment anywhere in the same four
+//!   narrative fields `collect_narrative` already scans -- never inside a
+//!   `command` field (`collect_runs`), where `/tmp` is the literal,
+//!   required text of what ran (a live-run scratch repository lives there
+//!   by design, `houserules.live-run-recipe`) and this check has no
+//!   business judging it. The second shape widened the first at batch 21
+//!   T2 fix round 1 (review important issue 1): six real corpus citations
+//!   name this project's own session-scratchpad home with no `/tmp/`
+//!   prefix at all, several eliding it to a bare `.../` (`.superpowers/sdd/
+//!   2026-09-08-batch-21/t2-evidence/rollout-check-report-claims-
+//!   ephemeral.sh`'s own re-derivation over the same 116-file corpus:
+//!   batch 3 task 2, batch 4 task 3, batch 9 tasks 3 and 4, batch 10 tasks
+//!   2 and 3). `/tmp/` still requires the word it roots to start with `/`
+//!   (`word_qualifies`'s own doc has the boundary account, fixed the same
+//!   round against review important issue 2: an unanchored substring match
+//!   used to flag a durable, tracked path like `tests/tmp/golden.json` or
+//!   a URL's own path segment); `scratchpad/` carries no such requirement,
+//!   since every real citation of that shape is the bare directory name.
+//!   Both shapes together are still blind to a macOS `$TMPDIR` (typically
+//!   `/var/folders/.../T/`), a Windows `%TEMP%`, or any other platform's
+//!   ephemeral home with no `scratchpad/` segment in it, and to a
+//!   durable-LOOKING repository-relative path that is in fact untracked or
+//!   never committed: a report cannot be checked against a git object that
+//!   was never added. A bare mention of the WORD "scratchpad" with no
+//!   `scratchpad/`-segmented path attached (this project's own history
+//!   carries dozens, honestly discussing the concept) is deliberately not
+//!   this check's business either. The `scratchpad/` arm carries no
+//!   absolute-path requirement (batch-21 T2 fix round 2, review new
+//!   breakage, minor): it flags any word containing a `scratchpad/`
+//!   segment, durable or not, so a real, tracked, repository-relative path
+//!   naming one -- verified live: `docs/scratchpad/notes.md` in a
+//!   narrative field flags -- would over-flag the same way the unanchored
+//!   `/tmp/` match once did. Left unanchored on measurement, not
+//!   oversight: `git ls-files | grep -c 'scratchpad/'` is 0 in this
+//!   repository's own tracked tree, and all six real corpus citations this
+//!   arm was built from (module doc, above) are genuinely ephemeral, so
+//!   nothing is mis-flagged today; named here as this project's own
+//!   history grows, per this file's own standard of naming even
+//!   undemonstrated false-positive vehicles.
 //! - `quote_mask` has no notion of `$(...)` command substitution
 //!   resetting quote context: real bash parses a same-character quote
 //!   opened again inside a `$(...)` (or `` `...` ``) as starting a fresh,
@@ -920,6 +961,137 @@ fn check_paste_run_lint(runs: &[(String, Run)], errors: &mut Vec<String>) {
     }
 }
 
+/// The absolute-path prefix `check_ephemeral_paths` treats as ephemeral: it
+/// does not survive past the session that wrote it
+/// (`process.evidence-outlives-the-session`). Matched only when it roots an
+/// absolute path (`word_qualifies`'s own doc has the boundary account) --
+/// see the module doc's HR-075 bullet for what this prefix still cannot
+/// see.
+const EPHEMERAL_PATH_PREFIX: &str = "/tmp/";
+
+/// The directory-segment shape this project's own session-scratchpad home
+/// always ends in, matched wherever it appears in a word (no absolute-path
+/// requirement: batch-21 T2 fix round 1, review important issue 1 -- six
+/// real corpus citations name this shape with no `/tmp/` prefix at all,
+/// several eliding the prefix to a bare `.../` -- see the module doc's
+/// HR-075 bullet).
+const EPHEMERAL_SCRATCHPAD_SEGMENT: &str = "scratchpad/";
+
+/// Leading bytes this project's own narrative prose glues onto an ephemeral
+/// citation that belong to the surrounding SENTENCE, not the path itself:
+/// an opening bracket/brace/paren, or a quote or backtick opening a
+/// markdown code span (`(scratchpad/task2-scratch-audit.mjs)`, a real
+/// corpus citation -- see the module doc's HR-075 bullet).
+const EPHEMERAL_PATH_LEADING_PUNCTUATION: &[char] = &['(', '[', '{', '\'', '"', '`'];
+
+/// Trailing bytes this project's own narrative prose glues onto an
+/// ephemeral citation that belong to the surrounding SENTENCE, not the path
+/// itself: a comma or period ending the clause, a closing bracket/paren/
+/// brace, a quote, or a backtick closing a markdown code span. Re-measured
+/// at batch-21 T2 fix round 2 (review critical issue 1b: fix round 1's own
+/// correction traded one wrong count for another) directly from
+/// `t2-evidence/enumerate-narrative-tmp-hits.py`'s own run at HEAD
+/// (`t2-evidence/r2-c1b-remeasure.txt`, retained): 10 tokens total, six
+/// carrying trailing punctuation glued to the path with no space --
+/// `/tmp/houserules-target-uQK5Qz/tools/kb.mjs,`, `/tmp/renamed-binary)`,
+/// `/tmp/release-committed.yml,`, `/tmp/verify-goldens.py,`, and two from
+/// this very report's own fix_rounds[0] narrative illustrating the
+/// anchoring fix rather than citing a real ephemeral artifact,
+/// `tests/tmp/golden.json)` and `.../tmp/report.html)`. The remaining four
+/// -- `/tmp/hr009-*`, both `/tmp/hr009-aKTTWA` occurrences, and
+/// `/tmp/hr009-nN2oLG` -- carry none: each is followed by a space in its
+/// source sentence, verified against the raw corpus text, not restated.
+/// The `` /tmp/houserules-fixbase-worktree`; `` token both earlier rounds
+/// counted no longer appears in this run at all: ruling R1 rewrote
+/// task-1-report.json's three narrative citations later in fix round 1,
+/// removing it from the corpus.
+const EPHEMERAL_PATH_TRAILING_PUNCTUATION: &[char] =
+    &[',', ';', ':', ')', ']', '}', '\'', '"', '`', '.'];
+
+/// The byte offset of the end of the maximal non-whitespace run starting at
+/// `start` in `text` -- `text.len()` when none is found.
+fn word_end(text: &str, start: usize) -> usize {
+    text[start..]
+        .find(|c: char| c.is_whitespace())
+        .map_or(text.len(), |offset| start + offset)
+}
+
+/// The byte offset of the start of the maximal non-whitespace run
+/// containing `pos` in `text` -- `0` when `pos` sits in the text's first
+/// word.
+fn word_start(text: &str, pos: usize) -> usize {
+    text[..pos]
+        .char_indices()
+        .rev()
+        .find(|&(_, c)| c.is_whitespace())
+        .map_or(0, |(i, c)| i + c.len_utf8())
+}
+
+/// `true` when `word` (already trimmed of leading/trailing punctuation) is
+/// the kind of token `trigger` may legitimately root (batch-21 T2 fix
+/// round 1, review important issue 2). `/tmp/` counts only when `word` is
+/// itself an absolute path (starts with `/`) -- otherwise the trigger sits
+/// inside a relative path (`tests/tmp/golden.json`) or a URL's own path
+/// segment (`https://example.test/tmp/report.html`), neither an ephemeral
+/// filesystem location; `/var/tmp/capture.txt` still qualifies, rooted at
+/// its own leading `/`, not at the `/tmp/` substring partway through it.
+/// `scratchpad/` carries no such requirement: every real corpus citation of
+/// that shape (module doc's HR-075 bullet) is the bare directory name,
+/// with or without a leading `/` or an elided `.../` prefix, so requiring
+/// an absolute-path start would exclude the shape this arm exists to
+/// catch.
+fn word_qualifies(trigger: &str, word: &str) -> bool {
+    trigger != EPHEMERAL_PATH_PREFIX || word.starts_with('/')
+}
+
+/// Every word in `text` naming `trigger`, once per unique trimmed word,
+/// pushed onto `errors` under `label` -- the shared walk
+/// `check_ephemeral_paths` runs once per trigger shape. `seen` is threaded
+/// across every call for one `(label, text)` pair so a word matching both
+/// triggers (an absolute path with a `scratchpad/` segment) is not flagged
+/// twice.
+fn flag_ephemeral_words<'a>(
+    text: &'a str,
+    trigger: &str,
+    seen: &mut Vec<&'a str>,
+    label: &str,
+    errors: &mut Vec<String>,
+) {
+    let mut search_from = 0;
+    while let Some(relative) = text[search_from..].find(trigger) {
+        let match_start = search_from + relative;
+        let start = word_start(text, match_start);
+        let end = word_end(text, match_start);
+        let raw = &text[start..end];
+        search_from = end;
+        let path = raw
+            .trim_start_matches(EPHEMERAL_PATH_LEADING_PUNCTUATION)
+            .trim_end_matches(EPHEMERAL_PATH_TRAILING_PUNCTUATION);
+        if path.len() <= trigger.len() || !word_qualifies(trigger, path) || seen.contains(&path) {
+            continue;
+        }
+        seen.push(path);
+        errors.push(format!(
+            "{label}: cites \"{path}\", an ephemeral path that will not exist once the session ends"
+        ));
+    }
+}
+
+/// Every ephemeral path token `narrative` cites -- a `/tmp/`-rooted
+/// absolute path or a `scratchpad/`-named directory segment -- once per
+/// unique path per field (HR-075, docs/specs/2026-09-08-batch-21-gates.md
+/// §3): a narrative claim naming an artifact there describes a location
+/// that will not exist by the time anyone re-opens the report. Never scans
+/// a `command` field -- see the module doc's HR-075 bullet for the full
+/// boundary account of why, and what these two shapes still cannot see.
+fn check_ephemeral_paths(narrative: &[(String, String)], errors: &mut Vec<String>) {
+    for (label, text) in narrative {
+        let mut seen: Vec<&str> = Vec::new();
+        flag_ephemeral_words(text, EPHEMERAL_PATH_PREFIX, &mut seen, label, errors);
+        flag_ephemeral_words(text, EPHEMERAL_SCRATCHPAD_SEGMENT, &mut seen, label, errors);
+    }
+}
+
 /// Reads and parses `path` as a JSON report, naming the file in any read
 /// or parse error -- `tools/lib/json-store.mjs`'s `readJson`, collapsed to
 /// one named-error shape (`houserules.crash-paths-are-named`): JS raises a
@@ -950,6 +1122,7 @@ fn check_report_claims(report_path: &Path, root: &Path) -> Result<Vec<String>, S
     check_narrative_shas_resolve(root, &narrative, &mut errors);
     check_self_audit_narrative(&narrative, &report, &mut errors);
     check_paste_run_lint(&runs, &mut errors);
+    check_ephemeral_paths(&narrative, &mut errors);
     Ok(errors)
 }
 
@@ -1527,5 +1700,195 @@ mod tests {
         write_json(&report_path, &report);
         let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
         assert_eq!(errors, Vec::<String>::new());
+    }
+
+    // ---- HR-075: the ephemeral-path check ----
+
+    /// Natural RED (pre-fix: `check_report_claims` called only the original
+    /// six checks; this shape was invisible). HR-075's own incident,
+    /// verbatim: `.superpowers/sdd/2026-09-07-batch-20/task-3-report.json`'s
+    /// `fix_rounds[0].findings[2].finding` names the exact narrative
+    /// citation that cost batch 20 T3 a fix round.
+    #[test]
+    fn flags_a_fix_round_finding_citing_a_slash_tmp_artifact_path() {
+        let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-finding-");
+        let mut report = base_report(&head);
+        report["fix_rounds"] = json!([{
+            "round": 0,
+            "findings": [{
+                "finding": "CRITICAL 3: the goldens closure's enumeration lived at /tmp/verify-goldens.py, a session scratchpad -- process.evidence-outlives-the-session names only the batch workspace or the tracked tree as citable, and the script could not rerun after the session ended.",
+                "file": "t3-evidence/verify-goldens.py",
+                "fix": "moved the script into the batch workspace",
+            }],
+            "commits": [],
+            "tests": [],
+        }]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(
+            errors,
+            vec![
+                "fix_rounds[0].findings[0].finding: cites \"/tmp/verify-goldens.py\", an ephemeral path that will not exist once the session ends".to_string()
+            ]
+        );
+    }
+
+    /// The brief's own central boundary: a `/tmp` path inside a `command`
+    /// field is the literal, required text of what ran
+    /// (`houserules.live-run-recipe` puts every scratch git repository
+    /// under the session scratchpad on purpose) and must never flag, even
+    /// though `EPHEMERAL_PATH_PREFIX` would match it if `collect_runs`'
+    /// fields were ever in this check's scope.
+    #[test]
+    fn does_not_flag_a_slash_tmp_path_inside_a_command_field() {
+        let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-command-");
+        let mut report = base_report(&head);
+        report["live_run"] = json!([{
+            "command": "cd /tmp/claude-1001/scratch/hr075-live && houserules check-knowledge",
+            "output": "knowledge: ok\n",
+        }]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// The measured false-positive class this check deliberately does not
+    /// catch (module doc's HR-075 bullet): this project's own history
+    /// carries dozens of honest narrative sentences discussing the CONCEPT
+    /// of a session scratchpad with no path attached at all.
+    #[test]
+    fn does_not_flag_narrative_prose_that_only_mentions_scratchpad_with_no_path() {
+        let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-prose-");
+        let mut report = base_report(&head);
+        report["self_review"] = json!([
+            "Ran the scratch git repository under the session scratchpad, never touching this repository's working tree."
+        ]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// Two more real corpus shapes in one document: the same path cited
+    /// twice flags once (dedup), and a trailing comma or period ending the
+    /// sentence is trimmed from the quoted path.
+    #[test]
+    fn flags_each_unique_slash_tmp_path_once_and_trims_trailing_sentence_punctuation() {
+        let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-dedup-");
+        let mut report = base_report(&head);
+        report["implemented"] = json!(
+            "Left /tmp/hr075-scratch, /tmp/hr075-scratch, in place; also see /tmp/other-artifact."
+        );
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(
+            errors,
+            vec![
+                "implemented: cites \"/tmp/hr075-scratch\", an ephemeral path that will not exist once the session ends".to_string(),
+                "implemented: cites \"/tmp/other-artifact\", an ephemeral path that will not exist once the session ends".to_string(),
+            ]
+        );
+    }
+
+    /// Natural RED (batch-21 T2 fix round 1, review important issue 1): the
+    /// widened scratchpad-shape arm did not exist before this round. Seeded
+    /// verbatim from one of the six real corpus shapes the review's own
+    /// probe re-derives: `.superpowers/sdd/2026-09-02-batch-9/task-3-
+    /// report.json`'s `self_review[7]` names a scratch install at an
+    /// elided `.../scratchpad/hr033-live` path.
+    #[test]
+    fn flags_a_scratchpad_directory_segment_with_an_elided_prefix() {
+        let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-scratchpad-");
+        let mut report = base_report(&head);
+        report["self_review"] = json!([
+            "Left the scratch install at .../scratchpad/hr033-live in place; no prior task in this batch reused it."
+        ]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(
+            errors,
+            vec![
+                "self_review[0]: cites \".../scratchpad/hr033-live\", an ephemeral path that will not exist once the session ends".to_string()
+            ]
+        );
+    }
+
+    /// Natural RED (batch-21 T2 fix round 1, review important issue 1): a
+    /// parenthesized, no-leading-dots scratchpad citation -- the other real
+    /// corpus shape (batch-3 task-2-report.json fix_rounds[0].findings[2].
+    /// fix) -- also needs the leading-punctuation trim `flag_ephemeral_
+    /// words` added this round, or the flagged text would keep the
+    /// enclosing `(`.
+    #[test]
+    fn flags_a_parenthesized_scratchpad_citation_trimmed_of_its_parens() {
+        let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-scratchpad-parens-");
+        let mut report = base_report(&head);
+        report["self_review"] = json!([
+            "Fixed the live-run script (scratchpad/task2-scratch-audit.mjs) to mkdtempSync under the session scratchpad."
+        ]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(
+            errors,
+            vec![
+                "self_review[0]: cites \"scratchpad/task2-scratch-audit.mjs\", an ephemeral path that will not exist once the session ends".to_string()
+            ]
+        );
+    }
+
+    /// Natural RED (batch-21 T2 fix round 1, review important issue 2, the
+    /// reviewer's own first probe): an unanchored substring match used to
+    /// flag a durable, tracked, repository-relative path merely for
+    /// containing a `/tmp/` segment.
+    #[test]
+    fn does_not_flag_a_durable_relative_path_containing_a_slash_tmp_slash_segment() {
+        let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-relative-");
+        let mut report = base_report(&head);
+        report["implemented"] = json!("The fixture at tests/tmp/golden.json is tracked.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// Natural RED (batch-21 T2 fix round 1, review important issue 2, the
+    /// reviewer's own second probe): a URL whose own path carries a
+    /// `/tmp/` segment is not a local ephemeral path.
+    #[test]
+    fn does_not_flag_a_url_path_segment_containing_slash_tmp_slash() {
+        let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-url-");
+        let mut report = base_report(&head);
+        report["implemented"] =
+            json!("See https://example.test/tmp/report.html for the upstream note.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// Natural RED (batch-21 T2 fix round 1, review important issue 2, the
+    /// reviewer's own third probe): `/var/tmp/` is still a real, ephemeral
+    /// absolute path -- it must still flag, quoting the WHOLE path from its
+    /// own leading `/`, not the bare `/tmp/capture.txt` suffix an
+    /// unanchored match used to fabricate.
+    #[test]
+    fn flags_slash_var_slash_tmp_quoting_the_whole_absolute_path() {
+        let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-var-tmp-");
+        let mut report = base_report(&head);
+        report["implemented"] = json!("The capture sits at /var/tmp/capture.txt.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(
+            errors,
+            vec![
+                "implemented: cites \"/var/tmp/capture.txt\", an ephemeral path that will not exist once the session ends".to_string()
+            ]
+        );
     }
 }
