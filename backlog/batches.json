@@ -307,7 +307,7 @@
       "kickoff": "docs/specs/2026-09-08-batch-21-gates.md",
       "status": {
         "state": "done",
-        "text": "Done 2026-09-11: all six gated items delivered plus the in-flight HR-087 (fresh-init docs seed), HR-093 (diff-shape-gate retired as an expired proof), and the branch-fix round (cfg(unix) portability + the cross-target lint step with its mise-provisioned target). Mid-batch rebase onto post-hardening main (PR #9 + PR #12); walkdir adopted exact-pinned with its license live-proven under cargo deny; four tasks + branch-fix, ~19 review rounds. Quality split stated honestly: no runtime defect survived any round; one Windows BUILD defect survived five Linux-only rounds and is the origin of houserules.platform-gated-tests + the lint proxy. HR-088/089/090/094 filed; owner queue at the batch report."
+        "text": "Done 2026-09-11: all six gated items delivered plus the in-flight HR-087 (fresh-init docs seed), HR-093 (diff-shape-gate retired as an expired proof), and the branch-fix round (cfg(unix) portability + the cross-target lint step with its mise-provisioned target). Mid-batch rebase onto post-hardening main (PR #9 + PR #12); walkdir adopted exact-pinned with its license live-proven under cargo deny; four tasks + branch-fix, ~19 review rounds. Quality split stated honestly: no runtime defect survived any round; one Windows BUILD defect survived five Linux-only rounds and is the origin of houserules.platform-gated-tests + the lint proxy. HR-088/089/090/094 filed; owner queue at the batch report. ACCEPTED by the owner 2026-09-11 (design.md 5.60); pause ruled - no next batch selected."
       }
     }
   ]

@@ -742,3 +742,10 @@ Each item records the ruling with its date, or stays marked open.
     unreachable SHA markers to event locators per
     cite-durable-refs, riding a future batch. Source: owner,
     2026-09-11, batch 21 report.
+60. **Batch 21 accepted; pause — ruled 2026-09-11.** The gates
+    batch accepted as merged (main a550830). No batch 22
+    selection now: the backlog waits, the step-two release set
+    stays owner-attended (HR-068 first), and the template
+    cluster (HR-078/080/090/094 + riders HR-095/096) stands as
+    the recorded candidate for whenever work resumes. Source:
+    owner, 2026-09-11, batch 21 acceptance.
