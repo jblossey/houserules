@@ -18,7 +18,7 @@ tests/goldens/** -text
 # The fixture directories (mini, mini-bad, mini-stale, batch14-workspace,
 # invalid-deliverable, skipped-report, stats-workspace) lived under
 # tests/corpus/fixtures/ and so carried the first `-text` rule above
-# until batch 20 T3 relocated them to tests/fixtures/ (commit 850559c)
+# until batch 20 T3 relocated them to tests/fixtures/ (commit e36c4b2)
 # without a matching .gitattributes update -- a rename `.gitattributes`
 # path rules do not follow. Every check_parity.rs comparison against
 # tests/fixtures/mini and tests/fixtures/mini-stale is exact-string
@@ -41,10 +41,10 @@ tests/fixtures/** -text
 # files, standing-rules.md, and the one fixed SKILL_PATH) -- carried no
 # `-text` protection at all, unlike the frozen/reviewed test corpora
 # above. The consumer is what is new, not the leg: `windows-latest` has
-# run `cargo test` in this repository's own ci.yml since 8c3cc15
+# run `cargo test` in this repository's own ci.yml since 0bb27a0
 # (2026-09-04, before batch 20), but dogfood.rs -- and its
 # `generated_files_are_fresh_relative_to_knowledge` case, which has no
-# JS predecessor -- arrived with batch 20 T1's test port (f7833f3), so
+# JS predecessor -- arrived with batch 20 T1's test port (2174a9f), so
 # no Windows run had reached that comparison until batch 20 T6 fix
 # round 1 cleared the two gaps above. There, `houserules render --check`
 # against this checkout's own live root reported all eight generated

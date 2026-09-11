@@ -1,7 +1,7 @@
 # Batch 0: bootstrap — rename, license, hook matcher, dogfood
 
 Date: 2026-08-31. Status: implemented on 2026-08-31 as backlog batch 1 —
-commits 6721668 (T0), 7db7db9 (T1), d356fba (T2), a1d31ac (T3), 3bc142e (T4).
+commits 44c2556 (T0), a45961e (T1), 757f127 (T2), 6fc4244 (T3), 3b7d0f3 (T4).
 Approved by the owner on 2026-08-31 (the orchestrator implements; the
 bootstrap exception of §6 accepted and recorded in backlog/decisions.json).
 Driver: `docs/design.md` §5 (rulings 1, 2, 5, 6 of 2026-08-31). A backlog

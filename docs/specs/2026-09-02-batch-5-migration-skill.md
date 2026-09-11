@@ -2,7 +2,7 @@
 
 Date: 2026-09-02. Status: approved by the owner on 2026-09-02, as written.
 Driver: backlog batch 5 — HR-013 (owner request of 2026-09-01), HR-014
-(batch 4 deferral). Branch `batch-5` from `2a535f6`.
+(batch 4 deferral). Branch `batch-5` from `6d58633`.
 Process: implementer on sonnet, task review on opus, branch review on fable;
 one tier up after two endpoint drops; strictly sequential. Workspace
 `.superpowers/sdd/2026-09-02-batch-5/` with the ledger `progress.md`.

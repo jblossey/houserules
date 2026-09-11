@@ -1,6 +1,6 @@
 {
   "kind": "branch-review",
-  "base": "4a7aeb4f57eccd65be2becc38ca1fe9a8df2a4c3",
+  "base": "182d8aacf81b3306097d6433fa1b7bb9a98b07cc",
   "head": "508a089d6eaeae9110c3f517095b62f66bb881c9",
   "strengths": [
     "The validate hardening is a textbook extension: checkTaskReportAudit sits beside the existing shape checks as one documented single-purpose function (tools/kb.mjs:786-812), its messages keep the usage-error voice, and its doc comment's flow claim was made true before it shipped — the r0 review forced the retrieval protocol to migrate (audit, fill, validate once) instead of special-casing the draft, which is quality.no-compat-softening applied to a process flow.",
@@ -38,7 +38,7 @@
     { "id": "process.backlog-drives-work", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "T1 traces to HR-041, T2 to HR-043+HR-050, T3 to process.evals-rerun as scheduled in the approved spec; batches.json batch 14 status updated in the range" },
     { "id": "process.brainstorm-first", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "spec approved by the owner 2026-09-04 as written and committed first (c7db95e), before any implementation commit" },
     { "id": "process.code-health-scan", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "spec section 6 names the smells per touched file; the tasks honored it (extend-don't-restructure in kb.mjs, one-sentence edits in place, scratch dirs through the shared helper)" },
-    { "id": "process.ff-only-merges", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "git log --merges 4a7aeb4..508a089 is empty, the range is linear; the merge itself is finish work per spec section 5" },
+    { "id": "process.ff-only-merges", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "git log --merges 182d8aa..508a089 is empty, the range is linear; the merge itself is finish work per spec section 5" },
     { "id": "process.live-run-before-ci", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "T1: five per-command captures against doctored copies of the real batch-11 report; T2: eight fresh-install proofs (init, greps, kb/backlog checks); T3's scenarios are live runs by construction" },
     { "id": "process.model-policy", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "implementers on sonnet, every task review on opus, branch review on fable (spec process line; ledger dispatch lines 3, 5, 13, 25)" },
     { "id": "process.rulings-to-file", "kind": "rule", "mode": "judged", "result": "pass", "evidence": "the no-reopen ruling shipped into task-reviewer.md item 6, the rebuild ruling into the orchestrating skill (citing process.main-wins-backlog-collisions, whose body it matches), batch status into batches.json; no ruling lives only in the ledger" },

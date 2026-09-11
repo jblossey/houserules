@@ -3,7 +3,7 @@
 Date: 2026-09-02. Status: approved by the owner on 2026-09-02, as written
 (T4 gates both harness trailers).
 Driver: backlog batch 6 — HR-019, HR-018, HR-020 (batch 5 branch review),
-HR-015 (batch 4 branch review). Branch `batch-6` from `c3e763a`.
+HR-015 (batch 4 branch review). Branch `batch-6` from `775b105`.
 Process: implementer on sonnet, task review on opus, branch review on fable;
 one tier up after two endpoint drops; strictly sequential. Workspace
 `.superpowers/sdd/2026-09-02-batch-6/` with the ledger `progress.md`.

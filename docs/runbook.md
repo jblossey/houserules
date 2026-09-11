@@ -90,14 +90,14 @@ not carried over from the `node` shape:
   `template/` tree into the released binary, so a commit that changes
   only `template/`, `README.md`, or another root-level path changes
   shipped code and now produces no release PR at all. Measured over
-  `v0.2.0-alpha..9e4bf91` (batch 20 T5 fix round 1 review): 82 of 119
+  `v0.2.0-alpha..6aa19e0` (batch 20 T5 fix round 1 review): 82 of 119
   commits touch no path under `crates/houserules/`, and 7 of 27
   `feat`/`fix` commits are unattributed under the new package path —
-  four of them (`9a3d697 feat(template)`, `523da2f fix(template)`,
-  `1537d89 fix(tools)`, `6fb46ca fix(template)`) change the embedded
+  four of them (`7460c77 feat(template)`, `6ac1aaa fix(template)`,
+  `719d3f5 fix(tools)`, `101555e fix(template)`) change the embedded
   payload directly, enumerated by what each commit actually touches,
   not by subject scope — a subject-scoped read of this same range
-  missed `1537d89` (`fix(tools): validate rejects incomplete terminal
+  missed `719d3f5` (`fix(tools): validate rejects incomplete terminal
   reports`, no `crates/houserules/` path, two `template/` files)
   (`.superpowers/sdd/2026-09-07-batch-20/t5-evidence/
   hr081-template-payload-commits.sh`,

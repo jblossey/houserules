@@ -3,7 +3,7 @@
 Date: 2026-09-03. Status: approved by the owner on 2026-09-03, as written.
 Driver: backlog batch 10 — HR-035 (batch 9 T2 review, ENOSPC census),
 HR-036, HR-037 (batch 9 branch review, template defects). Branch
-`batch-10` from `35ac91b`.
+`batch-10` from `00df631`.
 Process: implementer on sonnet, task review on opus, branch review on
 fable; one tier up after two endpoint drops; strictly sequential; the
 audit `--ids` on every round are the dispatch's Knowledge ids. Workspace

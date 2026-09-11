@@ -2,7 +2,7 @@
 
 Date: 2026-09-01. Status: approved by the owner on 2026-09-01, as written (commitlint included).
 Driver: backlog batch 2 — HR-004 (owner ruling of 2026-09-01, `docs/design.md`
-§5.7), HR-001, HR-002. Branch `batch-2` from `9a15f95`; the ruling commit
+§5.7), HR-001, HR-002. Branch `batch-2` from `e0410dc`; the ruling commit
 `3eef303` is its first commit.
 Process: the first batch through the agent layer — implementer on sonnet, task
 review on opus, branch review on fable (`process.model-policy`), strictly
@@ -145,7 +145,7 @@ path; a malformed knowledge or backlog file yields one usage-error line.
 
 After each task: task review (opus) with `AUDIT_JSON`; every finding fixed,
 Minor included, or deferred as a backlog item with a reason. After T3: branch
-review (fable) over `9a15f95..HEAD` with the plan, this spec, and the
+review (fable) over `e0410dc..HEAD` with the plan, this spec, and the
 workspace; retrospective proposals applied in one `docs(knowledge)` commit,
 standing-rule proposals listed for the owner. Then `finishing-a-feature`
 without its push and PR steps (no remote; decision 3): backlog ticked, one to

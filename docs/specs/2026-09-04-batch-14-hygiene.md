@@ -3,7 +3,7 @@
 Date: 2026-09-04. Status: approved by the owner on 2026-09-04, as written.
 Driver: backlog batch 14 — HR-041 (batches 11/12 branch reviews),
 HR-043 (batch 11 branch review), HR-050 (batch 13 branch review).
-Branch `batch-14` from `4a7aeb4`.
+Branch `batch-14` from `182d8aa`.
 Process: implementer on sonnet, task review on opus, branch review on
 fable; one tier up after two endpoint drops; strictly sequential; the
 audit `--ids` on every round are the dispatch's Knowledge ids.

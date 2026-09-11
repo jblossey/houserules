@@ -153,7 +153,7 @@ Each item records the ruling with its date, or stays marked open.
    `groundrules`, `codelore`, `kbkit`, `lorebook`, `repolore`, `codecanon`
    (taken on npm). The rename covers the package and bin name, the stamp
    file (`.lorekit.json` → `.houserules.json`), the README, this record,
-   and the tests. Done in 7db7db9 on 2026-08-31.
+   and the tests. Done in a45961e on 2026-08-31.
 2. **License — ruled 2026-08-31: MIT.** The source project tag-pilot is
    `UNLICENSED`/private with the same owner, and the payload contains no
    third-party material (the superpowers plugin is only named, in
@@ -167,7 +167,7 @@ Each item records the ruling with its date, or stays marked open.
    corporate SPDX allowlists), Apache-2.0 (NOTICE handling is heavy for
    vendored files), staying UNLICENSED (only coherent for a local-only
    clone). To do: LICENSE file ("2026 Jannis Blossey"), `"license": "MIT"`
-   in `package.json`, the headers, the README sentence. Done in a1d31ac on
+   in `package.json`, the headers, the README sentence. Done in 6fc4244 on
    2026-08-31.
 3. **Publishing — open, deferred by the owner on 2026-08-31.** No remote,
    no npm publish, no marketplace registration was performed. Options, in
@@ -184,7 +184,7 @@ Each item records the ruling with its date, or stays marked open.
    `tools/kb.mjs` and `tools/backlog.mjs`) with a regression test that runs
    the bin through a symlink; (b) `package.json` has no `files` field, so a
    git or npm install also carries `tests/`, `docs/`, `mise.toml`, and
-   `vitest.config.mts`. (a) is backlog item HR-001; (b) was done in a1d31ac
+   `vitest.config.mts`. (a) is backlog item HR-001; (b) was done in 6fc4244
    on 2026-08-31 (`files`: bin, template, README.md, LICENSE).
 4. **Adoption path for tag-pilot itself — open, deferred by the owner on
    2026-08-31 until PR #42 is merged.** TagPilot already runs the source of
@@ -224,7 +224,7 @@ Each item records the ruling with its date, or stays marked open.
    copies or the generated files. Coverage globs list only
    `template/tools/*` and `bin/`, so the copies do not distort coverage.
    Rejected: no dogfooding (rules by instruction only, nothing exercises
-   `init`/`update` between releases); deferring. Done in 3bc142e on
+   `init`/`update` between releases); deferring. Done in 3b7d0f3 on
    2026-08-31; the backlog lives in `backlog/` from then on.
 6. **SessionStart matcher — ruled 2026-08-31: `startup|resume|clear|fork`
    for the `start` ritual; the `compact` entry stays.** Verified against the
@@ -239,7 +239,7 @@ Each item records the ruling with its date, or stays marked open.
    seed-once and `init` merges by exact matcher string, so the new value
    reaches new installs only; existing adopters edit one line. Known
    upstream quirk, irrelevant here: in VS Code `/clear` reports `startup`
-   (anthropics/claude-code#26794). Done in d356fba on 2026-08-31.
+   (anthropics/claude-code#26794). Done in 757f127 on 2026-08-31.
 7. **Package manager — ruled 2026-09-01: pnpm only; the workspace is set
    up like tag-pilot's.** The owner's instruction of 2026-09-01: use pnpm,
    never npm or npx, and set the workspace up as tag-pilot does. tag-pilot
@@ -376,7 +376,7 @@ Each item records the ruling with its date, or stays marked open.
     moment (one release, zero external consumers).
     `include-component-in-tag` goes false in the release-please config
     at the next config-touching task; the alias tag `v0.2.0-alpha`
-    points at the existing release commit (bd2b754) so the grammar is
+    points at the existing release commit (c44e7c4) so the grammar is
     uniform from the first release, and `houserules-v0.2.0-alpha`
     stays as history. Unblocks HR-048's channels and HR-049. Source:
     owner, 2026-09-04.
@@ -555,7 +555,7 @@ Each item records the ruling with its date, or stays marked open.
     Tier-2 phase 5, where the mandatory no-Node sweep runs.
     Source: owner, 2026-09-06, batch 18 report.
 36. **Batch 18 accepted; phase 4 gated next — ruled 2026-09-06.**
-    Tier-2 phase 3 accepted as merged (main a20a179). The next
+    Tier-2 phase 3 accepted as merged (main c82fe1e). The next
     batch gates phase 4: HR-048 delivery channels, HR-049's
     pinned tag, macOS signing — unblocking HR-063/064. Source:
     owner, 2026-09-06, batch 18 report.
@@ -588,7 +588,7 @@ Each item records the ruling with its date, or stays marked open.
     sweeps falsify closure. Source: owner, 2026-09-07, batch 19
     report.
 40. **Batch 19 accepted — ruled 2026-09-07.** Phase 4 accepted
-    as merged (main 6a79ace) under the two-step reality; the
+    as merged (main 253746a) under the two-step reality; the
     step-two queue stands (HR-068 token → first release →
     runbook step 6). The controller selects the next batch and
     presents its gate. Source: owner, 2026-09-07, batch 19
@@ -689,7 +689,7 @@ Each item records the ruling with its date, or stays marked open.
     counts inline), so no code edit is owed. Source: owner,
     2026-09-08, batch 20 report.
 53. **Batch 20 accepted — ruled 2026-09-08.** Tier-2 phase 5
-    accepted as merged (main d0cc286): the repository and kit
+    accepted as merged (main b947e78): the repository and kit
     are one static binary plus POSIX shell; HR-047 closes the
     Tier-2 rewrite; release-please live-proven under the §5.43
     rust config on the merge push itself. The controller
@@ -743,7 +743,7 @@ Each item records the ruling with its date, or stays marked open.
     cite-durable-refs, riding a future batch. Source: owner,
     2026-09-11, batch 21 report.
 60. **Batch 21 accepted; pause — ruled 2026-09-11.** The gates
-    batch accepted as merged (main a550830). No batch 22
+    batch accepted as merged (main 19b75c4). No batch 22
     selection now: the backlog waits, the step-two release set
     stays owner-attended (HR-068 first), and the template
     cluster (HR-078/080/090/094 + riders HR-095/096) stands as

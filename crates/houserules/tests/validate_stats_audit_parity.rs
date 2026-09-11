@@ -418,8 +418,8 @@ fn audit_matches_the_frozen_validate_terminal_report_slice() {
     let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     assert_audit_matches_corpus(
         &worktree.path,
-        "a13117540cc1480b00d9b57907d3ad4b02767b1c",
-        "1537d89ad000d7376160c30fb06edc604ce4352c",
+        "9e959f6f297c41e273bb9d5c83d900a95974453c",
+        "719d3f5883e973d8eb57c3db434fc1d016dddf6f",
         "houserules.template-is-the-source,process.tdd,process.deliverables-json,quality.principles,writing-style.doc-comments",
         "validate-terminal-report.json",
         1,
@@ -432,8 +432,8 @@ fn audit_matches_the_frozen_knowledge_retrospective_slice() {
     let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     assert_audit_matches_corpus(
         &worktree.path,
-        "c290a29526aa30c080cc9bfbdd7753b746e6e22d",
-        "779300045991aa4349c2b6774c181aec36af7cb7",
+        "6c9cf8b48cbda2374414e230e66f043abf8708e9",
+        "0654e82a0682011423b667dee248e5cb078be4e7",
         "houserules.template-is-the-source,process.deliverables-json,writing-style.principles,quality.principles,knowledge-base.state-only-the-source",
         "knowledge-retrospective.json",
         0,
@@ -819,9 +819,9 @@ fn audit_with_sanctioned_annotates_a_real_fail_row_and_summary_exactly_once() {
         .args([
             "audit",
             "--base",
-            "a13117540cc1480b00d9b57907d3ad4b02767b1c",
+            "9e959f6f297c41e273bb9d5c83d900a95974453c",
             "--head",
-            "1537d89ad000d7376160c30fb06edc604ce4352c",
+            "719d3f5883e973d8eb57c3db434fc1d016dddf6f",
             "--ids",
             "houserules.template-is-the-source,process.tdd,process.deliverables-json,quality.principles,writing-style.doc-comments",
             "--sanctioned",
@@ -866,9 +866,9 @@ fn audit_trims_the_values_in_ids_and_writes_the_json_file() {
         .args([
             "audit",
             "--base",
-            "c290a29526aa30c080cc9bfbdd7753b746e6e22d",
+            "6c9cf8b48cbda2374414e230e66f043abf8708e9",
             "--head",
-            "779300045991aa4349c2b6774c181aec36af7cb7",
+            "0654e82a0682011423b667dee248e5cb078be4e7",
             "--ids",
             "process.tdd, quality.principles",
         ])
@@ -909,9 +909,9 @@ fn resolves_report_and_json_against_the_given_cwd_not_the_worktree_root() {
         .args([
             "audit",
             "--base",
-            "c290a29526aa30c080cc9bfbdd7753b746e6e22d",
+            "6c9cf8b48cbda2374414e230e66f043abf8708e9",
             "--head",
-            "779300045991aa4349c2b6774c181aec36af7cb7",
+            "0654e82a0682011423b667dee248e5cb078be4e7",
             "--report",
             "rel.json",
             "--json",

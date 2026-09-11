@@ -4,7 +4,7 @@ Date: 2026-09-02. Status: approved by the owner on 2026-09-02, as written
 (HR-029 stays a designed trap with a judged criterion).
 Driver: backlog batch 8 — HR-025, HR-026 (batch 7 reviews), HR-027, HR-028
 (batch 7 task 1 reviewer notes, owner-included at the gate), HR-029,
-HR-030 (batch 7 branch review). Branch `batch-8` from `e2d2c2b`.
+HR-030 (batch 7 branch review). Branch `batch-8` from `18bc48a`.
 Process: implementer on sonnet, task review on opus, branch review on
 fable; one tier up after two endpoint drops; strictly sequential.
 Workspace `.superpowers/sdd/2026-09-02-batch-8/` with the ledger

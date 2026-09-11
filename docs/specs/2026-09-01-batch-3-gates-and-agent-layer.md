@@ -3,7 +3,7 @@
 Date: 2026-09-01. Status: approved by the owner on 2026-09-01, as written (all five tasks).
 Driver: backlog batch 3 — HR-005, HR-009, HR-006 (with ruling 7,
 `docs/design.md` §5.8), HR-008, HR-007; all filed by the batch 2 retrospective
-on 2026-09-01. Branch `batch-3` from `3cc86e6`.
+on 2026-09-01. Branch `batch-3` from `3ec7ecd`.
 Process: implementer on sonnet, task review on opus, branch review on fable
 (`process.model-policy`), strictly sequential; when an endpoint drops twice,
 the implementer moves one tier up and its reviewer with it (ruling of
@@ -81,7 +81,7 @@ reviews found in `init` and in the agent templates.
   was cut; `audit --base main --head branch` lists only the branch's files,
   and a `grep-absent` or `diff-append-only` rule on main's new file is not
   triggered. Existing audit tests stay green.
-- Live run: this repository — `tools/kb.sh audit --base 9a15f95 --head HEAD`
+- Live run: this repository — `tools/kb.sh audit --base e0410dc --head HEAD`
   lists the same files before and after (linear history); the scratch repo
   from the test shape shows the difference (record both).
 
@@ -103,7 +103,7 @@ reviews found in `init` and in the agent templates.
   `checkBase`.
 - Live run: scratch `init`; a commit with a 120-character body line →
   `tools/kb.sh audit --base HEAD~1` shows the fail row; a wrapped commit
-  passes. In this repository `tools/kb.sh audit --base 9a15f95 --head HEAD`
+  passes. In this repository `tools/kb.sh audit --base e0410dc --head HEAD`
   stays clean (all bodies were wrapped at finishing).
 
 ### T4 `feat(tools): audit report fields over a workspace of task reports` (HR-008)
@@ -127,7 +127,7 @@ reviews found in `init` and in the agent templates.
   triggered and missing) → fail naming the second; both set → pass; none
   triggered → the evidence above; `--report` unchanged; `--report` plus
   `--workspace` → usage error.
-- Live run: `tools/kb.sh audit --base 9a15f95 --head 7ba8ebe --workspace
+- Live run: `tools/kb.sh audit --base e0410dc --head 2572e20 --workspace
   .superpowers/sdd/2026-09-01-batch-2` — the four report-field rows are
   judged (pass), not skipped.
 
@@ -156,7 +156,7 @@ reviews found in `init` and in the agent templates.
 
 After each task: task review with `AUDIT_JSON`; every finding fixed, Minor
 included, or deferred as a backlog item with a reason. After T5: branch
-review over `3cc86e6..HEAD` with `--workspace` (T4 makes it real) and the
+review over `3ec7ecd..HEAD` with `--workspace` (T4 makes it real) and the
 retrospective. Then `finishing-a-feature` without its push and PR steps (no
 remote): backlog ticked, one to five clean commits, commitlint over the range,
 ff-only merge into `main` from the CLI, in a `&&`-only chain with no

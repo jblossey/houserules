@@ -22,7 +22,7 @@
 //! named against the union's in the test's doc comment; malformed globs
 //! are named errors, never panics; extglob (`+(...)`, `!(...)`, `@(...)`)
 //! is not in the vocabulary. Verified live against globset 0.4.20 and the
-//! frozen union (node 24.18.1 at a73a8c6) for every glob this repository's
+//! frozen union (node 24.18.1 at af13303) for every glob this repository's
 //! `knowledge/areas.json` actually declares (`**`, `*`, literals): the
 //! answers agree. The known divergences, each pinned below:
 //! - Extglob narrows: the union treats `+(...)`/`!(...)`/`@(...)` as
@@ -342,7 +342,7 @@ mod tests {
     /// Fix round 1, finding 1, review issue 1, divergence 1 of 3: the
     /// frozen union treats extglob as matching
     /// (`matchesGlob('src/x.js', 'src/+(x|y).js')` is `true`, verified
-    /// live on node 24.18.1 at a73a8c6). The owner's ruling takes extglob
+    /// live on node 24.18.1 at af13303). The owner's ruling takes extglob
     /// out of the vocabulary; globset treats `+`, `(`, `)`, `|` as literal
     /// characters, so this pins globset's answer: `false`.
     #[test]

@@ -309,7 +309,7 @@
         "model": "sonnet",
         "pass": 6,
         "of": 6,
-        "notes": "First run under the post-JS restatement (batch-20 head c9851cb, package.json-free tree): similar pinned =3.2.0 via cargo add --dev with Cargo.toml and Cargo.lock in manifests; vetting live from crates.io (release 2026-08-17, 191M downloads); the single-manifest branch walked with the cfg(test)-only, dev-dependency placement reasoning stated; one natural RED/GREEN plus a disclosed reverted mutation for a test that passed by coincidence under the stub; both hygiene rows pass; 10/10 deterministic; a tmpfs quota forced the live run onto the debug binary, disclosed."
+        "notes": "First run under the post-JS restatement (batch-20 head 4d2d390, package.json-free tree): similar pinned =3.2.0 via cargo add --dev with Cargo.toml and Cargo.lock in manifests; vetting live from crates.io (release 2026-08-17, 191M downloads); the single-manifest branch walked with the cfg(test)-only, dev-dependency placement reasoning stated; one natural RED/GREEN plus a disclosed reverted mutation for a test that passed by coincidence under the stub; both hygiene rows pass; 10/10 deterministic; a tmpfs quota forced the live run onto the debug binary, disclosed."
       },
       {
         "scenario": "docs-edit",

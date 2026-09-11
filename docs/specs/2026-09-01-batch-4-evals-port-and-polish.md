@@ -2,7 +2,7 @@
 
 Date: 2026-09-01. Status: approved by the owner on 2026-09-01, as written (T5 included).
 Driver: backlog batch 4 — HR-010, HR-011, HR-012, HR-003 (unblocked: tag-pilot
-PR #42 is merged). Branch `batch-4` from `4043d75`.
+PR #42 is merged). Branch `batch-4` from `54116ff`.
 Process: implementer on sonnet, task review on opus, branch review on fable
 (`process.model-policy`), strictly sequential; one tier up after two endpoint
 drops. Workspace `.superpowers/sdd/2026-09-01-batch-4/` (git-ignored) with the

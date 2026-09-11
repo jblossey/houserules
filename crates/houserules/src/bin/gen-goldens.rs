@@ -98,12 +98,12 @@ use serde_json::{Value, json};
 /// module into `tests/*.rs` integration-test binaries, never into a
 /// `[[bin]]` target, the same reason this file already keeps its own
 /// `sorted_json_names` rather than importing the test suite's copy.
-/// Batch 20 T3 fix round 1 (task-3-review.json, issue 1): commit 1b00beb
+/// Batch 20 T3 fix round 1 (task-3-review.json, issue 1): commit 2ff182b
 /// moved the frozen sha off `tests/corpus/manifest.json` for five test
 /// files but missed this sixth reader, so `main` below still tried to read
 /// a file the same commit set had already deleted -- `cargo run --bin
 /// gen-goldens` panicked, exit 101, before writing anything.
-const FROZEN_SHA: &str = "a73a8c6b1c511217ceafa0bdaf6df8acdaaa1b71";
+const FROZEN_SHA: &str = "af13303c5c2a7aa2b40b6676f52d9a1f730c20f9";
 
 /// A fresh, empty directory under the OS temp root, removed by its own
 /// `Drop`. `tempfile` (this crate's `[dev-dependencies]`) is unavailable to
@@ -794,8 +794,8 @@ fn main() {
         written.push(audit_and_freeze(
             &bin,
             &worktree.path,
-            "a13117540cc1480b00d9b57907d3ad4b02767b1c",
-            "1537d89ad000d7376160c30fb06edc604ce4352c",
+            "9e959f6f297c41e273bb9d5c83d900a95974453c",
+            "719d3f5883e973d8eb57c3db434fc1d016dddf6f",
             "houserules.template-is-the-source,process.tdd,process.deliverables-json,quality.principles,writing-style.doc-comments",
             &goldens_dir,
             "validate-terminal-report",
@@ -803,8 +803,8 @@ fn main() {
         written.push(audit_and_freeze(
             &bin,
             &worktree.path,
-            "c290a29526aa30c080cc9bfbdd7753b746e6e22d",
-            "779300045991aa4349c2b6774c181aec36af7cb7",
+            "6c9cf8b48cbda2374414e230e66f043abf8708e9",
+            "0654e82a0682011423b667dee248e5cb078be4e7",
             "houserules.template-is-the-source,process.deliverables-json,writing-style.principles,quality.principles,knowledge-base.state-only-the-source",
             &goldens_dir,
             "knowledge-retrospective",

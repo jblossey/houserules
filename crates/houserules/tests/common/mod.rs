@@ -31,7 +31,7 @@ use std::sync::Mutex;
 /// with the file that used to carry it. Each of the five readers' own
 /// wrapper now returns this constant instead of re-reading a file that no
 /// longer exists.
-pub const FROZEN_SHA: &str = "a73a8c6b1c511217ceafa0bdaf6df8acdaaa1b71";
+pub const FROZEN_SHA: &str = "af13303c5c2a7aa2b40b6676f52d9a1f730c20f9";
 
 /// Serializes `git worktree add`/`remove` across this test binary's
 /// threads. `git worktree` mutates shared metadata under `.git/worktrees/`,
@@ -149,7 +149,7 @@ impl FrozenWorktree {
     /// `-c core.autocrlf=false -c core.eol=lf` (CI fix round: the windows
     /// leg of the rust matrix) pin the checkout to the frozen sha's own
     /// LF bytes regardless of the runner's ambient git config. The frozen
-    /// sha (a73a8c6) predates this repository's `.gitattributes`, so
+    /// sha (af13303) predates this repository's `.gitattributes`, so
     /// nothing there marks its files `text`; a windows runner's
     /// `core.autocrlf=true` (Git for Windows' common default, the same as
     /// setting `text=auto` on every file plus `core.eol=crlf`, per `git

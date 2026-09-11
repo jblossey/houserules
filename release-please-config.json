@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/v17.11.2/schemas/config.json",
-  "bootstrap-sha": "fc445a6421130d6398f01f83f7295f3131ba267d",
+  "bootstrap-sha": "8931962b7b8ec67096cbc614973a9f773a76f096",
   "include-component-in-tag": false,
   "extra-files": [
     "/README.md",

@@ -139,7 +139,7 @@
     },
     {
       "date": "2026-09-06",
-      "text": "Batch 18 accepted (Tier-2 phase 3, main a20a179); the next batch gates phase 4 - HR-048 delivery channels, HR-049's pinned tag, macOS signing, unblocking HR-063/064. docs/design.md §5.36."
+      "text": "Batch 18 accepted (Tier-2 phase 3, main c82fe1e); the next batch gates phase 4 - HR-048 delivery channels, HR-049's pinned tag, macOS signing, unblocking HR-063/064. docs/design.md §5.36."
     },
     {
       "date": "2026-09-06",
@@ -155,7 +155,7 @@
     },
     {
       "date": "2026-09-07",
-      "text": "Batch 19 accepted (phase 4, main 6a79ace) under the two-step reality; the step-two queue stands and the controller selects the next gate. docs/design.md 5.40."
+      "text": "Batch 19 accepted (phase 4, main 253746a) under the two-step reality; the step-two queue stands and the controller selects the next gate. docs/design.md 5.40."
     },
     {
       "date": "2026-09-07",
@@ -207,7 +207,7 @@
     },
     {
       "date": "2026-09-08",
-      "text": "Batch 20 accepted as merged (main d0cc286); Tier 2 complete; controller selects the next batch. docs/design.md 5.53."
+      "text": "Batch 20 accepted as merged (main b947e78); Tier 2 complete; controller selects the next batch. docs/design.md 5.53."
     },
     {
       "date": "2026-09-08",
@@ -235,7 +235,7 @@
     },
     {
       "date": "2026-09-11",
-      "text": "Batch 21 accepted as merged (main a550830); pause ruled - no batch 22 selection; the template cluster stands as the recorded candidate. docs/design.md 5.60."
+      "text": "Batch 21 accepted as merged (main 19b75c4); pause ruled - no batch 22 selection; the template cluster stands as the recorded candidate. docs/design.md 5.60."
     }
   ],
   "notes": []

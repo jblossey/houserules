@@ -5,7 +5,7 @@ amendment: `live_run` (T3) and `mode` (T4) are required fields, not
 optional; `verdict.text` (T5) stays optional.
 Driver: backlog batch 7 — HR-022, HR-024 (batch 6 reviews), HR-016, HR-017
 (batch 4 retrospective), HR-021, HR-023 (batch 5/6 retrospectives).
-Branch `batch-7` from `16f68d5`.
+Branch `batch-7` from `0550408`.
 Process: implementer on sonnet, task review on opus, branch review on fable;
 one tier up after two endpoint drops; strictly sequential. Workspace
 `.superpowers/sdd/2026-09-02-batch-7/` with the ledger `progress.md`.

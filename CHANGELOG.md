@@ -5,9 +5,9 @@
 
 ### Features
 
-* **cli:** update reports the kit version drift ([ca45e79](https://github.com/jblossey/houserules/commit/ca45e79eb6e94eff349e2fd6cdd0f84e2c75ce1e))
+* **cli:** update reports the kit version drift ([180e549](https://github.com/jblossey/houserules/commit/180e5492bfc7541a9d7d8934e7fb9fad99d5b1f4))
 
 
 ### Bug Fixes
 
-* **template:** the capture form and the decidable collision line ([9686872](https://github.com/jblossey/houserules/commit/9686872027446d3626fc56729df3c8cd14f50783))
+* **template:** the capture form and the decidable collision line ([945e3ce](https://github.com/jblossey/houserules/commit/945e3ceb2704a3db1b09fc426be26ea22bb71acc))

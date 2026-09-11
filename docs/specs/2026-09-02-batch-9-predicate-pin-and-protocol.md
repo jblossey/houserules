@@ -3,7 +3,7 @@
 Date: 2026-09-02. Status: approved by the owner on 2026-09-02, as written.
 Driver: backlog batch 9 — HR-031 (ruled 2026-09-02: unify), HR-032
 (batch 8 T5 review), HR-033, HR-034 (batch 8 branch review). Branch
-`batch-9` from `58e2d3f`.
+`batch-9` from `02e9efc`.
 Process: implementer on sonnet, task review on opus, branch review on
 fable; one tier up after two endpoint drops; strictly sequential; the
 audit `--ids` on every round are the dispatch's Knowledge ids. Workspace

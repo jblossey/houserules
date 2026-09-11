@@ -3,7 +3,7 @@
 Date: 2026-09-03. Status: approved in outline at the hotfix gate,
 2026-09-03 (HR-044 alone; restamp + regex widening + the
 release-runbook decision in this spec). Driver: HR-044. Branch
-`batch-12` from `9d0bb10`. Main is RED; this batch turns it green.
+`batch-12` from `5b89e9c`. Main is RED; this batch turns it green.
 Process: implementer on sonnet, task review on opus, branch review on
 fable over the one-task diff; the audit `--ids` are the dispatch's
 Knowledge ids. Workspace `.superpowers/sdd/2026-09-03-batch-12/`.
@@ -23,7 +23,7 @@ not repeat this.
 
 ## 3. Facts
 
-- The 0.2.0-alpha release commit (bd2b754) bumped package.json;
+- The 0.2.0-alpha release commit (c44e7c4) bumped package.json;
   nobody ran `update --dir .`, so root `.houserules.json` still says
   0.1.0 and tests/dogfood.test.mjs fails (stamp must equal VERSION).
 - tests/init.test.mjs asserts the stamped version matches
