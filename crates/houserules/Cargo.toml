@@ -8,7 +8,7 @@ name = "houserules"
 # package now names this path with release-type "rust" (HR-073, batch 20
 # T5): release-please bumps this field itself, in its own PR, the same
 # way "node" once bumped package.json; never hand-edit it otherwise.
-version = "0.2.0-alpha"
+version = "1.0.0-alpha"
 edition = "2024"
 rust-version = "1.98"
 description = "A reusable knowledge-management and agent-workflow kit for AI-assisted repositories."
