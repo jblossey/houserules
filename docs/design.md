@@ -704,3 +704,11 @@ Each item records the ruling with its date, or stays marked open.
     §5.47 walkdir adoption (HR-079). Each gate proves itself on
     a seeded instance of its own batch-20 incident. Source:
     owner, 2026-09-08, batch 21 gate.
+55. **HR-086's scoping ratified — ruled 2026-09-11.** The
+    textList minLength ships on seven of the nine fields; the
+    two retrospective tasks lists keep the old floor (measured:
+    84 of 90 real entries are one-character task references; a
+    shared floor rejects real data; the shredded-prose incident
+    class is fully covered by the seven). The spec gains the
+    recording amendment. Source: owner, 2026-09-11, batch 21
+    report.
