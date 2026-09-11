@@ -11,10 +11,11 @@
 //! 2026-09-05-batch-18-phase3.md §3): `check-knowledge`'s "generated file is
 //! out of date" hint now names `houserules render`, which the frozen JS at
 //! the (now retired) `tests/corpus/manifest.json`'s `frozen_sha` could no
-//! longer produce. `diff-shape-gate` (`cargo run --bin diff-shape-gate`)
-//! proves the re-baseline changed only that hint (`mini-stale`'s slice; the
-//! other three slices' bytes are unaffected and regenerate identical). The
-//! comparison logic below is otherwise unchanged.
+//! longer produce. `diff-shape-gate` proved the re-baseline changed only
+//! that hint (`mini-stale`'s slice; the other three slices' bytes are
+//! unaffected and regenerate identical), before it retired as a spent
+//! one-time proof (HR-093). The comparison logic below is otherwise
+//! unchanged.
 
 mod common;
 

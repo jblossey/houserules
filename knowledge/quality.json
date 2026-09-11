@@ -133,7 +133,9 @@
       "body": [
         "A hand-typed inclusion list cannot cover a file that does not exist yet, and batch 20 T4 showed it already missed ones that did: two seeded violations passed the first shipped residue gate because neither file was ever added to its list. A gate declared permanent has to default to gated, not to remembering.",
         "Derive the walk set (git ls-files minus an EXCLUDED_PREFIXES-style constant whose doc names the reason for each entry) so a newly tracked file is gated the moment it lands; pin the boundary with a test that classifies every real tracked path.",
-        "An input the gate cannot read is a named, fatal error, never a continue: the silent-skip version under-counted and passed a seeded violation hiding behind a rename. A readable-but-binary input may be a counted, printed skip."
+        "An input the gate cannot read is a named, fatal error, never a continue: the silent-skip version under-counted and passed a seeded violation hiding behind a rename. A readable-but-binary input may be a counted, printed skip.",
+        "A gate's file list comes from the authoritative set (git-tracked files, never the working directory); every finding names which derivation decided it; every skip is counted and printed on every branch, including the one where the primary derivation returns nothing; and an enumeration feeding a closure claim fails loudly on input it cannot read (batch 21 T1/T2 arcs).",
+        "A gate that needs a toolchain component derives that need from declared configuration (mise.toml tools, lockfiles), never from what the authoring machine happens to have installed; prove a new gate on a runner shaped like CI's fresh declared install (batch 21 branch-fix: a lint step green only on a hand-added rustup target no tracked file declared)."
       ],
       "tags": [
         "gates",

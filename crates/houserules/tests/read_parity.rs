@@ -14,8 +14,9 @@
 //! docs/specs/2026-09-07-batch-20-phase5.md §2's boundary correction;
 //! design.md §5.42): `tests/corpus/**` retires with the rest of the
 //! vitest layer this same batch. `cargo run --bin gen-goldens` regenerates
-//! every slice here; `diff-shape-gate` (`cargo run --bin diff-shape-gate`)
-//! proves the batch 18 T5 re-baseline changed only the command string.
+//! every slice here; `diff-shape-gate` proved the batch 18 T5 re-baseline
+//! changed only the command string, before it retired as a spent one-time
+//! proof (HR-093).
 
 mod common;
 

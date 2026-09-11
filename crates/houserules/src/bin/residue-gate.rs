@@ -3,11 +3,11 @@
 //! patterns -- `node`, `npm`, `pnpm`, `npx`, `vitest`, `.mjs`/`.mts`, and
 //! `package.json` -- across every file this repository tracks, outside a
 //! declared sanctioned-history allowlist. A sibling to `find-shell-tool-
-//! refs`/`diff-shape-gate` in shape (dev-only, not shipped in `template/`
-//! or the payload), but unlike those two one-time rewrite proofs, this
-//! gate is meant to fire forever: it is wired into `mise run lint`
-//! (`mise.toml`'s `lint` task), so every future PR and the CI checks job
-//! run it too.
+//! refs` in shape (dev-only, not shipped in `template/` or the payload),
+//! and to `diff-shape-gate` until HR-093 retired that one as a spent
+//! one-time proof; unlike those one-time rewrite proofs, this gate is
+//! meant to fire forever: it is wired into `mise run lint` (`mise.toml`'s
+//! `lint` task), so every future PR and the CI checks job run it too.
 //!
 //! # Scope: the tracked-file list minus a declared exclusion list, not a
 //! hand-typed inclusion list (fix round 1, important finding 1)
