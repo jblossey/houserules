@@ -785,6 +785,74 @@ fn audit_needs_base_prints_the_frozen_message_and_exits_2() {
     assert_eq!(output.stderr, b"audit needs --base <ref>\n");
 }
 
+/// HR-077: a `--sanctioned` value missing the `<rule>=<ref>` separator is
+/// this command's own usage error, checked before `--base` is even read
+/// (`audit`'s own argument-order-independent CLI convention) -- not a
+/// panic and not silently ignored.
+#[test]
+fn audit_with_a_malformed_sanctioned_value_exits_2() {
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
+    let output = houserules()
+        .args(["audit", "--sanctioned", "process.evals-rerun"])
+        .current_dir(&worktree.path)
+        .output()
+        .expect("run audit");
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    assert_eq!(
+        output.stderr,
+        b"--sanctioned \"process.evals-rerun\" needs the shape <rule>=<ref>\n"
+    );
+}
+
+/// HR-077 consumer-run proof (`process.wiring-checks-run-the-resolution`,
+/// spec §5.50): the same real range `audit_matches_the_frozen_validate_
+/// terminal_report_slice` already proves genuinely fails
+/// `process.evals-rerun` (batch 20's own spec-booked evals red), run WITH
+/// `--sanctioned` on top. The row keeps `result: "fail"` and gains the
+/// declaration in its evidence exactly once; the summary's
+/// `sanctioned_fail` states it exactly once too; no `stale_sanctions`.
+#[test]
+fn audit_with_sanctioned_annotates_a_real_fail_row_and_summary_exactly_once() {
+    let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
+    let output = houserules()
+        .args([
+            "audit",
+            "--base",
+            "a13117540cc1480b00d9b57907d3ad4b02767b1c",
+            "--head",
+            "1537d89ad000d7376160c30fb06edc604ce4352c",
+            "--ids",
+            "houserules.template-is-the-source,process.tdd,process.deliverables-json,quality.principles,writing-style.doc-comments",
+            "--sanctioned",
+            "process.evals-rerun=spec section 6",
+        ])
+        .current_dir(&worktree.path)
+        .output()
+        .expect("run audit");
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "a sanctioned fail still fails the run"
+    );
+    let value: Value = serde_json::from_slice(&output.stdout).expect("valid json");
+    let row = value["rules"]
+        .as_array()
+        .expect("rules array")
+        .iter()
+        .find(|r| r["id"] == "process.evals-rerun")
+        .expect("process.evals-rerun row present");
+    assert_eq!(row["result"], serde_json::json!("fail"));
+    let evidence = row["evidence"].as_str().expect("evidence is a string");
+    assert_eq!(
+        evidence.matches("sanctioned: spec section 6").count(),
+        1,
+        "evidence: {evidence:?}"
+    );
+    assert_eq!(value["summary"]["sanctioned_fail"], serde_json::json!(1));
+    assert!(value.get("stale_sanctions").is_none());
+}
+
 /// tests/kb.test.mjs, describe('main (audit, stats)'): "trims the values in
 /// --ids" and "forwards ... --json from the CLI to audit" (the --json file
 /// write half): a comma-and-space-separated --ids value trims to the bare

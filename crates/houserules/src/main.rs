@@ -225,6 +225,13 @@ enum Command {
         /// Also writes the JSON result to this file.
         #[arg(long)]
         json: Option<PathBuf>,
+        /// Declares a spec-booked interim fail, `<rule>=<ref>`; repeatable.
+        /// The rule's row keeps its true `fail` result and gains
+        /// `(sanctioned: <ref>)` in its evidence; the summary's
+        /// `sanctioned_fail` counts it. A rule named here that did not fail
+        /// is reported in `stale_sanctions`, not silently accepted.
+        #[arg(long)]
+        sanctioned: Vec<String>,
         /// Repository root to audit; defaults to the enclosing git
         /// repository's top level, resolved from the current directory.
         #[arg(long)]
@@ -407,8 +414,9 @@ fn main() -> ExitCode {
             report,
             workspace,
             json,
+            sanctioned,
             dir,
-        }) => rules::cmd_audit(dir, base, head, ids, report, workspace, json),
+        }) => rules::cmd_audit(dir, base, head, ids, report, workspace, json, sanctioned),
         Some(Command::Validate { files, dir }) => rules::cmd_validate(dir, files),
         Some(Command::Stats { workspace, dir }) => rules::cmd_stats(dir, workspace),
         Some(Command::Index {
