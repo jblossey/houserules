@@ -306,8 +306,8 @@
       "summary": "The gates catch what batch 20 caught by hand: the dead-glob gate in check-knowledge (HR-074), the ephemeral-path check in check-report-claims (HR-075), the backlog emitter round-trip in check-backlog (HR-076), the audit sanctioned-fail annotation (HR-077), the degenerate-textList guard (HR-086); plus the ruled walkdir adoption replacing the duplicated dev-bin walkers (HR-079, design.md 5.47).",
       "kickoff": "docs/specs/2026-09-08-batch-21-gates.md",
       "status": {
-        "state": "planned",
-        "text": "Selected 2026-09-08 (design.md 5.53); spec approved as drafted 2026-09-08 (5.54); in planning."
+        "state": "done",
+        "text": "Done 2026-09-11: all six gated items delivered plus the in-flight HR-087 (fresh-init docs seed), HR-093 (diff-shape-gate retired as an expired proof), and the branch-fix round (cfg(unix) portability + the cross-target lint step with its mise-provisioned target). Mid-batch rebase onto post-hardening main (PR #9 + PR #12); walkdir adopted exact-pinned with its license live-proven under cargo deny; four tasks + branch-fix, ~19 review rounds. Quality split stated honestly: no runtime defect survived any round; one Windows BUILD defect survived five Linux-only rounds and is the origin of houserules.platform-gated-tests + the lint proxy. HR-088/089/090/094 filed; owner queue at the batch report."
       }
     }
   ]

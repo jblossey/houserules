@@ -37,7 +37,8 @@
         "Run every command block you ship exactly as printed, top to bottom, in the environment the reader will have (a fresh directory for a quick start). A block that needs unstated context, or that resolves differently than printed (an unpinned git spec), fails this rule (batch 13: a quick start that exited 1 as printed, an install form floating to the default branch, a kit-only mechanism shipped as generic).",
         "The walk includes a control: when a line looks optional, re-run the block without it and confirm the block then fails — that proves the line load-bearing instead of decorative (batch 18 T6 r2: the quick start's `houserules update --dir .` line was proven load-bearing by exactly this control). Sweeps keyed on deleted-tool names miss claims keyed on surviving names (batch 18 branch review: a design-doc aside naming `bin/houserules.mjs` escaped a sweep that grepped for the deleted wrappers); sweep for the claim's subject too.",
         "A corrected measurement sweeps its dependents: when a sentence is corrected, re-open every sentence that cites, paraphrases, or leans on it — not only the lines the round edited; antecedents drift when their referent is repaired (batch 19 T2 r2, README:110).",
-        "An amendment re-derives the entry's summary from the amended body before filing - the summary is the half that renders into the loaded rules files, so a stale summary ships wider than the body it contradicts (batch 20 T3: two amended entries kept summaries their own new bodies had overturned; batch 20 T4: two shipped doc comments stated non-facts their own commits made false)."
+        "An amendment re-derives the entry's summary from the amended body before filing - the summary is the half that renders into the loaded rules files, so a stale summary ships wider than the body it contradicts (batch 20 T3: two amended entries kept summaries their own new bodies had overturned; batch 20 T4: two shipped doc comments stated non-facts their own commits made false).",
+        "Before shipping a uniqueness or attribution sentence ('the only', 'caused by'), run the enumeration that would falsify it against the tree at HEAD - batch 21's two instances (a misattributed gate failure; a false only-bin-that-walks claim) were each falsifiable by one grep the writer did not run."
       ],
       "tags": [
         "knowledge",
@@ -93,6 +94,28 @@
       "verify": [
         "knowledge/areas.json"
       ]
+    },
+    {
+      "id": "knowledge-base.cite-durable-refs",
+      "kind": "rule",
+      "area": "docs",
+      "summary": "Cite a commit in a permanent file only if it is or will be reachable from main; name in-branch events by batch/task/round; restate interim SHAs at aggregation.",
+      "body": [
+        "Batch 21's mid-batch rebase replayed 29 commits; knowledge and backlog prose written before it kept the old SHAs, which no branch reached afterward. git branch --contains is the reachability check a reviewer runs before accepting a SHA citation.",
+        "Aggregation collapses the branch into new commits, so even post-rebase in-branch SHAs die at the finish; only aggregated commits land on main. A durable locator is the event's batch/task/round plus its subject, or the final aggregated SHA added at aggregation time.",
+        "Workspace deliverables are exempt in practice (untracked, machine-local, the reflog's lifetime), but tracked knowledge, backlog bodies, specs, and design records are permanent and clone-facing. Nine pre-batch-21 bare historical markers were dispositioned as accepted history at the batch-21 report; this rule governs prospectively."
+      ],
+      "tags": [
+        "knowledge",
+        "rebase",
+        "aggregation",
+        "evidence"
+      ],
+      "source": {
+        "date": "2026-09-11",
+        "by": "review",
+        "ref": "batch 21 branch review, important issue 2"
+      }
     }
   ]
 }

@@ -469,7 +469,8 @@
       "body": [
         "Owner ruling at the batch 17 report, applied at batch 18 T5 fix round 1 when find-shell-tool-refs.mjs and diff-shape-gate.mjs were ported to cargo bins in the same round that added them.",
         "tools/make-corpus.mjs was the one ruled interim exception (docs/design.md decision 30); it retired with the frozen JS at Tier-2 phase 5 (batch 20 T3, HR-047).",
-        "The ruling previously had no loading path for tools/**; this entry gives it one so a dispatch touching tools/ carries it without --ids."
+        "The ruling previously had no loading path for tools/**; this entry gives it one so a dispatch touching tools/ carries it without --ids.",
+        "diff-shape-gate.rs itself completed and retired at batch 21 (HR-093): it proved the batch 18 T5 corpus-to-goldens re-shape changed only the flat-command rewrite, category by category, and held through the last commit where the proof held -- batch 21 T2 fix round 1's second commit. Batch 21 T2 fix round 1's PROTOCOL edit (the very next commit in that round) legitimately edited a generated file's source and regenerated it in the same commit, which expired the proof permanently -- the gate's new side read the working tree while its old side was pinned to frozen git history, so no later regeneration could ever bring them back into agreement. Retired rather than re-pinned: a gate with both sides frozen to immutable refs compares two constants forever, which proves nothing further. After the deletion, find-shell-tool-refs.rs is the only bin under this rule that uses walkdir; gen-goldens.rs still carries its own recursive copy_dir_recursive (fs::read_dir plus recursion, no walkdir). (Branch review, important issue 2: the original two SHAs cited here, 2f3e633 and 218e0a8, predate batch 21's mid-batch rebase and are reachable from no branch; named by batch/task/round/subject instead, since that locator survives every future re-SHA that a rebase or aggregation performs.)"
       ],
       "tags": [
         "dev-tools",
@@ -569,6 +570,28 @@
         "date": "2026-09-11",
         "by": "user",
         "ref": "HR-091"
+      }
+    },
+    {
+      "id": "houserules.platform-gated-tests",
+      "kind": "rule",
+      "area": "rust",
+      "summary": "Gate platform-specific code with #[cfg]: a std::os::unix or std::os::windows use compiles only on that platform; CI builds all targets on three OSes.",
+      "body": [
+        "Batch 21 T1 fix rounds 3-4 added three tests using std::os::unix::ffi::OsStrExt ungated; cargo check --target x86_64-pc-windows-gnu --all-targets failed E0433 in both affected test targets, so windows-latest clippy and test could not compile. The defect survived five review rounds and two controller gate sweeps because every proof ran on Linux.",
+        "The crate's own precedent is the gate: install.rs, commit_msg_hook.rs, and validate_stats_audit_parity.rs all cfg-gate their os::unix uses, with a #[cfg(windows)] arm where the behavior needs a Windows equivalent.",
+        "The cheap local proxy runs in mise run lint since batch 21: cargo check --target x86_64-pc-windows-gnu --all-targets --locked, with the target provisioned by mise.toml's rust targets option. The host's green cargo test proves one OS of three.",
+        "Second layer, found on PR #14's real macos-latest run after #[cfg(unix)] shipped (the same three tests then panicked at an fs::write unwrap, Os error 92 Illegal byte sequence, since APFS rejects a non-UTF-8 filename at creation): a cfg gate names one CAPABILITY at a time, so #[cfg(unix)] covering the compiler capability (OsStrExt exists) does not cover a distinct filesystem capability (writing that name succeeds) the same test also needs and Linux alone has both of; the fix (seed via git's byte-oriented index -- git hash-object -w --stdin, git update-index --add --cacheinfo -- never a real file write) is recorded at its call site, `crates/houserules/src/rules/check.rs`'s `seed_undecodable_tracked_path`."
+      ],
+      "tags": [
+        "tests",
+        "ci",
+        "portability"
+      ],
+      "source": {
+        "date": "2026-09-11",
+        "by": "review",
+        "ref": "batch 21 branch review, critical issue 1"
       }
     }
   ]

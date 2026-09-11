@@ -207,7 +207,17 @@
 //!   arm was built from (module doc, above) are genuinely ephemeral, so
 //!   nothing is mis-flagged today; named here as this project's own
 //!   history grows, per this file's own standard of naming even
-//!   undemonstrated false-positive vehicles.
+//!   undemonstrated false-positive vehicles. A glued NON-punctuation prefix
+//!   is also invisible to both shapes (batch 21 branch review, minor
+//!   issue): `EPHEMERAL_PATH_LEADING_PUNCTUATION` trims neither `=` nor
+//!   `:`, so a word like `OUT=/tmp/x` or `dest:/tmp/x` -- an env-var
+//!   assignment or a labeled value quoted in prose -- keeps that prefix
+//!   after the trim, no longer starts with `/`, and `word_qualifies`
+//!   rejects it the same way an unanchored bare path would have passed
+//!   unflagged before this check existed. Undemonstrated in the swept
+//!   corpus today (docs-only disclosure; the corpus-measured boundary
+//!   stands, no behavior change licensed here), named per this file's own
+//!   standard.
 //! - `quote_mask` has no notion of `$(...)` command substitution
 //!   resetting quote context: real bash parses a same-character quote
 //!   opened again inside a `$(...)` (or `` `...` ``) as starting a fresh,

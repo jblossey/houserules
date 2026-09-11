@@ -1265,7 +1265,7 @@
         "Source: batch 20 branch review, retrospective violated_rules[0]; task-3-review.json important finding 3."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 21
     },
     {
@@ -1278,7 +1278,7 @@
         "see HR-072 for the lint's other filed narrowings."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 21,
       "see": [
         "HR-072"
@@ -1293,7 +1293,7 @@
         "Source: batch 20 branch review, issues[1] and template_defects[2]."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 21
     },
     {
@@ -1305,7 +1305,7 @@
         "Source: batch 20 branch review, template_defects[0]."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 21
     },
     {
@@ -1330,7 +1330,7 @@
         "CORRECTION (batch 21 T3 fix round 1, review-ruled sound): the 'as a dev-dependency' instruction above cannot compile. A `src/bin/*.rs` target never links `[dev-dependencies]` -- Cargo makes those visible only to test/bench/example builds -- so walkdir lands under `[dependencies]` instead. It was already a normal transitive dependency of rust-embed (via rust-embed-utils) at the same pinned version, so the shipped `houserules` binary's footprint does not change. For the record: an `examples/` target does see `[dev-dependencies]` (verified), a larger restructure nobody licensed here."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 21
     },
     {
@@ -1458,7 +1458,7 @@
         "Not fixed inside T6: the schema is outside that task's scope and quality.no-compat-softening forbids a partial patch that would look like a guard. The round-2 incident itself is disclosed in the T6 report's self_review and concerns."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 21,
       "see": [
         "HR-085"
@@ -1569,18 +1569,38 @@
     {
       "id": "HR-093",
       "type": "chore",
-      "title": "Public-surface sweep: no private paths, emails, or attribution anywhere public",
+      "title": "Retire diff-shape-gate as a completed, expired proof",
       "body": [
-        "Owner ruling 2026-09-11 after a sweep of every PR (all states), comment, review, issue, release, commit message on every remote branch, and tracked file on main. Cleaned the same day: session links and tool-attribution lines in the descriptions of PRs #3, #4, #5, #9, #12; a git+file URL under the maintainer's home directory in docs/plans/2026-09-01-batch-2.md.",
-        "Fixed in this item: the batch-14 fixture reports and crates/houserules/tests/validate_stats_audit_parity.rs carried the generating machine's /home/<user>/... prefix (26 lines, 6 files, plus the two test assertions); neutralized to /home/maintainer/... (houserules.corpus-batch14-fixtures-are-committed updated). The standing rule houserules.tag-pilot-is-read-only, one backlog body, two plan/spec documents, and the fixture review evidence named a local path for the tag-pilot checkout; they now name the checkout without a path (render and gen-goldens regenerated the rules, skill, and read-parity goldens).",
-        "PENDING: the commit author identity. 308 commits on main carry the maintainer's personal email; the ruling is to rewrite them to the GitHub noreply address (a mailmap rewrite of every ref, force-push under a temporarily disabled ruleset, the old-to-new commit map committed under docs/ so every cited sha stays resolvable). The repository-local git identity already uses the noreply address for every commit from 2026-09-11 on. Status flips to done when the rewrite lands."
+        "RULED by the controller (batch 21, derived and verified end to end at task-3-review.json issue 3): crates/houserules/src/bin/diff-shape-gate.rs is an EXPIRED ONE-SHOT PROOF, retired rather than repaired. It proved the batch-18 T5 corpus-to-goldens re-shape (tests/corpus/{render,check,knowledge}/** moving to tests/goldens/**) changed nothing but the flat-command rewrite, category by category (render, check, read-parity), by diffing the frozen corpus at OLD_REF (git history, immutable) against the goldens on disk today through MAPPING_TABLE substitution.",
+        "The proof last held with the goldens as of the last commit where the proof held -- batch 21 T2 fix round 1's second commit: independently re-confirmed at the time, while that commit's SHA (2f3e633) still resolved locally, `git diff 2f3e633 HEAD -- tests/goldens/` touched only the two SKILL.md lines the gate now flags, so the gate saw 0 unexplained lines at that commit. This is a historical account of a command that ran when the SHA resolved, not a re-runnable enumeration: batch 21's mid-batch rebase leaves that SHA reachable from no branch, so it cannot be re-diffed in a fresh clone (branch review, important issue 2). Batch 21 T2 fix round 1's PROTOCOL edit (the very next commit in that round: render.rs:47's PROTOCOL constant gained the --sanctioned clause, all five generated copies regenerated in the same commit) expired the proof permanently -- the gate's 'new' side reads the working tree, so any later legitimate edit to a generated file moves it even against the same frozen OLD_REF, and the corpus side can never move again to catch up; no regeneration clears it. Confirmed live at HEAD: `cargo run --bin diff-shape-gate` still exits 1 with exactly the two SKILL.md lines that edit introduced.",
+        "Retirement over pinning: pinning the gate's new side to a frozen ref (e.g. the last commit where the proof held, above) would compare two immutable git objects forever -- a tautology, not a live check. It is wired to nothing: mise.toml's lint task, .github/, and .githooks/ (this repository's own core.hooksPath) all verified zero hits; a human running it by hand was its only caller. Precedent: the vitest coverage ratchet (houserules.vitest-coverage-floor-tracks-the-rust-port) and tools/make-corpus.mjs (houserules.dev-tools-are-rust-native) both retired with their endings recorded in knowledge rather than kept running past their purpose.",
+        "Disposition of every tracked reference, widened enumeration (t4-evidence/enumerate-diff-shape-gate-refs.sh, `diff[- _]?shape` case-insensitive, the deletion license): 18 tracked hits at this task's own BASE (the task's BASE (batch 21 T4's dispatch base, an in-branch commit restated here as an event per knowledge-base.cite-durable-refs)), not 12 -- the original script bounded the sweep to the deleted tool's own NAME (`diff-shape-gate`/`diff_shape_gate`) and missed six lines that name the same gate by its SUBJECT instead (fix round 1, task-4-review.json critical finding 1). 2 lines delete with the bin file (diff-shape-gate.rs:2 and :47), taking its 4 unit tests and its own walkdir-based walk_files with them -- find-shell-tool-refs.rs keeps its own copy, so walkdir remains a real dependency (its own bin plus rust-embed's transitive edge). 6 lines across 5 files amend to past tense, naming this retirement: crates/houserules/src/bin/residue-gate.rs:6, crates/houserules/tests/check_parity.rs:14, read_parity.rs:17, render_parity.rs:12 AND :13 (one file, two lines), and crates/houserules/src/install.rs:85-86 -- the last a shipped, present-tense proof citation for the deleted binary ('this task's diff-shape gate proves the \"exactly\" part') that the original, narrower sweep never saw. The remaining 10 lines across 7 files stay as sanctioned history, unedited: HR-079's body in this same file (kit.json:1328), docs/plans/2026-09-08-batch-21-gates.md:62 and :93, docs/specs/2026-09-08-batch-21-gates.md:79, and knowledge/houserules.json:470 (T3's already-executed task text and the pre-existing mjs-to-cargo-bin port paragraph, five lines the original sweep did find), plus backlog/batches.json:263, docs/plans/2026-09-05-batch-18-phase3.md:64 and :92, and docs/specs/2026-09-05-batch-18-phase3.md:68 and :85 (five more lines the widened sweep adds: a closed batch's own historical record of what the gate did at the time, in each case, not a currently-runnable or adopter-facing claim). knowledge/houserules.json's houserules.dev-tools-are-rust-native gains a new closing paragraph recording this ending.",
+        "Corrected at fix round 1 (task-4-review.json critical finding 2): this item's own disposition paragraph originally miscounted its bucket sizes (it said 'six references stay as sanctioned history, unedited' and then listed five, because render_parity.rs's two hits were counted as one file rather than two lines) before the widening above was even applied; the paragraph is restated in full rather than patched, so it reads as one consistent, artifact-derived accounting in one unit (lines) throughout. The task report's own narrower claims ('12 hits before this task's second commit'; '10 of the original 12 minus the 2 deleted') are corrected the same way in task-4-report.json's fix_rounds[0]: 12 was the ORIGINAL (narrow, pre-widening) sweep's count at this task's BASE the task's BASE (batch 21 T4's dispatch base, an in-branch commit restated here as an event per knowledge-base.cite-durable-refs), not at any point 'before the second commit' -- the same narrow sweep run at the item-filing commit (batch 21 T4's first commit) (after the first commit filed this item, whose own prose repeats the gate's name many times) already reads 16; and of the original 12 narrow-pattern hits, only 9 survive unchanged at the retirement commit (batch 21 T4's second commit), because render_parity.rs's two hits collapsed into one line under the amendment, not two. Commit the retirement commit (batch 21 T4's second commit)'s own body cannot be amended: its '.git/hooks/' wording (corrected above) and this count history both carry to aggregation instead of a rewrite."
       ],
       "milestone": null,
-      "status": "partial",
+      "status": "done",
+      "batch": 21,
+      "see": [
+        "HR-079"
+      ]
+    },
+    {
+      "id": "HR-094",
+      "type": "process",
+      "title": "Template-batch trio: tree-binary rule, resume narrative rewrite, subject-derived sweeps",
+      "body": [
+        "From the batch 21 branch review's template_defects, all three homes are template files and ride the next template-touching batch (with HR-078, HR-080, HR-090; one shared evals rerun where triggered).",
+        "(1) Orchestrating skill / retrieval protocol: when the current branch changes generated output, run all gates through the tree binary (cargo run --release --bin houserules) and re-install after merge - the stale installed binary false-failed check-knowledge all batch and cost a standing ledger workaround.",
+        "(2) Implementer template, resume path: on resume after an interruption, and at the end of every fix round, rewrite implemented/self_review/concerns from the tree at HEAD; a carried sentence is unverified - batch 21 T2's resumed round carried five stale statements and cost a full review round.",
+        "(3) Task-reviewer template, closure-claim check: derive the enumeration's pattern from the claim's SUBJECT via a spelling-discovery probe over the corpus; reject a closure keyed to one artifact's name - three sweeps this batch were bounded narrower than their claims."
+      ],
+      "milestone": null,
+      "status": "open",
       "batch": null,
       "see": [
-        "HR-091",
-        "HR-092"
+        "HR-078",
+        "HR-080",
+        "HR-090"
       ]
     }
   ]

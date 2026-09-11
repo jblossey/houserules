@@ -83,7 +83,8 @@
 //! invocations `node bin/houserules.mjs init` still prints -- so the two
 //! engines' seeded trees now diverge on exactly the rewritten bytes, and
 //! stay byte-identical on everything else (this task's diff-shape gate
-//! proves the "exactly" part).
+//! proved the "exactly" part, before it retired as a spent one-time
+//! proof, HR-093).
 //!
 //! `render_and_report` (`rules::render`) reruns this crate's own already-
 //! ported renderer on the freshly-seeded target, in place of the JS

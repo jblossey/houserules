@@ -11,6 +11,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 ## Rules
 
 - [houserules.crash-paths-are-named] Where the frozen JS crashed or a glob/regex fails to compile, the binary reports one named error or finding — never a reproduced crash, never a silent default.
+- [houserules.platform-gated-tests] Gate platform-specific code with #[cfg]: a std::os::unix or std::os::windows use compiles only on that platform; CI builds all targets on three OSes.
 - [quality.gates-derive-their-scope] A permanent gate derives its scope (tracked files minus declared, reasoned exclusions) and fails loudly on unreadable input; a hand-typed list is ungated.
 
 ## Gotchas
