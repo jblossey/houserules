@@ -291,7 +291,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor workflow.
 
 ```sh
 mise run setup    # activates the commit-msg hook (trailer gate + check-commit)
-mise run lint     # shellcheck, check-knowledge, check-backlog, render --check
+mise run lint     # shellcheck, cargo deny, check-knowledge, check-backlog, render --check
 cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 ```
 
