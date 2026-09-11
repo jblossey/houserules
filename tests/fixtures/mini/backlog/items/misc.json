@@ -11,7 +11,9 @@
       "milestone": null,
       "status": "open",
       "title": "Write the mini-tools smoke test",
-      "body": ["Synthetic open item for the mini fixture."]
+      "body": [
+        "Synthetic open item for the mini fixture."
+      ]
     },
     {
       "id": "HR-902",
@@ -19,7 +21,9 @@
       "milestone": null,
       "status": "done",
       "title": "Ship the mini-tools smoke test",
-      "body": ["Synthetic done item for the mini fixture."],
+      "body": [
+        "Synthetic done item for the mini fixture."
+      ],
       "batch": 1
     }
   ]

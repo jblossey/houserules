@@ -1,7 +1,7 @@
 {
   "command": "houserules check-backlog --dir <frozen-worktree>",
   "cwd": "<frozen-worktree>",
-  "stdout": "backlog: ok\n",
-  "stderr": "",
-  "exit": 0
+  "stdout": "",
+  "stderr": "backlog/parked.json: does not round-trip through the shipped emitter (re-emitting diverges from the file on disk). No shipped command writes this file. Re-save it as 2-space-indented JSON, raw UTF-8 (no \\uXXXX escapes), with one trailing newline.\n",
+  "exit": 1
 }

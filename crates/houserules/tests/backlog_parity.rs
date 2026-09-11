@@ -11,6 +11,16 @@
 //! of the vitest layer this same batch. The comparison logic below is
 //! otherwise unchanged -- same fixture, same frozen sha, same byte
 //! compares.
+//!
+//! HR-076 (batch 21 T1) flips what the `check` slice pins: the frozen
+//! sha's own `backlog/parked.json` predates the emitter round-trip gate
+//! and does not round-trip, so `tests/goldens/backlog/check.json` now
+//! pins that one finding and exit 1, not `backlog: ok`/exit 0 -- see
+//! `check_backlog_matches_the_frozen_corpus`'s own doc. Fix round 1
+//! (important issue 5) adds `mini/check.json` beside it: `tests/fixtures/
+//! mini` round-trips cleanly (fixed by the same task), so the ok path
+//! stays pinned by `check_backlog_matches_the_mini_corpus`, one clean
+//! slice next to one failure slice.
 
 mod common;
 
@@ -86,12 +96,34 @@ fn batch_14_matches_the_frozen_corpus() {
     assert_run_matches(&["batch", "14"], &worktree.path, "batch-14.json");
 }
 
-/// Parity gate, slice 4 of 4: `check-backlog` against a clean backlog --
-/// `backlog: ok`, exit 0, matching `tests/goldens/backlog/check.json`.
+/// Parity gate, slice 4 of 4: `check-backlog` against the frozen sha's
+/// own backlog. Fix round 1, critical issue 1 (task-1-review.json): this
+/// no longer pins a clean run -- `tests/goldens/backlog/check.json` now
+/// pins `backlog/parked.json: does not round-trip through the shipped
+/// emitter ...`, empty stdout, exit 1, because the frozen sha's own
+/// `backlog/parked.json` predates HR-076's round-trip gate and was
+/// hand-formatted with single-line item objects. Confirmed live against
+/// a fresh checkout of `common::FROZEN_SHA`: the same finding, verbatim,
+/// every time, since the frozen sha never moves. The clean path stays
+/// pinned by `check_backlog_matches_the_mini_corpus` below.
 #[test]
 fn check_backlog_matches_the_frozen_corpus() {
     let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     assert_run_matches(&["check-backlog"], &worktree.path, "check.json");
+}
+
+/// Fix round 1, important issue 5: the clean path check-backlog's own
+/// output stays golden-pinned even though the frozen-sha slice above now
+/// pins a failure -- `tests/fixtures/mini` round-trips byte-for-byte
+/// (fixed by this same task's own HR-076 commit), so `backlog: ok`, exit
+/// 0 still has a slice proving it.
+#[test]
+fn check_backlog_matches_the_mini_corpus() {
+    assert_run_matches(
+        &["check-backlog"],
+        &repo_root().join("tests/fixtures/mini"),
+        "mini/check.json",
+    );
 }
 
 /// Parity gate, `set` slice: run on a fresh copy of the `mini` fixture (

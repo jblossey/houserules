@@ -19,6 +19,7 @@ use std::process::ExitCode;
 use regress::Regex;
 use serde_json::Value;
 
+use super::glob::compile;
 use super::model::{Base, load_base};
 use super::render::{RULE_KINDS, SKILL_PATH, render_all};
 
@@ -466,14 +467,253 @@ pub(crate) fn validate(
     }
 }
 
+/// Where `tracked_tree_files` derived its file list from -- named in
+/// every dead-glob finding (fix round 1, important issue 2) so a reader
+/// knows which set decided liveness, since the two disagree exactly on
+/// the residue a gitignored or untracked file leaves behind.
+#[derive(Clone, Copy)]
+enum TreeSource {
+    /// `git ls-files` succeeded: this repository's tracked files, a
+    /// gitignored or plain untracked file excluded regardless of whether
+    /// it sits on disk.
+    GitTracked,
+    /// `git ls-files` found nothing to consult: `root` is not a git
+    /// working tree, git itself could not run there, or `root` IS a git
+    /// repository but its index is still empty (nothing `git add`ed
+    /// yet). Every file on disk, minus a top-level `.git`, stands in
+    /// instead.
+    Filesystem,
+}
+
+impl TreeSource {
+    /// The parenthetical a dead-glob finding names its source with.
+    fn label(self) -> &'static str {
+        match self {
+            TreeSource::GitTracked => "git ls-files",
+            TreeSource::Filesystem => "filesystem walk, no git-tracked files found",
+        }
+    }
+}
+
+/// The file list `check_base`'s dead-glob gate (HR-074) matches area
+/// globs against, as forward-slash-relative paths, plus which of the two
+/// derivations below produced it. `git ls-files` is primary wherever
+/// `root` is a git working tree: the residue-gate's own pattern
+/// (`bin/residue-gate.rs`'s module doc, `quality.gates-derive-their-
+/// scope`) and the one that answers "tracked" the way the spec's own
+/// "files in the tracked tree" language means it -- a directory retired
+/// from tracking (HR-074's own incident: cli's `bin/**` after the T3
+/// retirement) must go dead the moment `git rm`/an untracked rename takes
+/// it out of the index, not stay alive on whichever machine still has the
+/// old file, or is missing a `.gitignore`'d one, on disk (fix round 1,
+/// important issue 2: reproduced with a gitignored `bin/artifact.bin`
+/// and an untracked `tools/legacy/old.sh`, both of which kept their globs
+/// alive under a filesystem-only derivation while `git ls-files` saw
+/// neither).
+///
+/// The filesystem walk is an explicit, documented fallback for the two
+/// cases `git ls-files` cannot answer for: `root` is not a git working
+/// tree at all (a non-git `--dir` tree, or this module's own un-init'ed
+/// tempdir test fixtures) -- `check-knowledge` is a shipped, git-
+/// independent command (`--dir` bypasses git resolution entirely, and
+/// `check_base` itself never calls git otherwise, `model::load_base`'s
+/// own module doc), so a tree with no git history at all must still get
+/// an answer -- or `root` is a git repository whose index is empty (this
+/// function's own inline doc has the second case's own account).
+///
+/// The second element is every tracked path `git_ls_files` could not
+/// decode as UTF-8 (fix round 3, new_breakage 1, task-1-review-r3.json),
+/// named so `check_base` can report each as its own finding -- never
+/// silently dropped, and never allowed to change the derivation `label`
+/// reports for every OTHER, valid path. `TreeSource` keeps exactly two
+/// variants for this rather than gaining a third: a decode failure never
+/// pushes a repository off the git derivation on its own (that still
+/// only happens when zero paths decode, the pre-existing empty-set
+/// case above), so `GitTracked`'s own label stays true for every finding
+/// that names a real glob -- there is no third state for it to speak
+/// for. A file this narrowly targeted decode failure could plausibly
+/// still cause -- every tracked path failing to decode at once -- falls
+/// through to the empty-set branch below, and Filesystem's own label
+/// already covers the FILE LIST honestly there (git returned nothing
+/// USABLE, which is what "no git-tracked files found" means). The SKIPS
+/// still travel with it, though (fix round 4, new_breakage, task-1-
+/// review-r4.json): the branch below carries whatever `git_ls_files`
+/// named as undecodable into its own return, rather than discarding
+/// them the moment `files` came back empty -- a repository whose one
+/// tracked path is entirely non-UTF-8 still gets that path named, not
+/// silently absorbed into a bare `Filesystem` fallback that looks
+/// exactly like "nothing is tracked here at all".
+fn tracked_tree_files(root: &Path) -> Result<(Vec<String>, TreeSource, Vec<String>), String> {
+    // An empty index falls back too (found live-running this same fix
+    // round's own remedy, task-1-review.json's important issue 2): a
+    // `git init` with nothing yet `git add`ed reads identically to "no
+    // git repository" from a liveness point of view -- reproduced live,
+    // `git init` then `houserules init --dir .` then `check-knowledge`
+    // (exactly the sequence `init` itself prints as "next:") flagged
+    // EVERY area's EVERY glob dead before this fallback existed, since
+    // nothing had been staged yet. The residue this gate exists to
+    // exclude (a gitignored or untracked file surviving a real
+    // retirement) presupposes an established, non-empty tracked history
+    // to retire something FROM; an index with nothing in it at all is
+    // never that case, so trusting the filesystem there costs nothing
+    // the primary derivation was built to catch.
+    let (files, skipped) = git_ls_files(root).unwrap_or_default();
+    if !files.is_empty() {
+        return Ok((files, TreeSource::GitTracked, skipped));
+    }
+    // Fix round 4, new_breakage (task-1-review-r4.json): `skipped` is
+    // carried into the Filesystem fallback too, not dropped with
+    // `files` -- every tracked path git named but could not decode
+    // still gets its own finding even in the corner where NONE of
+    // git's entries decoded (so `files` above is empty and this
+    // function falls back to the filesystem walk for its file list).
+    // Losing `skipped` here would be the exact silence fix round 3
+    // closed, surviving in the one branch that fix did not wire.
+    let files = filesystem_tree_files(root)?;
+    Ok((files, TreeSource::Filesystem, skipped))
+}
+
+/// Runs `git ls-files -z` at `root`, decoding each NUL-separated entry on
+/// its own -- `None` when `root` is not a git working tree or git itself
+/// is not on `PATH`; `tracked_tree_files` walks the filesystem instead in
+/// either case. Never panics: an unavailable git is exactly the "fall
+/// back" case from this function's point of view, not a fatal one
+/// (`bin/residue-gate.rs`'s own `tracked_files` panics on the identical
+/// command, but that dev-only tool always runs inside this checkout's
+/// own git history, where the command cannot fail this way).
+///
+/// `-z` is not optional (fix round 2, new_breakage 1, task-1-
+/// review-r2.json): without it, git's own `core.quotePath` (on by
+/// default) double-quotes and octal-escapes any path byte outside
+/// printable ASCII, so a tracked `docs/café.md` came back as the
+/// 12-character-escaped literal `"docs/caf\303\251.md"` -- a string no
+/// glob matches -- and a naive `.lines()` split has the identical
+/// failure mode for an embedded newline. `-z` disables that quoting and
+/// NUL-terminates each entry instead of newline-terminating it.
+///
+/// Decoding happens per entry, not once over the whole buffer (fix round
+/// 3, new_breakage 1, task-1-review-r3.json): a single `String::from_utf8`
+/// over the joined output turned ONE tracked path with non-UTF-8 bytes
+/// (a latin-1 filename, say) into a `None` for the ENTIRE result, which
+/// silently downgraded every other, perfectly valid path to the
+/// filesystem fallback -- under a label ("no git-tracked files found")
+/// that was false, since git had found some. Splitting on NUL first and
+/// decoding each piece keeps every valid entry in the returned list
+/// (`-z`'s own trailing NUL leaves one empty final piece, filtered like
+/// before) and collects every undecodable one, as its own raw bytes
+/// rendered lossily for display, into the second list instead of
+/// discarding it.
+fn git_ls_files(root: &Path) -> Option<(Vec<String>, Vec<String>)> {
+    let output = std::process::Command::new("git")
+        .args(["ls-files", "-z"])
+        .current_dir(root)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let mut files = Vec::new();
+    let mut skipped = Vec::new();
+    for entry in output.stdout.split(|&byte| byte == 0) {
+        if entry.is_empty() {
+            continue;
+        }
+        match std::str::from_utf8(entry) {
+            Ok(path) => files.push(path.to_string()),
+            Err(_) => skipped.push(String::from_utf8_lossy(entry).into_owned()),
+        }
+    }
+    Some((files, skipped))
+}
+
+/// The fallback tree: every regular file under `root`, as forward-slash-
+/// relative paths, recursed depth-first and skipping a top-level `.git`
+/// directory (VCS internals, never a project file an area glob could
+/// legitimately target). A directory `fs::read_dir` cannot open, or a
+/// directory entry it cannot read, is a named, fatal error here (fix
+/// round 1, important issue 2; `quality.gates-derive-their-scope`): the
+/// prior cut's silent `return` on the same failure under-counted the
+/// tree instead of failing loudly, which is the same shape
+/// `bin/residue-gate.rs`'s own module doc ("Unreadable and binary paths")
+/// already ruled against for the sibling gate.
+fn filesystem_tree_files(root: &Path) -> Result<Vec<String>, String> {
+    let mut out = Vec::new();
+    walk_tree(root, root, &mut out)?;
+    Ok(out)
+}
+
+/// `filesystem_tree_files`'s recursive step: appends every file under
+/// `dir` (relative to `root`) to `out`, skipping a `.git` subdirectory.
+fn walk_tree(root: &Path, dir: &Path, out: &mut Vec<String>) -> Result<(), String> {
+    let entries = fs::read_dir(dir).map_err(|error| format!("{}: {error}", dir.display()))?;
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("{}: {error}", dir.display()))?;
+        let path = entry.path();
+        if path.is_dir() {
+            if entry.file_name() == ".git" {
+                continue;
+            }
+            walk_tree(root, &path, out)?;
+        } else {
+            let relative = path
+                .strip_prefix(root)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .replace('\\', "/");
+            out.push(relative);
+        }
+    }
+    Ok(())
+}
+
+/// The dead-glob gate (HR-074): every glob in a non-empty `paths` list
+/// that matches zero files in `tree`, as `knowledge/areas.json.<area>.
+/// paths: "<glob>" matches no tracked file (<source>)` findings, one per
+/// dead glob, `source` naming which of `tracked_tree_files`'s two
+/// derivations decided liveness (fix round 1, important issue 2) --
+/// distinct from an empty `paths` list (`global`/`process`'s own shape),
+/// which this never reports, because iterating zero globs finds zero dead
+/// ones by construction (no special case needed or wanted: the empty-list
+/// legality this task's brief requires falls out of checking per glob,
+/// not per area). `glob` is compiled once, outside the per-path scan (fix
+/// round 1, minor issue 7: recompiling per candidate path measured
+/// 0.01s -> 0.33s on this repository's own tree, 170,100 compiles for
+/// 9450 files x 18 globs); `glob::compile`, not `glob::glob_match`, is
+/// this crate's one matching engine now used here (that module's own
+/// doc). A glob's compile failure is unreachable here: `model::build_areas`
+/// already validates every area's globs at load time, so `base.areas`
+/// never carries one `check_base` could reach.
+fn dead_glob_findings(
+    areas: &[(String, super::model::AreaDef)],
+    tree: &[String],
+    source: TreeSource,
+) -> Vec<String> {
+    let mut findings = Vec::new();
+    for (area, def) in areas {
+        for glob in &def.paths {
+            let matcher =
+                compile(glob).expect("area globs are validated at load time (model::build_areas)");
+            let alive = tree.iter().any(|path| matcher.is_match(path));
+            if !alive {
+                findings.push(format!(
+                    "knowledge/areas.json.{area}.paths: {glob:?} matches no tracked file ({})",
+                    source.label()
+                ));
+            }
+        }
+    }
+    findings
+}
+
 /// Validates a loaded base against the schema and every cross-entry and
 /// generated-file invariant -- `tools/kb.mjs`'s `checkBase`, two stages in
 /// the same order: schema/id/area/standing/see/verify/check-shape errors
 /// accumulate first, and if any fired, `check_base` returns immediately
 /// (rendering needs a valid base, the same reason the JS bails at
 /// `if (errors.any) return errors.list`); only a clean first stage reaches
-/// the stale/stray/budget checks, which need the generated files to exist
-/// meaningfully.
+/// the dead-glob, stale/stray, and budget checks below, which need the
+/// generated files (and, for the dead-glob gate, a valid `areas` list) to
+/// exist meaningfully.
 pub(crate) fn check_base(base: &Base) -> Vec<String> {
     let mut errors = Vec::new();
     let areas_schema = base
@@ -595,6 +835,24 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
         return errors; // rendering needs a valid base
     }
 
+    match tracked_tree_files(&base.root) {
+        Ok((tree, source, skipped)) => {
+            // Named, non-fatal (fix round 3, new_breakage 1, task-1-
+            // review-r3.json): an undecodable path never changes `source`
+            // or drops out silently -- `dead_glob_findings` still runs
+            // against every path that DID decode, using the derivation
+            // `source` names truthfully.
+            for entry in &skipped {
+                errors.push(format!(
+                    "knowledge/areas.json: a tracked path is not valid UTF-8, skipped from \
+                     the dead-glob scan: {entry}"
+                ));
+            }
+            errors.extend(dead_glob_findings(&base.areas, &tree, source));
+        }
+        Err(message) => errors.push(message),
+    }
+
     let rendered = render_all(base);
     let rendered_paths: HashSet<&str> = rendered.iter().map(|(path, _)| path.as_str()).collect();
     for (path, content) in &rendered {
@@ -683,10 +941,96 @@ pub(crate) fn cmd_check_knowledge(root: Option<PathBuf>) -> ExitCode {
 mod tests {
     use std::fs;
     use std::path::Path;
+    use std::process::Command;
 
     use serde_json::json;
 
     use super::*;
+
+    /// Runs `git` at `root`, asserting success -- this module's own copy
+    /// of the small per-module helper every git-backed test module in
+    /// this crate keeps (`audit.rs`, `check_commit.rs`,
+    /// `report_claims.rs`'s own `fn git`; `gen-goldens.rs`'s module doc
+    /// explains why each keeps its own rather than sharing one).
+    fn git(root: &Path, args: &[&str]) -> String {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(root)
+            .output()
+            .expect("run git");
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout).into_owned()
+    }
+
+    /// Registers `raw_path` (arbitrary bytes, not required to be valid
+    /// UTF-8) as a tracked file in `root`'s git index, through git's
+    /// plumbing layer -- never `fs::write` on a non-UTF-8 name, which
+    /// panics on macOS: PR #14's macos-latest CI job (run 34605787940,
+    /// job 103283751346) failed at exactly that `unwrap()` with `Os error
+    /// 92, Illegal byte sequence`, because APFS rejects an invalid-UTF-8
+    /// byte sequence at file CREATION. `#[cfg(unix)]` alone only gates the
+    /// COMPILER capability this test needs (`OsStrExt`); the FILESYSTEM
+    /// capability a real write also needs is Linux-only, a second,
+    /// distinct layer (`houserules.platform-gated-tests`'s own body now
+    /// carries this lesson). Git's object database and index are
+    /// byte-oriented and never touch a real path on disk for this, so
+    /// APFS never sees the name: `git hash-object -w --stdin` writes
+    /// `content` as a blob and returns its id, and `git update-index
+    /// --add --cacheinfo <mode> <id> <path>` (the three-separate-
+    /// arguments form -- git's own docs name it "for backward
+    /// compatibility" beside the single comma-joined form, kept here for
+    /// the opposite reason: the comma form cannot carry a path with
+    /// invalid UTF-8 bytes, since a Rust `&str` cannot hold one either)
+    /// registers `raw_path` at that blob without writing it anywhere.
+    /// `git ls-files -z` then reports it identically to a real file.
+    ///
+    /// `#[cfg(unix)]`: its only two callers are themselves `#[cfg(unix)]`
+    /// (`raw_path`'s own construction needs `OsStrExt`), so on every other
+    /// target this function is unused -- ungated, it would fail
+    /// `cargo clippy --all-targets -- -D warnings` on windows-latest CI
+    /// (`.github/workflows/ci.yml`'s rust job) with a `dead_code` warning
+    /// turned error, the same class of failure this whole branch-fix round
+    /// exists to close.
+    #[cfg(unix)]
+    fn seed_undecodable_tracked_path(root: &Path, raw_path: &std::ffi::OsStr, content: &str) {
+        let hash_output = Command::new("git")
+            .args(["hash-object", "-w", "--stdin"])
+            .current_dir(root)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .and_then(|mut child| {
+                use std::io::Write;
+                child
+                    .stdin
+                    .take()
+                    .expect("piped stdin")
+                    .write_all(content.as_bytes())?;
+                child.wait_with_output()
+            })
+            .expect("run git hash-object -w --stdin");
+        assert!(
+            hash_output.status.success(),
+            "git hash-object failed: {}",
+            String::from_utf8_lossy(&hash_output.stderr)
+        );
+        let blob = String::from_utf8(hash_output.stdout)
+            .expect("git hash-object prints a hex object id")
+            .trim()
+            .to_string();
+
+        let status = Command::new("git")
+            .args(["update-index", "--add", "--cacheinfo", "100644", &blob])
+            .arg(raw_path)
+            .current_dir(root)
+            .status()
+            .expect("run git update-index --cacheinfo");
+        assert!(status.success(), "git update-index --cacheinfo failed");
+    }
 
     /// Shallow-merges `overrides`' fields onto `base` -- the Rust
     /// equivalent of `tests/kb.test.mjs`'s `{...entry(), ...over}` object
@@ -747,6 +1091,30 @@ mod tests {
         })
     }
 
+    /// One representative file per glob `areas_json()` declares (HR-074):
+    /// once the dead-glob gate ships, an area's non-empty `paths` list
+    /// needs every glob it names to match at least one file in the tree,
+    /// so every fixture whose `areas.json` declares a glob needs a file
+    /// that glob actually matches -- these are that file, one per glob,
+    /// content unused. `docs`'s `CLAUDE.md` glob is covered separately
+    /// (`make_repo` always writes that file itself).
+    fn write_area_marker_files(root: &Path) {
+        for relative in [
+            "crates/marker.rs",
+            "Cargo.toml",
+            "apps/desktop/src/marker.ts",
+            "apps/api/marker.ts",
+            "packages/schemas/marker.json",
+            "tools/marker.sh",
+            ".github/marker.yml",
+            "docs/marker.md",
+        ] {
+            let path = root.join(relative);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, "marker\n").unwrap();
+        }
+    }
+
     /// Groups `entries` by their id prefix and writes each group as its own
     /// topic file -- Rust port of `tests/kb.test.mjs`'s `writeTopics`.
     fn write_topics(root: &Path, entries: &[Value]) {
@@ -795,6 +1163,7 @@ mod tests {
         .unwrap();
         write_topics(root, entries);
         fs::write(root.join("CLAUDE.md"), "# Test\n").unwrap();
+        write_area_marker_files(root);
     }
 
     /// This checkout's `template/` directory, resolved at compile time from
@@ -832,12 +1201,25 @@ mod tests {
             fs::read_to_string(template.join("CLAUDE.md")).unwrap(),
         )
         .unwrap();
+        // Fix round 1, important issue 4 (task-1-review.json): every path
+        // here is a real file `houserules init` itself writes -- nothing
+        // stands in for one. The seed's `docs`/`tools` areas
+        // (`template/knowledge/areas.json`) declare `docs/**`,
+        // `tools/**`, and `.github/**`; `docs/README.md` (HR-087),
+        // `tools/claude-session-start.sh`, and
+        // `.github/workflows/knowledge.yml` are what a real `init` puts
+        // under each, so copying them is what keeps this seed a fixture
+        // that pins the shipped product rather than a fixture padded to
+        // pass around it.
         for path in [
             ".claude/schemas/deliverables.json",
             ".claude/evals/record.json",
             "backlog/schema.json",
             ".claude/skills/finishing-a-feature/SKILL.md",
             ".claude/skills/orchestrating/SKILL.md",
+            "tools/claude-session-start.sh",
+            ".github/workflows/knowledge.yml",
+            "docs/README.md",
         ] {
             let dest = root.join(path);
             fs::create_dir_all(dest.parent().unwrap()).unwrap();
@@ -1356,6 +1738,297 @@ mod tests {
             errors.contains(&".claude/rules/extra.md: not generated by kb; remove it".to_string())
         );
         assert!(!errors.iter().any(|e| e.contains("notes.txt")));
+    }
+
+    /// HR-074: an area whose `paths` list declares a glob that matches
+    /// zero files in the tracked tree fails, naming the area and the dead
+    /// glob -- the incident this closes (batch 20 branch review
+    /// retrospective, violated_rules[0]: cli's `bin/**` matched nothing
+    /// from the T3 retirement until a fix round, silently orphaning
+    /// `quality.absence-is-designed` and `houserules.live-run-recipe`,
+    /// with no gate noticing). `rust`'s other two globs, and every other
+    /// area's globs, still match a real file (`write_area_marker_files`),
+    /// so this also proves the negative direction in the same assertion:
+    /// a live glob next to a dead one reports only the dead one, and
+    /// `global`/`process`'s own deliberately empty `paths` lists report
+    /// nothing at all.
+    ///
+    /// This fixture's tempdir is never `git init`ed, so it exercises
+    /// `tracked_tree_files`'s documented FALLBACK derivation (filesystem
+    /// walk); `check_base_decides_glob_liveness_from_git_tracked_files_
+    /// not_the_working_directory` below exercises the primary, git-backed
+    /// one.
+    #[test]
+    fn check_base_reports_a_dead_glob_naming_the_area_and_glob() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(root, &[entry(json!({}))]);
+        let mut areas = areas_json();
+        areas["rust"] = json!({"paths": ["crates/**", "Cargo.toml", "bin/**"]});
+        fs::write(
+            root.join("knowledge/areas.json"),
+            serde_json::to_string(&areas).unwrap(),
+        )
+        .unwrap();
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        let base = load_base(root).expect("loads");
+        assert_eq!(
+            check_base(&base),
+            vec![
+                "knowledge/areas.json.rust.paths: \"bin/**\" matches no tracked file \
+                 (filesystem walk, no git-tracked files found)"
+                    .to_string()
+            ]
+        );
+    }
+
+    /// HR-074's own subtle branch, named explicitly: a deliberately empty
+    /// `paths` list (`global`'s and `process`'s own shape, matching the
+    /// real `knowledge/areas.json`) is a legal choice, not the "declares
+    /// globs that match nothing" defect the gate targets -- it must never
+    /// appear in a dead-glob finding. `passes_a_valid_base` already proves
+    /// this fixture reports nothing at all; this test names the invariant
+    /// on its own so a future change that starts checking areas as a
+    /// whole (all-or-nothing) rather than per glob cannot silently regress
+    /// it unnoticed.
+    #[test]
+    fn check_base_does_not_flag_a_deliberately_empty_paths_list() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(root, &[entry(json!({}))]);
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        let base = load_base(root).expect("loads");
+        let errors = check_base(&base);
+        assert!(
+            !errors
+                .iter()
+                .any(|e| e.contains("areas.json.process") || e.contains("areas.json.global")),
+            "a deliberately empty paths list must never be flagged as dead: {errors:#?}"
+        );
+    }
+
+    /// Fix round 1, important issue 2 (task-1-review.json): glob liveness
+    /// must be decided by git-tracked files where `root` is a git
+    /// repository, not by whatever happens to sit on disk -- the
+    /// reviewer's own reproduction, the exact residue-survival shape the
+    /// dead-glob gate exists to close (a directory retired from tracking,
+    /// HR-074's own incident) can recur silently otherwise. A gitignored-
+    /// but-present file (`bin/artifact.bin`) and a plain untracked-but-
+    /// present file (`tools/legacy/old.sh`), neither ever `git add`ed,
+    /// must NOT keep their globs alive, even though `bin/**` and
+    /// `tools/legacy/**` both match something on disk.
+    #[test]
+    fn check_base_decides_glob_liveness_from_git_tracked_files_not_the_working_directory() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        git(root, &["init", "-q"]);
+        make_repo(root, &[entry(json!({}))]);
+        let mut areas = areas_json();
+        areas["rust"] = json!({"paths": ["crates/**", "Cargo.toml", "bin/**"]});
+        areas["webview"] = json!({"paths": ["apps/desktop/src/**", "tools/legacy/**"]});
+        fs::write(
+            root.join("knowledge/areas.json"),
+            serde_json::to_string(&areas).unwrap(),
+        )
+        .unwrap();
+        // Track everything real the fixture has created so far -- only
+        // the residue seeded below is meant to stay untracked.
+        git(root, &["add", "-A"]);
+
+        fs::write(root.join(".gitignore"), "bin/\n").unwrap();
+        fs::create_dir_all(root.join("bin")).unwrap();
+        fs::write(root.join("bin/artifact.bin"), "residue").unwrap();
+        fs::create_dir_all(root.join("tools/legacy")).unwrap();
+        fs::write(root.join("tools/legacy/old.sh"), "#!/bin/sh\n").unwrap();
+
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        let base = load_base(root).expect("loads");
+        let mut errors = check_base(&base);
+        errors.sort();
+        assert_eq!(
+            errors,
+            vec![
+                "knowledge/areas.json.rust.paths: \"bin/**\" matches no tracked file \
+                 (git ls-files)"
+                    .to_string(),
+                "knowledge/areas.json.webview.paths: \"tools/legacy/**\" matches no tracked \
+                 file (git ls-files)"
+                    .to_string(),
+            ]
+        );
+    }
+
+    /// Found live-running this same fix round's own I2 remedy, not in the
+    /// review itself: a git repository whose index is still empty --
+    /// `git init` then `houserules init` then `houserules check-
+    /// knowledge`, before the adopter's first `git add`, exactly the
+    /// sequence `init` itself prints as "next:" -- must not report every
+    /// glob dead. `tracked_tree_files`'s own doc has the full account.
+    #[test]
+    fn check_base_falls_back_to_the_filesystem_when_the_git_index_is_empty() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        git(root, &["init", "-q"]);
+        make_repo(root, &[entry(json!({}))]);
+        // Deliberately no `git add`: the index stays empty, while every
+        // marker file `make_repo` writes is genuinely present on disk.
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        let base = load_base(root).expect("loads");
+        assert_eq!(check_base(&base), Vec::<String>::new());
+    }
+
+    /// Fix round 2, new_breakage 1 (task-1-review-r2.json): `git ls-files`
+    /// without `-z` lets git's own `core.quotePath` octal-escape a
+    /// non-ASCII path, so a tracked `docs/café.md` came back as the
+    /// 12-character-escaped string `"docs/caf\303\251.md"` -- which no
+    /// glob matches -- instead of the real path. A tracked non-ASCII file
+    /// under a globbed area must not make that glob look dead.
+    #[test]
+    fn check_base_matches_a_glob_against_a_tracked_non_ascii_path() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        git(root, &["init", "-q"]);
+        make_repo(root, &[entry(json!({}))]);
+        // Remove the plain-ASCII docs marker `write_area_marker_files`
+        // wrote: docs/** must be satisfied by the accented file alone, or
+        // a naive line-split's mangling of it would hide behind this
+        // other match instead of failing the test.
+        fs::remove_file(root.join("docs/marker.md")).unwrap();
+        fs::write(root.join("docs/café.md"), "# café\n").unwrap();
+        git(root, &["add", "-A"]);
+
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        let base = load_base(root).expect("loads");
+        assert_eq!(check_base(&base), Vec::<String>::new());
+    }
+
+    /// Fix round 3, new_breakage 1 (task-1-review-r3.json): the round 2
+    /// fix decoded the whole `git ls-files -z` buffer in one
+    /// `String::from_utf8` call, so ONE tracked path with invalid UTF-8
+    /// bytes (a latin-1 name, here) turned the WHOLE call into `None`,
+    /// silently downgrading every other, perfectly valid path to the
+    /// filesystem derivation under a label ("no git-tracked files found")
+    /// that was false -- git had found plenty. A seeded dead glob
+    /// (`infra`'s extra `"handbook/**"`) must still be reported, still
+    /// labeled `(git ls-files)` -- proving the repo stayed on the git
+    /// derivation -- and the undecodable path itself must appear as its
+    /// own named, non-fatal finding, never silently dropped and never
+    /// fatal to the scan of any other path.
+    ///
+    /// Unix-only (branch review, critical issue 1): `OsStrExt::from_bytes`
+    /// is a Unix-only extension trait (`std::os::unix::ffi`), so this test
+    /// does not compile on Windows at all -- `crates/houserules/tests/
+    /// install.rs`'s own `init_marks_shell_scripts_and_the_git_hook_
+    /// executable` is the crate's precedent for gating a whole test this
+    /// way rather than only the one line that needs it.
+    ///
+    /// Seeded through the git index, not the filesystem (branch-fix round
+    /// 2: PR #14's macos-latest job panicked at an `fs::write` unwrap on
+    /// this exact name -- `seed_undecodable_tracked_path`'s own doc has
+    /// the full account). This is safe here specifically because
+    /// `check_base`'s dead-glob scan matches every tracked path against a
+    /// glob by NAME alone and never opens one to read its content, so a
+    /// path that exists only in the index, never on disk, exercises the
+    /// identical code path a real file would.
+    #[cfg(unix)]
+    #[test]
+    fn check_base_names_an_undecodable_tracked_path_and_stays_on_the_git_derivation() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        git(root, &["init", "-q"]);
+        make_repo(root, &[entry(json!({}))]);
+        let mut areas = areas_json();
+        areas["infra"] = json!({"paths": ["tools/**", ".github/**", "handbook/**"]});
+        fs::write(
+            root.join("knowledge/areas.json"),
+            serde_json::to_string(&areas).unwrap(),
+        )
+        .unwrap();
+        git(root, &["add", "-A"]);
+
+        // `0xE9` alone is not a valid UTF-8 continuation byte, so this
+        // name cannot decode as UTF-8 no matter how the `-z` output is
+        // split. `OsStrExt::from_bytes` builds the raw path directly,
+        // bypassing Rust's own UTF-8 requirement on `&str`/`String` --
+        // the same way a real latin-1 filename reaches a git repository
+        // from a non-Rust tool.
+        use std::os::unix::ffi::OsStrExt;
+        let name = std::ffi::OsStr::from_bytes(b"docs/caf\xe9.md");
+        seed_undecodable_tracked_path(root, name, "# non-utf8\n");
+
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        let base = load_base(root).expect("loads");
+        let mut errors = check_base(&base);
+        errors.sort();
+        assert_eq!(
+            errors,
+            vec![
+                "knowledge/areas.json.infra.paths: \"handbook/**\" matches no tracked file \
+                 (git ls-files)"
+                    .to_string(),
+                "knowledge/areas.json: a tracked path is not valid UTF-8, skipped from the \
+                 dead-glob scan: docs/caf\u{fffd}.md"
+                    .to_string(),
+            ]
+        ); // '.' (0x2E) sorts before ':' (0x3A): the `.infra.paths` finding leads.
+    }
+
+    /// Fix round 4, new_breakage (task-1-review-r4.json): `tracked_tree_
+    /// files` returned the skipped list only on the `GitTracked` branch;
+    /// the `Filesystem` fallback returned `Vec::new()` unconditionally,
+    /// so when NO tracked path decodes -- `files` above comes back
+    /// empty, `git_ls_files`'s own `skipped` list is discarded with it --
+    /// the reader was told nothing at all: `knowledge: ok`, though git
+    /// had returned a path it could not read. Reproduced with a
+    /// repository whose ONLY tracked path is undecodable: it is `git
+    /// add`ed before this fixture writes anything else, so it is the
+    /// sole entry `git ls-files` names, and none of it decodes.
+    ///
+    /// Unix-only (branch review, critical issue 1): see the sibling test
+    /// above for why `OsStrExt::from_bytes` gates the whole function.
+    ///
+    /// Seeded through the git index, not the filesystem (branch-fix round
+    /// 2: `seed_undecodable_tracked_path`'s own doc has the PR #14
+    /// macos-latest account). Safe here for the same reason as the
+    /// sibling test above: `check_base`'s dead-glob scan never reads a
+    /// tracked path's content, only its name, so an index-only entry with
+    /// no file on disk at all still exercises the real code path.
+    #[cfg(unix)]
+    #[test]
+    fn check_base_names_an_undecodable_tracked_path_even_when_none_of_them_decode() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        git(root, &["init", "-q"]);
+
+        // `0xE9` alone is not a valid UTF-8 continuation byte.
+        use std::os::unix::ffi::OsStrExt;
+        let name = std::ffi::OsStr::from_bytes(b"caf\xe9.md");
+        seed_undecodable_tracked_path(root, name, "# non-utf8\n");
+
+        // Every real file this fixture writes next stays untracked: the
+        // filesystem fallback below still finds them all on disk (this
+        // is the zero-decode corner, so `tracked_tree_files` falls back
+        // to it regardless), so no glob goes dead and the skip is the
+        // only finding this test pins.
+        make_repo(root, &[entry(json!({}))]);
+
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        let base = load_base(root).expect("loads");
+        assert_eq!(
+            check_base(&base),
+            vec![
+                "knowledge/areas.json: a tracked path is not valid UTF-8, skipped from the \
+                 dead-glob scan: caf\u{fffd}.md"
+                    .to_string()
+            ]
+        );
     }
 
     /// tests/kb.test.mjs, describe('render'): "checkBase reports drift,

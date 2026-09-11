@@ -11,6 +11,8 @@
 //! `serde_json::Value`, never a `backlog::model` typed struct.
 
 use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::Path;
 
 use serde_json::{Value, json};
 
@@ -95,6 +97,50 @@ fn list_row(item: &Value) -> Value {
     })
 }
 
+/// Verifies that `relative` (a backlog JSON file under `root`, already
+/// loaded as `value`) round-trips byte-identical through the SHIPPED
+/// emitter (HR-076): `crate::emit::emit`, the exact function `set_item`'s
+/// own rewrite calls (`emit(&file_value)`, below) -- never a second,
+/// re-implemented serializer, which is the incident this check exists to
+/// close recurring inside its own fix (batch 20 branch review: a
+/// controller edit re-serialized `kit.json` with ASCII escapes, diverging
+/// from the emitter's raw-UTF-8 form, caught only by the review). A file
+/// this process cannot re-read is not reported here -- `load_backlog`
+/// already required it to read successfully to reach this point at all.
+fn check_emitter_round_trip(root: &Path, relative: &str, value: &Value, errors: &mut Vec<String>) {
+    let Ok(on_disk) = fs::read(root.join(relative)) else {
+        return;
+    };
+    if on_disk != emit(value).into_bytes() {
+        errors.push(format!(
+            "{relative}: does not round-trip through the shipped emitter (re-emitting diverges \
+             from the file on disk). {}",
+            round_trip_remedy(relative)
+        ));
+    }
+}
+
+/// The one-sentence, actionable remedy `check_emitter_round_trip` names
+/// beside a divergence (fix round 1, minor issue 8): an items file has a
+/// shipped writer (`set_item`, below) that reaches it through the exact
+/// same `emit` call the check compares against, so any assignment on any
+/// item in the file re-canonicalizes the whole thing; the other five
+/// backlog files have no shipped writer at all (`emit` is reached from
+/// exactly one production call site, `set_item`'s own), so the remedy
+/// names the canonical form directly rather than a command that cannot
+/// produce it. HR-088 (filed alongside this fix) tracks a `--fix` arm as
+/// a possible future replacement for this second branch; not built this
+/// round.
+fn round_trip_remedy(relative: &str) -> &'static str {
+    if relative.starts_with("backlog/items/") {
+        "Run `houserules set <id> <field>=<value>` on any item in this file; the rewrite \
+         re-canonicalizes the whole file."
+    } else {
+        "No shipped command writes this file. Re-save it as 2-space-indented JSON, raw UTF-8 \
+         (no \\uXXXX escapes), with one trailing newline."
+    }
+}
+
 /// Validates a loaded backlog against its schema and every cross-file
 /// invariant -- `checkBacklog`, ported. Returns `(errors, warnings)`; an
 /// empty `errors` with `check-backlog` printing `warn:` lines for each
@@ -103,6 +149,19 @@ fn list_row(item: &Value) -> Value {
 pub(crate) fn check_backlog(b: &LoadedBacklog) -> (Vec<String>, Vec<String>) {
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
+
+    for (relative, value) in [
+        ("backlog/schema.json", &b.schema),
+        ("backlog/amendments.json", &b.amendments),
+        ("backlog/batches.json", &b.batches),
+        ("backlog/decisions.json", &b.decisions),
+        ("backlog/parked.json", &b.parked),
+    ] {
+        check_emitter_round_trip(&b.root, relative, value, &mut errors);
+    }
+    for section in &b.sections {
+        check_emitter_round_trip(&b.root, &section.file, &section.content, &mut errors);
+    }
 
     check_ref(
         &b.amendments,
@@ -958,6 +1017,69 @@ mod tests {
         assert_eq!(
             errors2,
             vec!["backlog/items/E01.json: section \"E02\" must equal the file name \"E01\""]
+        );
+    }
+
+    /// HR-076: a backlog file that no longer round-trips byte-identical
+    /// through the shipped emitter (`crate::emit::emit`, the same function
+    /// `set_item` writes through) fails, naming the file -- the incident
+    /// this closes (batch 20 branch review: the HR-047 tick re-serialized
+    /// kit.json with ASCII escapes, diverging from the emitter's raw-UTF-8
+    /// form, caught only by the branch review). Reproduces that exact
+    /// shape: `emit`'s raw UTF-8 never re-renders `é` as `é`, so a
+    /// file hand-escaped that way can never round-trip back to itself.
+    #[test]
+    fn check_backlog_reports_a_file_that_diverges_from_the_shipped_emitter() {
+        // `id: WI-002` matches `test_support::make_repo`'s own hardcoded
+        // `batches.json` (`"items": ["WI-002"]`), so the fixture is
+        // otherwise clean and the round-trip finding below is the only one.
+        let dir = make_repo(vec![item(json!({"id": "WI-002", "title": "Café item."}))]);
+        let path = dir.path().join("backlog/items/E01.json");
+        let canonical = fs::read_to_string(&path).unwrap();
+        assert!(
+            canonical.contains('é'),
+            "fixture must carry a raw UTF-8 non-ASCII character to reproduce the incident"
+        );
+        let escaped = canonical.replace('é', "\\u00e9");
+        fs::write(&path, escaped).unwrap();
+
+        let b = load_backlog(dir.path()).expect("loads");
+        let (errors, _warnings) = check_backlog(&b);
+        assert_eq!(
+            errors,
+            vec![
+                "backlog/items/E01.json: does not round-trip through the shipped emitter \
+                 (re-emitting diverges from the file on disk). Run `houserules set <id> \
+                 <field>=<value>` on any item in this file; the rewrite re-canonicalizes the \
+                 whole file."
+                    .to_string()
+            ]
+        );
+    }
+
+    /// Fix round 1, minor issue 8 (task-1-review.json): the five backlog
+    /// files with no shipped writer (`batches.json` here) get the OTHER
+    /// remedy sentence -- no command to run, so the message states the
+    /// canonical form directly.
+    #[test]
+    fn check_backlog_names_the_no_writer_remedy_for_a_diverging_top_level_file() {
+        let dir = make_repo(default_items());
+        let path = dir.path().join("backlog/batches.json");
+        let canonical = fs::read_to_string(&path).unwrap();
+        let squashed: Value = serde_json::from_str(&canonical).unwrap();
+        fs::write(&path, serde_json::to_string(&squashed).unwrap()).unwrap();
+
+        let b = load_backlog(dir.path()).expect("loads");
+        let (errors, _warnings) = check_backlog(&b);
+        assert_eq!(
+            errors,
+            vec![
+                "backlog/batches.json: does not round-trip through the shipped emitter \
+                 (re-emitting diverges from the file on disk). No shipped command writes this \
+                 file. Re-save it as 2-space-indented JSON, raw UTF-8 (no \\uXXXX escapes), \
+                 with one trailing newline."
+                    .to_string()
+            ]
         );
     }
 }

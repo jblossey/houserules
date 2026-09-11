@@ -414,6 +414,38 @@ mod tests {
         );
     }
 
+    /// HR-086: the batch 20 T6 incident, reproduced -- a `+=` of a string
+    /// onto a textList field appends one list item per character. 25
+    /// single-character `self_review` items (the exact count the incident's
+    /// own probe carried, `.superpowers/sdd/2026-09-07-batch-20/
+    /// t6-fix3-evidence/degenerate-self-review-probe.json`) must now fail,
+    /// naming the first shredded item's own minLength floor.
+    #[test]
+    fn rejects_a_self_review_shredded_into_one_character_per_item() {
+        let root = schema_root();
+        let mut report = report_sample();
+        let shredded: Vec<Value> = "Re-read the whole change."
+            .chars()
+            .map(|c| json!(c.to_string()))
+            .collect();
+        assert_eq!(
+            shredded.len(),
+            25,
+            "the incident's own probe carried 25 items"
+        );
+        report["self_review"] = json!(shredded);
+        let file = write_report(root.path(), &report);
+        let result = validate_deliverable(root.path(), &file).unwrap();
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.ends_with(".self_review[0]: shorter than 3")),
+            "{:?}",
+            result.errors
+        );
+    }
+
     /// tests/kb.test.mjs: "accepts a BLOCKED report with a null
     /// self_audit".
     #[test]
@@ -876,6 +908,75 @@ mod tests {
         assert_eq!(
             result.errors,
             vec![format!("{}.verdict.text: must be string", file.display())]
+        );
+    }
+
+    /// A minimal, schema-valid branch review: one retrospective
+    /// `violated_rules` entry whose own `tasks` list names task numbers,
+    /// not prose (HR-086's own scoping question -- this module's doc has
+    /// the measured reasoning).
+    fn branch_review_sample() -> Value {
+        json!({
+            "kind": "branch-review", "base": "abc1234", "head": "abc1235",
+            "strengths": ["Clear commit history across the whole branch."],
+            "issues": [], "rule_adherence": [],
+            "recommendations": ["Ship the next batch at the same steady pace."],
+            "retrospective": {
+                "violated_rules": [{
+                    "id": "process.tdd", "count": 1, "tasks": ["1"], "proposal": {},
+                }],
+                "uncovered_findings": [], "stale_entries": [], "unused_ids": [],
+                "template_defects": [],
+            },
+            "assessment": {"ready": "yes", "text": "Ready to merge as is."},
+        })
+    }
+
+    /// tests/kb.test.mjs has no branch-review sample; HR-086 needs one to
+    /// prove both directions in a single document -- confirms the new
+    /// floor accepted a task-number reference just as short as the
+    /// incident's shredded characters.
+    #[test]
+    fn accepts_a_well_formed_branch_review_with_no_errors() {
+        let root = schema_root();
+        let file = root.path().join("branch-review.json");
+        fs::write(
+            &file,
+            serde_json::to_string(&branch_review_sample()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            validate_deliverable(root.path(), &file).unwrap().errors,
+            Vec::<String>::new()
+        );
+    }
+
+    /// HR-086's scoping question, settled by measuring the real corpus
+    /// (this module's own doc on the schema copy has the numbers): the
+    /// nine-field blast radius splits into seven PROSE fields (self_review,
+    /// concerns, strengths, out_of_scope, verdict.open, recommendations)
+    /// and the two retrospective `tasks` lists, which legitimately hold
+    /// single-digit task-number references ("1", "2") -- the measured
+    /// corpus's own `tasks` items ranged from 1 to 137 characters, so no
+    /// single floor could gate them without also gating real task
+    /// numbers. This document carries a single-character `tasks` item
+    /// (legitimate, unflagged) alongside a single-character
+    /// `recommendations` item (illegitimate, flagged) to prove the split
+    /// in one assertion.
+    #[test]
+    fn accepts_a_single_character_task_reference_while_rejecting_an_equally_short_recommendation() {
+        let root = schema_root();
+        let mut branch_review = branch_review_sample();
+        branch_review["recommendations"] = json!(["ok"]);
+        let file = root.path().join("branch-review.json");
+        fs::write(&file, serde_json::to_string(&branch_review).unwrap()).unwrap();
+        let result = validate_deliverable(root.path(), &file).unwrap();
+        assert_eq!(
+            result.errors,
+            vec![format!(
+                "{}.recommendations[0]: shorter than 3",
+                file.display()
+            )]
         );
     }
 

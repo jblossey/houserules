@@ -87,6 +87,7 @@ const SEED_ONCE: &[&str] = &[
     ".claude/evals/record.json",
     ".claude/evals/seeded-violations.json",
     ".github/workflows/knowledge.yml",
+    "docs/README.md",
     "CLAUDE.md",
 ];
 

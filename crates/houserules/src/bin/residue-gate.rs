@@ -151,13 +151,37 @@ fn repo_root() -> PathBuf {
 }
 
 /// Every path `git ls-files` names under `root`, repo-relative POSIX
-/// paths, in the order git prints them -- the walk set this gate audits
-/// is exactly this list minus `EXCLUDED_PREFIXES`, so a newly tracked
-/// file is gated by default (this module's own doc, "Scope", has the
-/// finding this replaced).
-fn tracked_files(root: &Path) -> Vec<String> {
+/// paths, in the order git prints them, alongside every entry that was
+/// NOT valid UTF-8 (rendered lossily, for display only) -- the walk set
+/// this gate audits is exactly the first list minus `EXCLUDED_PREFIXES`,
+/// so a newly tracked file is gated by default (this module's own doc,
+/// "Scope", has the finding this replaced).
+///
+/// `-z` is not optional (fix round 2, new_breakage 1, task-1-
+/// review-r2.json: `check.rs`'s `git_ls_files` carried the identical bug,
+/// this function its cited pattern source): without it, git's own
+/// `core.quotePath` (on by default) double-quotes and octal-escapes any
+/// path byte outside printable ASCII, so a tracked `café.md` prints as
+/// the escaped literal `"caf\303\251.md"` -- a string this gate would
+/// then walk as a nonexistent file -- and a plain `.lines()` split has
+/// the same failure for an embedded newline. `-z` disables that quoting
+/// and NUL-terminates each entry instead, so the split below recovers
+/// the exact tracked path; `-z`'s own trailing NUL leaves one empty
+/// element, filtered out.
+///
+/// Decoding happens per entry, not once over the whole buffer (fix round
+/// 3, new_breakage 1, task-1-review-r3.json: `check.rs`'s `git_ls_files`
+/// carried the identical bug, this function its cited pattern source): a
+/// single `String::from_utf8` over the joined output would let ONE
+/// tracked path with non-UTF-8 bytes turn the WHOLE call into a panic,
+/// losing every other, perfectly valid path's classification along with
+/// it. An undecodable entry is instead a named, non-fatal skip -- `main`
+/// reports it the same "counted, printed, never fatal" way it already
+/// reports a binary asset (`ReadOutcome::Binary`'s own doc) -- and never
+/// changes how any other tracked path is walked.
+fn tracked_files(root: &Path) -> (Vec<String>, Vec<String>) {
     let output = Command::new("git")
-        .args(["ls-files"])
+        .args(["ls-files", "-z"])
         .current_dir(root)
         .output()
         .unwrap_or_else(|error| panic!("run git ls-files: {error}"));
@@ -166,11 +190,18 @@ fn tracked_files(root: &Path) -> Vec<String> {
         "git ls-files failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    String::from_utf8(output.stdout)
-        .expect("git ls-files output is UTF-8")
-        .lines()
-        .map(str::to_string)
-        .collect()
+    let mut valid = Vec::new();
+    let mut undecodable = Vec::new();
+    for entry in output.stdout.split(|&byte| byte == 0) {
+        if entry.is_empty() {
+            continue;
+        }
+        match std::str::from_utf8(entry) {
+            Ok(path) => valid.push(path.to_string()),
+            Err(_) => undecodable.push(String::from_utf8_lossy(entry).into_owned()),
+        }
+    }
+    (valid, undecodable)
 }
 
 /// `true` when `rel_path` falls under a declared `EXCLUDED_PREFIXES`
@@ -326,7 +357,7 @@ fn exceptions() -> Vec<Exception> {
 /// exception account.
 fn main() {
     let root = repo_root();
-    let tracked = tracked_files(&root);
+    let (tracked, undecodable) = tracked_files(&root);
     let walked: Vec<&String> = tracked.iter().filter(|path| !is_excluded(path)).collect();
 
     let exceptions = exceptions();
@@ -359,6 +390,15 @@ fn main() {
         println!("-- {} walked path(s) failed to read --", unreadable.len());
         for (path, message) in &unreadable {
             println!("{path}: {message}");
+        }
+    }
+    if !undecodable.is_empty() {
+        println!(
+            "\n-- {} git-tracked path(s) skipped (not valid UTF-8) --",
+            undecodable.len()
+        );
+        for entry in &undecodable {
+            println!("  {entry}");
         }
     }
     if !binary_skips.is_empty() {
@@ -400,9 +440,10 @@ fn main() {
     }
 
     println!(
-        "\nsummary: {} tracked, {} excluded, {} walked, {} read, {} binary skipped, \
-         {} unreadable, {} total hits, {} excepted, {} unexpected",
-        tracked.len(),
+        "\nsummary: {} tracked, {} skipped (not utf-8), {} excluded, {} walked, {} read, \
+         {} binary skipped, {} unreadable, {} total hits, {} excepted, {} unexpected",
+        tracked.len() + undecodable.len(),
+        undecodable.len(),
         tracked.len() - walked.len(),
         walked.len(),
         read_count,
@@ -419,6 +460,75 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Registers `raw_path` (arbitrary bytes, not required to be valid
+    /// UTF-8) as a tracked file in `root`'s git index, through git's
+    /// plumbing layer -- never `fs::write` on a non-UTF-8 name, which
+    /// panics on macOS: PR #14's macos-latest CI job (run 34605787940,
+    /// job 103283751346) failed at exactly that `unwrap()` with `Os error
+    /// 92, Illegal byte sequence`, because APFS rejects an invalid-UTF-8
+    /// byte sequence at file CREATION. `#[cfg(unix)]` alone only gates the
+    /// COMPILER capability this test needs (`OsStrExt`); the FILESYSTEM
+    /// capability a real write also needs is Linux-only, a second,
+    /// distinct layer (`houserules.platform-gated-tests`'s own body now
+    /// carries this lesson). Git's object database and index are
+    /// byte-oriented and never touch a real path on disk for this, so
+    /// APFS never sees the name: `git hash-object -w --stdin` writes
+    /// `content` as a blob and returns its id, and `git update-index
+    /// --add --cacheinfo <mode> <id> <path>` (the three-separate-
+    /// arguments form -- git's own docs name it "for backward
+    /// compatibility" beside the single comma-joined form, kept here for
+    /// the opposite reason: the comma form cannot carry a path with
+    /// invalid UTF-8 bytes, since a Rust `&str` cannot hold one either)
+    /// registers `raw_path` at that blob without writing it anywhere.
+    /// `git ls-files -z` then reports it identically to a real file. This
+    /// module's own copy of the identical helper `check.rs`'s test module
+    /// keeps (this file's own `tracked_files` doc names that module as
+    /// this function's cited pattern source).
+    ///
+    /// `#[cfg(unix)]`: its only caller is itself `#[cfg(unix)]`
+    /// (`raw_path`'s own construction needs `OsStrExt`), so on every
+    /// other target this function is unused -- ungated, it would fail
+    /// `cargo clippy --all-targets -- -D warnings` on windows-latest CI
+    /// (`.github/workflows/ci.yml`'s rust job) with a `dead_code` warning
+    /// turned error, the same class of failure this whole branch-fix
+    /// round exists to close.
+    #[cfg(unix)]
+    fn seed_undecodable_tracked_path(root: &Path, raw_path: &std::ffi::OsStr, content: &str) {
+        let hash_output = Command::new("git")
+            .args(["hash-object", "-w", "--stdin"])
+            .current_dir(root)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .and_then(|mut child| {
+                use std::io::Write;
+                child
+                    .stdin
+                    .take()
+                    .expect("piped stdin")
+                    .write_all(content.as_bytes())?;
+                child.wait_with_output()
+            })
+            .expect("run git hash-object -w --stdin");
+        assert!(
+            hash_output.status.success(),
+            "git hash-object failed: {}",
+            String::from_utf8_lossy(&hash_output.stderr)
+        );
+        let blob = String::from_utf8(hash_output.stdout)
+            .expect("git hash-object prints a hex object id")
+            .trim()
+            .to_string();
+
+        let status = Command::new("git")
+            .args(["update-index", "--add", "--cacheinfo", "100644", &blob])
+            .arg(raw_path)
+            .current_dir(root)
+            .status()
+            .expect("run git update-index --cacheinfo");
+        assert!(status.success(), "git update-index --cacheinfo failed");
+    }
 
     /// A line invoking `pnpm test` gets flagged: the core PATTERNS match
     /// fires on a real command shape, case-insensitively.
@@ -517,11 +627,16 @@ mod tests {
     #[test]
     fn every_real_tracked_file_is_classified_and_key_files_land_correctly() {
         let root = repo_root();
-        let tracked = tracked_files(&root);
+        let (tracked, undecodable) = tracked_files(&root);
         assert!(
             tracked.len() > 50,
             "expected a real, populated tracked-file list, got {}",
             tracked.len()
+        );
+        assert_eq!(
+            undecodable,
+            Vec::<String>::new(),
+            "this checkout tracks no non-UTF-8 path"
         );
         for path in &tracked {
             let _ = is_excluded(path); // must not panic for any real tracked path
@@ -532,6 +647,84 @@ mod tests {
         assert!(!is_excluded("tools/claude-session-start.sh"));
         assert!(tracked.iter().any(|p| p == "knowledge/houserules.json"));
         assert!(is_excluded("knowledge/houserules.json"));
+    }
+
+    /// Fix round 2, new_breakage 1 (task-1-review-r2.json): the same
+    /// quoting bug `check.rs`'s `git_ls_files` carried -- this repository
+    /// has zero non-ASCII tracked paths, so the bug is latent here and
+    /// this seeded scratch repo is the only way to exercise it. Without
+    /// `-z`, git's own `core.quotePath` would return a tracked
+    /// `docs/café.md` as the escaped literal `"docs/caf\303\251.md"`.
+    #[test]
+    fn tracked_files_returns_a_non_ascii_path_unescaped() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(root)
+            .output()
+            .expect("git init");
+        fs::write(root.join("café.md"), "# café\n").expect("write café.md");
+        Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(root)
+            .output()
+            .expect("git add");
+        let (files, undecodable) = tracked_files(root);
+        assert_eq!(files, vec!["café.md".to_string()], "{files:?}");
+        assert_eq!(undecodable, Vec::<String>::new());
+    }
+
+    /// Fix round 3, new_breakage 1 (task-1-review-r3.json): the same
+    /// whole-buffer-decode bug `check.rs`'s `git_ls_files` carried -- this
+    /// repository has zero non-UTF-8 tracked paths, so a seeded scratch
+    /// repo is the only way to exercise it. A tracked path with genuinely
+    /// invalid UTF-8 bytes must not panic the whole call, and must not
+    /// silently vanish from the result: it lands in the second, named
+    /// list, while every other, valid tracked path still lands in the
+    /// first.
+    ///
+    /// Unix-only (branch review, critical issue 1): `OsStrExt::from_bytes`
+    /// is a Unix-only extension trait (`std::os::unix::ffi`), so this test
+    /// does not compile on Windows at all -- `crates/houserules/tests/
+    /// install.rs`'s own `init_marks_shell_scripts_and_the_git_hook_
+    /// executable` is the crate's precedent for gating a whole test this
+    /// way rather than only the one line that needs it.
+    ///
+    /// Seeded through the git index, not the filesystem (branch-fix round
+    /// 2: PR #14's macos-latest job panicked at an `fs::write` unwrap on
+    /// this exact name -- `seed_undecodable_tracked_path`'s own doc has
+    /// the full account). Safe here specifically because `tracked_files`
+    /// returns the raw path list and never opens a single file to read
+    /// its content, so an index-only entry with no file on disk at all
+    /// exercises the identical code path a real file would.
+    #[cfg(unix)]
+    #[test]
+    fn tracked_files_names_an_undecodable_path_instead_of_dropping_it() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(root)
+            .output()
+            .expect("git init");
+        fs::write(root.join("README.md"), "# scratch\n").expect("write README.md");
+        Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(root)
+            .output()
+            .expect("git add");
+        // `0xE9` alone is not a valid UTF-8 continuation byte.
+        use std::os::unix::ffi::OsStrExt;
+        let name = std::ffi::OsStr::from_bytes(b"caf\xe9.md");
+        seed_undecodable_tracked_path(root, name, "# non-utf8\n");
+        let (files, undecodable) = tracked_files(root);
+        assert_eq!(files, vec!["README.md".to_string()], "{files:?}");
+        assert_eq!(
+            undecodable,
+            vec!["caf\u{fffd}.md".to_string()],
+            "{undecodable:?}"
+        );
     }
 
     /// README's "no Node" negation is excepted, not flagged.
