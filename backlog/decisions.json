@@ -228,6 +228,10 @@
     {
       "date": "2026-09-11",
       "text": "Four batch-21 standing bullets applied: claims-match x2 (world-change re-derive; observed-vs-inferred), closure-claims (subject-derived patterns), doc-comments (behavior statements are claims). docs/design.md 5.58."
+    },
+    {
+      "date": "2026-09-11",
+      "text": "Fix both: HR-091/092 attributed to the batch-21 window with a disclosed side-PR note; HR-096 files the nine-marker restatement. docs/design.md 5.59."
     }
   ],
   "notes": []
