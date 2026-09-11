@@ -82,8 +82,10 @@
       "kind": "rule",
       "area": "global",
       "standing": true,
-      "summary": "Never add a co-author or session trailer line to any commit.",
-      "body": [],
+      "summary": "Never add a co-author, session, or tool-attribution line to any commit or pull request description.",
+      "body": [
+        "The repository is public. A generated-with line or a session link in a PR description is as public as a commit trailer and is removed on sight (owner ruling 2026-09-11)."
+      ],
       "tags": [
         "git"
       ],
