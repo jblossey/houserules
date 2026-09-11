@@ -254,7 +254,13 @@ const KIT_OWNED: &[&str] = &[
 ];
 
 /// Project-data files `init` seeds once and never touches again.
-/// `bin/houserules.mjs`'s own `SEED_ONCE`, ported verbatim.
+/// `bin/houserules.mjs`'s own `SEED_ONCE`, ported verbatim, plus
+/// `docs/README.md` (HR-087, fix round 1, important issue 3): without it
+/// a fresh `init`'s own `docs` area (`knowledge/areas.json`) declares
+/// `docs/**` over a directory the seed otherwise never creates, so
+/// `check-knowledge` -- the very next step `init` prints -- failed on
+/// every fresh install until this file gave that glob something real to
+/// match.
 const SEED_ONCE: &[&str] = &[
     "knowledge/schema.json",
     "knowledge/areas.json",
@@ -275,6 +281,7 @@ const SEED_ONCE: &[&str] = &[
     ".claude/evals/record.json",
     ".claude/evals/seeded-violations.json",
     ".github/workflows/knowledge.yml",
+    "docs/README.md",
     "CLAUDE.md",
 ];
 

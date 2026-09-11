@@ -25,6 +25,16 @@
         "$ref": "#/$defs/text"
       }
     },
+    "prose": {
+      "type": "string",
+      "minLength": 3
+    },
+    "proseList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/prose"
+      }
+    },
     "taskNumber": {
       "type": [
         "integer",
@@ -477,10 +487,10 @@
           "$ref": "#/$defs/selfAudit"
         },
         "self_review": {
-          "$ref": "#/$defs/textList"
+          "$ref": "#/$defs/proseList"
         },
         "concerns": {
-          "$ref": "#/$defs/textList"
+          "$ref": "#/$defs/proseList"
         },
         "knowledge_used": {
           "type": "array",
@@ -603,7 +613,7 @@
           }
         },
         "strengths": {
-          "$ref": "#/$defs/textList"
+          "$ref": "#/$defs/proseList"
         },
         "issues": {
           "type": "array",
@@ -705,7 +715,7 @@
           }
         },
         "out_of_scope": {
-          "$ref": "#/$defs/textList"
+          "$ref": "#/$defs/proseList"
         },
         "verdict": {
           "type": "object",
@@ -722,7 +732,7 @@
               ]
             },
             "open": {
-              "$ref": "#/$defs/textList"
+              "$ref": "#/$defs/proseList"
             },
             "text": {
               "$ref": "#/$defs/text"
@@ -758,7 +768,7 @@
           "$ref": "#/$defs/sha"
         },
         "strengths": {
-          "$ref": "#/$defs/textList"
+          "$ref": "#/$defs/proseList"
         },
         "issues": {
           "type": "array",
@@ -773,7 +783,7 @@
           }
         },
         "recommendations": {
-          "$ref": "#/$defs/textList"
+          "$ref": "#/$defs/proseList"
         },
         "retrospective": {
           "type": "object",

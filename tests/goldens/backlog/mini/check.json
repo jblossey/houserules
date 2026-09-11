@@ -1,0 +1,7 @@
+{
+  "command": "houserules check-backlog --dir tests/fixtures/mini",
+  "cwd": "tests/fixtures/mini",
+  "stdout": "backlog: ok\n",
+  "stderr": "",
+  "exit": 0
+}

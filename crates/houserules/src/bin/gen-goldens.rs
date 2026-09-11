@@ -687,7 +687,26 @@ fn main() {
                 &capture,
             ));
         }
+    }
 
+    // backlog/mini/check.json (fix round 1, important issue 5): the clean
+    // path check-backlog's own output needs a golden that can still be
+    // clean, now that the frozen-worktree slice above pins a failure --
+    // tests/fixtures/mini round-trips byte-for-byte (this task's own
+    // HR-076 fix), so it is the fixture that keeps `backlog: ok` pinned.
+    written.push(write_golden(
+        &goldens_dir,
+        "backlog/mini/check.json",
+        &dir_capture(
+            &bin,
+            &["check-backlog"],
+            &root.join("tests/fixtures/mini"),
+            "tests/fixtures/mini",
+        ),
+    ));
+
+    {
+        let worktree = Worktree::checkout(&root, frozen_sha);
         for (slice, args) in [
             ("topics", vec!["topics"]),
             ("index", vec!["index"]),

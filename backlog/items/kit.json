@@ -1464,6 +1464,55 @@
       ]
     },
     {
+      "id": "HR-087",
+      "type": "bug",
+      "title": "a fresh init's own docs area glob is dead until docs/ gets real content",
+      "body": [
+        "Found live-running HR-074 (batch 21 T1): template/knowledge/areas.json's docs area declares docs/** among its globs, and a brand-new `houserules init` never creates anything under docs/ -- CLAUDE.md, knowledge/**, backlog/**, and .claude/** all match immediately, but docs/** alone starts dead. check-knowledge --dir <freshly-init'd repo> fails on the very first run with `knowledge/areas.json.docs.paths: \"docs/**\" matches no tracked file`, contradicting the \"next: houserules check-knowledge && houserules check-backlog\" line init itself prints.",
+        "Reproduced live: git init a scratch dir, `houserules init --dir .`, `houserules check-knowledge --dir .` -- exit 1, the one line above, no docs/ content anywhere yet. tools/** does not share the defect (`.github/workflows/knowledge.yml` already matches .github/**, tools' other glob).",
+        "Out of scope for HR-074 itself: fixing this means editing template/knowledge/areas.json, a template file HR-074's own task brief named out of bounds (\"NO template/agent/eval file changes beyond the schema copy -- if a fix would touch one, FLAG\"). Candidate fixes for whoever picks this up: drop the bare docs/** glob (fold docs into the same treatment as tools, or into global/process's own empty-list precedent), or seed a placeholder file under docs/ alongside the other SEED_ONCE files.",
+        "Ruled in-branch by the task-1 review (fix round 1, important issue 3): a scope guard on the implementer is not a licence for the defect to ship, and the fix is small and bounded. Fixed: template/docs/README.md ships via SEED_ONCE (install.rs), giving the docs area's docs/** glob a real file every init writes; verified restoring knowledge: ok on a fresh init and keeping `houserules for docs/design.md` at [\"docs\", \"global\"]."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 21,
+      "see": [
+        "HR-074"
+      ]
+    },
+    {
+      "id": "HR-088",
+      "type": "feat",
+      "title": "check-backlog gains a --fix arm for a non-round-tripping backlog file",
+      "body": [
+        "Filed by the task-1 fix round 1 review (minor issue 8): check-backlog's round-trip finding (HR-076) names a concrete remedy per file class, but only backlog/items/*.json has a shipped command that can reach it (`houserules set`). The other five files (schema.json, amendments.json, batches.json, decisions.json, parked.json) have no writer at all, so an adopter who trips this on one of them is told to hand-reproduce serde_json's pretty-printer byte for byte.",
+        "Candidate: a `--fix` arm on check-backlog (or a small subcommand) that rewrites the named file through the same `crate::emit::emit` call the check already compares against, so the repair path and the check path stay the same function. Not built in the fix round that filed it: the message-only remedy was the scoped fix; a --fix arm is a larger surface (does it fix every diverging file in one run, or one named file? does it need a --dry-run?) that deserves its own task."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-076"
+      ]
+    },
+    {
+      "id": "HR-089",
+      "type": "bug",
+      "title": "houserules update never backfills docs/README.md on a pre-batch-21 install",
+      "body": [
+        "Filed by the task-1 fix round 2 review (task-1-review-r2.json, new_breakage 3). docs/README.md (HR-087) closes the fresh-init path but not the update path: SEED_ONCE seeds a file once and never touches it again (install.rs's own documented contract), so an install that predates this batch and has no docs/ content stays broken after update.",
+        "Reproduced by the reviewer at HEAD: take an install that predates this change with no docs/ content, run `houserules update --dir .` (which still prints the same `next: houserules check-knowledge && houserules check-backlog` line), and check-knowledge exits 1 with `knowledge/areas.json.docs.paths: \"docs/**\" matches no tracked file (git ls-files)`; no docs/README.md appears.",
+        "Same class as HR-087, reached by the other command: the kit's own seeded areas.json declares a glob its own seed leaves unmatched, for an adopter who did nothing wrong. Exposure today is nil (the kit is an unpublished 0.2.0-alpha, the tag-pilot adoption is parked at PP-1-02, and this repository has real docs/ content), and the failure is loud, named, and self-explanatory -- why this is filed rather than fixed in-branch, unlike HR-087.",
+        "Do not fix by making update backfill SEED_ONCE: that contradicts install.rs's own documented \"seeds once and never touches again\" contract and opens a design question this item does not settle -- backfill semantics generally, versus an adopter who deleted a seed file on purpose, versus a documented manual step printed by update itself. Pick one before implementing."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-087"
+      ]
+    },
+    {
       "id": "HR-091",
       "type": "chore",
       "title": "Harden the public repository: rulesets, Dependabot, CodeQL, SHA-pinned actions, cargo deny, attestations",
