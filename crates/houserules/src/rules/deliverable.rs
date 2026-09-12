@@ -59,6 +59,32 @@ pub(super) struct WorkspaceFiles {
     pub reviews: Vec<String>,
 }
 
+/// The task-id segment shared by every deliverable filename pattern below,
+/// declared once as `.claude/schemas/deliverables.json`'s `$defs.taskId`
+/// pattern (both copies) -- `task_id_shape_is_declared_identically_in_both_
+/// schema_copies` pins the two to this literal. Digits, with an optional
+/// trailing lowercase letter for a split task (`1`, `3a`).
+const TASK_ID_SHAPE: &str = r"\d+[a-z]?";
+
+/// The `task-<id>-audit*.json` filename pattern, with `<id>` built from
+/// `TASK_ID_SHAPE`.
+fn audit_pattern() -> String {
+    format!(r"^task-{TASK_ID_SHAPE}-audit.*\.json$")
+}
+
+/// The `task-<id>-report.json` filename pattern, with `<id>` built from
+/// `TASK_ID_SHAPE`. A report never carries a round suffix, unlike an audit
+/// or a review, so nothing follows the marker word.
+fn report_pattern() -> String {
+    format!(r"^task-{TASK_ID_SHAPE}-report\.json$")
+}
+
+/// The `task-<id>-review*.json` filename pattern, with `<id>` built from
+/// `TASK_ID_SHAPE`.
+fn review_pattern() -> String {
+    format!(r"^task-{TASK_ID_SHAPE}-review.*\.json$")
+}
+
 /// `true` when `name` matches `pattern` anywhere -- every pattern this
 /// module compiles is anchored (`^...$`), so this is a whole-string
 /// match. Uses `regress` (already this crate's ECMAScript-regex engine,
@@ -85,17 +111,17 @@ pub(super) fn workspace_files(dir: &Path) -> Result<WorkspaceFiles, String> {
     }
     let mut audits: Vec<String> = names
         .iter()
-        .filter(|name| matches(name, r"^task-.+-audit.*\.json$"))
+        .filter(|name| matches(name, &audit_pattern()))
         .cloned()
         .collect();
     let mut reports: Vec<String> = names
         .iter()
-        .filter(|name| matches(name, r"^task-.+-report\.json$"))
+        .filter(|name| matches(name, &report_pattern()))
         .cloned()
         .collect();
     let mut reviews: Vec<String> = names
         .iter()
-        .filter(|name| matches(name, r"^task-.+-review.*\.json$"))
+        .filter(|name| matches(name, &review_pattern()))
         .cloned()
         .collect();
     audits.sort();
@@ -110,7 +136,79 @@ pub(super) fn workspace_files(dir: &Path) -> Result<WorkspaceFiles, String> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    use serde_json::Value;
+
     use super::*;
+
+    /// The repo-root and template copies of the deliverables schema, each
+    /// paired with its repository-relative literal --
+    /// `houserules.template-is-the-source` keeps both in lockstep, and a
+    /// failure message names the file the way this repository names it,
+    /// not the `../..`-joined `PathBuf` a maintainer would have to read
+    /// backwards (`houserules.path-pins-mirror-the-code`).
+    fn schema_paths() -> [(&'static str, PathBuf); 2] {
+        let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        [
+            (
+                ".claude/schemas/deliverables.json",
+                crate_root.join("../../.claude/schemas/deliverables.json"),
+            ),
+            (
+                "template/.claude/schemas/deliverables.json",
+                crate_root.join("../../template/.claude/schemas/deliverables.json"),
+            ),
+        ]
+    }
+
+    /// Pins `TASK_ID_SHAPE` to `.claude/schemas/deliverables.json`'s
+    /// declared `$defs.taskId.pattern` in both copies: a schema edit that
+    /// drifts from the Rust constant fails here.
+    #[test]
+    fn task_id_shape_is_declared_identically_in_both_schema_copies() {
+        let expected = format!("^{TASK_ID_SHAPE}$");
+        for (label, path) in schema_paths() {
+            let text = fs::read_to_string(&path).unwrap_or_else(|error| panic!("{label}: {error}"));
+            let schema: Value =
+                serde_json::from_str(&text).unwrap_or_else(|error| panic!("{label}: {error}"));
+            let pattern = schema["$defs"]["taskId"]["pattern"]
+                .as_str()
+                .unwrap_or_else(|| panic!("{label}: $defs.taskId.pattern missing"));
+            assert_eq!(pattern, expected, "{label}");
+        }
+    }
+
+    /// Every one of the three filename patterns must accept a bare digit
+    /// and a digit+letter split id (`1`, `3a`) and reject a two-letter
+    /// id, a non-digit id, an embedded dash, and a bare word (`3ab`,
+    /// `abc`, `3-a`, `round2`). To reproduce a divergence, temporarily
+    /// hardcode a narrower id shape in one of `audit_pattern`/
+    /// `report_pattern`/`review_pattern`: exactly that pattern's rows
+    /// turn red, then revert it.
+    #[test]
+    fn filename_patterns_agree_on_the_declared_task_id_shape() {
+        let accepted_ids = ["1", "12", "3a", "10b"];
+        let rejected_ids = ["3ab", "abc", "3-a", "round2"];
+        let patterns = [
+            ("audit", audit_pattern()),
+            ("report", report_pattern()),
+            ("review", review_pattern()),
+        ];
+        for (marker, pattern) in patterns {
+            for id in accepted_ids {
+                let name = format!("task-{id}-{marker}.json");
+                assert!(matches(&name, &pattern), "{marker}: {name} should match");
+            }
+            for id in rejected_ids {
+                let name = format!("task-{id}-{marker}.json");
+                assert!(
+                    !matches(&name, &pattern),
+                    "{marker}: {name} should not match"
+                );
+            }
+        }
+    }
 
     #[test]
     fn read_deliverable_value_reports_invalid_json_naming_the_file() {
@@ -137,7 +235,12 @@ mod tests {
     /// deliverable `branch-fix-1-report.json` that must land in none of
     /// the three lists -- this pins `workspace_files`' own
     /// classification directly, at both the letter-accepting and the
-    /// branch-decoy-rejecting edges of its patterns.
+    /// branch-decoy-rejecting edges of its patterns. Three retained,
+    /// ad-hoc evidence names that predate and fall outside the declared
+    /// task-id shape (`task-1-final-full-task-audit.json`,
+    /// `task-3-live-audit-js.json`, `task-1-fixround1-fixdiff-audit.json`)
+    /// are asserted OUT of `audits`: they name real, retained evidence
+    /// files, deliberately excluded from the shape and never renamed.
     #[test]
     fn classifies_audits_reports_and_reviews_ignoring_unrelated_files() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -150,6 +253,9 @@ mod tests {
             "task-2-review.json",
             "unrelated.txt",
             "branch-fix-1-report.json",
+            "task-1-final-full-task-audit.json",
+            "task-3-live-audit-js.json",
+            "task-1-fixround1-fixdiff-audit.json",
         ] {
             fs::write(dir.path().join(name), "{}").expect("write fixture");
         }
@@ -178,5 +284,15 @@ mod tests {
                 .reviews
                 .contains(&"branch-fix-1-report.json".to_string())
         );
+        for name in [
+            "task-1-final-full-task-audit.json",
+            "task-3-live-audit-js.json",
+            "task-1-fixround1-fixdiff-audit.json",
+        ] {
+            assert!(
+                !files.audits.contains(&name.to_string()),
+                "{name} predates the declared task-id shape and must stay out of audits"
+            );
+        }
     }
 }

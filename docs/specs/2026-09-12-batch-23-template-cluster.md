@@ -82,6 +82,14 @@ the declared shape). TDD: the parity test RED against a
 deliberately diverged pattern (disclosed mutation), GREEN at
 HEAD. Both schema copies (root + template).
 
+Amendment (controller-ruled at T1 review, recorded for the batch
+report): the corpus measure excludes pre-batch-18 ad-hoc
+evidence names; the declared shape governs deliverables, and 11
+historical batch-17 root-level audit files are deliberately
+outside it — houserules stats on that workspace reads 14 audits
+at HEAD (was 25), the excluded files being evidence, not
+deliverables.
+
 ## 4. The two record riders (HR-095, HR-096)
 
 - HR-095: one sentence in `report_claims.rs`'s Limits section:

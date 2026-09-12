@@ -140,6 +140,13 @@
 //!   it believes itself outside any quote -- a false positive that a
 //!   walker kept deliberately below full shell grammar (see Further
 //!   constraints below) cannot rule out.
+//! - A narrative sentence that names an ephemeral path's CLASS (a scratch
+//!   file, a `/tmp` capture) without embedding the literal, and cites the
+//!   literal only inside a retained workspace capture, is not a checker
+//!   escape: the literal never reaches a scanned field, so
+//!   `check_ephemeral_paths` has nothing to flag there, and nothing needs
+//!   flagging -- the durable evidence lives in the retained capture, not
+//!   the narrative.
 //!
 //! Further constraints (this tool carries no frozen-corpus parity
 //! contract, unlike the flat command surface, so these are simply its own

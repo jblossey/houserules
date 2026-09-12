@@ -128,7 +128,7 @@
       "title": "Seeded knowledge.yml needs an install step before it can run",
       "body": [
         "Batch 18 T5 fix round 1 (task-5-review.json, findings \"seeded CI gate + hook\" and houserules.payload-runs-on-builtins): template/.github/workflows/knowledge.yml now runs houserules check-knowledge, houserules check-backlog, and houserules audit, but no step in that job puts the houserules binary on the runner -- an adopter's houserules init seeds a PR gate whose first real step fails. The dead actions/setup-node@v7 step is dropped in the same fix round; this item tracks the missing install step itself.",
-        "Batch 19 T2: the install step now exists. A pinned cargo-dist shell-installer step (`releases/download/v<version>/houserules-installer.sh`) runs before check-knowledge/check-backlog/audit, defended against jdx/mise-action (a new marketplace-action dependency plus an inline mise.toml an adopter repo does not otherwise carry) in commit 167772b and the task report's `implemented` field. No new dependency enters this repository's own manifests; dependency_vetting there is null.",
+        "Batch 19 T2: the install step now exists. A pinned cargo-dist shell-installer step (`releases/download/v<version>/houserules-installer.sh`) runs before check-knowledge/check-backlog/audit, defended against jdx/mise-action (a new marketplace-action dependency plus an inline mise.toml an adopter repo does not otherwise carry) at batch 19 T2's commit \"feat(template): install houserules before the seeded CI gate runs\" and that task's report `implemented` field. No new dependency enters this repository's own manifests; dependency_vetting there is null.",
         "STAYS OPEN: jblossey/houserules carries one release so far (houserules-v0.2.0-alpha, 2026-09-03), and it ships zero assets; the v0.2.0-alpha tag the install step's URL actually needs has no release of its own (the releases API confirms both facts, fix round 1 t2-evidence/releases-api-listing.json). Either way the pinned URL 404s. Fix round 1 also gave the step `shell: bash`, so that 404 aborts the step itself (GitHub's documented -o pipefail) instead of surfacing two steps later as a confusing 'houserules: command not found' -- but a real CI run of the seeded step still cannot succeed until HR-048's pipeline cuts a release with assets. Closes only then, once a live run of a freshly seeded repository's PR gate proves the install step end to end (docs/specs/2026-09-06-batch-19-phase4.md §7's step two) -- the wiring is done, the verification is not.",
         "houserules.payload-runs-on-builtins (the invariant that the SessionStart hook and the CI gates run where nothing is installed) is amended at T6 to the ruled binary+POSIX contract, and again at T2 to name this step; both amendments land against the fact each carried at the time, not silently past it.",
         "Source: batch 18 T5 fix round 1 review, filed by the implementer per process.no-tech-debt."
@@ -150,7 +150,7 @@
         "Batch 18 T6 fix round 1 (task-6-review.json, issue 2, knowledge-base.state-only-the-source): the README's runnable blocks called a bare `houserules` binary no install path supplied. The fix round's answer is a temporary \"Building the houserules binary\" section (`git clone` this repository, `cargo install --path crates/houserules --bin houserules`) placed before the first bare `houserules` call, explicitly marked pending HR-048.",
         "This item tracks retiring that section once HR-048 ships a real binary delivery channel: replace the build-from-source block with the shipped install form (the release-asset download, mise/ubi, or whichever channel HR-048 lands), and re-verify every runnable block top to bottom against it. Interlocked with HR-049 (the README's pinned install tag following each release) -- both touch the same blocks and should land together or in HR-049's wake, the same ordering HR-063 already notes for the seeded CI workflow's install step.",
         "Blocked on HR-048; cannot land before it.",
-        "Batch 19 T2 (17a243d) performed the retirement: the build-from-source section is gone and the install blocks ship the real channels with dated PENDING control runs proving each fails for the right reason today (no release with assets). STAYS OPEN until step two: docs/runbook.md step 6's README install-block re-walk at the first release with assets closes it.",
+        "Batch 19 T2's commit \"docs(readme): flip install and quick start to the real binary channels\" performed the retirement: the build-from-source section is gone and the install blocks ship the real channels with dated PENDING control runs proving each fails for the right reason today (no release with assets). STAYS OPEN until step two: docs/runbook.md step 6's README install-block re-walk at the first release with assets closes it.",
         "Source: batch 18 T6 fix round 1 review, issue 2 (2026-09-06)."
       ],
       "tags": [
@@ -495,6 +495,22 @@
         "HR-048",
         "HR-068",
         "HR-081"
+      ]
+    },
+    {
+      "id": "HR-109",
+      "type": "bug",
+      "title": "The schema engine silently ignores unsupported keywords - a gate that narrows itself",
+      "body": [
+        "Found at batch 23 T1 review round 2, proven empirically: rules/check.rs's validate handles only $ref, enum, type, pattern, minLength, maxLength, minimum, items, uniqueItems, required, properties, and additionalProperties; any other keyword (oneOf, anyOf, allOf, const, maximum, format) falls through every branch and the field goes UNCHECKED with no finding printed. A scratch schema whose taskNumber carried oneOf stopped raising the 'must be integer or string' error entirely.",
+        "This is the class quality.gates-derive-their-scope exists for: a validation gate that narrows itself in silence. It is also what made a review-suggested oneOf fix unimplementable at T1 (the two-descriptions fallback shipped instead).",
+        "Remedy, pick one at spec time: the engine reports an unsupported keyword as a named finding (the way an uncompilable pattern already is - houserules.crash-paths-are-named's shape), or it grows real combinator support. The named-finding route is the smaller, safer first step and unblocks combinators later."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-107"
       ]
     }
   ]

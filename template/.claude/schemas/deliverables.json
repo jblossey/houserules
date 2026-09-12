@@ -36,10 +36,16 @@
       }
     },
     "taskNumber": {
+      "description": "A task-report/task-review/re-review's own `task` field value: an integer or a free-form string naming the task to a human reader. Governs that field's value, not a deliverable filename -- see taskId for the filename's own, narrower shape.",
       "type": [
         "integer",
         "string"
       ]
+    },
+    "taskId": {
+      "description": "The task-id segment of a deliverable filename (task-<id>-report.json, task-<id>-audit*.json, task-<id>-review*.json): digits, with an optional trailing lowercase letter for a split task. This is the task-id shape the houserules binary's deliverable filename patterns use, distinct from taskNumber's free-form field value.",
+      "type": "string",
+      "pattern": "^\\d+[a-z]?$"
     },
     "commit": {
       "type": "object",

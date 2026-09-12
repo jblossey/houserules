@@ -2,8 +2,8 @@
 
 Date: 2026-09-01. Status: approved by the owner on 2026-09-01, as written (commitlint included).
 Driver: backlog batch 2 — HR-004 (owner ruling of 2026-09-01, `docs/design.md`
-§5.7), HR-001, HR-002. Branch `batch-2` from `e0410dc`; the ruling commit
-`3eef303` is its first commit.
+§5.7), HR-001, HR-002. Branch `batch-2` from `e0410dc`; the branch's first
+commit records the owner's ruling above (`docs/design.md` §5.7).
 Process: the first batch through the agent layer — implementer on sonnet, task
 review on opus, branch review on fable (`process.model-policy`), strictly
 sequential. Ruling of 2026-09-01: task 3 fix round 1 ran on an opus implementer

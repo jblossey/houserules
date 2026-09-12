@@ -378,7 +378,7 @@
       "type": "bug",
       "title": "The stamp read crashes on a non-object .houserules.json",
       "body": [
-        "install reads the marker with 'existsSync(markerPath) ? readJson(markerPath) : { idPrefix: prefix }' and then touches marker.idPrefix; a .houserules.json holding null (or a string, a number, a boolean, an array) passes readJson and crashes with a raw stack at bin/houserules.mjs:185. Verified live at batch 6 HEAD 8175928: first init exit 0, 'printf null > .houserules.json', second init exit 1 with the stack.",
+        "install reads the marker with 'existsSync(markerPath) ? readJson(markerPath) : { idPrefix: prefix }' and then touches marker.idPrefix; a .houserules.json holding null (or a string, a number, a boolean, an array) passes readJson and crashes with a raw stack at bin/houserules.mjs:185. Verified live at batch 6 task 3's HEAD commit ('fix(cli): reject a non-object settings.json as a usage error'): first init exit 0, 'printf null > .houserules.json', second init exit 1 with the stack.",
         "Fix as HR-020's sibling: reject a non-object marker with the one-line UsageError convention ('<path>: not a JSON object'), RED first; the existing HR-010 stamp tests stay green.",
         "Source: batch 6 task 3 review, minor 2 (2026-09-02)."
       ],
