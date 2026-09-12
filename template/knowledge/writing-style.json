@@ -39,7 +39,8 @@
         "History narration belongs in git, the specs, and the knowledge base, not in the code itself.",
         "A knowledge id naming a rule the code enforces is a current contract, not history; it may stay in a comment.",
         "Fixture data inside a test body (an id, a date, a path) is data, not narration; leave it as written.",
-        "A comment stating a constraint plus its history keeps the constraint only; drop the history."
+        "A comment stating a constraint plus its history keeps the constraint only; drop the history.",
+        "A history-sweep's verification derives its marker classes from the survey's own hit list and re-widens after every fix round; a zero from a pattern that never tested a spelling the sweep removed elsewhere is vacuous."
       ],
       "tags": [
         "comments"
@@ -61,7 +62,8 @@
         "Conventions: TSDoc in TypeScript, JSDoc in JavaScript, rustdoc in Rust, docstrings in Python — the language's standard form.",
         "Self-documenting code first: full words, verbs for functions, `is`/`has` for booleans, no abbreviation a newcomer must decode, one meaning per name. A comment that explains a name means the name is wrong.",
         "Comments inside a body still follow writing-style.code-comments: only for a constraint the code cannot show.",
-        "A doc comment stating a behavior ('returns tracked files', 'exits 0 on clean') is a claim under process.claims-match-artifacts - re-read it against the symbol at HEAD in the same pass that edits the symbol (batch 21 T1: a function documented as the tracked-file list walked the whole disk)."
+        "A doc comment stating a behavior ('returns tracked files', 'exits 0 on clean') is a claim under process.claims-match-artifacts - re-read it against the symbol at HEAD in the same pass that edits the symbol (batch 21 T1: a function documented as the tracked-file list walked the whole disk).",
+        "A rewrite re-resolves, in the same commit, every cross-reference to a section, file, or symbol it deletes or renames; the dangling-cross-reference class recurred in three of batch 22's five tasks."
       ],
       "tags": [
         "docs",

@@ -594,7 +594,9 @@
         "Close every report by running the report-claims checker (`houserules check-report-claims <REPORT_FILE>`) over the report file after the last edit, and paste its clean run as the final tests entry. The checker is a floor, not a substitute for the manual sweep: its Limits section (crates/houserules/src/report_claims.rs, reachable only where this kit's own source lives) names what only the sweep catches; an adopter repo carries no such source, so there a false positive is disclosed per report and reported upstream instead. It ships as a `houserules` subcommand (HR-066, batch 20 T2), so the closing act runs in every adopter repo, not only the one that built it. The checker gates gitignored workspace reports, never a tracked artifact a CI job could see, so it carries no CI job of its own -- the implementer template's closing-act mandate (HR-060) is the whole mechanism.",
         "A commit message body is a claim like a report sentence: recompute its counts from the artifact before committing; a wrong count found post-commit is recorded in the report for aggregation to carry, never amended and never left silent (batch 20 carried five such corrections; commit prose was the largest surviving drift surface once the checker gated reports).",
         "After any world-changing event - a fix round, an interruption, a rebase - re-derive every count and summary-scope field (implemented, self_review, doc comments citing measurements) from the tree at HEAD before re-submitting; a carried-forward sentence is a new claim, never trusted (batch 21: all four tasks failed this at least once; the interruption seam cost a full review round).",
-        "A claim about a failure names whether it was OBSERVED or INFERRED - a commit body keeps the same observed-vs-reconstructed split its report keeps (batch 21 branch-fix 2: the report drew the split correctly while a local-history commit body collapsed it into one 'panicked')."
+        "A claim about a failure names whether it was OBSERVED or INFERRED - a commit body keeps the same observed-vs-reconstructed split its report keeps (batch 21 branch-fix 2: the report drew the split correctly while a local-history commit body collapsed it into one 'panicked').",
+        "Five drift classes, each caught only by re-derivation across batch 22's five tasks: a rewritten command string that was never run as written; a count not re-measured after the change; a citation carrying a stream index where a file line belongs; a false universal ('every', 'all') no enumeration was run for; and a transcription of another agent's wording whose particulars were never checked against the tree.",
+        "Re-derive every sentence from the tree at the final HEAD immediately before the report ships; a sentence carried from a draft, a review, or a dispatch is re-derived before it lands."
       ],
       "tags": [
         "reports",
@@ -618,7 +620,8 @@
         "The enumeration lives at a path that outlives the session and reruns cleanly; its own summary line states the counts the claim cites, so a reader checks the artifact, not the prose.",
         "A migration or flip closure names its zero-hit sweep of the RETIRED form (the grep pattern and its variants), rerunnable at HEAD; the enumeration is of the old form's residue, not the new form's presence (ruled batch 19: presence enumerations confirm known work, only residue sweeps falsify closure — batch 18 T6 and batch 19 T2 both failed this way).",
         "The enumeration artifact is executable: a script whose own run prints the counts the claim cites, not a static dump or a hand-asserted mapping (batch 20: an asserted mapping hid a live coverage drop; grep dumps matched no command at HEAD until an executable sweep replaced them; a /tmp list failed durability until the comparison reran from git history).",
-        "The enumeration's pattern derives from the claim's SUBJECT, widened to every spelling the corpus itself uses - run a spelling-discovery probe first and retain it - never from one artifact's name (batch 21: a name-keyed sweep missed six subject-spelling lines; a /tmp-only regex missed six scratchpad citations; a hand-asserted home list omitted a live home)."
+        "The enumeration's pattern derives from the claim's SUBJECT, widened to every spelling the corpus itself uses - run a spelling-discovery probe first and retain it - never from one artifact's name (batch 21: a name-keyed sweep missed six subject-spelling lines; a /tmp-only regex missed six scratchpad citations; a hand-asserted home list omitted a live home).",
+        "The enumeration names its corpus AND its pattern classes, and the pattern set derives from the corpus's own spellings: run a spelling-discovery probe first and retain it beside the verification script. Batch 22 hit all three failure sub-shapes - a spelling the pattern never tested for, an assigned file absent from the file list, and a marker class the script's own header claimed but did not encode."
       ],
       "tags": [
         "reports",
@@ -713,6 +716,27 @@
         "date": "2026-09-08",
         "by": "review",
         "ref": "batch 20 branch review; task-3-review.json important finding 1; T3 report concerns[10]"
+      }
+    },
+    {
+      "id": "process.suggestions-are-unverified",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Another agent's suggested wording, pin, or count is a draft, not evidence: re-derive every number, quote, and reference from the tree before transcribing it.",
+      "body": [
+        "A reviewer's finding text and a controller's course correction are claims by their authors; the agent who lands them owns their truth at the landing revision.",
+        "Origin: batch 22 T3a round 3 - a review's suggested wording carried line pins wrong in the suggestion itself, and the fix transcribed them unchecked; the repair dropped pins for stable function names.",
+        "This is the transcriber's half of process.review-findings-are-claims-too, which binds only the finding's author."
+      ],
+      "tags": [
+        "reports",
+        "reviews"
+      ],
+      "source": {
+        "date": "2026-09-12",
+        "by": "user",
+        "ref": "batch 22 report, standing proposal 3"
       }
     }
   ]

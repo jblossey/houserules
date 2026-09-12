@@ -22,6 +22,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [process.review-findings-are-claims-too] A review finding stating a measurement, a reproduction, or a proposed fix's behavior is verified by running it before filing; restated claims are re-derived.
 - [process.rulings-to-file] Every ruling goes to its home file in the same turn — a deferral’s backlog item included. A ledger and the chat are not home files; neither survives compaction.
 - [process.sequential-agents] Run all agent work strictly sequentially. Never dispatch two implementers or two reviewers at the same time.
+- [process.suggestions-are-unverified] Another agent's suggested wording, pin, or count is a draft, not evidence: re-derive every number, quote, and reference from the tree before transcribing it.
 - [process.tdd] Test-driven development for every executable change: the failing test first, or a disclosed-mutation proof for already-correct behavior; verbatim RED and GREEN.
 - [quality.no-compat-softening] Never soften a design for backward compatibility. Make the correct change and migrate everything it breaks; the codebase is not built on compromises.
 - [quality.principles] YAGNI, KISS, DRY; prefer a well-maintained library to custom code; one responsibility per unit; tests assert behavior; a11y and i18n are part of done.
