@@ -749,3 +749,16 @@ Each item records the ruling with its date, or stays marked open.
     cluster (HR-078/080/090/094 + riders HR-095/096) stands as
     the recorded candidate for whenever work resumes. Source:
     owner, 2026-09-11, batch 21 acceptance.
+61. **Batch 22 selected and its spec approved — ruled
+    2026-09-11.** The pause lifts: batch 22 is the stewardship
+    trio HR-105/098/099 plus HR-089 as a rider ("New trio +
+    HR-089"); the template cluster moves to recorded candidate
+    for batch 23. The spec (docs/specs/2026-09-11-batch-22-
+    stewardship.md) is approved as drafted with three design
+    rulings folded in: the knowledge schema gains an optional
+    status field (active default | superseded | retired) as
+    the archive sweep's retirement signal; both in-code docs
+    standing rules revise to the drafted wordings (no history
+    narration in code); sha2 is adopted for the update
+    baselines with entry-level upsert for SEED_ONCE knowledge
+    topics. Source: owner, 2026-09-11, batch-22 shaping.

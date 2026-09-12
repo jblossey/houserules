@@ -236,6 +236,10 @@
     {
       "date": "2026-09-11",
       "text": "Batch 21 accepted as merged (main 19b75c4); pause ruled - no batch 22 selection; the template cluster stands as the recorded candidate. docs/design.md 5.60."
+    },
+    {
+      "date": "2026-09-11",
+      "text": "Batch 22 selected (HR-105/098/099 + HR-089) and its spec approved as drafted with three design rulings: knowledge status field, both in-code docs rule wordings, sha2 + entry-level upsert. docs/design.md 5.61."
     }
   ],
   "notes": []
