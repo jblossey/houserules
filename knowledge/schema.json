@@ -170,6 +170,13 @@
         "standing": {
           "type": "boolean"
         },
+        "status": {
+          "enum": [
+            "active",
+            "superseded",
+            "retired"
+          ]
+        },
         "summary": {
           "type": "string",
           "minLength": 1,

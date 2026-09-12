@@ -47,7 +47,13 @@
 //! implementer template's closing act runs in every adopter repo, not
 //! only this one (`report_claims.rs`'s own module doc has the full
 //! account, including the paste-run lint HR-071 adds in the same move).
+//! `archive` (`archive::cmd_archive`) moves retired backlog items, batch
+//! entries, and knowledge entries into their `archive/` mirrors;
+//! `archive.rs`'s own module doc has the full account, including the
+//! fallback lookups `get` (above) falls back to once an id it resolves
+//! moves out of the active set.
 
+mod archive;
 mod backlog;
 mod emit;
 mod get;
@@ -373,6 +379,14 @@ enum Command {
         #[arg(long)]
         dir: Option<PathBuf>,
     },
+    /// Moves done/dropped backlog items, done batch entries, and
+    /// superseded/retired knowledge entries into their `archive/` mirrors.
+    Archive {
+        /// Repository root to sweep; defaults to the enclosing git
+        /// repository's top level, resolved from the current directory.
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -451,5 +465,6 @@ fn main() -> ExitCode {
         Some(Command::CheckReportClaims { report_path, dir }) => {
             report_claims::cmd_check_report_claims(dir, report_path)
         }
+        Some(Command::Archive { dir }) => archive::cmd_archive(dir),
     }
 }

@@ -705,6 +705,58 @@ fn dead_glob_findings(
     findings
 }
 
+/// Validates every file directly under `knowledge/archive/` against the
+/// knowledge schema (`base.schema`, the same root every active topic file
+/// validates against) and collects every archived entry's id, so a `see`
+/// citation to one still resolves (`knowledge-base.ids-are-permanent`,
+/// below).
+///
+/// An absent `knowledge/archive/` directory is not itself a finding --
+/// most repositories have archived nothing yet. Any other reason the
+/// directory or one of its files cannot be read or parsed is a named
+/// error: corruption is loud (`crate::archive::list_archive_json_files`
+/// and `crate::archive::read_json_as`, this function's own two calls into
+/// the archive module, carry that policy). A finding names its file by
+/// the repository-relative path this function already computes, on every
+/// platform: `read_json_as` takes that name directly rather than
+/// deriving one from the path it reads.
+///
+/// This is a SCHEMA check plus id collection only: an archived entry's
+/// `verify` path or area-glob liveness is never judged here, only whether
+/// the file's shape still parses as a valid knowledge topic file.
+fn check_archive(base: &Base, errors: &mut Vec<String>) -> HashSet<String> {
+    let mut ids = HashSet::new();
+    let dir = base.root.join("knowledge/archive");
+    let names = match crate::archive::list_archive_json_files(&dir) {
+        Ok(Some(names)) => names,
+        Ok(None) => return ids,
+        Err(message) => {
+            errors.push(message);
+            return ids;
+        }
+    };
+    for name in names {
+        let relative = format!("knowledge/archive/{name}");
+        match crate::archive::read_json_as(&dir.join(&name), &relative) {
+            Ok(content) => {
+                validate(&content, &base.schema, &relative, errors, &base.schema);
+                for entry in content
+                    .get("entries")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                {
+                    if let Some(id) = entry.get("id").and_then(Value::as_str) {
+                        ids.insert(id.to_string());
+                    }
+                }
+            }
+            Err(message) => errors.push(message),
+        }
+    }
+    ids
+}
+
 /// Validates a loaded base against the schema and every cross-entry and
 /// generated-file invariant -- `tools/kb.mjs`'s `checkBase`, two stages in
 /// the same order: schema/id/area/standing/see/verify/check-shape errors
@@ -715,6 +767,9 @@ fn dead_glob_findings(
 /// generated files (and, for the dead-glob gate, a valid `areas` list) to
 /// exist meaningfully.
 pub(crate) fn check_base(base: &Base) -> Vec<String> {
+    let mut archive_errors = Vec::new();
+    let archived_ids = check_archive(base, &mut archive_errors);
+
     let mut errors = Vec::new();
     let areas_schema = base
         .schema
@@ -800,7 +855,9 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
                 .flatten()
             {
                 let see_id = to_js_string(see_id);
-                if !base.entries.contains_key(see_id.as_str()) {
+                if !base.entries.contains_key(see_id.as_str())
+                    && !archived_ids.contains(see_id.as_str())
+                {
                     errors.push(format!("{at}: see \"{see_id}\" does not exist"));
                 }
             }
@@ -832,6 +889,7 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
         }
     }
     if !errors.is_empty() {
+        errors.extend(archive_errors);
         return errors; // rendering needs a valid base
     }
 
@@ -903,6 +961,7 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
             check_budget(&base.root, path, BUDGETS.area_lines, None, &mut errors);
         }
     }
+    errors.extend(archive_errors);
     errors
 }
 

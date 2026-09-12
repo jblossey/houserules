@@ -30,7 +30,30 @@ and lint first.
    `backlog/batches.json` (a direct edit), and run `houserules check-backlog`.
    Commit this update.
 
-3. **Aggregate commits.** When interactive rebase is unavailable, use a
+3. **Sweep the archive.** Confirm every batch entry you are about to sweep
+   has its acceptance ruling homed (`backlog/decisions.json` or the
+   batch's own ledger) — `houserules archive` does not check this itself;
+   it trusts the operator to run the sweep only after rulings land, which
+   is why this step comes after step 2. Then, in order:
+   ```sh
+   houserules archive
+   houserules render
+   houserules check-knowledge
+   houserules check-backlog
+   ```
+   `archive` moves every item, batch, and knowledge entry the ruling above
+   just retired into `backlog/archive/`/`knowledge/archive/`; running it
+   is safe even when nothing qualifies yet. `render` regenerates
+   `.claude/rules/*.md` and the `project-knowledge` skill: a sweep that
+   moves a rendered (standing or area-file) knowledge entry leaves those
+   generated files stale, and `check-knowledge` fails on that drift if you
+   skip this step. If either check still fails after `render`, the finding
+   is real — fix it (or revert the sweep) before continuing; do not
+   proceed to step 4 with a red gate. Commit the sweep and the
+   regenerated files together, with the backlog update or in the branch
+   that closes next — never skip the sweep itself outright.
+
+4. **Aggregate commits.** When interactive rebase is unavailable, use a
    soft reset instead:
    ```sh
    git reset --soft $(git merge-base main HEAD)
@@ -39,19 +62,19 @@ and lint first.
    result (`git restore --staged .` and re-stage per logical group as
    needed). Never include a co-author line, in this or any commit.
 
-4. **Push and open a PR.**
+5. **Push and open a PR.**
    ```sh
    git push -f -u origin <branch>
    gh pr create --fill
    ```
 
-5. **Wait for CI.**
+6. **Wait for CI.**
    ```sh
    gh pr checks --watch
    ```
    All checks must pass before continuing.
 
-6. **Merge fast-forward from the CLI.** Never use the GitHub merge button.
+7. **Merge fast-forward from the CLI.** Never use the GitHub merge button.
    ```sh
    git switch main && git pull --ff-only
    git merge --ff-only <branch>
@@ -59,7 +82,7 @@ and lint first.
    ```
    GitHub marks the PR merged once the commits reach main.
 
-7. **After merging a release-please PR, or any merge that changes the
+8. **After merging a release-please PR, or any merge that changes the
    houserules version, restamp the kit version.** Skip this step for
    every other merge. `.houserules.json` records the houserules version
    this project runs. That stamp goes stale when the version changes: a
@@ -80,7 +103,7 @@ and lint first.
    git push
    ```
 
-8. **Delete the branch.**
+9. **Delete the branch.**
    ```sh
    git push origin --delete <branch>
    git branch -d <branch>
@@ -90,7 +113,7 @@ and lint first.
 
 - **Main moved since branching.** `git merge --ff-only` will fail. Rebase
   first (`git rebase main`), re-verify green, then aggregate commits as in
-  step 3.
+  step 4.
 - **Force-pushing main.** Force-push (`-f`) is only ever for feature
   branches. Never force-push main.
 - **Adding a co-author line.** This repository never uses co-author trailers,

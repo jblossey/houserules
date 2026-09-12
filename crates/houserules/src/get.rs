@@ -72,6 +72,21 @@ fn is_backlog_id(id: &str) -> bool {
     false
 }
 
+/// Marks a record resolved from `backlog/archive/` or `knowledge/archive/`
+/// (`crate::archive::find_archived_backlog_item`/
+/// `find_archived_knowledge_entry`) with `"archived": true` -- the designed
+/// token an archived id's `get` output carries (`quality.absence-is-
+/// designed`'s own principle, applied to a record's active/archived state
+/// rather than an absent field: a reader must see this at a glance, never
+/// infer it from the record's own `status` field, which a plain backlog
+/// item does not even carry).
+fn label_archived(mut record: Value) -> Value {
+    if let Value::Object(map) = &mut record {
+        map.insert("archived".to_string(), Value::Bool(true));
+    }
+    record
+}
+
 /// Runs `get`: resolves each of `ids` by shape (`is_backlog_id`), loading
 /// the backlog or the knowledge base at most once each, lazily, and prints
 /// the results as one JSON array in the order given -- `main`'s own "needs
@@ -105,7 +120,14 @@ pub(crate) fn cmd_get(dir: Option<PathBuf>, ids: Vec<String>) -> ExitCode {
                 }
             }
             let loaded = loaded_backlog.as_ref().expect("just loaded above");
-            backlog::get_items(loaded, one).map_err(|error| error.0)
+            match backlog::get_items(loaded, one) {
+                Ok(values) => Ok(values),
+                Err(error) => match crate::archive::find_archived_any(&root, id) {
+                    Ok(Some(record)) => Ok(vec![label_archived(record)]),
+                    Ok(None) => Err(error.0),
+                    Err(message) => Err(message),
+                },
+            }
         } else {
             if loaded_knowledge.is_none() {
                 match rules::load_base(&root) {
@@ -117,7 +139,14 @@ pub(crate) fn cmd_get(dir: Option<PathBuf>, ids: Vec<String>) -> ExitCode {
                 }
             }
             let base = loaded_knowledge.as_ref().expect("just loaded above");
-            rules::get_entries(base, one)
+            match rules::get_entries(base, one) {
+                Ok(values) => Ok(values),
+                Err(active_message) => match crate::archive::find_archived_any(&root, id) {
+                    Ok(Some(record)) => Ok(vec![label_archived(record)]),
+                    Ok(None) => Err(active_message),
+                    Err(message) => Err(message),
+                },
+            }
         };
         match result {
             Ok(mut resolved) => values.push(resolved.remove(0)),

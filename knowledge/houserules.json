@@ -86,6 +86,7 @@
       "id": "houserules.node-under-mise",
       "kind": "gotcha",
       "area": "global",
+      "status": "retired",
       "summary": "RETIRED at batch 20 T3 (HR-047): node and pnpm left mise.toml entirely once the JS toolchain retired; this PATH trap no longer applies to either tool.",
       "body": [
         "Historical account, kept per knowledge-base.ids-are-permanent. Through batch 20 T2, `node` and `pnpm` were on PATH only under `mise exec --`/`mise run` (`mise exec -- pnpm test`); a scratch-directory run needed `mise x node@24.18.1 pnpm@11.18.0 rust@1.98.1 -- <command>`, since mise strips an inactive tool's paths and a plain PATH export does not survive `mise x`.",
@@ -182,6 +183,7 @@
       "id": "houserules.vitest-restore-mocks-scope",
       "kind": "gotcha",
       "area": "tests",
+      "status": "retired",
       "summary": "RETIRED at batch 20 T3 (HR-047): vitest left the repository entirely, and with it every `vi.mock`/`vi.spyOn` call site this gotcha governed.",
       "body": [
         "Historical account, kept per knowledge-base.ids-are-permanent. `restoreMocks` restored `vi.spyOn` spies only; resetting a `vi.mock` factory's `vi.fn` needed an explicit `afterEach` with `mockReset()`. `mockReset()` on a mock made with `vi.fn(impl)` also restored `impl` and dropped queued `mockImplementationOnce` entries, so the wrapped real function came back (verified against the Vitest 4 docs in the batch 3 task 1 fix round).",
@@ -225,6 +227,7 @@
       "id": "houserules.glob-union-matcher",
       "kind": "gotcha",
       "area": "rust",
+      "status": "retired",
       "summary": "RETIRED at batch 20 T3: tools/kb.mjs's own globMatch union is gone; crates/houserules/src/rules/glob.rs's globset engine is the only matcher left.",
       "body": [
         "node:path matchesGlob excludes a path segment that starts with `.` under `**` (undocumented; verified live on Node 24.18.1). globToRegExp restores dot-segments but translates only `**` and `*`, escaping every other metacharacter as a literal.",
@@ -352,6 +355,7 @@
       "id": "houserules.vitest-coverage-floor-tracks-the-rust-port",
       "kind": "gotcha",
       "area": "tests",
+      "status": "retired",
       "summary": "RETIRED at batch 20 T3: the vitest ratchet ended with vitest itself; cargo's suites are the ongoing gate, with no coverage threshold of their own.",
       "body": [
         "HR-054 task 4 ported checkBase/checkShape/checkBudget to Rust; kb.mjs itself is unchanged, but its measured branch coverage fell from 99.36% to 67.08% (no vitest caller left for that code). The first fix round's answer -- one global branches drop, 99 to 80 -- was rejected in review: a single global number also weakens the gate over bin/houserules.mjs, backlog.mjs, json-store.mjs, and cli.mjs, none of which this task touched (task-4-review.json, fix round 1, finding 4).",
