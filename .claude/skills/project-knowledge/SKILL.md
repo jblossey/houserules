@@ -53,7 +53,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 houserules  23  Working in the houserules kit repository
 knowledge-base  5  Authoring knowledge entries
-process  31  How work runs: batches, dispatch, reviews, rulings
+process  32  How work runs: batches, dispatch, reviews, rulings
 quality  6  Quality principles
 security-hygiene  5  Dependency, commit, and test hygiene
 writing-style  4  Writing style for docs, comments, commits, reports

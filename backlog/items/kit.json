@@ -220,32 +220,6 @@
       ]
     },
     {
-      "id": "HR-078",
-      "type": "process",
-      "title": "implementer template: edit reports via temp file, validate, then move",
-      "body": [
-        "From the batch 20 branch review: a jq quoting slip in T4's fix round briefly overwrote the report with an empty file; recovery depended on an intact intermediate copy. The implementer template gains one sentence: edit a report by writing to a temp file, running houserules validate on it, then moving it over the original - never in-place through a pipeline whose failure truncates the target. Template edit: rides the next template-touching batch and pays the evals co-change there.",
-        "Source: batch 20 branch review, template_defects[1]."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 23
-    },
-    {
-      "id": "HR-080",
-      "type": "process",
-      "title": "Seeded escape hatch names its upstream destination",
-      "body": [
-        "RULED 2026-09-08 (design.md 5.51): the implementer template's closing-act false-positive branch gains the destination - report the vehicle upstream (an issue at github.com/jblossey/houserules). Template edit: rides the next template-touching batch alongside HR-078 and pays the evals co-change there."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 23,
-      "see": [
-        "HR-078"
-      ]
-    },
-    {
       "id": "HR-081",
       "type": "fix",
       "title": "release-please misses commits that change the embedded template/ payload but not crates/houserules/**",
@@ -294,84 +268,6 @@
       "batch": null,
       "see": [
         "HR-076"
-      ]
-    },
-    {
-      "id": "HR-090",
-      "type": "process",
-      "title": "teach --sanctioned in the three dispatch agent templates and the orchestrating skill",
-      "body": [
-        "Corrected at batch-21 T2 fix round 1 (review critical issue 2): round 0 asserted this item's own home list by hand rather than from a real enumeration, and the assertion was wrong twice over. The retained, rerunnable sweep (t2-evidence/sweep-audit-invocation-sentences.sh, a git ls-files walk grepping four audit-invocation forms; t2-evidence/sweep-audit-invocation-dispositions.md dispositions all 43 hits) found one home round 0 missed entirely: crates/houserules/src/rules/render.rs:47, the PROTOCOL constant that renders the audit invocation into .claude/skills/project-knowledge/SKILL.md and every adopter's generated skill. That file is tracked and NOT a template file, so it needed no deferral -- it was fixed in the same fix round (ruling R3): PROTOCOL[2] gained one clause teaching --sanctioned, and houserules render plus gen-goldens regenerated every downstream copy (root and mini SKILL.md, both render goldens).",
-        "Corrected again at fix round 2 (re-review critical issue 2): round 1 read the sweep's own silence on template/.claude/skills/orchestrating/SKILL.md as proof the file teaches no audit invocation. That is a claim about the sweep's four patterns, not about the file: `grep -n -i audit` on it returns 8 lines, and three of them teach the invocation's own flags (--ids, --workspace in place of --report) in prose forms none of the sweep's patterns match -- 'the audit command's `--ids <the Knowledge ids>`', 'its audit runs `--workspace <WORKSPACE>` in place of `--report`', and 'A branch review's audit runs `--workspace <WORKSPACE>`' (lines 39, 44, and 53 at this revision; batch 23 T2 shifts them to 41, 46, and 55, a line-pin drift that revision, not number, now names). The sweep script's own header and the dispositions file now name this pattern-recall gap.",
-        "What remains genuinely deferred, per the corrected sweep: three template files teaching a human or agent the audit invocation syntax to copy verbatim -- template/.claude/agents/implementer.md, template/.claude/agents/task-reviewer.md, and template/.claude/agents/branch-reviewer.md (their root .claude/agents/*.md mirrors are KIT_OWNED consequences of editing the template, not separate homes) -- plus template/.claude/skills/orchestrating/SKILL.md, teaching the invocation's flags without a form the sweep's patterns can see. Every existing sentence in all four stays correct as written -- --sanctioned is additive, so nothing is stale -- but each could additionally name --sanctioned as the mechanism for a spec-booked interim fail, replacing the hand-narration pattern that cost batch 20 fourteen audits and review rounds (HR-077's own incident). Every one of the four is a template file, off-limits under batch 21's task-2 brief (shared constraints: \"NO template/agent/eval edits\") regardless of any other trigger; editing implementer.md or task-reviewer.md specifically also co-changes process.evals-rerun's own check (its trigger names only those two plus .claude/evals/*.json, not branch-reviewer.md or the orchestrating skill), so either also owes the shared evals rerun.",
-        "Filed rather than edited in-branch, per that constraint. Fold into a future template-touching batch's plan (the same batch that lands HR-078/HR-080, per the batch-21 spec's own NOT-in-scope list) alongside its shared evals rerun; that plan should also widen the sweep's pattern set so a flag-only teaching form like the orchestrating skill's own is not invisible to it again.",
-        "Ruled out of scope at batch 23 T2 review (docs/specs/2026-09-12-batch-23-template-cluster.md §2 amendment): template/.claude/skills/orchestrating/SKILL.md contains no `houserules audit` invocation to copy verbatim, only flag prose -- teaching --sanctioned there has no invocation to attach it to. The three agent templates (implementer.md, task-reviewer.md, branch-reviewer.md) are the complete home set this item delivers; all three gained --sanctioned at batch 23 T2."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 23,
-      "see": [
-        "HR-077",
-        "HR-078",
-        "HR-080"
-      ]
-    },
-    {
-      "id": "HR-094",
-      "type": "process",
-      "title": "Template-batch trio: tree-binary rule, resume narrative rewrite, subject-derived sweeps",
-      "body": [
-        "From the batch 21 branch review's template_defects, all three homes are template files and ride the next template-touching batch (with HR-078, HR-080, HR-090; one shared evals rerun where triggered).",
-        "(1) Orchestrating skill / retrieval protocol: when the current branch changes generated output, run all gates through the tree binary (cargo run --release --bin houserules) and re-install after merge - the stale installed binary false-failed check-knowledge all batch and cost a standing ledger workaround.",
-        "(2) Implementer template, resume path: on resume after an interruption, and at the end of every fix round, rewrite implemented/self_review/concerns from the tree at HEAD; a carried sentence is unverified - batch 21 T2's resumed round carried five stale statements and cost a full review round.",
-        "(3) Task-reviewer template, closure-claim check: derive the enumeration's pattern from the claim's SUBJECT via a spelling-discovery probe over the corpus; reject a closure keyed to one artifact's name - three sweeps this batch were bounded narrower than their claims."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 23,
-      "see": [
-        "HR-078",
-        "HR-080",
-        "HR-090"
-      ]
-    },
-    {
-      "id": "HR-095",
-      "type": "chore",
-      "title": "Limits sentence: cite-into-artifact is the ephemeral-narrative pattern",
-      "body": [
-        "RULED 2026-09-11 (design.md 5.57): one sentence in report_claims.rs's HR-075 Limits section records the standing answer - a narrative names an ephemeral path's class and cites the literal in a retained workspace capture; no checker escape. Rides the next implementation branch."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 23
-    },
-    {
-      "id": "HR-096",
-      "type": "chore",
-      "title": "Restate the nine unreachable historical SHA markers to event locators",
-      "body": [
-        "RULED 2026-09-11 (batch 21 report, 'Fix both'): the nine pre-batch-21 'verified live at commit X' markers whose SHAs no clone can resolve restate to durable event locators per knowledge-base.cite-durable-refs. The enumeration is retained at the batch-21 workspace's branch-fix-evidence/sweep-unreachable-shas.sh (12 rows; the two in-scope fixed at batch 21; these nine are the remainder). Rides a future batch; each restatement preserves the historical claim and names the event instead of the dead SHA."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 23
-    },
-    {
-      "id": "HR-097",
-      "type": "chore",
-      "title": "Public-surface sweep: no private paths, emails, or attribution anywhere public",
-      "body": [
-        "Owner ruling 2026-09-11 after a sweep of every PR (all states), comment, review, issue, release, commit message on every remote branch, and tracked file on main. Cleaned the same day: session links and tool-attribution lines in the descriptions of PRs #3, #4, #5, #9, #12; a git+file URL under the maintainer's home directory in docs/plans/2026-09-01-batch-2.md; the batch-14 fixture reports and validate_stats_audit_parity.rs now carry a /home/maintainer/... prefix (houserules.corpus-batch14-fixtures-are-committed updated); the standing rule houserules.tag-pilot-is-read-only, one backlog body, two plan/spec documents, and the fixture review evidence name the tag-pilot checkout without a path.",
-        "Done 2026-09-11: the owner ran docs/history/2026-09-11-author-email-rewrite.sh (filter-branch over every ref, 292 commits, 0 left with the personal address, force-pushed under a temporarily disabled ruleset, the old-to-new map beside it). The same day FROZEN_SHA moved to that rewrite commit and gen-goldens regenerated the read-parity and render goldens, which had kept the old tag-pilot path from the earlier pin's tree. Every sha cited before this date resolves through the map.",
-        "Record of an id collision: this item was first filed as HR-093 on the hygiene branch while batch 21 filed its own HR-093 (diff-shape-gate retirement); the batch-21 close kept its item and dropped this one, and a later edit meant for this item landed in that HR-093's third paragraph until the token change restored it from the pre-edit tree. Re-filed here under a fresh id."
-      ],
-      "milestone": null,
-      "status": "done",
-      "batch": null,
-      "see": [
-        "HR-091",
-        "HR-092"
       ]
     },
     {
@@ -427,26 +323,6 @@
         "HR-106's keep/drop line (docs/specs/2026-09-11-batch-22-stewardship.md §3) drops batch/task/round references, commit SHAs, and CI run/job ids from comments, keeping only the current constraint. The repository root's own .gitattributes carries exactly that class of history narration in its four comment blocks, confirmed present at HEAD: PR #6 and CI run 34056471594 (the tests/goldens/** block), commit e36c4b2 (the tests/fixtures/** block, alongside batch 20 T3 and HR-084), commits 0bb27a0 and 2174a9f (the .claude/rules/**/.claude/skills/project-knowledge/** block, alongside batch 20 T6), and HR-054 (the tests/corpus/** block).",
         "Found during HR-106's own T3c comment sweep of crates/houserules/tests/**; .gitattributes is not a code file under any of spec §3's three file lists (crates/houserules/src/**, crates/houserules/tests/**, tools/*.sh, .githooks/*, and the template shell copies), so the sweep left it untouched, per scope.",
         "Prune each block to the current constraint it states (which paths get -text, and why -text specifically, not the discovery history), the same rewrite HR-106's own sweeps already applied across crates/houserules/src/** and crates/houserules/tests/**."
-      ]
-    },
-    {
-      "id": "HR-103",
-      "type": "chore",
-      "title": "Template-cluster riders from the batch-22 branch review",
-      "body": [
-        "Filed at batch-22 close from the branch review's retrospective (branch-review.json, template_defects) and the branch-fix-1 review. Rides the template cluster (HR-078/080/090/094/095/096) for its shared evals rerun; the agent-template edits below trigger process.evals-rerun.",
-        "1. Declare the deliverable task-id shape once and derive all three filename patterns from it, with a parity test. Today the schema accepts lettered ids, audit/review discovery matches task-.+, and reports matched task-\\\\d+ until the batch-22 branch fix widened it; three answers to one question.",
-        "2. branch-reviewer template, audit step: after the workspace audit, compare the report count the audit's evidence names against the workspace's task-*-report.json listing; a mismatch invalidates every report-field row.",
-        "3. implementer template, report step: write implemented/self_review sentences from the tree at the final HEAD, re-running each measurement; a sentence carried from a draft, a review, or a dispatch is re-derived before it ships. This instruction closed batch 22's five-task report-drift arc as dispatch prose and belongs in the template.",
-        "4. implementer template, knowledge_used: the rules a task exists to enforce count as relied-on; list them. All three batch-22 sweep reports omitted writing-style.code-comments/doc-comments and degraded the stats signal.",
-        "5. orchestrating skill, batch close checklist: every task-*-report.json in the workspace has a ledger row stating its close commit and round count before the branch review dispatches."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 23,
-      "see": [
-        "HR-094",
-        "HR-090"
       ]
     },
     {
@@ -512,6 +388,49 @@
       "batch": null,
       "see": [
         "HR-107"
+      ]
+    },
+    {
+      "id": "HR-110",
+      "type": "feat",
+      "title": "Cross-check numeric and locative claims against their cited captures",
+      "body": [
+        "From the batch-23 branch review retrospective: a sentence in a commit body, report narrative, or plan stating 'N passed', 'N files', or 'the X live in Y' while citing a retained capture should fail a deterministic check when the number or location is absent from that capture. All three batch-23 state-only-the-source instances (523-vs-528, a sweep example failing its own pattern, a plan's marker-location sentence) were one such cross-check away."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-107"
+      ]
+    },
+    {
+      "id": "HR-111",
+      "type": "feat",
+      "title": "Vacuous-zero check: a cited sweep must cover the file it certifies",
+      "body": [
+        "From the batch-23 branch review retrospective: when a report cites a sweep or enumeration as proof over a file, the audit's report check should verify the sweep's retained file list contains that file and flag the citation otherwise. Batch 23 T1 round 0 cited a sweep whose list omitted deliverable.rs - the file the task changed most - so its zero was vacuous."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-107",
+        "HR-110"
+      ]
+    },
+    {
+      "id": "HR-112",
+      "type": "feat",
+      "title": "Promote the no-provenance comment sweep into a deterministic gate",
+      "body": [
+        "From the batch-23 branch review retrospective: promote the retained no-provenance sweeps (batch-22 t3a set plus batch-23's per-file variant) into a residue-gate-style deterministic check over crates/**, so provenance narration in comments fails a gate instead of costing an opus review round. The marker classes derive from the retained probes; writing-style.code-comments' history clause is the governing rule."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-102"
       ]
     }
   ]

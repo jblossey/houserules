@@ -33,6 +33,7 @@ In a repository that builds `houserules` from source (the houserules kit reposit
 
 - Templates: `implementer` (sonnet), `task-reviewer` (opus), `branch-reviewer` (fable). Name the model on every dispatch; the template value is the default, not a substitute for naming it. Reviews always run on a mightier model than the implementer they review (`process.model-policy`).
 - Never dispatch two subagents at once.
+- Derive a dispatch's commit span with `git rev-list --count BASE..HEAD`; never hand-type a count into a dispatch or its ledger row.
 - An implementer dispatch is the task brief plus these lines:
   - `BASE: <sha>` — the commit before the task.
   - `Backlog: <ids the task delivers>`
@@ -56,6 +57,8 @@ In a repository that builds `houserules` from source (the houserules kit reposit
 - Severity of an adherence failure: standing rule is Critical; area rule is Important; `warn` is Minor.
 - Every finding is fixed (`process.no-tech-debt`). A deferral is a backlog item with a reason, named in the finding.
 - Ledger line per task: `Adherence: <pass>/<fail>/<warn>; judged fails: <ids or none>`.
+- A fix round closes in one of two recorded forms: a re-review deliverable in the workspace (the default for executable changes or any critical finding), or a controller verification note in the ledger naming each finding and the artifact proving its fix (sufficient for report-only or prose rounds) — `process.fix-round-verification-record`.
+- A plan's factual claims about where things live cite the enumeration that found them; the branch review re-derives them like report claims.
 - Batch close: before the branch review dispatches, confirm every `task-*-report.json` in the workspace has a ledger row stating its close commit and round count.
 - Log every controller slip that forces a re-run, an amend, or a correction — gate-caught or not — to the batch workspace ledger when it happens (`process.gate-shell-chains`).
 - On a mid-batch branch rebuild, write the old-to-new sha map to its own workspace file, cite it in the batch report, and never edit closed-task deliverables (`process.main-wins-backlog-collisions`).

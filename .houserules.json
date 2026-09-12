@@ -12,7 +12,7 @@
     ".claude/agents/implementer.md": "a14228f511bf96e0732a23d7316a1236808acfc3f75cec17821abf6564346a27",
     ".claude/agents/task-reviewer.md": "d7b5119dd88912f68ab925ea5e3eb130aafaa64eb6fb4f864dce5ee514ceb010",
     ".claude/agents/branch-reviewer.md": "77d54222433c4e005f940677e722c5ea33dcfa9980730edcfb93295aa4f7e390",
-    ".claude/skills/orchestrating/SKILL.md": "99ad54c158ccd9cf7dca20d5e4833098add0817dd5af99c3450fe8f0d6d51c49",
+    ".claude/skills/orchestrating/SKILL.md": "74a83f973ddeb56584bdd44f312565c375543244b10646ba8286206f246db71a",
     ".claude/skills/finishing-a-feature/SKILL.md": "12b104952321f5d0e2535691232f4f602c6c6b72c1e4d742b60e5346bcc3206e",
     ".claude/skills/migrating-knowledge/SKILL.md": "25f13d5d85b5441e7fc558b2d8d76d8577aacbf92dc29ede55a0f8f61eb3a2ab",
     "process.ask-when-missing": "ca5c0a30651528fc221883e97daad6da8c1fe0b76558f161a6a2796083e429d9",
@@ -52,6 +52,7 @@
     "writing-style.doc-comments": "76e2ebc0f213b083726e6833cff9628dd298c8694e0ea53f4f694f78efb0455e",
     "knowledge-base.summary-is-the-rule": "65f43f4d321c58e33c68f15389268cc6e98aeddaff20630e23ffb4b2246bee83",
     "knowledge-base.ids-are-permanent": "8697761b5e84fe03d5c54f6ccb5d009d152f3bab9d56319e551801b42b48e8e9",
-    "process.suggestions-are-unverified": "d170fc5f35f2e193c871640b8a905ad9b8b7ed335e56e6e22eac8e1aef9da6e1"
+    "process.suggestions-are-unverified": "d170fc5f35f2e193c871640b8a905ad9b8b7ed335e56e6e22eac8e1aef9da6e1",
+    "process.fix-round-verification-record": "8549dfa36ad070316690e9ad4dd84affd81ca03d36cb4c39392ab5501e8707ed"
   }
 }

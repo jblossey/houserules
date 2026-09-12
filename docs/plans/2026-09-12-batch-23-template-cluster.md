@@ -22,9 +22,11 @@ reviews on opus, strictly sequential.
   is a maintained enumeration (15 bullets, counted at the
   batch-22 sweep); HR-095 appends one bullet — keep the bullet
   form, no prose paragraph.
-- The nine HR-096 markers live in knowledge entry bodies (the
-  batch-21 sweep's rows); each restatement edits body text only
-  — entry ids, summaries, and areas untouched
+- The nine HR-096 markers live in backlog item and archive bodies
+  (four) and in old plan and spec header prose (five, the
+  batch-6/7/8/9 plans and the batch-2 spec); each restatement
+  edits body or header text only — where entries are involved,
+  ids, summaries, and areas stay untouched
   (knowledge-base.ids-are-permanent).
 - The three agent templates and the orchestrating skill are
   long instruction files; edits are surgical insertions at the

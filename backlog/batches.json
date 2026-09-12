@@ -27,21 +27,6 @@
       }
     },
     {
-      "number": 22,
-      "items": [
-        "HR-105",
-        "HR-106",
-        "HR-099",
-        "HR-089"
-      ],
-      "summary": "Kit stewardship, ruled by the owner 2026-09-11: the post-batch archive sweep that keeps the active backlog and knowledge free of retired data (HR-105), the repository-wide code-comment prune with a raised in-code documentation standing rule (HR-106), and the downstream update model - the kit updates template content for adopters while adopter-modified items stay untouched (HR-099), whose design settles HR-089's update backfill question.",
-      "kickoff": "docs/specs/2026-09-11-batch-22-stewardship.md",
-      "status": {
-        "state": "done",
-        "text": "Done 2026-09-12: all four items delivered - houserules archive with the reader split and the schema status field (HR-105, first real sweep run at this close: 101 records); the baselines-plus-overrides downstream update model with sha2, entry-level upsert, migration, and this repository's own marker migrated (HR-099, settling HR-089's backfill); the three-part comment sweep under the two revised in-code docs standing rules, ~60% of comment lines de-narrated with zero code change (HR-106). Five tasks, twelve review rounds plus a branch review and one branch fix (the audit --workspace lettered-id widen); HR-100/101/102/103/104 filed; rulings 5.61/5.62 homed in-branch. Acceptance pending. ACCEPTED by the owner 2026-09-12 (design.md 5.64)."
-      }
-    },
-    {
       "number": 23,
       "items": [
         "HR-078",
@@ -55,8 +40,8 @@
       "summary": "The template cluster: the accumulated template and process lessons from batches 20-22 land in the shipped agent templates, skills, and teaching docs under one shared evals rerun - report-editing temp-file guidance (HR-078), the upstream escape-hatch destination (HR-080), --sanctioned taught in templates with widened sweep patterns (HR-090), the orchestrating/implementer/reviewer template lessons (HR-094), the cite-into-artifact Limits sentence (HR-095), the nine-marker restatement (HR-096), and the batch-22 branch review's five template defects (HR-103).",
       "kickoff": "docs/specs/2026-09-12-batch-23-template-cluster.md",
       "status": {
-        "state": "in-progress",
-        "text": "Spec approved as drafted 2026-09-12 (design.md 5.65); plan in draft."
+        "state": "done",
+        "text": "Done 2026-09-12: all seven items delivered - the task-id shape declared once and parity-pinned with the batch-17 exclusion ruled (HR-103(1)); the HR-095 Limits bullet; the nine HR-096 restatements closing to zero on the retained enumeration; every owner-ruled template sentence verbatim in the three agent templates and the orchestrating skill with the HR-090 sweep widened to 45/45 (HR-078/080/090/094, HR-103's template bullets); the evals rerun 14/14 clearing the sanctioned fail. Two tasks, three fix rounds, a fable branch review (ready with-fixes, both landed). HR-108/109/110/111/112 filed; rulings 5.65 + two controller amendments homed in-branch. Acceptance pending."
       }
     }
   ]

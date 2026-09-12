@@ -674,6 +674,27 @@
         "by": "user",
         "ref": "batch 22 report, standing proposal 3"
       }
+    },
+    {
+      "id": "process.fix-round-verification-record",
+      "kind": "rule",
+      "area": "process",
+      "standing": false,
+      "summary": "A fix round closes only with a written verification record: a re-review deliverable, or a controller note naming each finding and the artifact proving its fix.",
+      "body": [
+        "A re-review deliverable in the workspace is the default for rounds with executable changes or any critical finding. A controller verification note suffices for report-only or prose rounds when it names finding-by-finding evidence.",
+        "Origin: batch 23 T2's fix round closed on a ledger note alone; the verifications were real and reproducible, but nothing pinned where such a record must live or what it must name."
+      ],
+      "tags": [
+        "review",
+        "fix-round",
+        "verification"
+      ],
+      "source": {
+        "date": "2026-09-12",
+        "by": "review",
+        "ref": "batch 23 branch review, retrospective"
+      }
     }
   ]
 }
