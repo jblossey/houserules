@@ -72,7 +72,7 @@ toolchain, no Node. Install it through any of these channels, then run
 
 <!-- x-release-please-start-version -->
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jblossey/houserules/releases/download/v1.0.0-alpha/houserules-installer.sh | sh
 ```
 <!-- x-release-please-end -->
 
@@ -118,11 +118,11 @@ date filter`, not an absent release. Verified live 2026-09-07,
 <!-- x-release-please-start-version -->
 | Target | Archive |
 |---|---|
-| Apple Silicon macOS | [houserules-aarch64-apple-darwin.tar.xz](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-aarch64-apple-darwin.tar.xz) |
-| Intel macOS | [houserules-x86_64-apple-darwin.tar.xz](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-x86_64-apple-darwin.tar.xz) |
-| x64 Windows | [houserules-x86_64-pc-windows-msvc.zip](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-x86_64-pc-windows-msvc.zip) |
-| ARM64 Linux (musl) | [houserules-aarch64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-aarch64-unknown-linux-musl.tar.xz) |
-| x64 Linux (musl) | [houserules-x86_64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-x86_64-unknown-linux-musl.tar.xz) |
+| Apple Silicon macOS | [houserules-aarch64-apple-darwin.tar.xz](https://github.com/jblossey/houserules/releases/download/v1.0.0-alpha/houserules-aarch64-apple-darwin.tar.xz) |
+| Intel macOS | [houserules-x86_64-apple-darwin.tar.xz](https://github.com/jblossey/houserules/releases/download/v1.0.0-alpha/houserules-x86_64-apple-darwin.tar.xz) |
+| x64 Windows | [houserules-x86_64-pc-windows-msvc.zip](https://github.com/jblossey/houserules/releases/download/v1.0.0-alpha/houserules-x86_64-pc-windows-msvc.zip) |
+| ARM64 Linux (musl) | [houserules-aarch64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/download/v1.0.0-alpha/houserules-aarch64-unknown-linux-musl.tar.xz) |
+| x64 Linux (musl) | [houserules-x86_64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/download/v1.0.0-alpha/houserules-x86_64-unknown-linux-musl.tar.xz) |
 <!-- x-release-please-end -->
 
 Each archive carries a `.sha256` checksum beside it (append `.sha256` to
