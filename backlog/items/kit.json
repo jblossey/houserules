@@ -478,6 +478,24 @@
       "see": [
         "HR-075"
       ]
+    },
+    {
+      "id": "HR-108",
+      "type": "bug",
+      "title": "The GitHub releases page ships no source zip, no binaries; the installation methods do not work",
+      "body": [
+        "Owner observation (2026-09-12, batch-23 spec gate): the releases page currently shows neither the codebase zip it should carry nor the per-platform binaries, and the documented installation methods do not work.",
+        "RULED in the same breath: the batch AFTER batch 23 (batch 24) makes the whole repository and the setup around it right - the releases page, the binaries and their delivery channels, and every documented installation path, end to end.",
+        "Absorbs or coordinates with the release-adjacent items when batch 24 is shaped: HR-048 (binary delivery channels), HR-068 (release token decision, owner-attended), HR-081 (release-please attributes only crates/** commits while template/ ships in the binary), HR-082 (Cargo.lock residue), and the runbook's step-two set (HR-063/064/049/069/070)."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-048",
+        "HR-068",
+        "HR-081"
+      ]
     }
   ]
 }

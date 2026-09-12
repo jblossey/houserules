@@ -252,6 +252,10 @@
     {
       "date": "2026-09-12",
       "text": "Batch 22 accepted as merged (main 885d5a3). Batch 23 selected: the template cluster HR-078/080/090/094 + HR-095/096 + HR-103, one shared evals rerun. docs/design.md 5.64."
+    },
+    {
+      "date": "2026-09-12",
+      "text": "Batch-23 spec approved as drafted. Owner records: the releases page ships no source zip and no binaries, and the installation methods do not work (HR-108); batch 24 makes the whole repository and setup right. docs/design.md 5.65."
     }
   ],
   "notes": []

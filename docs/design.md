@@ -794,3 +794,13 @@ Each item records the ruling with its date, or stays marked open.
     evals rerun. The owner-attended release set (HR-068 first)
     stays parked for the owner. Source: owner, 2026-09-12,
     batch 22 acceptance.
+65. **Batch-23 spec approved; the release surface is broken;
+    batch 24 is the repo-and-setup batch — ruled 2026-09-12.**
+    The template-cluster spec is approved as drafted (every
+    template sentence verbatim). In the same ruling the owner
+    records that the GitHub releases page shows neither the
+    source zip nor the per-platform binaries and that the
+    documented installation methods do not work (HR-108), and
+    directs that the batch after batch 23 makes the whole
+    repository and the setup around it right. Source: owner,
+    2026-09-12, batch-23 spec gate.

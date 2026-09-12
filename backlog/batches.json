@@ -55,8 +55,8 @@
       "summary": "The template cluster: the accumulated template and process lessons from batches 20-22 land in the shipped agent templates, skills, and teaching docs under one shared evals rerun - report-editing temp-file guidance (HR-078), the upstream escape-hatch destination (HR-080), --sanctioned taught in templates with widened sweep patterns (HR-090), the orchestrating/implementer/reviewer template lessons (HR-094), the cite-into-artifact Limits sentence (HR-095), the nine-marker restatement (HR-096), and the batch-22 branch review's five template defects (HR-103).",
       "kickoff": "docs/specs/2026-09-12-batch-23-template-cluster.md",
       "status": {
-        "state": "planned",
-        "text": "Selected 2026-09-12 at the batch-22 acceptance (design.md 5.64); spec not yet drafted."
+        "state": "in-progress",
+        "text": "Spec approved as drafted 2026-09-12 (design.md 5.65); plan in draft."
       }
     }
   ]
