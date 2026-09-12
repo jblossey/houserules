@@ -34,7 +34,10 @@ entry, and each governs its own case:
 - A **knowledge-entry id** governs one entry inside a knowledge-topic
   file that is otherwise still reconciled normally: listing one
   silences that entry's own modified or deleted report, without
-  touching any other entry in the same file.
+  touching any other entry in the same file. An entry `houserules
+  archive` moves out of the active set looks deleted to `update`:
+  list its id here after the sweep, or every later `update` reports
+  it once per run.
 
 Delete a path or id from `overrides` to hand ownership back to the
 kit; the next `update` treats it as a plain, unowned divergence again.

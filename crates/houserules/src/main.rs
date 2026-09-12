@@ -184,7 +184,7 @@ enum Command {
         /// A single JSON deliverable a `report-field` check reads directly.
         #[arg(long)]
         report: Option<PathBuf>,
-        /// A directory of `task-<n>-report.json` files a `report-field`
+        /// A directory of `task-*-report.json` files a `report-field`
         /// check judges by each report's `files_changed`.
         #[arg(long)]
         workspace: Option<PathBuf>,

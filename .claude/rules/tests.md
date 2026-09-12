@@ -15,7 +15,5 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 - [houserules.corpus-batch14-fixtures-are-committed] tests/fixtures/batch14-workspace/ commits gitignored .superpowers/ batch-14 deliverables verbatim, host paths neutralized.
 - [houserules.pinned-shas-live-on-mains-ancestry] A committed test or fixture that pins a git sha must pin one on main's ancestry, proven reachable in a fresh clone.
-- [houserules.vitest-coverage-floor-tracks-the-rust-port] RETIRED at batch 20 T3: the vitest ratchet ended with vitest itself; cargo's suites are the ongoing gate, with no coverage threshold of their own.
-- [houserules.vitest-restore-mocks-scope] RETIRED at batch 20 T3 (HR-047): vitest left the repository entirely, and with it every `vi.mock`/`vi.spyOn` call site this gotcha governed.
 
 Detail: houserules get <id>

@@ -38,7 +38,8 @@
         "The walk includes a control: when a line looks optional, re-run the block without it and confirm the block then fails — that proves the line load-bearing instead of decorative (batch 18 T6 r2: the quick start's `houserules update --dir .` line was proven load-bearing by exactly this control). Sweeps keyed on deleted-tool names miss claims keyed on surviving names (batch 18 branch review: a design-doc aside naming `bin/houserules.mjs` escaped a sweep that grepped for the deleted wrappers); sweep for the claim's subject too.",
         "A corrected measurement sweeps its dependents: when a sentence is corrected, re-open every sentence that cites, paraphrases, or leans on it — not only the lines the round edited; antecedents drift when their referent is repaired (batch 19 T2 r2, README:110).",
         "An amendment re-derives the entry's summary from the amended body before filing - the summary is the half that renders into the loaded rules files, so a stale summary ships wider than the body it contradicts (batch 20 T3: two amended entries kept summaries their own new bodies had overturned; batch 20 T4: two shipped doc comments stated non-facts their own commits made false).",
-        "Before shipping a uniqueness or attribution sentence ('the only', 'caused by'), run the enumeration that would falsify it against the tree at HEAD - batch 21's two instances (a misattributed gate failure; a false only-bin-that-walks claim) were each falsifiable by one grep the writer did not run."
+        "Before shipping a uniqueness or attribution sentence ('the only', 'caused by'), run the enumeration that would falsify it against the tree at HEAD - batch 21's two instances (a misattributed gate failure; a false only-bin-that-walks claim) were each falsifiable by one grep the writer did not run.",
+        "A rewritten doc comment is teaching prose under this rule: re-derive caller counts, uniqueness claims, and cross-references from the tree at the revision under edit, never from the pre-rewrite text or another agent's summary (batch 22 T3a/T3c)."
       ],
       "tags": [
         "knowledge",
@@ -57,7 +58,8 @@
       "area": "docs",
       "summary": "Never rename a merged entry id. Add a new entry and link the old one with `see`.",
       "body": [
-        "Dispatches, reports, audits, and `see` lists cite ids; a rename breaks every one of them silently."
+        "Dispatches, reports, audits, and `see` lists cite ids; a rename breaks every one of them silently.",
+        "Permanence includes reachability through every reader - get, see-citations, batch membership - across an archive sweep; a mover that strands any one reader breaks the rule even though the id still exists on disk (batch 22 T1: three reader paths closed one by one)."
       ],
       "tags": [
         "knowledge",

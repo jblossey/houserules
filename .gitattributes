@@ -1,3 +1,10 @@
+# This repository compares exact bytes everywhere: the emitter round-trip
+# gate on backlog/knowledge JSON, the golden suites, and the root-vs-template
+# parity tests, on every OS. No checkout may convert line endings anywhere,
+# so every path is `-text`; the more specific lines below stay as emphasis
+# for the especially-critical trees.
+* -text
+
 # The frozen fixture corpus (tests/corpus/) is byte-compared verbatim by
 # the Rust parity gate (HR-054). `-text` disables Git's line-ending
 # conversion on checkin and checkout for these paths regardless of
@@ -53,3 +60,10 @@ tests/fixtures/** -text
 # ships and reads dogfooded, not a test fixture.
 .claude/rules/** -text
 .claude/skills/project-knowledge/** -text
+
+# The embedded install payload (crates/houserules/src/install.rs) walks
+# template/ at compile time and bakes its exact checkout bytes into the
+# binary. `-text` keeps every checkout of template/ LF regardless of the
+# build host's core.autocrlf, so every build embeds the same bytes and a
+# seeded install passes the emitter round-trip gate on every OS.
+template/** -text

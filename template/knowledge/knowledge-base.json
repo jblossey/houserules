@@ -36,7 +36,8 @@
         "A shipped template or seed names no root-only id, path, or command; verify every reference resolves in a fresh install before syncing the root copy (batch 7 task 3).",
         "Run every command block you ship exactly as printed, top to bottom, in the environment the reader will have (a fresh directory for a quick start). A block that needs unstated context, or that resolves differently than printed (an unpinned git spec), fails this rule (batch 13: a quick start that exited 1 as printed, an install form floating to the default branch, a kit-only mechanism shipped as generic).",
         "An amendment re-derives the entry's summary from the amended body before filing - the summary is the half that renders into the loaded rules files, so a stale summary ships wider than the body it contradicts (batch 20 T3: two amended entries kept summaries their own new bodies had overturned; batch 20 T4: two shipped doc comments stated non-facts their own commits made false).",
-        "Before shipping a uniqueness or attribution sentence ('the only', 'caused by'), run the enumeration that would falsify it against the tree at HEAD - batch 21's two instances (a misattributed gate failure; a false only-bin-that-walks claim) were each falsifiable by one grep the writer did not run."
+        "Before shipping a uniqueness or attribution sentence ('the only', 'caused by'), run the enumeration that would falsify it against the tree at HEAD - batch 21's two instances (a misattributed gate failure; a false only-bin-that-walks claim) were each falsifiable by one grep the writer did not run.",
+        "A rewritten doc comment is teaching prose under this rule: re-derive caller counts, uniqueness claims, and cross-references from the tree at the revision under edit, never from the pre-rewrite text or another agent's summary (batch 22 T3a/T3c)."
       ],
       "tags": [
         "knowledge",
@@ -55,7 +56,8 @@
       "area": "docs",
       "summary": "Never rename a merged entry id. Add a new entry and link the old one with `see`.",
       "body": [
-        "Dispatches, reports, audits, and `see` lists cite ids; a rename breaks every one of them silently."
+        "Dispatches, reports, audits, and `see` lists cite ids; a rename breaks every one of them silently.",
+        "Permanence includes reachability through every reader - get, see-citations, batch membership - across an archive sweep; a mover that strands any one reader breaks the rule even though the id still exists on disk (batch 22 T1: three reader paths closed one by one)."
       ],
       "tags": [
         "knowledge",

@@ -3,7 +3,7 @@
 //! by `stats.rs` and `audit.rs`.
 //!
 //! Both callers aggregate across a workspace of agent-authored JSON
-//! files (`task-*-audit*.json`, `task-<n>-report.json`,
+//! files (`task-*-audit*.json`, `task-*-report.json`,
 //! `task-*-review*.json`) that need not be schema-valid at read time --
 //! a report missing `knowledge_used`, a review missing
 //! `rule_adherence`, or an audit file missing `ids`/`rules` entirely are
@@ -52,7 +52,7 @@ pub(super) fn read_deliverable_value(path: &Path) -> Result<Value, String> {
 
 /// One workspace directory's deliverable filenames by kind, each
 /// sorted: `audits` (`task-*-audit*.json`), `reports`
-/// (`task-<n>-report.json`), and `reviews` (`task-*-review*.json`).
+/// (`task-*-report.json`), and `reviews` (`task-*-review*.json`).
 pub(super) struct WorkspaceFiles {
     pub audits: Vec<String>,
     pub reports: Vec<String>,
@@ -90,7 +90,7 @@ pub(super) fn workspace_files(dir: &Path) -> Result<WorkspaceFiles, String> {
         .collect();
     let mut reports: Vec<String> = names
         .iter()
-        .filter(|name| matches(name, r"^task-\d+-report\.json$"))
+        .filter(|name| matches(name, r"^task-.+-report\.json$"))
         .cloned()
         .collect();
     let mut reviews: Vec<String> = names
@@ -131,9 +131,13 @@ mod tests {
     }
 
     /// The workspace fixture mixes `task-1-audit.json`,
-    /// `task-2-audit-r1.json`, `task-1-report.json` (plus a decoy
-    /// `task-1-report.md`), and `task-2-review.json` -- this pins
-    /// `workspace_files`' own classification directly.
+    /// `task-2-audit-r1.json`, `task-1-report.json`, a lettered
+    /// `task-3a-report.json` (plus a decoy `task-1-report.md`),
+    /// `task-2-review.json`, an unrelated file, and a branch-level
+    /// deliverable `branch-fix-1-report.json` that must land in none of
+    /// the three lists -- this pins `workspace_files`' own
+    /// classification directly, at both the letter-accepting and the
+    /// branch-decoy-rejecting edges of its patterns.
     #[test]
     fn classifies_audits_reports_and_reviews_ignoring_unrelated_files() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -141,9 +145,11 @@ mod tests {
             "task-1-audit.json",
             "task-2-audit-r1.json",
             "task-1-report.json",
+            "task-3a-report.json",
             "task-1-report.md",
             "task-2-review.json",
             "unrelated.txt",
+            "branch-fix-1-report.json",
         ] {
             fs::write(dir.path().join(name), "{}").expect("write fixture");
         }
@@ -152,7 +158,25 @@ mod tests {
             files.audits,
             vec!["task-1-audit.json", "task-2-audit-r1.json"]
         );
-        assert_eq!(files.reports, vec!["task-1-report.json"]);
+        assert_eq!(
+            files.reports,
+            vec!["task-1-report.json", "task-3a-report.json"]
+        );
         assert_eq!(files.reviews, vec!["task-2-review.json"]);
+        assert!(
+            !files
+                .audits
+                .contains(&"branch-fix-1-report.json".to_string())
+        );
+        assert!(
+            !files
+                .reports
+                .contains(&"branch-fix-1-report.json".to_string())
+        );
+        assert!(
+            !files
+                .reviews
+                .contains(&"branch-fix-1-report.json".to_string())
+        );
     }
 }

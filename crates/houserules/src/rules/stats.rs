@@ -47,7 +47,7 @@ fn tasks_json(tasks: &BTreeSet<String>) -> Value {
 /// Aggregates rule violations and unused injected ids across a
 /// workspace's JSON deliverables: `task-*-audit*.json` for injected ids
 /// and deterministic failures, `task-*-review*.json` for judged
-/// failures, `task-<n>-report.json` for the ids a report cites as used.
+/// failures, `task-*-report.json` for the ids a report cites as used.
 pub(super) fn stats(dir: &Path) -> Result<Value, String> {
     let files = workspace_files(dir)?;
     let mut violations: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -181,7 +181,7 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
-        // A non-JSON report file; `stats` matches only `task-<n>-report.json`,
+        // A non-JSON report file; `stats` matches only `task-*-report.json`,
         // so this must not affect the count.
         fs::write(
             root.join("task-1-report.md"),

@@ -2235,7 +2235,7 @@ mod tests {
     }
 
     /// `--workspace` judges a `report-field` check against every
-    /// `task-<n>-report.json` in a workspace directory, instead of the
+    /// `task-*-report.json` in a workspace directory, instead of the
     /// single `--report` file.
     #[test]
     fn fails_a_workspace_report_field_check_naming_the_first_report_lacking_the_field() {
@@ -2277,6 +2277,52 @@ mod tests {
             row["evidence"],
             json!(
                 "task-2-report.json lacks a value for dependency_vetting (triggered by tools/package.json)"
+            )
+        );
+    }
+
+    /// A lettered task id (`task-3a-report.json`, from a split task) is a
+    /// report like any other: `--workspace` must judge it, not skip it.
+    #[test]
+    fn fails_a_workspace_report_field_check_naming_a_lettered_task_report_lacking_the_field() {
+        let dir = make_repo(&[report_field_entry()]);
+        let root = dir.path();
+        let base_sha = commit(root, "chore: base", None);
+        write_file(root, "tools/package.json", "{}\n");
+        commit(root, "feat: add a dependency", None);
+        let base = load_base(root).unwrap();
+        let workspace = write_workspace(&[
+            (
+                "task-1-report.json",
+                json!({
+                    "kind": "task-report", "files_changed": ["tools/package.json"],
+                    "dependency_vetting": {"manifests": ["tools/package.json"], "dependencies": []},
+                }),
+            ),
+            (
+                "task-3a-report.json",
+                json!({
+                    "kind": "task-report", "files_changed": ["tools/package.json"],
+                    "dependency_vetting": Value::Null,
+                }),
+            ),
+        ]);
+        let outcome = audit(
+            &base,
+            AuditOptions {
+                base_ref: Some(base_sha),
+                workspace: Some(workspace.path().to_path_buf()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(outcome.failed);
+        let row = &outcome.result["rules"][0];
+        assert_eq!(row["result"], json!("fail"));
+        assert_eq!(
+            row["evidence"],
+            json!(
+                "task-3a-report.json lacks a value for dependency_vetting (triggered by tools/package.json)"
             )
         );
     }
