@@ -1,8 +1,5 @@
-//! Ports `tests/dogfood.test.mjs` and `tests/init.test.mjs`'s
-//! `describe('manifest')` block to cargo (batch 20 T1, HR-047, spec
-//! §2/§9; `.superpowers/sdd/2026-09-07-batch-20/t1-evidence/mapping.md`
-//! rows 5 and 7b). This repository runs its own kit
-//! (`houserules.template-is-the-source`): the root copy of every
+//! Integration tests for the kit's own manifest. This repository runs its
+//! own kit (`houserules.template-is-the-source`): the root copy of every
 //! `KIT_OWNED` file must stay byte-identical to its `template/` source,
 //! every `SEED_ONCE`/`.claude/evals/` scenario copy the same, and the
 //! generated `.claude/rules/*.md`/skill files must stay fresh relative to
@@ -11,16 +8,15 @@
 //! rewrite) is the production behavior being pinned.
 //!
 //! The Rust binary exposes no library API for its own `KIT_OWNED`/
-//! `SEED_ONCE` constants (a bare CLI, no `pub` crate surface) -- unlike
-//! the JS suite, which imports `bin/houserules.mjs`'s constant directly,
-//! this file drives the same set from the binary's one CLI-exposed form,
+//! `SEED_ONCE` constants (a bare CLI, no `pub` crate surface), so this
+//! file drives the same set from the binary's one CLI-exposed form,
 //! `houserules files` (`install::cmd_files`), the way `crates/houserules/
 //! tests/install.rs`'s own `files_prints_the_kit_owned_and_seed_once_
 //! lists_as_json` already pins that command's exact output shape.
 //! `RETIRED` has no CLI-exposed form at all, so this file keeps its own
 //! small copy, cross-checked against `install.rs`'s own `RETIRED` via its
-//! existing `retired_holds_the_shell_tools_moved_at_t5` unit test rather
-//! than duplicating a second pin of the same fact here.
+//! existing `retired_holds_the_shell_tools_and_the_js_engines_they_fronted`
+//! unit test rather than duplicating a second pin of the same fact here.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -45,10 +41,10 @@ fn repo_root() -> PathBuf {
         .unwrap_or_else(|error| panic!("canonicalize {}: {error}", root.display()))
 }
 
-/// Formerly-`KIT_OWNED` paths `update` deletes from an install if present
-/// -- `install.rs`'s own private `RETIRED`, whose exact contents that
-/// module's own `retired_holds_the_shell_tools_and_the_js_engines_they_
-/// fronted` test already pins; duplicated here (not exported by the
+/// Paths the kit does not ship that `update` deletes from an install if
+/// present -- `install.rs`'s own private `RETIRED`, whose exact contents
+/// that module's own `retired_holds_the_shell_tools_and_the_js_engines_
+/// they_fronted` test already pins; duplicated here (not exported by the
 /// binary, and the CLI has no subcommand that echoes it) only so this
 /// file's own assertions below can name the paths without hand-writing
 /// them a second time inline.
@@ -62,9 +58,7 @@ const RETIRED: &[&str] = &[
 ];
 
 /// Runs `houserules files` and returns its `kitOwned`/`seedOnce` arrays as
-/// owned strings -- the one CLI-exposed form of the binary's own manifest
-/// (this module's own doc explains why the JS suite's direct import has
-/// no equivalent here).
+/// owned strings -- the one CLI-exposed form of the binary's own manifest.
 fn kit_files() -> (Vec<String>, Vec<String>) {
     let output = houserules().arg("files").output().expect("run files");
     assert!(output.status.success());
@@ -81,17 +75,16 @@ fn kit_files() -> (Vec<String>, Vec<String>) {
     (strings("kitOwned"), strings("seedOnce"))
 }
 
-/// Every file under `root`, as `/`-joined paths relative to `root`, sorted
-/// -- `tests/init.test.mjs`'s own `readdirSync(templateDir, { recursive:
-/// true, withFileTypes: true })`, reimplemented with `std::fs` alone (no
-/// new crate: `walkdir` is already a transitive dependency of `rust-embed`
-/// but not one this crate declares directly). Built from explicit `/`-
-/// joined segments, not `Path::display()`, so the result is byte-identical
-/// on every OS in the 3-OS CI matrix regardless of the native path
-/// separator; `fs::read_dir` does not filter dot-entries (confirmed by
-/// `install.rs`'s own `the_embedded_payload_carries_every_kit_owned_and_
-/// seed_once_path` test doc), matching Node's own `recursive: true`
-/// behavior this pins against.
+/// Every file under `root`, as `/`-joined paths relative to `root`, sorted --
+/// Node's own `fs.readdirSync(dir, { recursive: true, withFileTypes: true })`
+/// behavior, reimplemented with `std::fs` alone (no new crate: `walkdir` is
+/// already a transitive dependency of `rust-embed` but not one this crate
+/// declares directly). Built from explicit `/`-joined segments, not
+/// `Path::display()`, so the result is byte-identical on every OS in the 3-OS
+/// CI matrix regardless of the native path separator; `fs::read_dir` does not
+/// filter dot-entries (confirmed by `install.rs`'s own
+/// `the_embedded_payload_carries_every_kit_owned_and_seed_once_path` test
+/// doc), matching Node's own `recursive: true` behavior this pins against.
 fn list_files_recursive(root: &Path) -> Vec<String> {
     fn walk(dir: &Path, prefix: &[String], out: &mut Vec<String>) {
         for entry in
@@ -115,10 +108,10 @@ fn list_files_recursive(root: &Path) -> Vec<String> {
     out
 }
 
-/// `SEED_ONCE` paths under `.claude/evals/` excluding `record.json` --
-/// `tests/dogfood.test.mjs`'s own `SCENARIOS` filter (`record.json` is
-/// excluded by design: the root copy accumulates run sets across
-/// evaluations while the template ships only the seed record).
+/// `SEED_ONCE` paths under `.claude/evals/` excluding `record.json`:
+/// `record.json` is excluded by design, since the root copy accumulates
+/// run sets across evaluations while the template ships only the seed
+/// record.
 fn eval_scenarios(seed_once: &[String]) -> Vec<String> {
     seed_once
         .iter()
@@ -129,9 +122,8 @@ fn eval_scenarios(seed_once: &[String]) -> Vec<String> {
         .collect()
 }
 
-/// Ports `tests/init.test.mjs`'s `describe('manifest')`, "separates
-/// kit-owned machinery from seed-once project data": the two lists name
-/// their known members and never overlap.
+/// The two lists -- kit-owned machinery and seed-once project data --
+/// name their known members and never overlap.
 #[test]
 fn kit_owned_manifest_separates_from_seed_once_and_has_no_overlap() {
     let (kit_owned, seed_once) = kit_files();
@@ -169,13 +161,10 @@ fn kit_owned_manifest_separates_from_seed_once_and_has_no_overlap() {
     );
 }
 
-/// Ports `tests/init.test.mjs`'s `describe('manifest')`, "covers every
-/// template file, with settings.json handled specially": every file under
-/// `template/` is exactly `kitOwned` (minus `RETIRED`, which the frozen JS
-/// constant still names but this binary's own `KIT_OWNED` never carries --
-/// the filter is a structural no-op today, kept for parity with the JS
-/// shape it ports) plus `seedOnce` plus `.claude/settings.json` (seeded or
-/// merged specially, never plain-copied).
+/// Every file under `template/` is exactly `kitOwned` (minus `RETIRED`,
+/// which this binary's own `KIT_OWNED` never carries, so the filter is a
+/// structural no-op today) plus `seedOnce` plus `.claude/settings.json`
+/// (seeded or merged specially, never plain-copied).
 #[test]
 fn kit_owned_and_seed_once_account_for_every_template_file() {
     let (kit_owned, seed_once) = kit_files();
@@ -192,10 +181,9 @@ fn kit_owned_and_seed_once_account_for_every_template_file() {
     assert_eq!(actual, expected);
 }
 
-/// Ports `tests/dogfood.test.mjs`'s `describe('dogfood')`, "%s at the root
-/// equals its template source": every live `KIT_OWNED` root copy in this
-/// checkout is byte-identical to its `template/` source. A hand edit to
-/// either side fails here and is lost on the next `houserules update`.
+/// Every live `KIT_OWNED` root copy in this checkout is byte-identical to
+/// its `template/` source. A hand edit to either side fails here and is
+/// lost on the next `houserules update`.
 #[test]
 fn root_kit_owned_files_equal_their_template_source_byte_for_byte() {
     let (kit_owned, _seed_once) = kit_files();
@@ -220,13 +208,11 @@ fn root_kit_owned_files_equal_their_template_source_byte_for_byte() {
     }
 }
 
-/// Ports `tests/dogfood.test.mjs`'s `describe('dogfood')`, "%s has retired
-/// from both the root and template": `install.rs`'s own
-/// `retired_holds_the_shell_tools_moved_at_t5` already pins `RETIRED`'s
-/// exact contents (`houserules.template-is-the-source`'s own knowledge
-/// entry names it); this is the JS side of the same contract -- that
-/// neither retired path lingers in this checkout's own worktree, root or
-/// template.
+/// `install.rs`'s own `retired_holds_the_shell_tools_and_the_js_engines_
+/// they_fronted` already pins `RETIRED`'s exact contents
+/// (`houserules.template-is-the-source`'s own knowledge entry names it);
+/// this test confirms neither retired path lingers in this checkout's own
+/// worktree, root or template.
 #[test]
 fn retired_paths_are_absent_from_both_root_and_template() {
     let root = repo_root();
@@ -242,16 +228,14 @@ fn retired_paths_are_absent_from_both_root_and_template() {
     }
 }
 
-/// Ports `tests/dogfood.test.mjs`'s `describe('dogfood')`, "stamps the
-/// installed version and the HR id prefix": this repository's own
-/// `.houserules.json` names `env!("CARGO_PKG_VERSION")` and the `HR`
-/// backlog id prefix -- proof this repository dogfoods its own `init`/
-/// `update` output rather than a hand-written stamp. `baselines` is not
+/// This repository's own `.houserules.json` names `env!("CARGO_PKG_VERSION")`
+/// and the `HR` backlog id prefix -- proof this repository dogfoods its own
+/// `init`/`update` output rather than a hand-written stamp. `baselines` is not
 /// pinned here byte-for-byte: it holds one hash per `KIT_OWNED` file and
-/// kit-shipped knowledge entry, which grows with the payload itself, so
-/// this only checks that `update` has stamped one at all; the two
-/// `install.rs` unit tests inject their own list directly and cover the
-/// stamping mechanism's own behavior.
+/// kit-shipped knowledge entry, which grows with the payload itself, so this
+/// only checks that `update` has stamped one at all; the two `install.rs` unit
+/// tests inject their own list directly and cover the stamping mechanism's own
+/// behavior.
 ///
 /// `overrides` IS pinned exactly, because these three paths are load-
 /// bearing: without them, `update --dir .` here would backfill each one.
@@ -286,11 +270,9 @@ fn houserules_json_stamps_the_installed_version_and_the_hr_id_prefix() {
     );
 }
 
-/// Ports `tests/dogfood.test.mjs`'s `describe('the deliverables schema
-/// copies')`, "equals its template source with the id prefix rewrite
-/// applied": `.claude/schemas/deliverables.json` is `SEED_ONCE` --
-/// `update` never writes it, so root and template are hand-synced except
-/// for the one designed difference, `init`'s id-prefix rewrite
+/// `.claude/schemas/deliverables.json` is `SEED_ONCE` -- `update` never
+/// writes it, so root and template are hand-synced except for the one
+/// designed difference, `init`'s id-prefix rewrite
 /// (`WI-` -> `<idPrefix>-`). `quality.pin-copies-byte-exact`: the
 /// assertion applies that exact production transform to the template side
 /// rather than dropping the differing text, so the two cannot silently
@@ -313,9 +295,7 @@ fn deliverables_schema_equals_template_source_with_the_id_prefix_rewrite() {
     );
 }
 
-/// Ports `tests/dogfood.test.mjs`'s `describe('the seeded eval scenario
-/// copies')`, "derives at least one seeded scenario from SEED_ONCE": the
-/// filter this file's own byte-parity test below relies on is never
+/// The filter this file's own byte-parity test below relies on is never
 /// vacuously empty.
 #[test]
 fn seed_once_derives_at_least_one_eval_scenario() {
@@ -323,9 +303,7 @@ fn seed_once_derives_at_least_one_eval_scenario() {
     assert!(!eval_scenarios(&seed_once).is_empty());
 }
 
-/// Ports `tests/dogfood.test.mjs`'s `describe('the seeded eval scenario
-/// copies')`, "%s at the root equals its template source byte for byte":
-/// unlike the deliverables schema above, `.claude/evals/*.json` entries
+/// Unlike the deliverables schema above, `.claude/evals/*.json` entries
 /// are not `PREFIXED` -- `init` copies them unchanged, so the pin here is
 /// plain byte equality, no transform.
 #[test]
@@ -344,14 +322,11 @@ fn seed_once_eval_scenario_copies_equal_template_source_byte_for_byte() {
     }
 }
 
-/// Closes the "generated-file freshness (the render --check contract)"
-/// clause of the T1 plan entry: this repository's own `.claude/rules/
-/// *.md` and knowledge skill stay fresh relative to `knowledge/`. Runs
-/// `houserules render --check` directly against this checkout's live
-/// root, read-only -- unlike `tests/kb.test.mjs`'s own
-/// `withFrozenWorktree('HEAD', ...)` equivalent (row 9 of the T1 mapping),
-/// no worktree indirection is needed: the binary under test here already
-/// is this repository's own rendering authority
+/// This repository's own `.claude/rules/*.md` and knowledge skill stay
+/// fresh relative to `knowledge/`. Runs `houserules render --check`
+/// directly against this checkout's live root, read-only: no worktree
+/// indirection is needed, since the binary under test here already is
+/// this repository's own rendering authority
 /// (`houserules.template-is-the-source`), so a direct `--check` run
 /// cannot mutate anything a worktree copy would otherwise be protecting.
 #[test]

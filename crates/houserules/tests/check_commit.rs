@@ -1,12 +1,12 @@
-//! `check-commit` CLI-level tests (HR-062, batch 18 T2, spec §6): the usage
-//! errors and exit codes `cmd_check_commit` itself owns
-//! (`rules::check_commit`'s own module doc has the command's full account;
-//! its unit tests there cover the finding-generation logic these tests do
-//! not re-derive). `check-commit` has no frozen-JS predecessor at all --
-//! unlike every command `argv_closure.rs` and the other `*_parity.rs` files
-//! pin, there is nothing to compare it against, so this file follows their
-//! structural pattern (a scratch git repo, the compiled binary run as a
-//! real subprocess) without claiming any parity contract.
+//! `check-commit` CLI-level tests: the usage errors and exit codes
+//! `cmd_check_commit` itself owns (`rules::check_commit`'s own module doc
+//! has the command's full account; its unit tests there cover the
+//! finding-generation logic these tests do not re-derive). `check-commit`
+//! has no frozen-JS predecessor at all -- unlike every command
+//! `argv_closure.rs` and the other `*_parity.rs` files pin, there is
+//! nothing to compare it against, so this file follows their structural
+//! pattern (a scratch git repo, the compiled binary run as a real
+//! subprocess) without claiming any parity contract.
 
 use std::fs;
 use std::path::Path;

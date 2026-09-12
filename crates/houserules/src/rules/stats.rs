@@ -1,9 +1,7 @@
-//! The `stats` command: aggregates rule violations and unused injected ids
-//! across a workspace's JSON deliverables -- `tools/kb.mjs`'s `stats`,
-//! ported byte-for-byte (batch 17 T3, docs/specs/2026-09-04-batch-15-tier2-
-//! spec.md §5 phase 2). See `deliverable.rs`'s module doc for why every
-//! read here is a tolerant `serde_json::Value`, never a typed deliverable
-//! model.
+//! The `stats` command: aggregates rule violations and unused injected
+//! ids across a workspace's JSON deliverables. See `deliverable.rs`'s
+//! module doc for why every read here is a tolerant `serde_json::Value`,
+//! never a typed deliverable model.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
@@ -16,8 +14,8 @@ use crate::emit::emit;
 use super::deliverable::{array_field, read_deliverable_value, workspace_files};
 use super::model::load_base;
 
-/// Records that task `task` triggered (or violated) rule `id`, deduplicating
-/// repeats -- `tools/kb.mjs`'s `statsHit`.
+/// Records that task `task` triggered (or violated) rule `id`,
+/// deduplicating repeats.
 fn stats_hit(map: &mut BTreeMap<String, BTreeSet<String>>, id: &str, task: &str) {
     map.entry(id.to_string())
         .or_default()
@@ -25,13 +23,10 @@ fn stats_hit(map: &mut BTreeMap<String, BTreeSet<String>>, id: &str, task: &str)
 }
 
 /// The task label between `task-` and the first following `-` in a
-/// deliverable filename -- `tools/kb.mjs`'s `statsTask`
-/// (`name.match(/^task-([^-]+)/)[1]`). `workspace_files` already restricts
-/// its callers to names starting `task-<something>`, so the fallback (the
-/// whole name) is unreached in practice; it exists so this never panics on
-/// an unexpected shape, matching `quality.principles`' preference for a
-/// checked result over a crash where the JS itself would throw
-/// (`null[1]` on a failed `.match()`).
+/// deliverable filename. `workspace_files` already restricts its
+/// callers to names starting `task-<something>`, so the fallback (the
+/// whole name) is unreached in practice; it exists so this never panics
+/// on an unexpected shape (`quality.principles`).
 fn stats_task(name: &str) -> &str {
     match name.strip_prefix("task-") {
         Some(rest) => match rest.find('-') {
@@ -42,18 +37,17 @@ fn stats_task(name: &str) -> &str {
     }
 }
 
-/// Renders `tasks` as the sorted `Vec<&str>` -> JSON array `stats` reports
-/// under `tasks` -- `tools/kb.mjs`'s `statsTasks` (`[...set].toSorted()`);
-/// `BTreeSet` already iterates sorted, so this is just the JSON shape.
+/// Renders `tasks` as the sorted `Vec<&str>` -> JSON array `stats`
+/// reports under `tasks`. `BTreeSet` already iterates sorted, so this is
+/// just the JSON shape.
 fn tasks_json(tasks: &BTreeSet<String>) -> Value {
     Value::Array(tasks.iter().cloned().map(Value::String).collect())
 }
 
-/// Aggregates rule violations and unused injected ids across a workspace's
-/// JSON deliverables: `task-*-audit*.json` for injected ids and
-/// deterministic failures, `task-*-review*.json` for judged failures,
-/// `task-<n>-report.json` for the ids a report cites as used --
-/// `tools/kb.mjs`'s `stats`.
+/// Aggregates rule violations and unused injected ids across a
+/// workspace's JSON deliverables: `task-*-audit*.json` for injected ids
+/// and deterministic failures, `task-*-review*.json` for judged
+/// failures, `task-<n>-report.json` for the ids a report cites as used.
 pub(super) fn stats(dir: &Path) -> Result<Value, String> {
     let files = workspace_files(dir)?;
     let mut violations: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -118,14 +112,13 @@ pub(super) fn stats(dir: &Path) -> Result<Value, String> {
     }))
 }
 
-/// Runs the `stats` subcommand: resolves `root` (`--dir`, or the enclosing
-/// git repository's top level) and loads the knowledge base there before
-/// dispatching -- `tools/kb.mjs`'s `main` calls `loadBase(repoRoot(cwd))`
-/// unconditionally ahead of its command `switch`, for every command
-/// including `stats`, even though `stats` itself never reads the result;
-/// replicated here for parity's sake (a repository whose knowledge base
-/// fails to load fails `stats` too in the frozen JS, not only `audit`).
-/// Then runs `stats` over `workspace` and prints its JSON result.
+/// Runs the `stats` subcommand: resolves `root` (`--dir`, or the
+/// enclosing git repository's top level) and loads the knowledge base
+/// there before dispatching, even though `stats` itself never reads the
+/// result -- every `rules::` subcommand loads the knowledge base first,
+/// so a repository whose knowledge base fails to load fails `stats` too,
+/// not only `audit`. Then runs `stats` over `workspace` and prints its
+/// JSON result.
 pub(crate) fn cmd_stats(dir: Option<PathBuf>, workspace: PathBuf) -> ExitCode {
     let root = match crate::root::resolve_root(dir) {
         Ok(root) => root,
@@ -162,8 +155,8 @@ mod tests {
         }])
     }
 
-    /// tests/kb.test.mjs, describe('stats'): "aggregates violations, unused
-    /// ids, and file counts from a workspace of JSON deliverables".
+    /// Aggregates violations, unused ids, and file counts from a
+    /// workspace of JSON deliverables.
     #[test]
     fn aggregates_violations_unused_ids_and_file_counts() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -188,7 +181,8 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
-        // The old markdown-report contract; stats must ignore it entirely.
+        // A non-JSON report file; `stats` matches only `task-<n>-report.json`,
+        // so this must not affect the count.
         fs::write(
             root.join("task-1-report.md"),
             "# r\n\nKnowledge used: a.rule, b.c\n",
@@ -233,9 +227,8 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs, describe('stats'): "tolerates an audit file with
-    /// no ids or rules" -- the `?? []` fallback for a stats file or a
-    /// hand-written one.
+    /// Tolerates an audit file with no `ids` or `rules` field, whether a
+    /// generated stats file or a hand-written one.
     #[test]
     fn tolerates_an_audit_file_with_no_ids_or_rules() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -251,8 +244,8 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs, describe('stats'): "tolerates a review with no
-    /// rule_adherence and a report with no knowledge_used".
+    /// Tolerates a review with no `rule_adherence` and a report with no
+    /// `knowledge_used`.
     #[test]
     fn tolerates_a_review_with_no_rule_adherence_and_a_report_with_no_knowledge_used() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -277,8 +270,8 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs, describe('stats'): "raises a UsageError naming a
-    /// malformed deliverable file, instead of crashing".
+    /// Names a malformed deliverable file in the error, instead of
+    /// crashing.
     #[test]
     fn reports_a_malformed_deliverable_file_naming_it_instead_of_crashing() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -287,11 +280,9 @@ mod tests {
         assert!(error.contains("task-3-audit.json"), "{error}");
     }
 
-    /// Fix round 1, issue 7 (task-3-review.json): a present-but-wrongly-
-    /// typed `rules` field is a named finding, not silence. The frozen JS
-    /// crashes here (`for (const rule of data.rules)` on an object throws
-    /// `TypeError: ... is not iterable`, the reviewer's own measured
-    /// reproduction); this binary instead names the file and the field.
+    /// A present-but-wrongly-typed `rules` field is a named finding, not
+    /// silence: this binary names the file and the field
+    /// (`houserules.crash-paths-are-named`).
     #[test]
     fn reports_a_wrongly_typed_rules_field_naming_the_file_instead_of_silently_skipping_it() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -305,8 +296,8 @@ mod tests {
         assert!(error.contains("rules"), "{error}");
     }
 
-    /// Fix round 1, issue 7: the same treatment for `ids`, the sibling
-    /// field on the same `task-*-audit*.json` shape.
+    /// The same treatment for `ids`, the sibling field on the same
+    /// `task-*-audit*.json` shape.
     #[test]
     fn reports_a_wrongly_typed_ids_field_naming_the_file() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -320,7 +311,7 @@ mod tests {
         assert!(error.contains("ids"), "{error}");
     }
 
-    /// Fix round 1, issue 7: `rule_adherence`, the review-side sibling.
+    /// `rule_adherence`, the review-side sibling.
     #[test]
     fn reports_a_wrongly_typed_rule_adherence_field_naming_the_file() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -335,7 +326,7 @@ mod tests {
         assert!(error.contains("rule_adherence"), "{error}");
     }
 
-    /// Fix round 1, issue 7: `knowledge_used`, the report-side sibling.
+    /// `knowledge_used`, the report-side sibling.
     #[test]
     fn reports_a_wrongly_typed_knowledge_used_field_naming_the_file() {
         let dir = tempfile::tempdir().expect("tempdir");

@@ -1,11 +1,9 @@
-//! The `audit` command: builds the rule package for a git range, runs every
-//! member's deterministic check, and reports the result -- `tools/kb.mjs`'s
-//! `audit`, `runCheck`, and their git-plumbing helpers (`rev`, `gitDiff`,
-//! `changedFiles`, `treeFiles`, `showFile`, `commitsIn`, `removedLines`),
-//! ported (batch 17 T3, docs/specs/2026-09-04-batch-15-tier2-spec.md §5
-//! phase 2).
+//! The `audit` command: builds the rule package for a git range, runs
+//! every member's deterministic check, and reports the result, plus the
+//! git-plumbing helpers it runs on (`rev`, `git_diff`, `changed_files`,
+//! `tree_files`, `show_file`, `commits_in`, `removed_lines`).
 //!
-//! ## Data-layer decisions (spec §3)
+//! ## Data-layer decisions
 //!
 //! - Each entry's `check` object is read through `check_shape::CheckDef`
 //!   (`model::Entry.check`, typed `CheckField`), not raw `serde_json::Value`
@@ -15,15 +13,12 @@
 //!   case the rule favors. See `model::CheckField`'s own doc for how a
 //!   malformed `check` is told apart from an absent one: this file's own
 //!   row-building match (below) reports a `Malformed` check as a named,
-//!   exit-2 error rather than reproducing the frozen JS's own crash (an
-//!   unmatched `switch (c.type)` returning `undefined`, which throws
-//!   downstream) or silently tolerating it as a judged row.
+//!   exit-2 error, never a judged row.
 //! - `audit`'s own JSON output (`{base, head, ids, changed_files, areas,
 //!   area_files, rules, summary}`) is built as `serde_json::Value`
 //!   directly, not through any deliverables-schema type. This is not a
 //!   parse-tolerance judgment (nothing here is *read* untyped) but a
-//!   *shape* one: `audit`'s judged rows carry `result: "open"`
-//!   (`tools/kb.mjs:753` at the frozen sha) — a value
+//!   *shape* one: `audit`'s judged rows carry `result: "open"` — a value
 //!   `.claude/schemas/deliverables.json`'s `auditRow.result` enum
 //!   (`pass`/`fail`/`warn`/`skipped`) explicitly forbids. A report author
 //!   copies only this command's *deterministic* rows into a report's
@@ -33,48 +28,31 @@
 //!   `AuditRow`/`AuditRowResult` types here would either make them accept a
 //!   value the schema itself forbids (defeating their whole purpose as a
 //!   schema-exact pin) or require a second, audit-only row representation
-//!   alongside them -- more moving parts than one `Value` builder mirroring
-//!   the frozen JS's own object-literal shape line for line.
-//! - This is also why `rules::deliverables` and `crate::json_shape` are
-//!   deleted in this same commit, not merely left dormant: `validate`
-//!   (this crate's other T3 surface) never used them either (see
-//!   `validate_deliverable.rs`'s module doc), and `stats` aggregates
-//!   through tolerant `Value` reads for the same reason `deliverable.rs`
-//!   documents. Between the three T3 surfaces, no command constructs or
-//!   strictly parses a schema-exact deliverable, so no consumer exists
-//!   anywhere in this binary for the ~30 types HR-047 batch 16's spec §3
-//!   rule and the HR-059 backlog item ("rules/deliverables.rs and
-//!   check_shape.rs stay for T3's aggregating readers, judged per the same
-//!   rule at T3") explicitly deferred this judgment to. `check_shape.rs`'s
-//!   `CheckDef` is the one model layer that DOES get a real, direct
-//!   consumer here (the bullet above) and stays, allow dropped.
+//!   alongside them -- more moving parts than one `Value` builder.
+//! - This is also why this crate carries no typed deliverables model:
+//!   `validate` (see `validate_deliverable.rs`'s module doc) and `stats`
+//!   both aggregate through tolerant `Value` reads too, so no command
+//!   constructs or strictly parses a schema-exact deliverable anywhere in
+//!   this binary. `check_shape.rs`'s `CheckDef` is the one model layer
+//!   that DOES get a real, direct consumer here (the bullet above) and
+//!   stays.
 //!
-//! ## The ruled crash-path extension this file adds
+//! ## The crash-path extension this file adds
 //!
 //! A malformed check `pattern`/`subject`/`body_absent` regex, or a
-//! malformed `files`/`if`/`then` glob, reaching `run_check` crashes the
-//! frozen JS uncaught (`new RegExp`/`RegExp.prototype.test` throwing a
-//! `SyntaxError`, or `matchesGlob` throwing on some malformed inputs).
-//! `check-knowledge` (`check.rs`'s `regex_validity_message`) already
-//! validates a check's `pattern`/`subject`/`body_absent` regex fields
-//! eagerly at load time, the same way `model::load_base` eagerly compiles
-//! `areas.json`'s globs (spec §6's eager-glob-validation ruling). It does
-//! NOT validate a check's `files`/`if`/`then` glob fields the same way,
-//! so only a malformed check glob reaches `audit` on a base that already
-//! passes `check-knowledge` cleanly (verified live, fix round 2,
-//! task-3-review-r1.json new_breakage issue 1: a check with `files:
-//! "src/[z-a].js"` and an otherwise-valid `pattern` prints `knowledge:
-//! ok`, exit 0, where the same value under `pattern` instead makes
-//! `check-knowledge` itself exit 1, "check pattern is not a valid
-//! regex"). `audit` is therefore the first and only place a malformed
-//! check *glob* is diagnosed, and this binary reports it as a `Result`
-//! propagated all the way out to `cmd_audit`, which prints the standard
-//! one-line, exit-2 CLI failure (spec §6's general CLI-failure-path
-//! ruling: a JS re-throw/crash becomes one named line here, not a
-//! reproduced stack trace) -- reached, named, and exited, never a panic
-//! and never silently swallowed either (fix round 1's own defect, issue
-//! 4, was exactly a swallowed instance of this class, in `run_check`'s
-//! `co-change` branch).
+//! malformed `files`/`if`/`then` glob, reaching `run_check` would panic
+//! if left unguarded. `check-knowledge` (`check.rs`'s
+//! `regex_validity_message`) already validates a check's
+//! `pattern`/`subject`/`body_absent` regex fields eagerly at load time,
+//! the same way `model::load_base` eagerly compiles `areas.json`'s globs.
+//! It does NOT validate a check's `files`/`if`/`then` glob fields the
+//! same way, so a malformed check glob can reach `audit` on a base that
+//! already passes `check-knowledge` cleanly. `audit` is therefore the
+//! first and only place a malformed check *glob* is diagnosed, and this
+//! binary reports it as a `Result` propagated all the way out to
+//! `cmd_audit`, which prints the standard one-line, exit-2 CLI failure
+//! (`houserules.crash-paths-are-named`) -- reached, named, and exited,
+//! never a panic and never silently swallowed either.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -103,7 +81,7 @@ struct RawGitError {
 }
 
 /// Runs `git` with `args` inside `root`, forcing `LC_ALL=C` for
-/// locale-independent output -- `tools/kb.mjs`'s `git` helper.
+/// locale-independent output.
 fn run_git(root: &Path, args: &[&str]) -> Result<String, RawGitError> {
     match Command::new("git")
         .args(args)
@@ -123,10 +101,8 @@ fn run_git(root: &Path, args: &[&str]) -> Result<String, RawGitError> {
     }
 }
 
-/// The first non-blank line of `stderr`, trimmed -- `tools/kb.mjs`'s
-/// `gitDiff` fallback (`stderr.split('\n').find(...)`), with a generic
-/// message for the unrealized case JS falls back to `error.message` for
-/// (a nonzero exit with fully empty stderr).
+/// The first non-blank line of `stderr`, trimmed, with a generic message
+/// for the case of a nonzero exit with fully empty stderr.
 fn stderr_headline(error: &RawGitError) -> String {
     match error.stderr.lines().find(|line| !line.trim().is_empty()) {
         Some(line) => line.trim().to_string(),
@@ -134,12 +110,11 @@ fn stderr_headline(error: &RawGitError) -> String {
     }
 }
 
-/// Resolves `reference` to its short commit sha -- `tools/kb.mjs`'s `rev`.
-/// Any failure (a bad ref, or git itself failing to run) is `bad ref
-/// "<reference>"`, discarding git's own message the same way the frozen
-/// JS's `catch { throw ... }` does. `pub(super)`: `check_commit`'s own
-/// range arm resolves its `--from`/`--to` refs through this same function,
-/// so a bad ref reads identically from either command.
+/// Resolves `reference` to its short commit sha. Any failure (a bad ref,
+/// or git itself failing to run) is `bad ref "<reference>"`, discarding
+/// git's own message. `pub(super)`: `check_commit`'s own range arm
+/// resolves its `--from`/`--to` refs through this same function, so a bad
+/// ref reads identically from either command.
 pub(super) fn rev(root: &Path, reference: &str) -> Result<String, String> {
     run_git(
         root,
@@ -154,14 +129,13 @@ pub(super) fn rev(root: &Path, reference: &str) -> Result<String, String> {
     .map_err(|_| format!("bad ref \"{reference}\""))
 }
 
-/// A three-dot `git diff` range from the merge base of `base` and `head` to
-/// `head` -- `tools/kb.mjs`'s `range`.
+/// A three-dot `git diff` range from the merge base of `base` and `head`
+/// to `head`.
 fn range(base: &str, head: &str) -> String {
     format!("{base}...{head}")
 }
 
-/// Splits `text` into non-empty lines -- `tools/kb.mjs`'s `lines`
-/// (`text.split('\n').filter(Boolean)`).
+/// Splits `text` into non-empty lines.
 fn lines(text: &str) -> Vec<String> {
     text.lines()
         .filter(|l| !l.is_empty())
@@ -169,8 +143,8 @@ fn lines(text: &str) -> Vec<String> {
         .collect()
 }
 
-/// Runs `git diff` with `args` (everything after `diff`) -- `tools/kb.mjs`'s
-/// `gitDiff`. A shared merge base miss between `base` and `head` reports
+/// Runs `git diff` with `args` (everything after `diff`). A shared merge
+/// base miss between `base` and `head` reports
 /// the fixed `no merge base between "<base>" and "<head>"` message; any
 /// other failure carries git's own first non-empty stderr line.
 fn git_diff(root: &Path, base: &str, head: &str, args: &[&str]) -> Result<String, String> {
@@ -186,7 +160,7 @@ fn git_diff(root: &Path, base: &str, head: &str, args: &[&str]) -> Result<String
 }
 
 /// Every file added, copied, modified, or renamed between `base` and
-/// `head`'s merge base and `head` -- `tools/kb.mjs`'s `changedFiles`.
+/// `head`'s merge base and `head`.
 fn changed_files(root: &Path, base: &str, head: &str) -> Result<Vec<String>, String> {
     let output = git_diff(
         root,
@@ -197,14 +171,14 @@ fn changed_files(root: &Path, base: &str, head: &str) -> Result<Vec<String>, Str
     Ok(lines(&output))
 }
 
-/// Every file in `head`'s tree -- `tools/kb.mjs`'s `treeFiles`.
+/// Every file in `head`'s tree.
 fn tree_files(root: &Path, head: &str) -> Result<Vec<String>, String> {
     let output =
         run_git(root, &["ls-tree", "-r", "--name-only", head]).map_err(|e| stderr_headline(&e))?;
     Ok(lines(&output))
 }
 
-/// `path`'s content as it exists in `head` -- `tools/kb.mjs`'s `showFile`.
+/// `path`'s content as it exists in `head`.
 fn show_file(root: &Path, head: &str, path: &str) -> Result<String, String> {
     run_git(root, &["show", &format!("{head}:{path}")]).map_err(|e| stderr_headline(&e))
 }
@@ -239,8 +213,8 @@ impl Commit {
 }
 
 /// Every commit strictly between `base` and `head` (two-dot range -- not
-/// `range()`'s three-dot merge-base form) -- `tools/kb.mjs`'s `commitsIn`,
-/// plus the author name. `pub(super)`: `check_commit`'s own range arm
+/// `range()`'s three-dot merge-base form), plus the author name.
+/// `pub(super)`: `check_commit`'s own range arm
 /// reads a git range through this same function, not a second `git log`
 /// invocation of its own.
 pub(super) fn commits_in(root: &Path, base: &str, head: &str) -> Result<Vec<Commit>, String> {
@@ -272,8 +246,7 @@ pub(super) fn commits_in(root: &Path, base: &str, head: &str) -> Result<Vec<Comm
 }
 
 /// Every removed (`-`-prefixed, excluding the `---` file header) line in
-/// `files`'s diff between `base` and `head` -- `tools/kb.mjs`'s
-/// `removedLines`.
+/// `files`'s diff between `base` and `head`.
 fn removed_lines(
     root: &Path,
     base: &str,
@@ -293,10 +266,10 @@ fn removed_lines(
 
 // ---- check runners --------------------------------------------------------------------
 
-/// Every string a knowledge-schema glob field holds -- `tools/kb.mjs`'s
-/// `list` applied to a `check` field already narrowed to `Glob` (bare
-/// string or array of strings; a JSON-Schema `["string", "array"]`
-/// property, `check_shape::Glob`'s own doc).
+/// Every string a knowledge-schema glob field holds: a `check` field
+/// already narrowed to `Glob` (bare string or array of strings; a
+/// JSON-Schema `["string", "array"]` property, `check_shape::Glob`'s own
+/// doc).
 fn glob_list(glob: &Option<Glob>) -> Vec<&str> {
     match glob {
         None => Vec::new(),
@@ -305,10 +278,8 @@ fn glob_list(glob: &Option<Glob>) -> Vec<&str> {
     }
 }
 
-/// `true` when `path` matches any glob in `glob` -- `tools/kb.mjs`'s
-/// `matchAny`, on the single globset engine this crate's own
-/// `houserules.glob-union-matcher` ruling names (`glob::glob_match`), not
-/// the frozen JS's two-engine union.
+/// `true` when `path` matches any glob in `glob`, on the single globset
+/// engine `glob::glob_match` runs (`houserules.glob-union-matcher`).
 fn match_any(path: &str, glob: &Option<Glob>) -> Result<bool, String> {
     for candidate in glob_list(glob) {
         if glob_match(path, candidate).map_err(|error| error.to_string())? {
@@ -330,12 +301,11 @@ fn filter_matching(paths: &[String], glob: &Option<Glob>) -> Result<Vec<String>,
     Ok(matched)
 }
 
-/// Compiles `pattern` under `flags` with `g`/`y` stripped -- `tools/kb.mjs`'s
-/// `re`: a check's regex is built once and reused across every commit or
-/// file in a loop, and a global or sticky flag would make it stateful via
-/// `lastIndex` on the JS side, silently skipping matches after the first.
-/// `regress::Regex` carries no such state itself, but the flags are still
-/// stripped before compiling, matching the frozen JS exactly.
+/// Compiles `pattern` under `flags` with `g`/`y` stripped: a check's
+/// regex is built once and reused across every commit or file in a loop,
+/// so a stateful match-position flag has no place here. `regress::Regex`
+/// carries no such state itself, but the flags are still stripped before
+/// compiling for a consistent, documented contract.
 fn compile_check_regex(pattern: &str, flags: &str) -> Result<Regex, String> {
     let stripped: String = flags.chars().filter(|c| *c != 'g' && *c != 'y').collect();
     Regex::with_flags(pattern, stripped.as_str()).map_err(|error| error.to_string())
@@ -343,8 +313,8 @@ fn compile_check_regex(pattern: &str, flags: &str) -> Result<Regex, String> {
 
 /// One `commits`-type check, its `subject`/`body_absent` patterns compiled
 /// once -- the per-commit evaluation `run_check`'s `CheckType::Commits` arm
-/// and `check_commit::check_commit` (HR-062, batch 18 T2, spec §6) both
-/// run, factored here so the two commands can never drift apart on what
+/// and `check_commit::check_commit` both run, factored here so the two
+/// commands can never drift apart on what
 /// counts as a violation or how it reads (`houserules check-commit` reuses
 /// the audit's `commits` rules; it does not reimplement them). `pub(super)`
 /// rather than `pub(crate)`: `check_commit` is a sibling module under
@@ -380,12 +350,14 @@ impl<'a> CommitsCheck<'a> {
     /// Evaluates one commit against this check, in the same
     /// subject/body_absent/body_line_max order `run_check`'s own commit
     /// loop tests them: `Some(evidence)` for the first rule this commit
-    /// breaks, its text identical to what `run_check` used to build inline
-    /// (the audit command's own output must not change), `None` when the
-    /// commit satisfies every rule this check declares. A bot-authored
-    /// commit (`[bot]` author suffix) is exempt from `body_line_max` alone:
-    /// Dependabot's generated body carries compare links no human wraps
-    /// (HR-092); its subject and `body_absent` rules still apply.
+    /// breaks, `None` when the commit satisfies every rule this check
+    /// declares. `violation` is the single place that builds this
+    /// evidence text; both `run_check`'s `CheckType::Commits` arm and
+    /// `check_commit` call it, so the two commands' output cannot drift
+    /// apart. A bot-authored commit (`[bot]` author suffix) is exempt
+    /// from `body_line_max` alone: a generated body (Dependabot's compare
+    /// links, say) carries lines no human wraps; its subject and
+    /// `body_absent` rules still apply.
     pub(super) fn violation(&self, commit: &Commit) -> Option<String> {
         let (subject, body) = (commit.subject.as_str(), commit.body.as_str());
         if let Some(re) = &self.subject_re
@@ -417,9 +389,9 @@ impl<'a> CommitsCheck<'a> {
         None
     }
 
-    /// This check's declared `level` -- spec §6's level-survives ruling:
-    /// `check_commit`'s own outcome carries this forward onto each finding
-    /// the same way `run_check`'s `violated_result` already reads
+    /// This check's declared `level`: `check_commit`'s own outcome carries
+    /// this forward onto each finding the same way `run_check`'s
+    /// `violated_result` already reads
     /// `check.level` to decide a row's `result` (`"warn"` vs `"fail"`), so
     /// a warn-level `commits` check cannot silently escalate into a hard
     /// block on either surface.
@@ -429,9 +401,7 @@ impl<'a> CommitsCheck<'a> {
 }
 
 /// The value at a dot-separated `field` path in `data`, indexing into
-/// either an object's keys or an array's numeric-string indices --
-/// `tools/kb.mjs`'s `fieldValue` (`node[key]` on the JS side works for
-/// both; this mirrors it rather than only supporting objects).
+/// either an object's keys or an array's numeric-string indices.
 fn field_value<'a>(data: &'a Value, field: &str) -> Option<&'a Value> {
     field.split('.').try_fold(data, |node, key| match node {
         Value::Object(map) => map.get(key),
@@ -440,19 +410,16 @@ fn field_value<'a>(data: &'a Value, field: &str) -> Option<&'a Value> {
     })
 }
 
-/// `true` when `field_value` is present and not `null` -- `tools/kb.mjs`'s
-/// `report-field` check's own `hasField`.
+/// `true` when `field_value` is present and not `null`.
 fn has_field(data: &Value, field: &str) -> bool {
     !matches!(field_value(data, field), None | Some(Value::Null))
 }
 
 /// The per-check evaluation context: the range's changed files, the
 /// `--report`/`--workspace` inputs a `report-field` check reads, and the
-/// tree/blob/commit git reads every check type may need, each cached after
-/// its first read -- `tools/kb.mjs`'s `ctx` object, whose `tree`/`commits`
-/// getters and `show` cache are closures over mutable local state; a
-/// `RefCell` per cache is this struct's equivalent, since every check
-/// shares one immutable `&AuditContext`.
+/// tree/blob/commit git reads every check type may need, each cached
+/// after its first read. A `RefCell` per cache lets every check share one
+/// immutable `&AuditContext` while still mutating the cache on first use.
 struct AuditContext<'a> {
     root: &'a Path,
     base_sha: String,
@@ -500,12 +467,11 @@ impl AuditContext<'_> {
     }
 }
 
-/// Runs one entry's deterministic `check` and returns its audit row --
-/// `tools/kb.mjs`'s `runCheck`. See this module's doc for why the row is a
-/// raw `Value`, not a typed model. `check` is passed separately from
-/// `entry` (rather than read back off `entry.check`) so the caller's own
-/// `CheckField` match is the one place that decides "does this entry get
-/// its check run at all" (fix round 1, issue 7).
+/// Runs one entry's deterministic `check` and returns its audit row (see
+/// this module's doc for why the row is a raw `Value`, not a typed
+/// model). `check` is passed separately from `entry` (rather than read
+/// back off `entry.check`) so the caller's own `CheckField` match is the
+/// one place that decides "does this entry get its check run at all".
 fn run_check(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result<Value, String> {
     let level_str = match check.level {
         super::check_shape::CheckLevel::Fail => "fail",
@@ -562,10 +528,9 @@ fn run_check(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result<Valu
             // `check.then` has not been matched yet at this point (`trigger`
             // above matches `if_changed`, a different field) -- both loops
             // below propagate a malformed `then` with `?`, the same as
-            // `filter_matching` already does for `files`/`if_changed`, so
-            // fix round 1's swallowed-error defect (issue 4) cannot recur:
-            // there is no `unwrap_or(false)` left to hide a `GlobError`
-            // behind a false "did not match".
+            // `filter_matching` already does for `files`/`if_changed`: there
+            // is no `unwrap_or(false)` here to hide a `GlobError` behind a
+            // false "did not match".
             let mut satisfying: Option<&String> = None;
             for path in ctx.changed {
                 if match_any(path, &check.then)? {
@@ -627,13 +592,11 @@ fn run_check(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result<Valu
                 )));
             }
             if let Some(reports) = ctx.reports {
-                // Fix round 1, issue 7 (task-3-review.json): a
-                // `files_changed` array holding a non-string element is
+                // A `files_changed` array holding a non-string element is
                 // just as unusable for glob-matching as one that is not an
-                // array at all -- the frozen JS crashes either way
-                // (`matchesGlob` throws on a non-string path), so both
-                // shapes are named the same "lacks files_changed" finding
-                // here, not silently filtered element-by-element.
+                // array at all, so both shapes are named the same "lacks
+                // files_changed" finding here, not silently filtered
+                // element-by-element.
                 let has_valid_files_changed = |data: &Value| matches!(data.get("files_changed"), Some(Value::Array(items)) if items.iter().all(Value::is_string));
                 let malformed = reports
                     .iter()
@@ -651,10 +614,8 @@ fn run_check(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result<Valu
                 }
                 // The first of a report's `files_changed` matching `check.if_changed`,
                 // or `None` when none do -- propagates a malformed glob with `?`
-                // instead of the `unwrap_or(false)` that used to hide it behind a
-                // false "did not match" (branch review, issue 1: the one site in
-                // this file the co-change loops' own no-swallow claim, lines
-                // 463-469, did not yet cover).
+                // instead of `unwrap_or(false)`, which would hide it behind a
+                // false "did not match".
                 fn matching_file<'a>(
                     data: &'a Value,
                     globs: &Option<Glob>,
@@ -695,9 +656,8 @@ fn run_check(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result<Valu
 
 // ---- the audit engine -----------------------------------------------------------------
 
-/// `audit`'s inputs -- `tools/kb.mjs`'s `audit` options object, extended by
-/// `sanctioned` (HR-077, no frozen-JS counterpart; see this module's own
-/// "sanctioned-fail annotation" section below).
+/// `audit`'s inputs (see this module's own "sanctioned-fail annotation"
+/// section below for `sanctioned`).
 #[derive(Default)]
 pub(crate) struct AuditOptions {
     pub base_ref: Option<String>,
@@ -720,17 +680,15 @@ pub(crate) struct AuditOutcome {
 }
 
 /// `area_file_map` as a JSON object, preserving its own insertion order --
-/// `glob::area_files` already reproduces the frozen JS's own object-literal
-/// order (`global` first, then each area the first time one of `changed`'s
-/// paths matches it; that function's own doc has the fuller account), so
-/// this is a direct `Value` conversion, no reordering. Fix round 1, issue
-/// 6: a prior cut alphabetically sorted the keys here instead, reasoning
-/// that spec §4's field-identical gate compares parsed `Value`s (key order
-/// is not part of a JSON object's value under equality) -- true for the
-/// corpus tests, but every LIVE `houserules audit`/`--json` run is a real
-/// difference a byte-comparing user or script can see, and the ruled
-/// parity-first default (spec §7) is not to introduce one merely because
-/// one gate cannot detect it.
+/// `glob::area_files` already produces the order this command's own JSON
+/// output ships (`global` first, then each area the first time one of
+/// `changed`'s paths matches it; that function's own doc has the fuller
+/// account), so this is a direct `Value` conversion, no reordering.
+/// Alphabetically sorting the keys here instead would be invisible to a
+/// test comparing parsed `Value`s (key order is not part of a JSON
+/// object's value under equality), but every LIVE `houserules
+/// audit --json` run is a real difference a byte-comparing user or script
+/// can see.
 fn area_files_json(area_file_map: &indexmap::IndexMap<String, Vec<String>>) -> Value {
     let map: serde_json::Map<String, Value> = area_file_map
         .iter()
@@ -745,8 +703,8 @@ fn is_deterministic(row: &Value) -> bool {
 }
 
 /// Builds the rule package for a git range and runs every member's
-/// deterministic check -- `tools/kb.mjs`'s `audit`. See this module's doc
-/// for why the result is a raw `Value`.
+/// deterministic check. See this module's doc for why the result is a
+/// raw `Value`.
 pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, String> {
     let Some(base_ref) = opts.base_ref else {
         return Err("audit needs --base <ref>".to_string());
@@ -767,12 +725,10 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
     let mut package: HashMap<String, &Entry> = HashMap::new();
     for entry in base.entries.values() {
         let in_touched_area = areas.contains(&entry.area);
-        // `!matches!(entry.check, CheckField::Absent)` mirrors the frozen
-        // JS's own `e.check` truthy check exactly: a JS-truthy check joins
-        // the package whether or not it is valid (`e.check && ...` does
-        // not evaluate validity), so a `Malformed` check still needs to
-        // reach row-building below to be named, not be silently excluded
-        // here instead (fix round 1, issue 7).
+        // `!matches!(entry.check, CheckField::Absent)` joins the package
+        // whether or not the check is valid: a `Malformed` check still
+        // needs to reach row-building below to be named, not be silently
+        // excluded here instead.
         let has_check = !matches!(entry.check, super::model::CheckField::Absent);
         if entry.standing
             || (RULE_KINDS.contains(&entry.kind.as_str()) && in_touched_area)
@@ -825,11 +781,8 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
         let entry = package[id];
         let row = match &entry.check {
             super::model::CheckField::Valid(check) => run_check(entry, check, &ctx)?,
-            // Fix round 1, issue 7: the frozen JS's own crash path for this
-            // exact shape (a JS-truthy `check` `runCheck`'s `switch (c.type)`
-            // has no arm for) -- named here instead of reproduced, and
-            // instead of the earlier cut's silent downgrade to a judged
-            // row, per spec §6's crash-path ruling.
+            // A malformed check is a named error, never a silently
+            // downgraded judged row (`houserules.crash-paths-are-named`).
             super::model::CheckField::Malformed => {
                 return Err(format!("{id}: malformed check"));
             }
@@ -841,26 +794,25 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
         rows.push(row);
     }
 
-    // ---- HR-077: the sanctioned-fail annotation ----
+    // ---- the sanctioned-fail annotation ----
     //
-    // A `--sanctioned <rule>=<ref>` declares a spec-booked interim fail once
-    // per dispatch (batch 20's own evals red was re-narrated by hand in 14
-    // audits and review rounds). Semantics, defended against the row shape
-    // above: the sanctioned rule's row keeps its TRUE `result` -- a fail
-    // stays "fail", never silently becomes "pass" -- and gains the
-    // declaration in its `evidence` text alone, so `auditRow`'s schema
-    // shape (id/kind/mode/level/result/evidence, unchanged) needs no
-    // change at all. `parse_sanctioned` already ruled out an empty
-    // reference and a repeated rule id, so every remaining case names a
-    // real row: absent from the package entirely (a typo `--ids` itself
-    // would reject) is this function's own named error, the same
-    // "unknown id" shape `--ids` already uses one flag over; present but
-    // not `result: "fail"` is a stale booking, reported in
+    // A `--sanctioned <rule>=<ref>` declares a spec-booked interim fail
+    // once per dispatch, instead of narrating it by hand across every
+    // audit and review round the interim fail spans. Semantics, defended
+    // against the row shape above: the sanctioned rule's row keeps its
+    // TRUE `result` -- a fail stays "fail", never silently becomes "pass"
+    // -- and gains the declaration in its `evidence` text alone, so
+    // `auditRow`'s schema shape (id/kind/mode/level/result/evidence,
+    // unchanged) needs no change at all. `parse_sanctioned` already ruled
+    // out an empty reference and a repeated rule id, so every remaining
+    // case names a real row: absent from the package entirely (a typo
+    // `--ids` itself would reject) is this function's own named error,
+    // the same "unknown id" shape `--ids` already uses one flag over;
+    // present but not `result: "fail"` is a stale booking, reported in
     // `stale_sanctions` and folded into `failed`, never a silent no-op --
-    // that discipline is what keeps bookings honest (fix round 1, review
-    // minor issue 2 distinguishes the two: reading "did not fail" for a
-    // rule that never ran sent an author to un-book a typo instead of
-    // fixing it).
+    // distinguishing the two matters because reading "did not fail" for a
+    // rule that never ran would send an author to un-book a typo instead
+    // of fixing it.
     let mut stale_sanctions: Vec<String> = Vec::new();
     let mut sanctioned_fail = 0usize;
     for (rule, reference) in &opts.sanctioned {
@@ -925,19 +877,16 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
         summary["empty_range"] = Value::Bool(true);
     }
     // Additive, like `empty_range` above: omitted entirely rather than
-    // printed as 0, so an audit run with no `--sanctioned` at all keeps its
-    // pre-HR-077 summary shape byte for byte (the two frozen goldens under
-    // tests/goldens/audit/ pin exactly this: neither names --sanctioned, and
-    // gen-goldens reproduces both unchanged after this change).
+    // printed as 0, so an audit run with no `--sanctioned` at all keeps the
+    // same summary shape an audit with no empty range does.
     if sanctioned_fail > 0 {
         summary["sanctioned_fail"] = json!(sanctioned_fail);
     }
 
     // A sanctioned fail still counts in `fail` above (its `result` never
     // changed) and still fails the run; a stale booking fails the run too,
-    // even though every real row passed, since "a stale booking is a
-    // finding, not a no-op" (HR-077, docs/specs/2026-09-08-batch-21-gates.md
-    // §5).
+    // even though every real row passed, since a stale booking is a
+    // finding, not a no-op.
     let failed = rows
         .iter()
         .any(|row| row.get("result").and_then(Value::as_str) == Some("fail"))
@@ -961,22 +910,18 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
 
 // ---- CLI --------------------------------------------------------------------------
 
-/// Parses each `--sanctioned` value as `<rule>=<ref>` (HR-077): clap's own
-/// grammar (`main.rs`'s `Audit::sanctioned: Vec<String>`) admits any
-/// string, so a value missing the separator, naming an empty rule id or an
-/// empty reference, or repeating a rule id an earlier value already named,
-/// is this command's own usage error -- checked after `cmd_audit` resolves
-/// `root` and loads the knowledge base, but before any audit work starts
-/// (corrected at batch 21 T2 fix round 1, review critical issue 1: the
-/// prior doc claimed this ran before either, which `cmd_audit`'s own
-/// `resolve_root`-then-`load_base` order does not). An empty reference
-/// would book a sanction naming no reference at all, and a repeated rule
-/// id would let `sanctioned_fail` count past the one row it can ever
-/// annotate (fix round 1, review minor issue 1) -- both are this
-/// function's business, not the apply loop's, so a malformed
-/// `--sanctioned` is caught before any row is even read. Splits on the
-/// FIRST `=` only, so a reference itself containing `=` (a URL query
-/// string, say) survives whole.
+/// Parses each `--sanctioned` value as `<rule>=<ref>`: clap's own grammar
+/// (`main.rs`'s `Audit::sanctioned: Vec<String>`) admits any string, so a
+/// value missing the separator, naming an empty rule id or an empty
+/// reference, or repeating a rule id an earlier value already named, is
+/// this command's own usage error -- checked after `cmd_audit` resolves
+/// `root` and loads the knowledge base, but before any audit work starts.
+/// An empty reference would book a sanction naming no reference at all,
+/// and a repeated rule id would let `sanctioned_fail` count past the one
+/// row it can ever annotate -- both are this function's business, not
+/// the apply loop's, so a malformed `--sanctioned` is caught before any
+/// row is even read. Splits on the FIRST `=` only, so a reference itself
+/// containing `=` (a URL query string, say) survives whole.
 fn parse_sanctioned(raw: Vec<String>) -> Result<Vec<(String, String)>, String> {
     let mut seen_rules: Vec<String> = Vec::new();
     let mut pairs = Vec::with_capacity(raw.len());
@@ -1004,9 +949,8 @@ fn parse_sanctioned(raw: Vec<String>) -> Result<Vec<(String, String)>, String> {
 
 /// Runs the `audit` subcommand: resolves `root` (`--dir`, or the enclosing
 /// git repository's top level), loads the knowledge base there, parses
-/// `--ids` as a comma-separated, trimmed, non-empty list (`tools/kb.mjs`'s
-/// `main`'s own `audit` case) and `--sanctioned` per `parse_sanctioned`
-/// (HR-077), and prints the JSON result.
+/// `--ids` as a comma-separated, trimmed, non-empty list and
+/// `--sanctioned` per `parse_sanctioned`, and prints the JSON result.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_audit(
     dir: Option<PathBuf>,
@@ -1084,7 +1028,7 @@ mod tests {
     use super::*;
     use crate::rules::model::load_base;
 
-    // ---- fixture builders, ported from tests/kb.test.mjs's own module-level helpers ----
+    // ---- fixture builders ----
 
     fn git(root: &Path, args: &[&str]) -> String {
         let output = Command::new("git")
@@ -1112,7 +1056,6 @@ mod tests {
         }
     }
 
-    /// `tests/kb.test.mjs`'s `commit`.
     fn commit(root: &Path, message: &str, body: Option<&str>) -> String {
         commit_as(root, "t <t@t.t>", message, body)
     }
@@ -1143,7 +1086,6 @@ mod tests {
         git(root, &["rev-parse", "HEAD"]).trim().to_string()
     }
 
-    /// `tests/kb.test.mjs`'s `entry`.
     fn entry(overrides: Value) -> Value {
         let mut base = json!({
             "id": "process.sequential", "kind": "rule", "area": "process", "standing": true,
@@ -1158,7 +1100,6 @@ mod tests {
         base
     }
 
-    /// `tests/kb.test.mjs`'s module-level `SCHEMA`.
     fn seed_schema() -> Value {
         let path =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../template/knowledge/schema.json");
@@ -1170,7 +1111,6 @@ mod tests {
         schema
     }
 
-    /// `tests/kb.test.mjs`'s module-level `AREAS`.
     fn areas_json() -> Value {
         json!({
             "global": {"paths": []}, "process": {"paths": []},
@@ -1183,7 +1123,6 @@ mod tests {
         })
     }
 
-    /// `tests/kb.test.mjs`'s `writeTopics`.
     fn write_topics(root: &Path, entries: &[Value]) {
         let mut by_topic: BTreeMap<String, Vec<Value>> = BTreeMap::new();
         for e in entries {
@@ -1207,8 +1146,8 @@ mod tests {
         }
     }
 
-    /// `tests/kb.test.mjs`'s `makeRepo`, with `files` written before the
-    /// initial commit.
+    /// A seeded repository with `files` written before the initial
+    /// commit.
     fn make_repo_with_files(entries: &[Value], files: &[(&str, &str)]) -> tempfile::TempDir {
         let dir = tempfile::tempdir().expect("tempdir");
         let root = dir.path();
@@ -1236,7 +1175,6 @@ mod tests {
         make_repo_with_files(entries, &[])
     }
 
-    /// `tests/kb.test.mjs`'s `auditEntries`.
     fn audit_entries() -> Vec<Value> {
         vec![
             entry(json!({
@@ -1296,8 +1234,7 @@ mod tests {
     }
 
     /// A report-field check on any package.json -> `dependency_vetting`,
-    /// shared by the workspace tests -- `tests/kb.test.mjs`'s
-    /// `reportFieldEntry`.
+    /// shared by the workspace tests.
     fn report_field_entry() -> Value {
         entry(json!({
             "id": "process.reportws",
@@ -1309,7 +1246,6 @@ mod tests {
         }))
     }
 
-    /// `tests/kb.test.mjs`'s `writeWorkspace`.
     fn write_workspace(reports: &[(&str, Value)]) -> tempfile::TempDir {
         let dir = tempfile::tempdir().expect("tempdir");
         for (name, body) in reports {
@@ -1332,7 +1268,7 @@ mod tests {
             .unwrap_or_else(|| panic!("no row {id:?} in {rows:#?}"))[field]
     }
 
-    // ---- tests/kb.test.mjs, describe('audit') -----------------------------------------
+    // ---- audit ----
 
     #[test]
     fn derives_the_package_from_standing_rules_touched_areas_and_ids_and_runs_every_check() {
@@ -1461,8 +1397,8 @@ mod tests {
         assert_eq!(data["rules"].as_array().unwrap().len(), 8);
     }
 
-    /// HR-026: a check needs an audit loading path of its own; an area
-    /// match must admit a checked entry of any kind, not only rule and
+    /// A check needs an audit loading path of its own; an area match
+    /// must admit a checked entry of any kind, not only rule and
     /// invariant.
     #[test]
     fn joins_a_checked_procedure_entry_when_its_area_is_touched() {
@@ -1513,8 +1449,8 @@ mod tests {
         assert!(!ids.contains(&"infra.unchecked-proc"));
     }
 
-    /// HR-024: an audit whose range holds no commits used to read as clean
-    /// evidence ('0 commits checked') instead of a vacuous one.
+    /// An audit whose range holds no commits reads as a vacuous one, not
+    /// clean evidence ('0 commits checked').
     #[test]
     fn stamps_a_base_equals_head_audit_as_vacuous() {
         let dir = make_repo(&audit_entries());
@@ -1734,11 +1670,11 @@ mod tests {
         assert_eq!(outcome2.result["rules"][0]["result"], json!("pass"));
     }
 
-    /// HR-016: an implementer report missing a live-run recipe warns
-    /// instead of a full-text search; disclosed-mutation proof, not a
-    /// natural RED (`process.tdd`): with `if` set to a glob that never
-    /// matches, the missing-report assertion below fails ('pass', not
-    /// 'warn'); restoring `if: "**"` makes it pass again.
+    /// An implementer report missing a live-run recipe warns instead of a
+    /// full-text search; disclosed-mutation proof, not a natural RED
+    /// (`process.tdd`): with `if` set to a glob that never matches, the
+    /// missing-report assertion below fails ('pass', not 'warn');
+    /// restoring `if: "**"` makes it pass again.
     #[test]
     fn warns_a_report_field_row_when_live_run_is_missing_and_passes_when_present_even_empty() {
         let dir = make_repo(&[entry(json!({
@@ -1782,12 +1718,12 @@ mod tests {
         assert_eq!(outcome2.result["rules"][0]["result"], json!("pass"));
     }
 
-    /// Fix round 1, issue 4 (task-3-review.json): a malformed `then` glob
-    /// must be named, never swallowed into a false violation. Before the
-    /// fix, `match_any(path, &check.then).unwrap_or(false)` turned the
-    /// `GlobError` from the reviewer's own fixture shape (a descending
-    /// bracket range) into a silent "did not match", so the check reported
-    /// a `fail` row instead of the audit itself failing to run.
+    /// A malformed `then` glob must be named, never swallowed into a
+    /// false violation: `match_any(path,
+    /// &check.then).unwrap_or(false)` would turn a `GlobError` (a
+    /// descending bracket range, say) into a silent "did not match", so
+    /// the check would report a `fail` row instead of the audit itself
+    /// failing to run.
     #[test]
     fn a_malformed_then_glob_is_named_not_swallowed_into_a_false_violation() {
         let dir = make_repo_with_files(
@@ -1811,13 +1747,10 @@ mod tests {
         assert!(error.contains("src/[z-a].js"), "{error}");
     }
 
-    /// Fix round 1, issue 7 (task-3-review.json): a standing rule carrying
-    /// a malformed `check` object must be named, not silently downgraded
-    /// to a judged row. The frozen JS crashes on this exact shape (a
-    /// JS-truthy `check` whose `type` matches no `runCheck` arm returns
-    /// `undefined`, which then crashes the caller downstream); this
-    /// binary instead reports it as the standard one-line, exit-2 finding
-    /// -- naming both the entry and the reason, never silence.
+    /// A standing rule carrying a malformed `check` object must be
+    /// named, not silently downgraded to a judged row: the standard
+    /// one-line, exit-2 finding names both the entry and the reason,
+    /// never silence.
     #[test]
     fn a_malformed_check_on_a_standing_rule_is_named_not_silently_downgraded_to_judged() {
         let dir = make_repo(&[entry(json!({
@@ -1834,9 +1767,8 @@ mod tests {
         assert!(error.contains("malformed check"), "{error}");
     }
 
-    /// HR-019: a `co-change` `then` glob (matchAny) must cross a
-    /// dot-segment, the same defect as areaFiles but at the check-runner
-    /// call site.
+    /// A `co-change` `then` glob (`match_any`) must cross a dot-segment,
+    /// the same as `area_files` does at the area-resolution call site.
     #[test]
     fn matches_a_co_change_then_glob_across_a_dot_segment() {
         let dir = make_repo_with_files(
@@ -1866,9 +1798,9 @@ mod tests {
         );
     }
 
-    /// HR-018: when the only `if` match is the `then` path itself, naming
-    /// it as both the trigger and the record reads as circular; the
-    /// evidence names the case plainly instead.
+    /// When the only `if` match is the `then` path itself, naming it as
+    /// both the trigger and the record reads as circular; the evidence
+    /// names the case plainly instead.
     #[test]
     fn names_a_record_only_co_change_satisfied_by_definition() {
         let dir = make_repo_with_files(
@@ -1928,9 +1860,9 @@ mod tests {
         );
     }
 
-    /// Review finding (task 2, round 1): a `then` glob that matches
-    /// several changed files, with nothing else matching `if`, must not
-    /// name any of them as the trigger either.
+    /// A `then` glob that matches several changed files, with nothing
+    /// else matching `if`, must not name any of them as the trigger
+    /// either.
     #[test]
     fn names_no_then_matching_file_as_the_trigger_when_several_then_files_changed() {
         let dir = make_repo_with_files(
@@ -2211,8 +2143,7 @@ mod tests {
         );
     }
 
-    /// Fix round 1 (Task 4 review, Important #2 -- carried into the audit
-    /// port): `body_absent` must match any line of the body, not only an
+    /// `body_absent` must match any line of the body, not only an
     /// anchored match against the whole body string.
     #[test]
     fn matches_body_absent_against_any_body_line_not_only_the_body_start() {
@@ -2241,13 +2172,11 @@ mod tests {
         );
     }
 
-    /// A check's regex is built once and reused across every commit in the
-    /// loop; a `g`/`y` flag would make a JS `RegExp` stateful via
-    /// `lastIndex`. `regress::Regex` carries no such state at all (each
-    /// `find` call is independent), so this test cannot discriminate
-    /// stripped-vs-not the way the frozen JS's own test could -- it stays
-    /// as a direct behavioral pin (two "ok" commits both matched), not a
-    /// meaningful natural RED for this port.
+    /// A check's regex is built once and reused across every commit in
+    /// the loop. `regress::Regex` carries no state across `find` calls,
+    /// so stripping `g`/`y` cannot be distinguished behaviorally here --
+    /// this stays a direct behavioral pin (two "ok" commits both
+    /// matched).
     #[test]
     fn strips_a_g_y_flag_so_a_check_regex_cannot_leak_lastindex_across_commits() {
         let dir = make_repo(&[entry(json!({
@@ -2266,9 +2195,9 @@ mod tests {
         assert_eq!(row["evidence"], json!("2 commits checked"));
     }
 
-    /// HR-009: a three-dot diff between `base` and `head` compares from
-    /// their merge base to `head`, so main's later change to a file the
-    /// branch never touches stays out of the branch's own diff.
+    /// A three-dot diff between `base` and `head` compares from their
+    /// merge base to `head`, so main's later change to a file the branch
+    /// never touches stays out of the branch's own diff.
     #[test]
     fn diffs_from_the_merge_base_not_a_base_tip_that_moved_past_the_branch() {
         let dir = make_repo_with_files(
@@ -2305,7 +2234,7 @@ mod tests {
         assert_eq!(row["evidence"], json!("0 files checked"));
     }
 
-    /// HR-008: `--workspace` judges a `report-field` check against every
+    /// `--workspace` judges a `report-field` check against every
     /// `task-<n>-report.json` in a workspace directory, instead of the
     /// single `--report` file.
     #[test]
@@ -2413,8 +2342,7 @@ mod tests {
         assert_eq!(row["evidence"], json!("not triggered by any report"));
     }
 
-    /// Task 4 review, Important #2 (carried into the audit port): a
-    /// workspace report is required to carry `files_changed`; one that
+    /// A workspace report is required to carry `files_changed`; one that
     /// lacks it is malformed, not silently "no hit".
     #[test]
     fn fails_a_workspace_report_field_check_naming_a_report_that_lacks_files_changed() {
@@ -2443,13 +2371,10 @@ mod tests {
         );
     }
 
-    /// Fix round 1, issue 7 (task-3-review.json): a `files_changed` array
-    /// holding a non-string element (the reviewer's own measured
-    /// reproduction, `[5, "src/a.js"]`) is named the same "lacks
-    /// files_changed" finding as a wholly-non-array `files_changed`, not
-    /// silently filtered down to its string elements. The frozen JS
-    /// crashes on this exact shape (`matchesGlob` throws for a non-string
-    /// path argument).
+    /// A `files_changed` array holding a non-string element (`[5,
+    /// "src/a.js"]`, say) is named the same "lacks files_changed" finding
+    /// as a wholly-non-array `files_changed`, not silently filtered down
+    /// to its string elements.
     #[test]
     fn fails_a_workspace_report_field_check_naming_a_report_whose_files_changed_holds_a_non_string_entry()
      {
@@ -2484,17 +2409,16 @@ mod tests {
         );
     }
 
-    /// Branch review, issue 1: a report's `files_changed` that misses the
-    /// first glob in a multi-glob `if` forces `match_any` to fall through
-    /// to a later, malformed one -- `unwrap_or(false)` used to turn that
-    /// `GlobError` into a silent "did not match" (this hit's own report
-    /// excluded from `hits`, or "not triggered by any report" if it was
-    /// the only one), the same class fix round 1 (issue 4) named for
-    /// `then`. The real git diff changes `tools/package.json`, matching
-    /// the first glob, so `filter_matching` at line 516 never reaches the
-    /// second (the review's own "short-circuits before compiling the
-    /// rest"); the report's own `files_changed` names a path that matches
-    /// neither, so matching it must compile the malformed second glob.
+    /// A report's `files_changed` that misses the first glob in a
+    /// multi-glob `if` forces `match_any` to fall through to a later,
+    /// malformed one -- `unwrap_or(false)` would turn that `GlobError`
+    /// into a silent "did not match" (this hit's own report excluded
+    /// from `hits`, or "not triggered by any report" if it was the only
+    /// one). The real git diff changes `tools/package.json`, matching
+    /// the first glob, so `filter_matching` never reaches the second when
+    /// resolving the trigger; the report's own `files_changed` names a
+    /// path that matches neither, so matching it must compile the
+    /// malformed second glob.
     #[test]
     fn a_malformed_second_if_glob_is_named_when_a_reports_files_changed_misses_the_first() {
         let dir = make_repo(&[entry(json!({
@@ -2528,12 +2452,11 @@ mod tests {
         assert!(error.contains("src/[z-a].js"), "{error}");
     }
 
-    /// Task 4 review, Minor #3 (carried into the audit port): a missing
-    /// `--workspace` directory is a named error, not a raw stack trace.
-    /// The CLI-level "exactly one stderr line" assertion the frozen JS
-    /// test also makes lives in `tests/validate_stats_audit_parity.rs`
-    /// (`cmd_audit`'s own boundary), since this module's tests exercise
-    /// `audit()` directly, not the printed `main` dispatch.
+    /// A missing `--workspace` directory is a named error, not a raw
+    /// stack trace. The CLI-level "exactly one stderr line" assertion
+    /// lives in `tests/validate_stats_audit_parity.rs` (`cmd_audit`'s own
+    /// boundary), since this module's tests exercise `audit()` directly,
+    /// not the printed `main` dispatch.
     #[test]
     fn rejects_a_missing_workspace_directory_as_a_usage_error_not_a_stack_trace() {
         let dir = make_repo(&audit_entries());
@@ -2576,12 +2499,10 @@ mod tests {
         assert_eq!(error, "audit takes --report or --workspace, not both");
     }
 
-    /// tests/kb.test.mjs, describe('main (audit, stats)'): "carries git's
-    /// own stderr line for a diff failure that is not a merge-base miss" --
-    /// direct `git_diff` (a private helper `audit()` never feeds a
-    /// malformed pathspec itself, so this is the only way to exercise its
-    /// generic fallback, matching the frozen JS's own choice to export
-    /// `gitDiff` for exactly this test).
+    /// Carries git's own stderr line for a diff failure that is not a
+    /// merge-base miss: calls `git_diff` directly, since `audit()` never
+    /// feeds it a malformed pathspec itself, and this is the only way to
+    /// exercise its generic fallback.
     #[test]
     fn git_diff_carries_gits_own_stderr_line_for_a_non_merge_base_failure() {
         let dir = make_repo(&audit_entries());
@@ -2589,11 +2510,9 @@ mod tests {
         assert_eq!(error, "fatal: Invalid pathspec magic 'bad' in ':(bad'");
     }
 
-    /// tests/kb.test.mjs: "does not mislabel a pathspec failure whose text
-    /// happens to contain 'merge base'" -- the discriminator looks for the
-    /// literal substring "no merge base", so a pathspec that echoes back
-    /// the different words "bad merge base" must not be mistaken for an
-    /// actual merge-base miss.
+    /// The discriminator looks for the literal substring "no merge base",
+    /// so a pathspec that echoes back the different words "bad merge
+    /// base" must not be mistaken for an actual merge-base miss.
     #[test]
     fn git_diff_does_not_mislabel_a_pathspec_failure_whose_text_contains_merge_base() {
         let dir = make_repo(&audit_entries());
@@ -2610,15 +2529,11 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "falls back to the caught error's own message
-    /// when git never runs and leaves no stderr" -- a `cwd` that does not
-    /// exist makes `Command::output` itself fail (git never launches), so
-    /// `run_git`'s `RawGitError::stderr` carries the OS error's own text
-    /// instead of anything git printed. The frozen JS pins Node's own
-    /// `ENOENT` wording; this pins only that the fallback still produces a
-    /// real, non-empty one-line message, since Rust's `io::Error` text
-    /// differs (verified live: "No such file or directory (os error 2)",
-    /// not the string "ENOENT").
+    /// A `cwd` that does not exist makes `Command::output` itself fail
+    /// (git never launches), so `run_git`'s `RawGitError::stderr` carries
+    /// the OS error's own text instead of anything git printed. This
+    /// pins only that the fallback still produces a real, non-empty
+    /// one-line message, since the OS error text is platform-specific.
     #[test]
     fn git_diff_falls_back_to_the_os_errors_own_message_when_git_never_runs() {
         let missing_root =
@@ -2628,7 +2543,7 @@ mod tests {
         assert!(!error.is_empty());
     }
 
-    // ---- HR-077: the sanctioned-fail annotation ----
+    // ---- the sanctioned-fail annotation ----
 
     /// A commit whose subject violates `process.commits`' pattern, with no
     /// other file change -- every OTHER deterministic check in
@@ -2670,10 +2585,10 @@ mod tests {
         assert!(outcome.failed, "a sanctioned fail still fails the run");
     }
 
-    /// Fix round 1, review minor issue 2: a rule that RAN and passed is a
-    /// stale booking, distinguished by wording from a rule the package
-    /// never carried at all (`reports_an_unknown_sanctioned_id_as_a_named_
-    /// error_not_a_stale_booking`).
+    /// A rule that RAN and passed is a stale booking, distinguished by
+    /// wording from a rule the package never carried at all
+    /// (`reports_an_unknown_sanctioned_id_as_a_named_error_not_a_stale_
+    /// booking`).
     #[test]
     fn reports_a_stale_sanction_naming_a_rule_that_ran_and_passed() {
         let dir = make_repo(&audit_entries());
@@ -2700,11 +2615,11 @@ mod tests {
         assert!(outcome.failed, "a stale booking still fails the run");
     }
 
-    /// Fix round 1, review minor issue 2: a rule id absent from this
-    /// audit's package (never a row at all, typically a typo) is this
-    /// function's own named error -- the same "unknown id" shape `--ids`
-    /// already uses one flag over -- never folded into `stale_sanctions`
-    /// alongside a rule that genuinely ran and passed.
+    /// A rule id absent from this audit's package (never a row at all,
+    /// typically a typo) is this function's own named error -- the same
+    /// "unknown id" shape `--ids` already uses one flag over -- never
+    /// folded into `stale_sanctions` alongside a rule that genuinely ran
+    /// and passed.
     #[test]
     fn reports_an_unknown_sanctioned_id_as_a_named_error_not_a_stale_booking() {
         let (dir, base_sha) = make_repo_with_one_bad_commit_subject();
@@ -2744,8 +2659,8 @@ mod tests {
         );
     }
 
-    /// Fix round 1, review minor issue 1: an empty reference books a
-    /// sanction naming nothing to check against later.
+    /// An empty reference books a sanction naming nothing to check
+    /// against later.
     #[test]
     fn parse_sanctioned_rejects_an_empty_reference() {
         assert_eq!(
@@ -2754,8 +2669,8 @@ mod tests {
         );
     }
 
-    /// Fix round 1, review minor issue 1: a repeated rule id would let
-    /// `sanctioned_fail` count past the one row it can ever annotate.
+    /// A repeated rule id would let `sanctioned_fail` count past the one
+    /// row it can ever annotate.
     #[test]
     fn parse_sanctioned_rejects_a_repeated_rule_id() {
         assert_eq!(

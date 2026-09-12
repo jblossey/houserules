@@ -762,3 +762,14 @@ Each item records the ruling with its date, or stays marked open.
     narration in code); sha2 is adopted for the update
     baselines with entry-level upsert for SEED_ONCE knowledge
     topics. Source: owner, 2026-09-11, batch-22 shaping.
+62. **doc-comments wording trimmed to the summary cap — ruled
+    2026-09-11.** The 5.61 doc-comments wording measures 166
+    characters against the knowledge schema's 160-character
+    summary cap (found live by T3a's gate run). Ruled: trim,
+    not a cap raise and not a body split. The shipped summary
+    is "Document every exported symbol with the language's
+    doc-comment convention: the current contract. Name things
+    so the code reads without comments." — dropping only
+    "concise and complete", which writing-style.principles
+    already demands. The cap stays at 160 for all adopters.
+    Source: owner, 2026-09-11, batch-22 T3a escalation.

@@ -1,42 +1,15 @@
 //! The `check-report-claims` flat-surface subcommand: cross-checks one
 //! deliverable report's claims against the artifacts and git history it
-//! cites (batch 20 T2, HR-066, docs/specs/2026-09-07-batch-20-phase5.md
-//! §3). Ported first to a dev-only `src/bin/check-report-claims.rs` target
-//! in this crate (batch 18 T1, HR-061, docs/specs/2026-09-05-batch-18-
-//! phase3.md §7: `tools/check-report-claims.mjs`, ported byte-for-check,
-//! not byte-for-byte -- see this module's own "Port notes" below for why
-//! that distinction matters here); moved here and wired into
-//! `crate::main`'s dispatch in the same commit the dev bin retires, no
-//! thin wrapper left behind: the crate carries no `[lib]` target, so a
-//! second binary sharing this module's code would need one purely to keep
-//! an invocation shape (`cargo run --bin check-report-claims`) that only
-//! this repository could ever run -- exactly the gap this move exists to
-//! close (`quality.no-compat-softening`; every doc naming that invocation
-//! now names `houserules check-report-claims` instead -- the tree-wide
-//! residue sweep bounding that closure is retained at
-//! `.superpowers/sdd/2026-09-07-batch-20/t2-evidence/residue-sweep-bin-
-//! check-report-claims.txt` and cited in this task's own report's
-//! `fix_rounds[0].tests[0]`; every hit it finds is historical prose, not
-//! a live instruction). The dev bin's `cargo run --bin
-//! check-report-claims` command could run only inside this repository;
-//! `houserules check-report-claims` runs anywhere the shipped binary
-//! does, so `template/.claude/agents/implementer.md`'s seeded closing act
-//! (HR-060) now runs in every adopter repo `houserules init` seeds, not
-//! only this one (`houserules.payload-runs-on-builtins`'s second
-//! known-gap bullet, retired at this same commit). Lives at the crate
-//! root, like `emit`, `get`, `install`, `node_path`, and `root`, for the
-//! reason each of those gives: this module needs none of `crate::rules`'
-//! or `crate::backlog`'s modules (only `serde_json`, `std`, and a `git`
+//! cites. Lives at the crate root, like `emit`, `get`, `install`,
+//! `node_path`, and `root`: this module needs none of `crate::rules`' or
+//! `crate::backlog`'s modules (only `serde_json`, `std`, and a `git`
 //! subprocess for the same plumbing every other command in this crate
 //! already shells out to), so nesting it under either would buy nothing.
 //!
-//! Born from batch 17 task 1 (HR-059): four fix rounds in a row each
-//! closed on one `process.claims-match-artifacts` finding, and each
-//! finding was a narrative sentence describing a field the same round had
-//! just changed -- a hand re-check missed it every time, including once in
-//! the sentence describing this tool's own coverage. See that task's
-//! `task-1-report.json` (`fix_rounds[0..3]`) for the case history this
-//! tool exists to stop repeating.
+//! A report's narrative prose can restate a fact that a later edit changed
+//! elsewhere in the same report -- a stale head, a stale pass count, an
+//! unresolvable sha -- and a hand re-check tends to miss exactly this
+//! shape. This tool exists to catch that class mechanically.
 //!
 //! Limits (every doc comment below that says "see the module doc's
 //! limits" means this list): this tool narrows deliberately, in favour of
@@ -48,55 +21,37 @@
 //!   not -- widening the set is future work, not a limit of the mechanism
 //!   itself.
 //! - `check_self_audit_narrative` fires only on a `"<N>/<M> deterministic"`
-//!   ratio, not on the word `self_audit` (an earlier version keyed on that
-//!   word and flagged nine lines of this report's own legitimate history --
-//!   a fixture's unrelated `self_audit` field, a past round's sha with no
-//!   ratio nearby). A sentence naming a stale head with no ratio nearby is
-//!   not caught.
+//!   ratio, not on the bare word `self_audit`, which also names unrelated
+//!   things. A sentence naming a stale head with no ratio nearby is not
+//!   caught.
 //! - The sha-token pattern skips a token with no `a`-`f` letter: an
 //!   all-digit run is far more likely a byte or line count than a short
 //!   sha (real, but rare).
 //! - No check here can tell a sentence *asserting* a fact from one
 //!   *quoting* a past mistake -- both contain the same stale sha and
-//!   ratio. `fix_rounds[3]`'s own finding text works around this by
-//!   spelling quoted historical counts as words ("nine of nine"), which
-//!   the digit-based checks do not parse.
+//!   ratio. Spelling a quoted historical count as words ("nine of nine")
+//!   avoids a false flag, since the digit-based checks do not parse it.
 //! - `check_truncation_markers` verifies the excerpt is a byte-prefix of
 //!   the named file and the remaining-line count is exact; it never
 //!   checks that the file is really that *other* command's output, only
 //!   that the bytes match. A marker citing the right file with the wrong
-//!   command label in the `run.command` field passes clean (batch 17 task
-//!   1's own round-2 `tdd[1].green` mislabel, restored as a probe against
-//!   this tool during its review, is exactly this shape).
+//!   command label in the `run.command` field passes clean.
 //! - Any captured run output this tool scans (`tdd[].red`/`.green`,
 //!   `tests[]`, `live_run[]`, `fix_rounds[].tests[]`) that embeds a nested
 //!   test's own failure text can itself contain a string shaped like a
 //!   truncation marker, purely as quoted fixture data -- this tool cannot
 //!   tell a marker asserting a real truncation from one quoted inside
-//!   another test's panic output. Two instances so far, same mechanism,
-//!   different field: this task's own `tdd[].red` for the truncation-marker
-//!   mutation (the captured panic prints the fixture string
-//!   `[... 99 more lines; full run: full.txt ...]` verbatim inside its
-//!   `right: [...]` array, and `full.txt` resolves to nothing at repo
-//!   root) and batch 18 T1 fix round 1's own `fix_rounds[].tests[]` RED for
-//!   the u64-overflow test (the captured panic prints the fixture string
-//!   `[... 99999999999999999999999 more lines; full run: full.txt ...]`
-//!   the same way) -- real, disclosed false positives, surfaced by this
-//!   tool's own production use, not ones it can rule out.
+//!   another test's panic output. A real, disclosed false-positive
+//!   vehicle, not one this tool can rule out.
 //! - A second, distinct vehicle for the same shape of false positive: this
 //!   tool's own diagnostic line quotes the marker text verbatim, so once
-//!   the implementer template's closing act pastes that line into a
-//!   scanned run field (typically `tests[]`, the final entry), the next
-//!   run finds the same marker inside the checker's own prior output and
-//!   flags it again. Unlike the panic-output vehicle above, the quoted
-//!   text is this tool's own finding, not fixture data borrowed from
-//!   another test. This converges to a fixed point rather than growing
-//!   without bound -- verified by running the checker twice against a
-//!   report already carrying the self-flagged line and diffing the two
-//!   runs byte for byte -- because the quoted marker text does not change
-//!   between runs. One instance so far: batch 18 T1's own `tests[10]`,
-//!   which quotes `fix_rounds[0].tests[0]`'s finding line from the vehicle
-//!   above.
+//!   a report pastes that line into a scanned run field (typically
+//!   `tests[]`, the final entry), the next run finds the same marker
+//!   inside the checker's own prior output and flags it again. Unlike the
+//!   panic-output vehicle above, the quoted text is this tool's own
+//!   finding, not fixture data borrowed from another test. This converges
+//!   to a fixed point rather than growing without bound, because the
+//!   quoted marker text does not change between runs.
 //! - `check_self_audit_head_is_current` compares `self_audit.summary.head`
 //!   against the newest commit the report itself lists in `commits[]` and
 //!   `fix_rounds[].commits[]` (see that function's own doc for why, and
@@ -113,146 +68,93 @@
 //!   marks as replaced, like a pre-review amend) reads as unresolvable,
 //!   and this tool cannot yet tell that shape of "correct but aged"
 //!   report from a genuinely broken one.
-//! - `check_paste_run_lint` (HR-071, batch 20 T2, spec §4) flags a command
-//!   field carrying an angle-bracket placeholder, text appended after the
-//!   command that a shell would run as a second, separate command, or
-//!   quoting that does not balance -- the three shapes recurring across
-//!   batch 19's four review rounds (T1 r1/r2, T2 r1/r3). It cannot see a
-//!   retyped command that still parses cleanly: batch 19 T2 round 3's own
-//!   review found a command field carrying two literal backslashes before
-//!   a quote (`python3 -c \"import yaml; ...\"`) that every real shell
-//!   parses -- differently from what was intended, but without error --
+//! - `check_paste_run_lint` flags a command field carrying an
+//!   angle-bracket placeholder, text appended after the command that a
+//!   shell would run as a second, separate command, or quoting that does
+//!   not balance. It cannot see a retyped command that still parses
+//!   cleanly: a command field carrying two literal backslashes before a
+//!   quote (`python3 -c \"import yaml; ...\"`) parses in every real
+//!   shell -- differently from what was intended, but without error --
 //!   which is exactly the shape no quote-balance check can catch, named
 //!   here rather than silently missed.
 //! - `check_paste_run_lint`'s appended-text check exempts a parenthesized
-//!   subshell wrapping the WHOLE command (`( cmd )`, an idiom this
-//!   project's own history uses live) but not one chained after the
-//!   command's first token (`cmd1 && (cmd2)`, also legitimate shell):
-//!   `.superpowers/sdd/2026-09-04-batch-17/task-2-report.json`'s own
-//!   `live_run[8]` (`d=$(mktemp -d) && cp -r ... && git init -q "$d" &&
-//!   (cd "$d" && ...)`) is exactly that shape, and the shipped checker
-//!   flags it -- a real, measured false-positive vehicle (a full sweep of
-//!   this project's own 65 workspace reports, retained at
-//!   `t2-evidence/corpus-sweep-full.txt`, is where this instance surfaced),
-//!   disclosed rather than special-cased away. Narrowing this arm is
-//!   deferred to HR-072, filed against this measurement.
+//!   subshell wrapping the WHOLE command (`( cmd )`, a real shell idiom)
+//!   but not one chained after the command's first token (`cmd1 &&
+//!   (cmd2)`, also legitimate shell) -- a real, disclosed false-positive
+//!   vehicle rather than one special-cased away.
 //! - `check_paste_run_lint`'s placeholder check also fires on command
 //!   DATA that only looks like a placeholder, since it applies regardless
 //!   of `quote_mask`'s state: a literal `<...>` sitting inside a quoted
 //!   string (an HTML-comment probe, an email address) is real,
 //!   paste-runnable text, not a substitution point, but the check cannot
-//!   tell the two apart. This is the lint's most frequent false-positive
-//!   vehicle in this project's own history: the same corpus sweep finds
-//!   it 5 times across 4 reports --
-//!   `.superpowers/sdd/2026-09-01-batch-4/task-4-report.json` `tests[10]`
-//!   (an HTML-comment probe, `<!-- probe: ... -->`),
-//!   `.superpowers/sdd/2026-09-02-batch-6/task-4-report.json` `tests[13]`
-//!   and `fix_rounds[0].tests[18]`,
-//!   `.superpowers/sdd/2026-09-05-batch-18/task-2-report.json`
-//!   `live_run[4]`, and
-//!   `.superpowers/sdd/2026-09-07-batch-20/task-1-report.json`
-//!   `live_run[11]` (the last three of these four a `git commit -m
-//!   "... Co-Authored-By: ... <a@b.com>"` shape this repository's own
-//!   standing no-coauthor rule guarantees will keep recurring as literal
-//!   test data). Narrowing this arm (a quote-aware placeholder check) is
-//!   deferred to HR-072 alongside the subshell narrowing above.
+//!   tell the two apart -- the lint's most frequent false-positive
+//!   vehicle, most often a `git commit -m "... Co-Authored-By: ...
+//!   <a@b.com>"` shape this repository's own standing no-coauthor rule
+//!   guarantees will keep recurring as literal test data.
 //! - `check_paste_run_lint`'s placeholder check reads any `<...>` span
 //!   with no whitespace touching either bracket as a placeholder,
-//!   excluding only `<(`/`>(` process substitution -- verified against
-//!   the same corpus sweep, which never misreads a real process
-//!   substitution (`diff <(cmd1) <(cmd2)`, seen live in this project's
-//!   own history) as one. A command legitimately using bare `< file`
-//!   stdin redirection immediately followed later on the same line by a
-//!   `>` output redirect would still misread as a placeholder; no report
-//!   in the swept corpus does this, so it stays a theoretical,
-//!   undemonstrated vehicle, not one this project's own history can point
-//!   an instance at.
-//! - `check_ephemeral_paths` (HR-075, batch 21 T2, docs/specs/2026-09-08-
-//!   batch-21-gates.md §3) flags an absolute `/tmp/`-rooted path or a
+//!   excluding only `<(`/`>(` process substitution (`diff <(cmd1)
+//!   <(cmd2)`, real shell syntax, never misread). A command legitimately
+//!   using bare `< file` stdin redirection immediately followed later on
+//!   the same line by a `>` output redirect would still misread as a
+//!   placeholder -- theoretical, not yet observed.
+//! - `check_ephemeral_paths` flags an absolute `/tmp/`-rooted path or a
 //!   `scratchpad/`-named directory segment anywhere in the same four
 //!   narrative fields `collect_narrative` already scans -- never inside a
 //!   `command` field (`collect_runs`), where `/tmp` is the literal,
 //!   required text of what ran (a live-run scratch repository lives there
 //!   by design, `houserules.live-run-recipe`) and this check has no
-//!   business judging it. The second shape widened the first at batch 21
-//!   T2 fix round 1 (review important issue 1): six real corpus citations
-//!   name this project's own session-scratchpad home with no `/tmp/`
-//!   prefix at all, several eliding it to a bare `.../` (`.superpowers/sdd/
-//!   2026-09-08-batch-21/t2-evidence/rollout-check-report-claims-
-//!   ephemeral.sh`'s own re-derivation over the same 116-file corpus:
-//!   batch 3 task 2, batch 4 task 3, batch 9 tasks 3 and 4, batch 10 tasks
-//!   2 and 3). `/tmp/` still requires the word it roots to start with `/`
-//!   (`word_qualifies`'s own doc has the boundary account, fixed the same
-//!   round against review important issue 2: an unanchored substring match
-//!   used to flag a durable, tracked path like `tests/tmp/golden.json` or
-//!   a URL's own path segment); `scratchpad/` carries no such requirement,
-//!   since every real citation of that shape is the bare directory name.
-//!   Both shapes together are still blind to a macOS `$TMPDIR` (typically
-//!   `/var/folders/.../T/`), a Windows `%TEMP%`, or any other platform's
-//!   ephemeral home with no `scratchpad/` segment in it, and to a
-//!   durable-LOOKING repository-relative path that is in fact untracked or
-//!   never committed: a report cannot be checked against a git object that
-//!   was never added. A bare mention of the WORD "scratchpad" with no
-//!   `scratchpad/`-segmented path attached (this project's own history
-//!   carries dozens, honestly discussing the concept) is deliberately not
-//!   this check's business either. The `scratchpad/` arm carries no
-//!   absolute-path requirement (batch-21 T2 fix round 2, review new
-//!   breakage, minor): it flags any word containing a `scratchpad/`
-//!   segment, durable or not, so a real, tracked, repository-relative path
-//!   naming one -- verified live: `docs/scratchpad/notes.md` in a
-//!   narrative field flags -- would over-flag the same way the unanchored
-//!   `/tmp/` match once did. Left unanchored on measurement, not
-//!   oversight: `git ls-files | grep -c 'scratchpad/'` is 0 in this
-//!   repository's own tracked tree, and all six real corpus citations this
-//!   arm was built from (module doc, above) are genuinely ephemeral, so
-//!   nothing is mis-flagged today; named here as this project's own
-//!   history grows, per this file's own standard of naming even
-//!   undemonstrated false-positive vehicles. A glued NON-punctuation prefix
-//!   is also invisible to both shapes (batch 21 branch review, minor
-//!   issue): `EPHEMERAL_PATH_LEADING_PUNCTUATION` trims neither `=` nor
-//!   `:`, so a word like `OUT=/tmp/x` or `dest:/tmp/x` -- an env-var
-//!   assignment or a labeled value quoted in prose -- keeps that prefix
-//!   after the trim, no longer starts with `/`, and `word_qualifies`
-//!   rejects it the same way an unanchored bare path would have passed
-//!   unflagged before this check existed. Undemonstrated in the swept
-//!   corpus today (docs-only disclosure; the corpus-measured boundary
-//!   stands, no behavior change licensed here), named per this file's own
-//!   standard.
+//!   business judging it. `/tmp/` requires the word it roots to start
+//!   with `/` (`word_qualifies`'s own doc has the boundary account): an
+//!   unanchored substring match would otherwise flag a durable, tracked
+//!   path like `tests/tmp/golden.json` or a URL's own path segment.
+//!   `scratchpad/` carries no such requirement, since every real citation
+//!   of that shape is the bare directory name, with or without a leading
+//!   `/` or an elided `.../` prefix. Both shapes together are still blind
+//!   to a macOS `$TMPDIR` (typically `/var/folders/.../T/`), a Windows
+//!   `%TEMP%`, or any other platform's ephemeral home with no
+//!   `scratchpad/` segment in it, and to a durable-LOOKING
+//!   repository-relative path that is in fact untracked or never
+//!   committed: a report cannot be checked against a git object that was
+//!   never added. A bare mention of the WORD "scratchpad" with no
+//!   `scratchpad/`-segmented path attached is deliberately not this
+//!   check's business either. The `scratchpad/` arm carries no
+//!   absolute-path requirement: it flags any word containing a
+//!   `scratchpad/` segment, durable or not, so a real, tracked,
+//!   repository-relative path naming one (e.g. `docs/scratchpad/notes.md`)
+//!   over-flags the same way an unanchored `/tmp/` match would. A glued
+//!   NON-punctuation prefix is also invisible to both shapes:
+//!   `EPHEMERAL_PATH_LEADING_PUNCTUATION` trims neither `=` nor `:`, so a
+//!   word like `OUT=/tmp/x` or `dest:/tmp/x` -- an env-var assignment or a
+//!   labeled value quoted in prose -- keeps that prefix after the trim, no
+//!   longer starts with `/`, and `word_qualifies` rejects it the same way
+//!   an unanchored bare path would have passed unflagged.
 //! - `quote_mask` has no notion of `$(...)` command substitution
 //!   resetting quote context: real bash parses a same-character quote
 //!   opened again inside a `$(...)` (or `` `...` ``) as starting a fresh,
 //!   independent quoted region, not as closing the one around the whole
-//!   substitution. This walk does not track that: `bash -c "$(python3 -c
-//!   "import yaml; d=yaml.safe_load(open('...')); ...")"` (batch 19 task
-//!   2's own `fix_rounds[0].tests[4]`/`fix_rounds[2].tests[0]`, a real,
-//!   valid command) reads the inner `"import yaml...` quote as closing
-//!   the outer one, so by the time the walk reaches `open(...)` it
-//!   believes itself outside any quote -- a false positive, surfaced live
-//!   by this lint's first run against real report history (this task's
-//!   own `live_run`), not one a walker this project deliberately keeps
-//!   below full shell grammar (see the port notes above) can rule out.
+//!   substitution. This walk does not track that: a command like
+//!   `bash -c "$(python3 -c "import yaml; d=yaml.safe_load(open('...'));
+//!   ...")"`, valid in real bash, reads the inner `"import yaml...` quote
+//!   as closing the outer one, so by the time the walk reaches `open(...)`
+//!   it believes itself outside any quote -- a false positive that a
+//!   walker kept deliberately below full shell grammar (see Further
+//!   constraints below) cannot rule out.
 //!
-//! Port notes (batch 18 T1, disclosed divergences from the frozen JS --
-//! this tool carries no frozen-corpus parity contract, unlike the flat
-//! command surface):
+//! Further constraints (this tool carries no frozen-corpus parity
+//! contract, unlike the flat command surface, so these are simply its own
+//! bytes and its own behaviour, not a divergence from anything else):
 //! - `check_self_audit_narrative`'s search window around a stale sha
-//!   counts UTF-8 bytes, not the JS original's UTF-16 code units. The two
-//!   agree everywhere the ported test suite looks; only a report whose
-//!   narrative packs many multi-byte characters within 100 units of a
-//!   ratio would see the window's edge move, and no ported test
-//!   constructs that case.
+//!   counts UTF-8 bytes. Only a report whose narrative packs many
+//!   multi-byte characters within 100 units of a ratio would see the
+//!   window's edge move; not observed in practice.
 //! - `resolve_against` joins a relative path onto `root` with
-//!   `Path::join`, whose absolute-argument-replaces behaviour matches
-//!   Node's `path.resolve(root, relPath)` for both the plain-relative and
-//!   absolute-target cases the ported suite exercises (verified live by
-//!   that suite), but it does not collapse a `.`/`..` segment the way
-//!   `path.resolve` does; no ported test names a path containing one.
+//!   `Path::join`; it does not collapse a `.`/`..` segment in the input
+//!   path.
 //! - A usage error (no report path given) is clap's own required-argument
-//!   message, exit 2, once this tool became a flat-surface subcommand
-//!   (batch 20 T2) -- neither JS's thrown `UsageError` nor the dev bin's
-//!   own hand-written `usage:` line, both retired with it. A `git`
-//!   failure (not a repository, `git` missing) is likewise a named error
-//!   rather than an uncaught crash (`houserules.crash-paths-are-named`).
+//!   message, exit 2. A `git` failure (not a repository, `git` missing)
+//!   is likewise a named error rather than an uncaught crash
+//!   (`houserules.crash-paths-are-named`).
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
@@ -271,7 +173,7 @@ struct Run {
 /// Pushes `value` onto `runs` under `label` when it is an object carrying
 /// string `command` and `output` fields -- anything else (missing,
 /// malformed, or a `run` the schema allows to omit `output`) is silently
-/// skipped, matching `tools/check-report-claims.mjs`'s own tolerant reads.
+/// skipped.
 fn push_run(runs: &mut Vec<(String, Run)>, label: String, value: Option<&Value>) {
     let Some(value) = value else { return };
     let Some(command) = value.get("command").and_then(Value::as_str) else {
@@ -330,9 +232,9 @@ fn collect_runs(report: &Value) -> Vec<(String, Run)> {
 /// each `self_review[]` entry, and each
 /// `fix_rounds[].findings[].finding`/`.fix`. `concerns`, `docs_verified`,
 /// and issue/finding `file`/`why` fields are left out -- not because they
-/// cannot carry a claim, but because the three failures this tool was
-/// built from were all in these four shapes; widening the set is future
-/// work, named in the module doc's limits.
+/// cannot carry a claim, but because narrowing the scope keeps the
+/// false-positive rate low; widening the set is future work, named in the
+/// module doc's limits.
 fn collect_narrative(report: &Value) -> Vec<(String, String)> {
     let mut narrative = Vec::new();
     if let Some(text) = report.get("implemented").and_then(Value::as_str) {
@@ -369,19 +271,16 @@ fn collect_narrative(report: &Value) -> Vec<(String, String)> {
     narrative
 }
 
-/// The absolute form of `rel_path` against `root` -- `Path::join`, whose
-/// absolute-argument-replaces behaviour matches Node's
-/// `path.resolve(root, relPath)` for both cases the ported suite
-/// exercises (see the module doc's port notes for the one case it does
-/// not: `.`/`..` collapse).
+/// The absolute form of `rel_path` against `root`: `Path::join`, which
+/// does not collapse a `.`/`..` segment in `rel_path` (see the module
+/// doc's Further constraints).
 fn resolve_against(root: &Path, rel_path: &str) -> PathBuf {
     root.join(rel_path)
 }
 
 /// Reads `path` as UTF-8, replacing an invalid byte sequence with the
-/// replacement character instead of failing -- Node's
-/// `readFileSync(path, 'utf8')` never throws on invalid UTF-8 either; only
-/// a missing or unreadable file is an error here.
+/// replacement character instead of failing. Only a missing or unreadable
+/// file is an error here.
 fn read_utf8_lossy(path: &Path) -> std::io::Result<String> {
     std::fs::read(path).map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
 }
@@ -418,10 +317,9 @@ fn check_redirected_captures(root: &Path, runs: &[(String, Run)], errors: &mut V
     }
 }
 
-/// The line count `full_text` would report under `tools/kb.mjs`'s own
-/// convention: splitting on `\n` and dropping one trailing empty segment
-/// when the text ends with a newline, so a trailing `\n` never counts as
-/// an extra blank line.
+/// The line count `full_text` reports: splitting on `\n` and dropping one
+/// trailing empty segment when the text ends with a newline, so a
+/// trailing `\n` never counts as an extra blank line.
 fn line_count(full_text: &str) -> usize {
     let lines: Vec<&str> = full_text.split('\n').collect();
     if lines.last() == Some(&"") {
@@ -633,9 +531,9 @@ fn looks_like_a_sha(token: &str) -> bool {
 
 /// Every commit-shaped token in narrative prose must resolve to a real
 /// commit in `root`'s object database. Catches a typo or a fabricated
-/// sha; does not catch a real, resolvable sha used to describe the wrong
-/// thing (see `check_self_audit_narrative` for the one shape of that this
-/// tool does check, and the module doc for the rest).
+/// sha; does not catch a real, resolvable sha that names the wrong thing
+/// (see `check_self_audit_narrative` for the one shape of that this tool
+/// does check, and the module doc for the rest).
 fn check_narrative_shas_resolve(
     root: &Path,
     narrative: &[(String, String)],
@@ -660,8 +558,8 @@ fn check_narrative_shas_resolve(
 }
 
 /// Characters either side of a deterministic-ratio match searched for a
-/// co-located sha -- see the module doc's port notes for why this counts
-/// UTF-8 bytes, not the JS original's UTF-16 code units.
+/// co-located sha -- counted in UTF-8 bytes (see the module doc's Further
+/// constraints).
 const RATIO_SHA_WINDOW: usize = 100;
 
 /// A `"<N>/<M> deterministic"` ratio anywhere in narrative prose is a
@@ -670,8 +568,7 @@ const RATIO_SHA_WINDOW: usize = 100;
 /// which also names unrelated things; see the module doc's limits). Two
 /// things about that ratio must hold: it must equal `pass`/`deterministic`,
 /// and any commit sha within `RATIO_SHA_WINDOW` of it must be `base` or
-/// `head`. This is the check the tool exists for: all three of batch 17
-/// task 1's fix-round findings were exactly this shape -- a sentence
+/// `head`. This is the check the tool primarily exists for: a sentence
 /// naming a stale head next to a stale pass count for the self-audit
 /// sitting elsewhere in the file. Narrower than it could be, on purpose: a
 /// sentence naming only a stale head, with no ratio nearby, is not caught
@@ -746,7 +643,7 @@ fn check_self_audit_narrative(
 
 /// A reason `quote_mask` could not finish walking a command string to the
 /// end -- the "failed shlex-style parse" shape `check_paste_run_lint`
-/// (HR-071) flags. Both cases are exactly what a real shell's own
+/// flags. Both cases are exactly what a real shell's own
 /// word-splitter also refuses: an unterminated quote leaves the shell
 /// waiting for more input (`> ` on an interactive prompt), and a trailing
 /// backslash with nothing to escape is a syntax error.
@@ -773,8 +670,8 @@ impl std::fmt::Display for QuoteParseError {
 /// to answer two questions: does the quoting balance, and which byte
 /// offsets sit inside an open quote? Single quotes (`'...'`) admit no
 /// escapes, matching the POSIX shell grammar's own "a single-quote cannot
-/// occur within single-quotes" (IEEE Std 1003.1-2024 §2.2.2, verified
-/// live). Outside any quote, POSIX has a bare backslash escape exactly
+/// occur within single-quotes" (IEEE Std 1003.1-2024 §2.2.2). Outside
+/// any quote, POSIX has a bare backslash escape exactly
 /// the next character; this walk matches that. Inside double quotes,
 /// POSIX escapes a backslash only before five characters (`$`, `` ` ``,
 /// `"`, `\`, a literal newline); this walk instead escapes ANY following
@@ -792,14 +689,10 @@ impl std::fmt::Display for QuoteParseError {
 /// than the quote/escape state to run safely.
 ///
 /// A hand-rolled walk, not a crate (`shlex`, `shell-words`, `shellwords`):
-/// none is already a dependency of this crate, spec §8
-/// (docs/specs/2026-09-07-batch-20-phase5.md) bounds this task to std plus
-/// the crate's existing dependencies, and every one of those crates
-/// implements the full POSIX word-splitting grammar this lint has no use
-/// for (`security-hygiene.dependency-vetting`,
-/// `quality.well-maintained-libraries`: reasoning stated per the task,
-/// since this repository carries no maintained, std-only, no-execution
-/// tokenizer today).
+/// each implements the full POSIX word-splitting grammar this lint has no
+/// use for, and this repository carries no maintained, std-only,
+/// no-execution tokenizer (`security-hygiene.dependency-vetting`,
+/// `quality.well-maintained-libraries`).
 fn quote_mask(command: &str) -> Result<Vec<bool>, QuoteParseError> {
     let bytes = command.as_bytes();
     let mut mask = vec![false; bytes.len()];
@@ -895,14 +788,13 @@ fn find_placeholder(command: &str) -> Option<&str> {
 /// Finds the byte offset of text after `command`'s first token that a
 /// shell would run as its own, separate command if the field were pasted:
 /// an unquoted `#` comment marker at the start of a word (POSIX begins a
-/// comment only there, never mid-word -- verified live, see the
-/// implementation's own doc), or an unquoted `(` that opens neither a
-/// `$(...)` command substitution nor an escaped `\(` literal (`find`'s own
-/// `\( -name a -o -name b \)` idiom, seen live in this project's own
-/// history) nor process substitution's own `<(`/`>(`. A `(` that is
-/// itself the command's first token -- a subshell wrapping the WHOLE
-/// command (`( cmd; echo "EXIT=$?" )`, also seen live) -- is exempt too:
-/// only text appended AFTER a command that has already started counts
+/// comment only there, never mid-word), or an unquoted `(` that opens
+/// neither a `$(...)` command substitution nor an escaped `\(` literal
+/// (`find`'s own `\( -name a -o -name b \)` idiom) nor process
+/// substitution's own `<(`/`>(`. A `(` that is itself the command's first
+/// token -- a subshell wrapping the WHOLE command (`( cmd; echo
+/// "EXIT=$?" )`) -- is exempt too: only text appended AFTER a command
+/// that has already started counts
 /// (see the module doc's limits for the one shape of chained, legitimate
 /// parenthetical this does not exempt). `mask` (from `quote_mask`)
 /// excludes both markers from consideration while inside a quoted string,
@@ -914,7 +806,7 @@ fn find_appended_annotation(command: &str, mask: &[bool]) -> Option<usize> {
         if !mask[i] {
             let word_initial = i == 0 || bytes[i - 1].is_ascii_whitespace();
             match byte {
-                // POSIX (IEEE Std 1003.1-2024 §2.3, verified live): '#' begins a
+                // POSIX (IEEE Std 1003.1-2024 §2.3): '#' begins a
                 // comment only as the first character of a word, never mid-word
                 // (`foo#bar` is one literal token, not `foo` plus a comment).
                 b'#' if seen_token && word_initial => return Some(i),
@@ -937,12 +829,11 @@ fn find_appended_annotation(command: &str, mask: &[bool]) -> Option<usize> {
     None
 }
 
-/// The bounded, no-execution paste-run lint (HR-071, batch 20 T2, spec
-/// §4): flags a command field carrying an angle-bracket placeholder, text
-/// appended after the command that a shell would run as a second command,
-/// or quoting that does not balance -- the three shapes recurring across
-/// batch 19's four review rounds (see the module doc's limits for what
-/// none of the three can see). A command whose quoting fails to parse
+/// The bounded, no-execution paste-run lint: flags a command field
+/// carrying an angle-bracket placeholder, text appended after the command
+/// that a shell would run as a second command, or quoting that does not
+/// balance (see the module doc's limits for what none of the three can
+/// see). A command whose quoting fails to parse
 /// skips the other two checks: without a reliable quote mask,
 /// `find_appended_annotation` cannot safely tell quoted text from shell
 /// syntax, and one finding per broken command is enough.
@@ -975,46 +866,24 @@ fn check_paste_run_lint(runs: &[(String, Run)], errors: &mut Vec<String>) {
 /// does not survive past the session that wrote it
 /// (`process.evidence-outlives-the-session`). Matched only when it roots an
 /// absolute path (`word_qualifies`'s own doc has the boundary account) --
-/// see the module doc's HR-075 bullet for what this prefix still cannot
-/// see.
+/// see the module doc's Limits for what this prefix still cannot see.
 const EPHEMERAL_PATH_PREFIX: &str = "/tmp/";
 
 /// The directory-segment shape this project's own session-scratchpad home
-/// always ends in, matched wherever it appears in a word (no absolute-path
-/// requirement: batch-21 T2 fix round 1, review important issue 1 -- six
-/// real corpus citations name this shape with no `/tmp/` prefix at all,
-/// several eliding the prefix to a bare `.../` -- see the module doc's
-/// HR-075 bullet).
+/// always ends in, matched wherever it appears in a word with no
+/// absolute-path requirement -- see the module doc's Limits.
 const EPHEMERAL_SCRATCHPAD_SEGMENT: &str = "scratchpad/";
 
 /// Leading bytes this project's own narrative prose glues onto an ephemeral
 /// citation that belong to the surrounding SENTENCE, not the path itself:
 /// an opening bracket/brace/paren, or a quote or backtick opening a
-/// markdown code span (`(scratchpad/task2-scratch-audit.mjs)`, a real
-/// corpus citation -- see the module doc's HR-075 bullet).
+/// markdown code span (`(scratchpad/task2-scratch-audit.mjs)`).
 const EPHEMERAL_PATH_LEADING_PUNCTUATION: &[char] = &['(', '[', '{', '\'', '"', '`'];
 
 /// Trailing bytes this project's own narrative prose glues onto an
 /// ephemeral citation that belong to the surrounding SENTENCE, not the path
 /// itself: a comma or period ending the clause, a closing bracket/paren/
-/// brace, a quote, or a backtick closing a markdown code span. Re-measured
-/// at batch-21 T2 fix round 2 (review critical issue 1b: fix round 1's own
-/// correction traded one wrong count for another) directly from
-/// `t2-evidence/enumerate-narrative-tmp-hits.py`'s own run at HEAD
-/// (`t2-evidence/r2-c1b-remeasure.txt`, retained): 10 tokens total, six
-/// carrying trailing punctuation glued to the path with no space --
-/// `/tmp/houserules-target-uQK5Qz/tools/kb.mjs,`, `/tmp/renamed-binary)`,
-/// `/tmp/release-committed.yml,`, `/tmp/verify-goldens.py,`, and two from
-/// this very report's own fix_rounds[0] narrative illustrating the
-/// anchoring fix rather than citing a real ephemeral artifact,
-/// `tests/tmp/golden.json)` and `.../tmp/report.html)`. The remaining four
-/// -- `/tmp/hr009-*`, both `/tmp/hr009-aKTTWA` occurrences, and
-/// `/tmp/hr009-nN2oLG` -- carry none: each is followed by a space in its
-/// source sentence, verified against the raw corpus text, not restated.
-/// The `` /tmp/houserules-fixbase-worktree`; `` token both earlier rounds
-/// counted no longer appears in this run at all: ruling R1 rewrote
-/// task-1-report.json's three narrative citations later in fix round 1,
-/// removing it from the corpus.
+/// brace, a quote, or a backtick closing a markdown code span.
 const EPHEMERAL_PATH_TRAILING_PUNCTUATION: &[char] =
     &[',', ';', ':', ')', ']', '}', '\'', '"', '`', '.'];
 
@@ -1038,18 +907,17 @@ fn word_start(text: &str, pos: usize) -> usize {
 }
 
 /// `true` when `word` (already trimmed of leading/trailing punctuation) is
-/// the kind of token `trigger` may legitimately root (batch-21 T2 fix
-/// round 1, review important issue 2). `/tmp/` counts only when `word` is
-/// itself an absolute path (starts with `/`) -- otherwise the trigger sits
-/// inside a relative path (`tests/tmp/golden.json`) or a URL's own path
-/// segment (`https://example.test/tmp/report.html`), neither an ephemeral
-/// filesystem location; `/var/tmp/capture.txt` still qualifies, rooted at
-/// its own leading `/`, not at the `/tmp/` substring partway through it.
-/// `scratchpad/` carries no such requirement: every real corpus citation of
-/// that shape (module doc's HR-075 bullet) is the bare directory name,
-/// with or without a leading `/` or an elided `.../` prefix, so requiring
-/// an absolute-path start would exclude the shape this arm exists to
-/// catch.
+/// the kind of token `trigger` may legitimately root. `/tmp/` counts only
+/// when `word` is itself an absolute path (starts with `/`) -- otherwise
+/// the trigger sits inside a relative path (`tests/tmp/golden.json`) or a
+/// URL's own path segment (`https://example.test/tmp/report.html`),
+/// neither an ephemeral filesystem location; `/var/tmp/capture.txt` still
+/// qualifies, rooted at its own leading `/`, not at the `/tmp/` substring
+/// partway through it. `scratchpad/` carries no such requirement: every
+/// real citation of that shape (module doc's Limits) is the bare
+/// directory name, with or without a leading `/` or an elided `.../`
+/// prefix, so requiring an absolute-path start would exclude the shape
+/// this arm exists to catch.
 fn word_qualifies(trigger: &str, word: &str) -> bool {
     trigger != EPHEMERAL_PATH_PREFIX || word.starts_with('/')
 }
@@ -1089,11 +957,11 @@ fn flag_ephemeral_words<'a>(
 
 /// Every ephemeral path token `narrative` cites -- a `/tmp/`-rooted
 /// absolute path or a `scratchpad/`-named directory segment -- once per
-/// unique path per field (HR-075, docs/specs/2026-09-08-batch-21-gates.md
-/// §3): a narrative claim naming an artifact there describes a location
-/// that will not exist by the time anyone re-opens the report. Never scans
-/// a `command` field -- see the module doc's HR-075 bullet for the full
-/// boundary account of why, and what these two shapes still cannot see.
+/// unique path per field: a narrative claim naming an artifact there
+/// describes a location that will not exist by the time anyone re-opens
+/// the report. Never scans a `command` field -- see the module doc's
+/// Limits for the full boundary account of why, and what these two
+/// shapes still cannot see.
 fn check_ephemeral_paths(narrative: &[(String, String)], errors: &mut Vec<String>) {
     for (label, text) in narrative {
         let mut seen: Vec<&str> = Vec::new();
@@ -1103,12 +971,9 @@ fn check_ephemeral_paths(narrative: &[(String, String)], errors: &mut Vec<String
 }
 
 /// Reads and parses `path` as a JSON report, naming the file in any read
-/// or parse error -- `tools/lib/json-store.mjs`'s `readJson`, collapsed to
-/// one named-error shape (`houserules.crash-paths-are-named`): JS raises a
-/// plain `Error` for a missing file and a `UsageError` for invalid JSON,
-/// kept apart only so its `main` can choose an exit code, but
-/// `cmd_check_report_claims`, the one caller that maps this function's
-/// errors to an exit code, treats both the same way, exit 2.
+/// or parse error (`houserules.crash-paths-are-named`):
+/// `cmd_check_report_claims`, the one caller, maps a read failure and a
+/// parse failure to the same exit code, 2.
 fn load_report(path: &Path) -> Result<Value, String> {
     let text =
         std::fs::read_to_string(path).map_err(|error| format!("{}: {error}", path.display()))?;
@@ -1145,9 +1010,9 @@ fn check_report_claims(report_path: &Path, root: &Path) -> Result<Vec<String>, S
 /// report can live under a subdirectory `--dir` has no reason to name.
 /// Exit 0 (clean; prints `no claim mismatches found`), 1 (one line per
 /// mismatch on stderr), or 2 (the root could not be resolved, or
-/// `report_path` could not be resolved, read, or parsed as JSON -- see the
-/// module doc's port notes for the missing-argument case, which clap's
-/// own required-positional check now owns instead of this function).
+/// `report_path` could not be resolved, read, or parsed as JSON). A
+/// missing `report_path` argument is clap's own required-positional
+/// check; this function never sees that case.
 pub(crate) fn cmd_check_report_claims(dir: Option<PathBuf>, report_path: PathBuf) -> ExitCode {
     let root = match crate::root::resolve_root(dir) {
         Ok(root) => root,
@@ -1187,10 +1052,10 @@ mod tests {
 
     use super::*;
 
-    // ---- fixture builders, ported from tests/check-report-claims.test.mjs's own module-level helpers ----
+    // ---- fixture builders ----
 
-    /// `tests/check-report-claims.test.mjs`'s `initScratchRepo`: a fresh
-    /// git repo under a scratch dir, with one commit so `HEAD` resolves.
+    /// A fresh git repo under a scratch dir, with one commit so `HEAD`
+    /// resolves.
     fn init_scratch_repo(prefix: &str) -> (tempfile::TempDir, String) {
         let dir = tempfile::Builder::new()
             .prefix(prefix)
@@ -1244,10 +1109,9 @@ mod tests {
         std::fs::write(path, serde_json::to_string_pretty(value).unwrap()).unwrap();
     }
 
-    /// `tests/check-report-claims.test.mjs`'s `baseReport`: a minimal,
-    /// otherwise-clean task-report shape naming `head` as the one and only
-    /// commit in both `self_audit` and `commits`, so `head` is trivially
-    /// the report's own newest listed commit.
+    /// A minimal, otherwise-clean task-report shape naming `head` as the
+    /// one and only commit in both `self_audit` and `commits`, so `head`
+    /// is trivially the report's own newest listed commit.
     fn base_report(head: &str) -> Value {
         json!({
             "kind": "task-report",
@@ -1265,7 +1129,7 @@ mod tests {
         })
     }
 
-    /// Mapping 1/18: "passes a report with no captures, markers, or narrative claims".
+    /// Passes a report with no captures, markers, or narrative claims.
     #[test]
     fn passes_a_report_with_no_captures_markers_or_narrative_claims() {
         let (dir, head) = init_scratch_repo("check-report-claims-clean-");
@@ -1275,7 +1139,7 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    /// Mapping 2/18: "flags a redirected capture whose output does not byte-match its own target file".
+    /// Flags a redirected capture whose output does not byte-match its own target file.
     #[test]
     fn flags_a_redirected_capture_whose_output_does_not_byte_match_its_own_target_file() {
         let (dir, head) = init_scratch_repo("check-report-claims-redirect-");
@@ -1292,7 +1156,7 @@ mod tests {
         );
     }
 
-    /// Mapping 3/18: "passes a redirected capture whose output byte-matches its target file".
+    /// Passes a redirected capture whose output byte-matches its target file.
     #[test]
     fn passes_a_redirected_capture_whose_output_byte_matches_its_target_file() {
         let (dir, head) = init_scratch_repo("check-report-claims-redirect-ok-");
@@ -1306,7 +1170,7 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    /// Mapping 4/18: "resolves an absolute-path redirect target as-is, not joined onto root".
+    /// Resolves an absolute-path redirect target as-is, not joined onto root.
     #[test]
     fn resolves_an_absolute_path_redirect_target_as_is_not_joined_onto_root() {
         let (dir, head) = init_scratch_repo("check-report-claims-absolute-redirect-");
@@ -1326,7 +1190,7 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    /// Mapping 5/18: "flags a truncation marker whose claimed remaining-line count is wrong".
+    /// Flags a truncation marker whose claimed remaining-line count is wrong.
     #[test]
     fn flags_a_truncation_marker_whose_claimed_remaining_line_count_is_wrong() {
         let (dir, head) = init_scratch_repo("check-report-claims-marker-");
@@ -1346,7 +1210,7 @@ mod tests {
         );
     }
 
-    /// Mapping 6/18: "passes a truncation marker with the correct remaining-line count".
+    /// Passes a truncation marker with the correct remaining-line count.
     #[test]
     fn passes_a_truncation_marker_with_the_correct_remaining_line_count() {
         let (dir, head) = init_scratch_repo("check-report-claims-marker-ok-");
@@ -1363,11 +1227,11 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    /// Not a port: batch 18 T1 fix round 1 finding 3
-    /// (`houserules.crash-paths-are-named`). A marker's claimed count can
-    /// exceed `u64::MAX` even though it matches `\d+`; this is its own
-    /// named error, never a silent `u64::MAX` default that then reports a
-    /// fabricated mismatch against the real remaining-line count.
+    /// A marker's claimed count can exceed `u64::MAX` even though it
+    /// matches `\d+`; this is its own named error
+    /// (`houserules.crash-paths-are-named`), never a silent `u64::MAX`
+    /// default that then reports a fabricated mismatch against the real
+    /// remaining-line count.
     #[test]
     fn flags_a_truncation_marker_whose_claimed_count_does_not_fit_a_u64() {
         let (dir, head) = init_scratch_repo("check-report-claims-marker-overflow-");
@@ -1387,9 +1251,8 @@ mod tests {
         );
     }
 
-    /// Not a port: batch 18 T1 fix round 1 finding 3
-    /// (`process.claims-match-artifacts`). The mismatch message quotes the
-    /// marker's own captured digits, not a re-parsed-and-reformatted
+    /// The mismatch message quotes the marker's own captured digits
+    /// (`process.claims-match-artifacts`), not a re-parsed-and-reformatted
     /// count: a leading-zero claim like "007" must read "007" in the
     /// error text, not silently become "7".
     #[test]
@@ -1411,7 +1274,7 @@ mod tests {
         );
     }
 
-    /// Mapping 7/18: "flags self_audit.summary.head when it is not the report's own newest listed commit".
+    /// Flags self_audit.summary.head when it is not the report's own newest listed commit.
     #[test]
     fn flags_self_audit_head_when_it_is_not_the_reports_own_newest_listed_commit() {
         let (dir, first_commit) = init_scratch_repo("check-report-claims-stale-head-");
@@ -1429,7 +1292,7 @@ mod tests {
         );
     }
 
-    /// Mapping 8/18: "passes when self_audit.summary.head is behind live HEAD but is still the report's own newest listed commit".
+    /// Passes when self_audit.summary.head is behind live HEAD but is still the report's own newest listed commit.
     #[test]
     fn passes_when_self_audit_head_is_behind_live_head_but_is_still_the_reports_own_newest_listed_commit()
      {
@@ -1444,7 +1307,7 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    /// Mapping 9/18: "flags a listed commit sha that does not resolve, instead of silently skipping the head check".
+    /// Flags a listed commit sha that does not resolve, instead of silently skipping the head check.
     #[test]
     fn flags_a_listed_commit_sha_that_does_not_resolve_instead_of_silently_skipping_the_head_check()
     {
@@ -1470,7 +1333,7 @@ mod tests {
         );
     }
 
-    /// Mapping 10/18: "does not check self_audit.summary.head when self_audit is still null".
+    /// Does not check self_audit.summary.head when self_audit is still null.
     #[test]
     fn does_not_check_self_audit_head_when_self_audit_is_still_null() {
         let (dir, head) = init_scratch_repo("check-report-claims-null-audit-");
@@ -1482,7 +1345,7 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    /// Mapping 11/18: "flags a narrative sha that does not resolve to a real commit".
+    /// Flags a narrative sha that does not resolve to a real commit.
     #[test]
     fn flags_a_narrative_sha_that_does_not_resolve_to_a_real_commit() {
         let (dir, head) = init_scratch_repo("check-report-claims-bad-sha-");
@@ -1500,7 +1363,7 @@ mod tests {
         );
     }
 
-    /// Mapping 12/18: "does not flag an all-digit token even though it matches the sha shape".
+    /// Does not flag an all-digit token even though it matches the sha shape.
     #[test]
     fn does_not_flag_an_all_digit_token_even_though_it_matches_the_sha_shape() {
         let (dir, head) = init_scratch_repo("check-report-claims-digit-token-");
@@ -1512,7 +1375,7 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    /// Mapping 13/18: "flags a deterministic-pass ratio sitting next to a real sha that is neither base nor head".
+    /// Flags a deterministic-pass ratio sitting next to a real sha that is neither base nor head.
     #[test]
     fn flags_a_deterministic_pass_ratio_sitting_next_to_a_real_sha_that_is_neither_base_nor_head() {
         let (dir, _seed_head) = init_scratch_repo("check-report-claims-stale-narrative-sha-");
@@ -1558,7 +1421,7 @@ mod tests {
         );
     }
 
-    /// Mapping 14/18: "flags a self_audit-describing sentence with the wrong deterministic pass ratio".
+    /// Flags a self_audit-describing sentence with the wrong deterministic pass ratio.
     #[test]
     fn flags_a_self_audit_describing_sentence_with_the_wrong_deterministic_pass_ratio() {
         let (dir, head) = init_scratch_repo("check-report-claims-stale-ratio-");
@@ -1573,11 +1436,9 @@ mod tests {
         );
     }
 
-    /// Not a port: `quality.absence-is-designed`, surfaced by this task's
-    /// own knowledge lookup, has no JS counterpart (the frozen original
-    /// interpolates a bare `undefined` here). A report whose
-    /// `self_audit.summary` omits `pass`/`deterministic` renders the gap
-    /// as a named token, never a raw absence.
+    /// A report whose `self_audit.summary` omits `pass`/`deterministic`
+    /// renders the gap as a named token (`quality.absence-is-designed`),
+    /// never a raw absence.
     #[test]
     fn renders_a_missing_self_audit_field_as_a_named_token_not_a_raw_gap() {
         let (dir, head) = init_scratch_repo("check-report-claims-missing-summary-field-");
@@ -1597,7 +1458,7 @@ mod tests {
         );
     }
 
-    /// Mapping 15/18: "passes a self_audit-describing sentence naming the real head and the real ratio".
+    /// Passes a self_audit-describing sentence naming the real head and the real ratio.
     #[test]
     fn passes_a_self_audit_describing_sentence_naming_the_real_head_and_the_real_ratio() {
         let (dir, head) = init_scratch_repo("check-report-claims-narrative-ok-");
@@ -1611,11 +1472,9 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    // ---- HR-071: the bounded, no-execution paste-run lint ----
+    // ---- the bounded, no-execution paste-run lint ----
 
-    /// Natural RED (pre-fix: `check_report_claims` called only the
-    /// original five checks; this shape was invisible). One of the three
-    /// batch-19 shapes: an angle-bracket placeholder.
+    /// An angle-bracket placeholder.
     #[test]
     fn flags_a_command_carrying_an_angle_bracket_placeholder() {
         let (dir, head) = init_scratch_repo("check-report-claims-lint-placeholder-");
@@ -1633,9 +1492,8 @@ mod tests {
         );
     }
 
-    /// One of the three batch-19 shapes: prose (here, a parenthetical
-    /// label, batch 19 T2 round 3's own recurrence) appended after the
-    /// command's closing quote.
+    /// Prose (here, a parenthetical label) appended after the command's
+    /// closing quote.
     #[test]
     fn flags_a_command_with_a_parenthetical_label_appended_after_it() {
         let (dir, head) = init_scratch_repo("check-report-claims-lint-annotation-");
@@ -1655,8 +1513,7 @@ mod tests {
         );
     }
 
-    /// One of the three batch-19 shapes: a failed shlex-style parse (an
-    /// unterminated double quote).
+    /// A failed shlex-style parse (an unterminated double quote).
     #[test]
     fn flags_a_command_whose_quoting_does_not_parse() {
         let (dir, head) = init_scratch_repo("check-report-claims-lint-unbalanced-");
@@ -1676,12 +1533,10 @@ mod tests {
         );
     }
 
-    /// A clean report using real, legitimate shell shapes from this
-    /// project's own history must not flag: process substitution
-    /// (`diff <(...) <(...)`, batch 8 task 2), a subshell wrapping the
-    /// WHOLE command (`( cmd; echo "EXIT=$?" )`, batch 9 task 2), and an
-    /// escaped `find`-style parenthesis group (batch 10 task 1) all stay
-    /// clean.
+    /// A clean report using real, legitimate shell shapes must not flag:
+    /// process substitution (`diff <(...) <(...)`), a subshell wrapping
+    /// the WHOLE command (`( cmd; echo "EXIT=$?" )`), and an escaped
+    /// `find`-style parenthesis group all stay clean.
     #[test]
     fn does_not_flag_legitimate_process_substitution_subshells_or_escaped_parens() {
         let (dir, head) = init_scratch_repo("check-report-claims-lint-clean-");
@@ -1697,10 +1552,9 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    /// POSIX begins a comment only at the start of a word (verified live
-    /// against IEEE Std 1003.1-2024 §2.3); a mid-word `#`, like a GitHub
-    /// issue reference glued onto a path, is one literal token, not a
-    /// comment.
+    /// POSIX begins a comment only at the start of a word (IEEE Std
+    /// 1003.1-2024 §2.3); a mid-word `#`, like a GitHub issue reference
+    /// glued onto a path, is one literal token, not a comment.
     #[test]
     fn does_not_flag_a_mid_word_hash_that_is_not_a_comment_marker() {
         let (dir, head) = init_scratch_repo("check-report-claims-lint-midword-hash-");
@@ -1712,13 +1566,9 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    // ---- HR-075: the ephemeral-path check ----
+    // ---- the ephemeral-path check ----
 
-    /// Natural RED (pre-fix: `check_report_claims` called only the original
-    /// six checks; this shape was invisible). HR-075's own incident,
-    /// verbatim: `.superpowers/sdd/2026-09-07-batch-20/task-3-report.json`'s
-    /// `fix_rounds[0].findings[2].finding` names the exact narrative
-    /// citation that cost batch 20 T3 a fix round.
+    /// A fix-round finding citing a `/tmp`-rooted artifact path.
     #[test]
     fn flags_a_fix_round_finding_citing_a_slash_tmp_artifact_path() {
         let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-finding-");
@@ -1764,10 +1614,9 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    /// The measured false-positive class this check deliberately does not
-    /// catch (module doc's HR-075 bullet): this project's own history
-    /// carries dozens of honest narrative sentences discussing the CONCEPT
-    /// of a session scratchpad with no path attached at all.
+    /// The false-positive class this check deliberately does not catch
+    /// (module doc's Limits): an honest narrative sentence discussing the
+    /// CONCEPT of a session scratchpad with no path attached at all.
     #[test]
     fn does_not_flag_narrative_prose_that_only_mentions_scratchpad_with_no_path() {
         let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-prose-");
@@ -1781,9 +1630,8 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    /// Two more real corpus shapes in one document: the same path cited
-    /// twice flags once (dedup), and a trailing comma or period ending the
-    /// sentence is trimmed from the quoted path.
+    /// The same path cited twice flags once (dedup), and a trailing comma
+    /// or period ending the sentence is trimmed from the quoted path.
     #[test]
     fn flags_each_unique_slash_tmp_path_once_and_trims_trailing_sentence_punctuation() {
         let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-dedup-");
@@ -1803,12 +1651,8 @@ mod tests {
         );
     }
 
-    /// Natural RED (batch-21 T2 fix round 1, review important issue 1): the
-    /// widened scratchpad-shape arm did not exist before this round. Seeded
-    /// verbatim from one of the six real corpus shapes the review's own
-    /// probe re-derives: `.superpowers/sdd/2026-09-02-batch-9/task-3-
-    /// report.json`'s `self_review[7]` names a scratch install at an
-    /// elided `.../scratchpad/hr033-live` path.
+    /// A scratchpad citation with an elided `.../` prefix and no `/tmp/`
+    /// text at all still flags on its `scratchpad/` segment.
     #[test]
     fn flags_a_scratchpad_directory_segment_with_an_elided_prefix() {
         let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-scratchpad-");
@@ -1827,12 +1671,9 @@ mod tests {
         );
     }
 
-    /// Natural RED (batch-21 T2 fix round 1, review important issue 1): a
-    /// parenthesized, no-leading-dots scratchpad citation -- the other real
-    /// corpus shape (batch-3 task-2-report.json fix_rounds[0].findings[2].
-    /// fix) -- also needs the leading-punctuation trim `flag_ephemeral_
-    /// words` added this round, or the flagged text would keep the
-    /// enclosing `(`.
+    /// A parenthesized, no-leading-dots scratchpad citation needs the
+    /// leading-punctuation trim in `flag_ephemeral_words`, or the flagged
+    /// text would keep the enclosing `(`.
     #[test]
     fn flags_a_parenthesized_scratchpad_citation_trimmed_of_its_parens() {
         let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-scratchpad-parens-");
@@ -1851,10 +1692,8 @@ mod tests {
         );
     }
 
-    /// Natural RED (batch-21 T2 fix round 1, review important issue 2, the
-    /// reviewer's own first probe): an unanchored substring match used to
-    /// flag a durable, tracked, repository-relative path merely for
-    /// containing a `/tmp/` segment.
+    /// A durable, tracked, repository-relative path must not flag merely
+    /// for containing a `/tmp/` segment.
     #[test]
     fn does_not_flag_a_durable_relative_path_containing_a_slash_tmp_slash_segment() {
         let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-relative-");
@@ -1866,9 +1705,8 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    /// Natural RED (batch-21 T2 fix round 1, review important issue 2, the
-    /// reviewer's own second probe): a URL whose own path carries a
-    /// `/tmp/` segment is not a local ephemeral path.
+    /// A URL whose own path carries a `/tmp/` segment is not a local
+    /// ephemeral path.
     #[test]
     fn does_not_flag_a_url_path_segment_containing_slash_tmp_slash() {
         let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-url-");
@@ -1881,11 +1719,10 @@ mod tests {
         assert_eq!(errors, Vec::<String>::new());
     }
 
-    /// Natural RED (batch-21 T2 fix round 1, review important issue 2, the
-    /// reviewer's own third probe): `/var/tmp/` is still a real, ephemeral
-    /// absolute path -- it must still flag, quoting the WHOLE path from its
-    /// own leading `/`, not the bare `/tmp/capture.txt` suffix an
-    /// unanchored match used to fabricate.
+    /// `/var/tmp/` is still a real, ephemeral absolute path -- it must
+    /// still flag, quoting the WHOLE path from its own leading `/`, not
+    /// the bare `/tmp/capture.txt` suffix an unanchored match would
+    /// fabricate.
     #[test]
     fn flags_slash_var_slash_tmp_quoting_the_whole_absolute_path() {
         let (dir, head) = init_scratch_repo("check-report-claims-ephemeral-var-tmp-");

@@ -1,16 +1,12 @@
-//! Ports `tests/commit-msg-hook.test.mjs` to a cargo integration test
-//! (batch 20 T1, HR-047; `.superpowers/sdd/2026-09-07-batch-20/t1-
-//! evidence/mapping.md` row 3): `template/.githooks/commit-msg` itself
-//! does not change here, only its test driver moves. The hook's own doc
-//! comment states its contract: the trailer gate always runs; `houserules
-//! check-commit` runs only after a quiet `houserules check-commit --help`
-//! probe succeeds, so an older or absent binary degrades to the trailer
-//! gate alone instead of blocking every commit. Every case here spawns
-//! the real POSIX-shell hook against a scratch temp directory, on a
-//! hermetic `PATH` (any directory already carrying a `houserules`
-//! executable removed) with, where the case needs one, a fake
-//! `houserules` script placed on that `PATH` -- the same technique the JS
-//! suite used, ported case for case.
+//! Integration test for `template/.githooks/commit-msg`. The hook's own
+//! doc comment states its contract: the trailer gate always runs;
+//! `houserules check-commit` runs only after a quiet `houserules
+//! check-commit --help` probe succeeds, so an older or absent binary
+//! degrades to the trailer gate alone instead of blocking every commit.
+//! Every case here spawns the real POSIX-shell hook against a scratch
+//! temp directory, on a hermetic `PATH` (any directory already carrying a
+//! `houserules` executable removed) with, where the case needs one, a
+//! fake `houserules` script placed on that `PATH`.
 
 use std::env;
 use std::ffi::OsString;
@@ -25,11 +21,9 @@ use std::process::Command;
 /// (`run_hook`, below), and `canonicalize`'s own current docs state that
 /// on Windows it "converts the path to use extended length path syntax
 /// ... [which] may be incompatible with other applications ... passed to
-/// the application on the command-line" -- confirmed live: Git-for-
-/// Windows' `sh` cannot open a `\\?\`-prefixed path, so every case here
-/// failed with exit 127 and stderr opening `/usr/bin/bash:` (batch 20 T6
-/// fix round 1, windows-latest run 34217792336, job 102033559639) until
-/// this file stopped canonicalizing. The leading `..` components stay
+/// the application on the command-line" -- Git-for-Windows' `sh` cannot
+/// open a `\\?\`-prefixed path, failing every case here with exit 127 and
+/// stderr opening `/usr/bin/bash:`. The leading `..` components stay
 /// unresolved in the returned path; both Windows' and POSIX's own file
 /// APIs resolve `..` while opening a file, so `sh` (and every other
 /// non-Rust reader) still finds it.
@@ -38,23 +32,19 @@ fn hook_path() -> PathBuf {
 }
 
 /// `true` when `dir` holds a file named `houserules` (`houserules.exe` on
-/// Windows too). Deliberately coarser than the JS suite's own
-/// `accessSync(path, constants.X_OK)`: a portable executable-bit check has
-/// no std-only form, and adding a crate for this test-only concern is out
-/// of scope (spec §8: no new crates). Over-removing a `PATH` entry that
-/// happens to hold a non-executable file named `houserules` costs
-/// nothing here -- the goal is only a `PATH` no real `houserules` binary
-/// can leak through.
+/// Windows too). Deliberately coarser than a full executable-bit check: a
+/// portable executable-bit check has no std-only form, and adding a crate for
+/// this test-only concern is out of scope. Over-removing a `PATH` entry that
+/// happens to hold a non-executable file named `houserules` costs nothing here
+/// -- the goal is only a `PATH` no real `houserules` binary can leak through.
 fn dir_has_houserules(dir: &Path) -> bool {
     dir.join("houserules").is_file() || (cfg!(windows) && dir.join("houserules.exe").is_file())
 }
 
 /// This process's own `PATH`, with every directory holding a `houserules`
 /// executable removed -- the hermetic base every `run_hook` case builds
-/// its own `PATH` from, mirroring `tests/commit-msg-hook.test.mjs`'s own
-/// `pathWithoutHouserules`. `grep`/`head`/`sh` still resolve normally:
-/// only directories that themselves carry a `houserules` entry are
-/// dropped.
+/// its own `PATH` from. `grep`/`head`/`sh` still resolve normally: only
+/// directories that themselves carry a `houserules` entry are dropped.
 fn path_without_houserules() -> OsString {
     let path = env::var_os("PATH").unwrap_or_default();
     let kept: Vec<PathBuf> = env::split_paths(&path)

@@ -1,5 +1,4 @@
-//! Loads `backlog/*.json` into memory -- `tools/backlog.mjs`'s
-//! `loadBacklog`, ported (batch 17 T2).
+//! Loads `backlog/*.json` into memory.
 //!
 //! Every file loads as raw `serde_json::Value` (the crate-wide
 //! `preserve_order` feature backs each object with an insertion-order map,
@@ -9,20 +8,17 @@
 //! module doc for the two concrete reasons: `get`/`set` must reproduce
 //! each item's *own* on-disk key order byte-for-byte, which the struct's
 //! fixed declaration order cannot (a real backlog item's fields are not
-//! declaration-ordered -- verified against this repository's own
-//! `HR-052`), and `check-backlog` must tolerate a malformed item the way
-//! `rules::model`'s own load does for knowledge entries (`load_base`'s
-//! module doc), reporting it as a check finding rather than refusing to
-//! load.
+//! declaration-ordered), and `check-backlog` must tolerate a malformed
+//! item the way `rules::model`'s own load does for knowledge entries
+//! (`load_base`'s module doc), reporting it as a check finding rather
+//! than refusing to load.
 //!
-//! `load_backlog` mirrors `loadBacklog`'s own tolerance exactly: a
-//! malformed item (not an object, or with a non-string `id`) is silently
-//! excluded from `LoadedBacklog::items`, the same as JS's `item &&
-//! typeof item.id === 'string'` guard; a section file whose `items` field
-//! is missing or not an array contributes no items, matching `loadBacklog`'s
-//! `Array.isArray(section.items) ? section.items : []`. `check_backlog`
-//! (`commands.rs`) is the surface that reports these shapes as findings,
-//! using each section's raw, unfiltered content instead.
+//! `load_backlog`'s tolerance: a malformed item (not an object, or with a
+//! non-string `id`) is silently excluded from `LoadedBacklog::items`; a
+//! section file whose `items` field is missing or not an array
+//! contributes no items. `check_backlog` (`commands.rs`) is the surface
+//! that reports these shapes as findings, using each section's raw,
+//! unfiltered content instead.
 
 use std::collections::HashSet;
 use std::fmt;
@@ -33,11 +29,10 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 
 /// A failure while loading the backlog from disk: an unreadable file, or
-/// one that failed to parse as JSON -- `template/tools/lib/json-store.mjs`'s
-/// `readJson`, the same two failure shapes `rules::model::LoadError`
-/// carries for the knowledge base (backlog has no glob-bearing file, so no
-/// third variant). Named with the offending path, matching `readJson`'s own
-/// message text.
+/// one that failed to parse as JSON -- the same two failure shapes
+/// `rules::model::LoadError` carries for the knowledge base (backlog has
+/// no glob-bearing file, so no third variant). Named with the offending
+/// path.
 #[derive(Debug)]
 pub(crate) enum LoadError {
     Io {
@@ -63,8 +58,8 @@ impl fmt::Display for LoadError {
 
 impl std::error::Error for LoadError {}
 
-/// Reads `path` and parses it as JSON, naming the file in either failure --
-/// `readJson`, ported (see `LoadError`'s doc).
+/// Reads `path` and parses it as JSON, naming the file in either failure
+/// (see `LoadError`'s doc).
 pub(crate) fn read_json_value(path: &Path) -> Result<Value, LoadError> {
     let text = fs::read_to_string(path).map_err(|source| LoadError::Io {
         path: path.to_path_buf(),
@@ -78,10 +73,9 @@ pub(crate) fn read_json_value(path: &Path) -> Result<Value, LoadError> {
 
 /// One `backlog/items/*.json` file: its repo-relative path, file-stem
 /// name, and full raw content (`$schema`/`section`/`heading`/`title`/
-/// `spec`/`items`) -- `loadBacklog`'s per-file spread (`{file, name,
-/// ...readJson(...)}`), read once and shared by `check_backlog` (schema
-/// validation over the raw content) and `load_backlog`'s own item-indexing
-/// pass below.
+/// `spec`/`items`), read once and shared by `check_backlog` (schema
+/// validation over the raw content) and `load_backlog`'s own
+/// item-indexing pass below.
 #[derive(Debug)]
 pub(crate) struct Section {
     pub file: String,
@@ -90,12 +84,11 @@ pub(crate) struct Section {
 }
 
 /// The loaded backlog: every file's raw content, the section list, and
-/// every item indexed by id -- `loadBacklog`'s return value. An item's
-/// `Value` already carries the `section`/`file` fields `loadBacklog`
-/// attaches (`{...item, section: section.section, file: section.file}`),
-/// appended after its own on-disk keys, so `commands::cmd_get` can return
-/// it verbatim and `commands::cmd_set` can read `file` back off it to find
-/// which items file to rewrite.
+/// every item indexed by id. An item's `Value` already carries the
+/// `section`/`file` fields attached during loading, appended after its
+/// own on-disk keys, so `commands::get_items` can return it verbatim and
+/// `commands::set_item` can read `file` back off it to find which items
+/// file to rewrite.
 #[derive(Debug)]
 pub(crate) struct LoadedBacklog {
     pub root: PathBuf,
@@ -109,8 +102,8 @@ pub(crate) struct LoadedBacklog {
 }
 
 /// Loads every backlog file under `root`, indexing items by id with their
-/// section and file -- `loadBacklog`, ported (see the module doc for the
-/// raw-`Value` design and its tolerance for malformed items).
+/// section and file (see the module doc for the raw-`Value` design and
+/// its tolerance for malformed items).
 pub(crate) fn load_backlog(root: &Path) -> Result<LoadedBacklog, LoadError> {
     let dir = root.join("backlog");
     let schema = read_json_value(&dir.join("schema.json"))?;
@@ -187,8 +180,7 @@ mod tests {
     use super::super::test_support::{default_items, item, make_repo, write};
     use super::*;
 
-    /// tests/backlog.test.mjs, describe('loadBacklog and checkBacklog'):
-    /// "loads every file and indexes items with their section".
+    /// Loads every file and indexes items with their section.
     #[test]
     fn loads_every_file_and_indexes_items_with_their_section() {
         let dir = make_repo(default_items());
@@ -204,9 +196,8 @@ mod tests {
         );
     }
 
-    /// tests/backlog.test.mjs: "treats a section with no items array as
-    /// having none" -- `loadBacklog`'s `Array.isArray(section.items) ?
-    /// section.items : []` false branch.
+    /// A section with no `items` array contributes no indexed items, but
+    /// the section itself still loads.
     #[test]
     fn treats_a_section_with_no_items_array_as_having_none() {
         let dir = make_repo(default_items());
@@ -223,7 +214,7 @@ mod tests {
 
     /// A malformed item (non-string id) is excluded from the index, but its
     /// section's raw content still carries it whole, for `check_backlog` to
-    /// report -- `loadBacklog`'s `typeof item.id === 'string'` guard.
+    /// report.
     #[test]
     fn excludes_a_malformed_item_from_the_index_but_keeps_it_in_the_raw_section() {
         let dir = make_repo(vec![item(json!({})), json!({"id": 5, "type": "feat"})]);
@@ -241,7 +232,7 @@ mod tests {
     }
 
     /// A duplicate id across items keeps only the first occurrence in the
-    /// index -- `loadBacklog`'s `!items.has(item.id)` guard.
+    /// index.
     #[test]
     fn keeps_only_the_first_occurrence_of_a_duplicate_id() {
         let dir = make_repo(vec![
@@ -256,9 +247,8 @@ mod tests {
         );
     }
 
-    /// A missing `backlog/schema.json` is a load failure naming the file --
-    /// `readJson`'s unreadable-file message, matching `rules::model`'s
-    /// `LoadError::Io` for the knowledge base.
+    /// A missing `backlog/schema.json` is a load failure naming the file,
+    /// matching `rules::model`'s `LoadError::Io` for the knowledge base.
     #[test]
     fn a_missing_schema_file_is_a_load_error_naming_the_path() {
         let dir = make_repo(default_items());
@@ -267,8 +257,7 @@ mod tests {
         assert!(error.to_string().contains("schema.json"), "{error}");
     }
 
-    /// Invalid JSON in an items file is a load failure naming the file --
-    /// `readJson`'s parse-failure message.
+    /// Invalid JSON in an items file is a load failure naming the file.
     #[test]
     fn invalid_json_in_an_items_file_is_a_load_error() {
         let dir = make_repo(default_items());

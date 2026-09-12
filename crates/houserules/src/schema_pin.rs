@@ -1,14 +1,9 @@
-//! The schema-pin build-test mechanism (docs/specs/2026-09-04-batch-15-
-//! tier2-spec.md §3: "a build test that pins the serde models against the
-//! vendored schema files"). Shared by every model layer's own `#[cfg(test)]`
-//! tests (`backlog::model`, `rules::check_shape`) so the mechanism is
-//! written once and each schema-pin test only supplies the model type, the
-//! schema pointer, and one hand-written valid sample. `rules::deliverables`
-//! (batch 17 T1's own such caller) was deleted at T3, once none of that
-//! task's three surfaces turned out to need a typed deliverables model
-//! (`rules/mod.rs`'s own module doc has the full account) -- this module's
-//! mechanism itself is unaffected, and `check_shape`'s pin tests still
-//! exercise it fully.
+//! The schema-pin build-test mechanism: a build test that pins the serde
+//! models against the vendored schema files. Shared by every model
+//! layer's own `#[cfg(test)]` tests (`backlog::model`, `rules::
+//! check_shape`) so the mechanism is written once and each schema-pin
+//! test only supplies the model type, the schema pointer, and one
+//! hand-written valid sample.
 //!
 //! `#[cfg(test)]`-only (declared that way in `main.rs`): this is test
 //! infrastructure, not a shipped part of the binary.
@@ -37,21 +32,15 @@
 //!   to `null` in a copy of `sample` must (a) still validate against the
 //!   schema, (b) still deserialize into `T`, and (c) round-trip back out
 //!   as a *present* `null` -- not vanish, and not silently become the
-//!   missing-key state. Fix round 1 (review issue 1, batch 17 T1) added
-//!   this check after finding the state it closes: `sample` carries
-//!   exactly one value per property, so an *optional*, nullable property
-//!   modelled plain `Option<T>` (the now-deleted `rules::deliverables`'
-//!   `auditRow.level`, T1's own worked example) passed every other check
-//!   here while silently dropping `"level": null` on every judged row in
-//!   the committed fixtures -- the fix (`RequiredNullable<T>` for a
-//!   required-nullable property, `Option<Option<T>>` plus
-//!   `deserialize_optional_nullable` for an optional-nullable one) lived in
-//!   `crate::json_shape`, deleted alongside `rules::deliverables` at T3
-//!   once neither had a remaining consumer (`rules/mod.rs`'s module doc).
-//!   This check itself is unaffected by that deletion -- it runs for any
-//!   future null-admitting property either of this mechanism's two current
-//!   callers (`backlog::model`, `check_shape`) pins; neither happens to
-//!   declare one today.
+//!   missing-key state. `sample` carries exactly one value per property,
+//!   so an *optional*, nullable property modelled plain `Option<T>` would
+//!   pass every other check here while silently dropping a present
+//!   `null` on round-trip; this check catches exactly that (the fix for
+//!   such a property is `RequiredNullable<T>` when required, or
+//!   `Option<Option<T>>` plus a nullable-aware deserializer when
+//!   optional). It runs for any future null-admitting property either of
+//!   this mechanism's two current callers (`backlog::model`,
+//!   `check_shape`) pins; neither happens to declare one today.
 //! - **round-trip fidelity**: the *entire* re-serialized model, not only
 //!   its top-level key set, is compared against `sample` for exact
 //!   equality. This is what stops a dropped or altered *nested* field from
@@ -80,21 +69,17 @@
 //!   this module's oracle calls) rather than duplicating a regex or range
 //!   engine in the type system -- `quality.principles`' prefer-a-library
 //!   rule, applied to "the schema itself is the library".
-//! - A schema `enum` whose members are not all strings (the now-deleted
-//!   `rules::deliverables`'s `auditSummary.empty_range`,
-//!   `{"enum": [true]}`, was this mechanism's one worked example) is
-//!   outside `assert_enum_pinned`, which reads a schema enum through
-//!   `Value::as_str` and so sees only string-valued members -- such a
-//!   property needs its own dedicated type with hand-written
+//! - A schema `enum` whose members are not all strings (`{"enum":
+//!   [true]}`, say) is outside `assert_enum_pinned`, which reads a schema
+//!   enum through `Value::as_str` and so sees only string-valued members
+//!   -- such a property needs its own dedicated type with hand-written
 //!   `Serialize`/`Deserialize` and its own direct unit tests instead of
-//!   this shared mechanism, the way `rules::deliverables::EmptyRangeTrue`
-//!   (T1, deleted at T3 alongside the rest of that file) once did.
+//!   this shared mechanism.
 //! - A model type that declares no `assert_object_pinned`/
 //!   `assert_enum_pinned` call site anywhere is not pinned at all, and
 //!   nothing enforces that every type gets one -- there is no derive or
 //!   lint here, only the discipline of adding a call site for every new
-//!   type (batch 17 T1 fix round 1's `Finding`, missing through the first
-//!   cut, was the review's cited instance).
+//!   type.
 
 use std::collections::BTreeSet;
 

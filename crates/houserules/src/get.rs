@@ -1,30 +1,19 @@
-//! The flat CLI's unified `get` command (batch 17 T4, docs/specs/
-//! 2026-09-04-batch-15-tier2-spec.md §3): "`get` (resolves by id shape:
-//! `HR-031` is a backlog item, `process.tdd` a knowledge entry)". The
-//! frozen source ships this as two separate scripts, each with its own
-//! `get` -- `tools/kb.mjs`'s `cmdGet` (a knowledge entry) and
-//! `tools/backlog.mjs`'s `cmdGet` (a backlog item, amendment, or parked
-//! item) -- but this binary has one flat command surface, so the two
-//! cannot both be named `get`; this file is the one place that decides
-//! which of them a given id means. Lives at the crate root, like `emit`,
-//! because it is the one command that spans both feature modules -- `rules`
-//! and `backlog` never depend on each other (see `emit.rs`'s own module doc
-//! for why that boundary matters), and a `get` that called from inside
-//! either one would break it.
+//! The flat CLI's unified `get` command: resolves an id by shape
+//! (`HR-031` is a backlog item, `process.tdd` a knowledge entry). Lives
+//! at the crate root, like `emit`, because it is the one command that
+//! spans both feature modules -- `rules` and `backlog` never depend on
+//! each other (see `emit.rs`'s own module doc for why that boundary
+//! matters), and a `get` that called from inside either one would break
+//! it.
 //!
-//! Dispatch is per id, not two separate batch lookups merged afterward: a
-//! domain is loaded only once a request actually needs it (lazily, and at
-//! most once per invocation), and the first id that fails to resolve -- in
-//! the order given, whichever domain it is in -- is where lookup stops,
-//! matching each frozen `cmdGet`'s own `Array.prototype.map` fail-fast
-//! order. One consequence, disclosed rather than engineered around: unlike
-//! either single-domain script, which loads its sole domain unconditionally
-//! before checking for at least one id, an EMPTY id list here reports its
-//! usage error without needing either the backlog or the knowledge base to
-//! exist -- there is no id to decide a domain from, so neither loads. No
-//! committed corpus slice exercises `get` with no arguments against a
-//! broken repository, so this is a disclosed judgment call, not a pinned
-//! parity gate.
+//! Dispatch is per id, not two separate batch lookups merged afterward:
+//! a domain is loaded only once a request actually needs it (lazily,
+//! and at most once per invocation), and the first id that fails to
+//! resolve -- in the order given, whichever domain it is in -- is where
+//! lookup stops. One consequence, disclosed rather than engineered
+//! around: an EMPTY id list here reports its usage error without
+//! needing either the backlog or the knowledge base to exist -- there
+//! is no id to decide a domain from, so neither loads.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -53,9 +42,8 @@ fn is_digit_run(s: &str, len: Option<usize>) -> bool {
 /// `^[a-z0-9-]+\.[a-z0-9-]+$` (`knowledge/schema.json`), lowercase with a
 /// dot, so the two vocabularies never actually collide in practice -- but
 /// this function only ever checks the backlog shapes, since an id this
-/// function rejects reaching the knowledge base and failing there with
-/// `unknown id "..."` is exactly the frozen `cmdGet`'s own message either
-/// side would give it anyway.
+/// function rejects still fails cleanly against the knowledge base with a
+/// named `unknown id "..."` error.
 fn is_backlog_id(id: &str) -> bool {
     if let Some(rest) = id.strip_prefix("HR-") {
         return is_digit_run(rest, Some(3));
@@ -88,12 +76,10 @@ fn label_archived(mut record: Value) -> Value {
 }
 
 /// Runs `get`: resolves each of `ids` by shape (`is_backlog_id`), loading
-/// the backlog or the knowledge base at most once each, lazily, and prints
-/// the results as one JSON array in the order given -- `main`'s own "needs
-/// at least one id" usage error (shared, byte-identical text, by both
-/// frozen `cmdGet`s) when `ids` is empty; see the module doc for why that
-/// check runs before either domain loads here, unlike the frozen scripts'
-/// own load-then-check order.
+/// the backlog or the knowledge base at most once each, lazily, and
+/// prints the results as one JSON array in the order given -- a "needs
+/// at least one id" usage error when `ids` is empty; see the module doc
+/// for why that check runs before either domain loads.
 pub(crate) fn cmd_get(dir: Option<PathBuf>, ids: Vec<String>) -> ExitCode {
     if ids.is_empty() {
         eprintln!("get needs at least one id");

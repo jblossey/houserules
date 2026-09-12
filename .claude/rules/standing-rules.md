@@ -31,6 +31,6 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [security-hygiene.no-coauthor] Never add a co-author, session, or tool-attribution line to any commit or pull request description.
 - [security-hygiene.no-focused-tests] Never commit a focused test (`.only(`).
 - [security-hygiene.verify-current-docs] Verify every library, tool, and framework API against current docs before use. Internal knowledge is stale.
-- [writing-style.code-comments] Write a code comment only for a constraint the code cannot show.
-- [writing-style.doc-comments] Document every exported symbol with the language's doc-comment convention. Name things so the code reads without comments.
+- [writing-style.code-comments] Write a code comment only for a current constraint the code cannot show. Never narrate history in code; git, the specs, and the knowledge base hold it.
+- [writing-style.doc-comments] Document every exported symbol with the language's doc-comment convention: the current contract. Name things so the code reads without comments.
 - [writing-style.principles] Write docs, comments, commit messages, and reports in ASD-STE100 style: short sentences, active voice, one instruction per sentence, concise.

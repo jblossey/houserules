@@ -1,22 +1,15 @@
-//! The knowledge read-command parity tests (batch 17 T4): five commands
+//! The knowledge read-command parity tests: five commands
 //! (`topics`/`index`/`standing`/`get`/`for`), on both the frozen worktree
 //! and the `mini` fixture, byte-compared verbatim against the compiled
 //! binary, plus the CLI's usage-error arms these five commands add to the
 //! flat surface.
 //!
-//! `for` (bare and `--full`) moved to reviewed, Rust-generated goldens
-//! under `tests/goldens/read-parity/` at batch 18 T5 fix round 1 (spec §3
-//! boundary clarification, commit 878265b): its `"standing"` field embeds
-//! `STANDING_COMMAND`, which the rewrite flips from `tools/kb.sh standing`
-//! to `houserules standing`, so the frozen JS at the (now retired)
-//! `tests/corpus/manifest.json`'s `frozen_sha` could no longer produce
-//! its bytes. The other four commands joined it at batch 20 T3 (HR-047,
-//! docs/specs/2026-09-07-batch-20-phase5.md §2's boundary correction;
-//! design.md §5.42): `tests/corpus/**` retires with the rest of the
-//! vitest layer this same batch. `cargo run --bin gen-goldens` regenerates
-//! every slice here; `diff-shape-gate` proved the batch 18 T5 re-baseline
-//! changed only the command string, before it retired as a spent one-time
-//! proof (HR-093).
+//! `for` (bare and `--full`) sits in reviewed, Rust-generated goldens
+//! under `tests/goldens/read-parity/`: its `"standing"` field embeds
+//! `STANDING_COMMAND`, which reads `houserules standing`, not
+//! `tools/kb.sh standing`, so the frozen JS at `common::FROZEN_SHA`
+//! cannot produce its bytes. `cargo run --bin gen-goldens` regenerates
+//! every slice here.
 
 mod common;
 
@@ -72,10 +65,9 @@ fn assert_run_matches(args: &[&str], dir: &Path, slice: &str) {
     );
 }
 
-/// Parity gate, the frozen worktree ("the live tree" as of the corpus
-/// freeze): `topics`, `index` (bare and `--standing`), `standing`, `get
-/// houserules.template-is-the-source`, `for tools/kb.mjs` (bare and
-/// `--full`).
+/// Runs against the frozen worktree: `topics`, `index` (bare and
+/// `--standing`), `standing`, `get houserules.template-is-the-source`,
+/// `for tools/kb.mjs` (bare and `--full`).
 #[test]
 fn topics_matches_the_frozen_corpus_on_the_worktree() {
     let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
@@ -134,9 +126,9 @@ fn for_full_matches_the_frozen_corpus_on_the_worktree() {
     );
 }
 
-/// Parity gate, the `mini` fixture -- the same commands, over a fresh copy
-/// of the small synthetic knowledge base `tests/fixtures/mini`
-/// commits.
+/// Copies `tests/fixtures/mini` into a fresh scratch directory -- no
+/// `git init` needed here, since every caller below passes `--dir`
+/// explicitly rather than relying on git-root resolution.
 fn mini_copy() -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     copy_dir_recursive(&repo_root().join("tests/fixtures/mini"), dir.path());
@@ -200,17 +192,14 @@ fn for_full_matches_the_frozen_corpus_on_the_mini_fixture() {
 // both id shapes, so nothing here repeats them).
 
 /// `get` with no ids, in a repository holding NEITHER `knowledge/` nor
-/// `backlog/`: the distinguishing input for `get`'s own arity-first
-/// ordering (docs/specs/2026-09-04-batch-15-tier2-spec.md §3, ruled at the
-/// batch 17 T4 review, batch 17 fix round 1, review issue 6). Both frozen
-/// scripts load their sole domain unconditionally before their own arity
-/// check, so each throws an uncaught `ENOENT` stack trace here (`node`'s
-/// own exit 1 for an uncaught exception, verified live: `tools/kb.sh get`
-/// and `tools/backlog.sh get` both fail this way, naming their own
-/// `<domain>/schema.json`); `get`'s own domain depends on the ids given,
-/// so with none it cannot pick one to load at all, and checks arity first
-/// instead -- `get needs at least one id`, exit 2, needing neither
-/// directory to exist.
+/// `backlog/`: the distinguishing input for `get`'s own arity-first ordering.
+/// Both frozen scripts load their sole domain unconditionally before their own
+/// arity check, so each throws an uncaught `ENOENT` stack trace here (`node`'s
+/// own exit 1 for an uncaught exception: `tools/kb.sh get` and
+/// `tools/backlog.sh get` both fail this way, naming their own
+/// `<domain>/schema.json`); `get`'s own domain depends on the ids given, so
+/// with none it cannot pick one to load at all, and checks arity first instead
+/// -- `get needs at least one id`, exit 2, needing neither directory to exist.
 #[test]
 fn get_with_no_ids_in_a_repository_with_neither_domain_prints_the_usage_message_and_exits_2() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -264,13 +253,10 @@ fn a_missing_knowledge_directory_prints_a_named_error_and_exits_2() {
     assert!(stderr.contains("schema.json"), "got: {stderr:?}");
 }
 
-/// Batch 17 T4 fix round 1, review issue 4: invalid JSON in a knowledge
-/// file is a named, one-line error, exit 2 -- kb.test.mjs's own dropped
-/// `describe('main (read commands)')` case ("reports invalid JSON in a
-/// knowledge file as a usage error, not a stack trace") had no Rust
-/// replacement until now; `load_base` propagates the same
-/// `LoadError::Json` for every read command, exercised here through
-/// `topics` like the missing-`schema.json` case above.
+/// Invalid JSON in a knowledge file is a named, one-line error, exit 2 --
+/// `load_base` propagates the same `LoadError::Json` for every read
+/// command, exercised here through `topics` like the
+/// missing-`schema.json` case above.
 #[test]
 fn invalid_json_in_a_knowledge_file_prints_a_named_error_and_exits_2() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -292,11 +278,9 @@ fn invalid_json_in_a_knowledge_file_prints_a_named_error_and_exits_2() {
     );
 }
 
-// ---- the ruled clap argv deviation (spec §6), for the four commands this
-// task adds -- the same pattern backlog_parity.rs's and
-// validate_stats_audit_parity.rs's own such tests use. Batch 17 T4 fix
-// round 1, review issue 1: these nine shapes were the ones argv_closure.rs's
-// own module doc claimed were already pinned here; they were not, until now.
+// ---- the ruled clap argv deviation, for the four commands this file
+// adds -- the same pattern `backlog_parity.rs`'s and
+// `validate_stats_audit_parity.rs`'s own such tests use.
 
 /// `index --bogus`: JS ignores the unrecognized flag and lists (exit 0);
 /// the binary reports it as an unexpected argument, exit 2.
@@ -463,13 +447,13 @@ fn for_with_a_duplicated_full_flag_exits_2_where_js_let_the_repeat_be_a_no_op() 
     );
 }
 
-// ---- HR-056: the bare-invocation pin.
+// ---- The bare-invocation pin.
 
 /// Bare `houserules`, no subcommand and no flag: `arg_required_else_help`
 /// prints clap's own help to stderr and exits 2 -- matching the frozen
-/// `tools/kb.sh`/`tools/backlog.sh` contract (batch 16 branch review, issue
-/// 4: both print a usage line and fail with no command), not clap's
-/// all-`Option` default of a silent, empty success.
+/// `tools/kb.sh`/`tools/backlog.sh` contract (both print a usage line and
+/// fail with no command), not clap's all-`Option` default of a silent,
+/// empty success.
 #[test]
 fn bare_invocation_prints_help_on_stderr_and_exits_2() {
     let output = houserules().output().expect("run houserules bare");

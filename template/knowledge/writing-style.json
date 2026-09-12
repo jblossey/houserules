@@ -33,9 +33,13 @@
       "kind": "rule",
       "area": "global",
       "standing": true,
-      "summary": "Write a code comment only for a constraint the code cannot show.",
+      "summary": "Write a code comment only for a current constraint the code cannot show. Never narrate history in code; git, the specs, and the knowledge base hold it.",
       "body": [
-        "A comment asserting measured or cross-engine behavior is a claim: run the measurement before committing the sentence, and state where it was verified (batch 17 task 3: three false comments shipped, one licensing a real defect, and the fix introduced a fourth)."
+        "A comment asserting measured or cross-engine behavior is a claim: run the measurement before committing the sentence, and state where it was verified (batch 17 task 3: three false comments shipped, one licensing a real defect, and the fix introduced a fourth).",
+        "History narration belongs in git, the specs, and the knowledge base, not in the code itself.",
+        "A knowledge id naming a rule the code enforces is a current contract, not history; it may stay in a comment.",
+        "Fixture data inside a test body (an id, a date, a path) is data, not narration; leave it as written.",
+        "A comment stating a constraint plus its history keeps the constraint only; drop the history."
       ],
       "tags": [
         "comments"
@@ -51,7 +55,7 @@
       "kind": "rule",
       "area": "global",
       "standing": true,
-      "summary": "Document every exported symbol with the language's doc-comment convention. Name things so the code reads without comments.",
+      "summary": "Document every exported symbol with the language's doc-comment convention: the current contract. Name things so the code reads without comments.",
       "body": [
         "A doc comment states what the item is for, its invariants, and what it returns or raises when the signature does not say so. It never restates the signature.",
         "Conventions: TSDoc in TypeScript, JSDoc in JavaScript, rustdoc in Rust, docstrings in Python — the language's standard form.",

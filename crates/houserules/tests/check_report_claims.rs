@@ -1,17 +1,15 @@
-//! `check-report-claims` CLI-level tests (batch 20 T2, HR-066/HR-071): the
-//! usage errors, exit codes, and root/report-path resolution the
-//! subcommand wrapper itself owns (`report_claims.rs`'s own module doc
-//! has the checks' full account; its unit tests there cover the
-//! finding-generation logic these tests do not re-derive). Like
-//! `check_commit.rs` (batch 18 T2), this command has no frozen-JS
-//! predecessor in the flat surface -- it was ported from a dev-only
-//! `src/bin/` target with no CLI of its own beyond a positional and a raw
-//! `cwd` -- so this file follows that file's structural pattern (a
-//! scratch git repo, the compiled binary run as a real subprocess)
-//! without claiming any parity contract, and this command joins neither
-//! `argv_closure.rs`'s `COMMANDS` list nor any `_parity.rs` file (both
-//! scoped to "spec §3's full list as of batch 17 T4", `argv_closure.rs`'s
-//! own doc).
+//! `check-report-claims` CLI-level tests: the usage errors, exit codes,
+//! and root/report-path resolution the subcommand wrapper itself owns
+//! (`report_claims.rs`'s own module doc has the checks' full account;
+//! its unit tests there cover the finding-generation logic these tests
+//! do not re-derive). Like `check_commit.rs`, this command has no
+//! frozen-JS predecessor in the flat surface -- it was ported from a
+//! dev-only `src/bin/` target with no CLI of its own beyond a positional
+//! and a raw `cwd` -- so this file follows that file's structural
+//! pattern (a scratch git repo, the compiled binary run as a real
+//! subprocess) without claiming any parity contract, and this command
+//! joins neither `argv_closure.rs`'s `COMMANDS` list nor any
+//! `_parity.rs` file.
 
 use std::path::Path;
 use std::process::Command;

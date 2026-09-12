@@ -1,18 +1,15 @@
-//! `renderAll` and the `render` command: `tools/kb.mjs`'s generated-file
-//! writer, ported byte-for-byte (HR-054 task 3; the reviewed goldens
-//! under `tests/goldens/render/` are the parity gate — see
-//! `crates/houserules/tests/`).
+//! `render_all` and the `render` command: the generated-file writer. The
+//! reviewed goldens under `tests/goldens/render/` are the parity gate --
+//! see `crates/houserules/tests/`.
 //!
-//! `render_and_report` (batch 18 T3) is `cmd_render`'s own non-`--check`
-//! body, extracted so `install::cmd_init` can render a freshly-seeded
-//! target exactly as a `houserules render` run there would -- `init`
-//! seeds the knowledge base then must produce the same generated markdown
-//! `bin/houserules.mjs`'s own `install` gets by shelling out to the
-//! seeded `tools/kb.mjs render`; this binary has no Node to shell out to,
-//! so it reruns its own already-ported writer directly instead. A second,
-//! independently-written "load, write stale files, report the lines"
-//! sequence in `install.rs` would risk exactly the drift this crate's
-//! `emit`/`root`/`get` crate-root modules already exist to prevent.
+//! `render_and_report` is `cmd_render`'s own non-`--check` body,
+//! extracted so `install::cmd_init` can render a freshly-seeded target
+//! exactly as a `houserules render` run there would: `init` seeds the
+//! knowledge base and must produce the same generated markdown. A
+//! second, independently-written "load, write stale files, report the
+//! lines" sequence in `install.rs` would risk exactly the drift this
+//! crate's `emit`/`root`/`get` crate-root modules already exist to
+//! prevent.
 
 use std::fs;
 use std::io;
@@ -27,12 +24,11 @@ pub(crate) const GENERATED: &str = "Generated from knowledge/ by houserules rend
 pub(crate) const SKILL_PATH: &str = ".claude/skills/project-knowledge/SKILL.md";
 /// Entry kinds eligible for the standing rules, in the order they render.
 /// Also `check.rs`'s standing-shape check: a standing entry needs one of
-/// these kinds (and area `global` or `process`), the same pair
-/// `tools/kb.mjs`'s `RULE_KINDS` constant serves for both surfaces.
+/// these kinds (and area `global` or `process`).
 pub(super) const RULE_KINDS: [&str; 2] = ["rule", "invariant"];
 /// Entry kinds rendered into a per-area `.claude/rules/<area>.md` file.
-/// `pub(super)` (batch 17 T4): `read::for_result` needs the same three
-/// kinds, plus `procedure`, for `cmdFor`'s own `FOR_KINDS`.
+/// `pub(super)`: `read::for_result` needs the same three kinds, plus
+/// `procedure`, for `for`'s own kind filter.
 pub(super) const AREA_FILE_KINDS: [&str; 3] = ["rule", "invariant", "gotcha"];
 /// An area file's sections, in render order, each paired with its entry kind.
 const SECTION_KINDS: [(&str, &str); 3] = [
@@ -47,15 +43,12 @@ const PROTOCOL: [&str; 3] = [
     "3. Write `REPORT_FILE` as a `task-report` (schema `.claude/schemas/deliverables.json`, `self_audit: null`), then run `houserules audit --base <BASE> --head HEAD --ids <ids, comma-separated> --report <REPORT_FILE>`. The `--ids` value is the task's `Knowledge:` list, generated from it, never typed separately. Copy the audit `summary` and its `deterministic` rows into `self_audit` — never hand-written rows; the judged rows are the reviewer's. Fix every `fail`, re-run until clean, then run `houserules validate <REPORT_FILE>` and fix every error. Declare a spec-booked interim fail once with `--sanctioned <rule>=<ref>` instead of narrating it by hand. List the ids you relied on in `knowledge_used`.",
 ];
 
-/// Uppercases the first character of `s`, the rest untouched -- the port
-/// of `tools/kb.mjs`'s `cap` helper, which builds an area file's `#
-/// <Area> rules` heading. Relies on every area name being a single ASCII
-/// word (`knowledge/areas.json`'s keys, e.g. `docs`, `cli`): `to_uppercase`
-/// on a non-ASCII first character can grow it to more than one character
-/// (German `ß` uppercases to `SS`, for instance), which `cap`'s
-/// `s[0].toUpperCase() + s.slice(1)` cannot do at all, since JS indexes a
-/// string by UTF-16 code unit -- an area name outside that assumption is
-/// unverified on both sides.
+/// Uppercases the first character of `s`, the rest untouched -- builds
+/// an area file's `# <Area> rules` heading. Relies on every area name
+/// being a single ASCII word (`knowledge/areas.json`'s keys, e.g.
+/// `docs`, `cli`): `to_uppercase` on a non-ASCII first character can
+/// grow it to more than one character (German `ß` uppercases to `SS`,
+/// for instance); an area name outside that assumption is unverified.
 fn capitalize(s: &str) -> String {
     let mut chars = s.chars();
     match chars.next() {
@@ -64,10 +57,9 @@ fn capitalize(s: &str) -> String {
     }
 }
 
-/// Renders one entry as `- [id] summary` -- the port of `tools/kb.mjs`'s
-/// `ruleLine`. `standing_lines`, every area section, and the knowledge
-/// skill's `## Standing rules` block all depend on this exact format for
-/// byte parity with the frozen corpus.
+/// Renders one entry as `- [id] summary`. `standing_lines`, every area
+/// section, and the knowledge skill's `## Standing rules` block all
+/// depend on this exact format.
 fn rule_line(e: &Entry) -> String {
     format!("- [{}] {}", e.id, e.summary)
 }
@@ -218,19 +210,16 @@ pub(crate) fn render(base: &Base, check: bool) -> io::Result<Vec<String>> {
 /// current working directory, the same resolution `houserules render`
 /// (and `houserules check-knowledge` / `houserules check-backlog`, via
 /// `cmd_check_knowledge` in `check.rs` and the `backlog` module's CLI
-/// wrappers) performs before
-/// loading its base -- `tools/lib/json-store.mjs`'s `repoRoot`, the one
-/// helper the frozen `kb.mjs` and `backlog.mjs` both import. Crate-visible
-/// (batch 17 T2), not `rules`-private, for that same reason: the `backlog`
-/// module needs the identical resolution and would otherwise duplicate it.
-/// On failure (no enclosing repository, for instance) git itself can print
-/// more than one stderr line -- verified live: `git rev-parse
-/// --show-toplevel` outside any repository prints "fatal: not a git
-/// repository ..." AND a second "Stopping at filesystem boundary ..."
-/// line -- so this keeps only the first non-empty one, the same
-/// convention `tools/kb.mjs`'s `gitDiff` uses for its own git-subprocess
-/// errors, to hold the recorded one-line error contract (docs/specs/
-/// 2026-09-04-batch-15-tier2-spec.md §6).
+/// wrappers) performs before loading its base. Crate-visible, not
+/// `rules`-private: the `backlog` module needs the identical resolution
+/// and would otherwise duplicate it.
+///
+/// On failure (no enclosing repository, for instance) git itself can
+/// print more than one stderr line: `git rev-parse --show-toplevel`
+/// outside any repository prints "fatal: not a git repository ..." AND
+/// a second "Stopping at filesystem boundary ..." line, so this keeps
+/// only the first non-empty one, to hold the recorded one-line error
+/// contract.
 pub(crate) fn repo_root_from_cwd() -> io::Result<PathBuf> {
     let output = Command::new("git")
         .args(["rev-parse", "--show-toplevel"])
@@ -333,10 +322,10 @@ mod tests {
         }
     }
 
-    /// tests/kb.test.mjs, describe('render')'s fixture: `process` carries
-    /// two entries (a standing rule, a standing invariant), `rust` carries
-    /// three (a rule, a gotcha, and a `history`-kind entry excluded from
-    /// the rendered area file but still counted in the topic line).
+    /// `process` carries two entries (a standing rule, a standing
+    /// invariant), `rust` carries three (a rule, a gotcha, and a
+    /// `history`-kind entry excluded from the rendered area file but
+    /// still counted in the topic line).
     fn fixture_base() -> Base {
         let areas = vec![
             ("global".to_string(), AreaDef { paths: vec![] }),
@@ -394,8 +383,8 @@ mod tests {
         }
     }
 
-    /// tests/kb.test.mjs, describe('render'): "renders standing rules, one
-    /// file per area with entries, and the knowledge skill".
+    /// Renders standing rules, one file per area with entries, and the
+    /// knowledge skill.
     #[test]
     fn renders_standing_rules_one_file_per_area_and_the_knowledge_skill() {
         let base = fixture_base();
@@ -435,8 +424,7 @@ mod tests {
         assert!(skill.ends_with("## Topics\n\nprocess  2  process title\nrust  3  rust title\n"));
     }
 
-    /// tests/kb.test.mjs, describe('render'): "render writes stale files;
-    /// --check only lists them".
+    /// `render` writes stale files; `--check` only lists them.
     #[test]
     fn render_writes_stale_files_check_only_lists_them() {
         let dir = tempfile::tempdir().expect("tempdir");

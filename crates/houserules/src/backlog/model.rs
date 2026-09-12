@@ -1,33 +1,29 @@
-//! The backlog model layer: `backlog/schema.json` typed
-//! (docs/specs/2026-09-04-batch-15-tier2-spec.md §3). Every `$defs` entry
-//! the schema declares gets a serde type here, named after the schema's own
-//! field names -- but only where the spec §3 data-layer rule (controller-
-//! accepted at the batch 17 T2 review, HR-059) actually sanctions one: a
-//! typed model serves only a path where the data is never re-serialized
-//! back to its source file and a parse failure is an acceptable outcome. A
+//! The backlog model layer: `backlog/schema.json` typed. Every `$defs`
+//! entry the schema declares gets a serde type here, named after the
+//! schema's own field names -- but only where a typed model actually
+//! serves a consumer: a path where the data is never re-serialized back
+//! to its source file and a parse failure is an acceptable outcome. A
 //! type with no such consumer is not kept dormant; it is deleted with its
-//! pin test, which is why this file holds one type, not the fifteen `$defs`
-//! entries `backlog/schema.json` declares.
+//! pin test, which is why this file holds one type, not the fifteen
+//! `$defs` entries `backlog/schema.json` declares.
 //!
 //! `ItemStatus` (`$defs/status`) is `backlog::commands::set_item`'s one
 //! caller: it validates a `set status=<value>` assignment against this
-//! schema-pinned enum instead of a hand-typed string array that could drift
-//! from `backlog/schema.json` unnoticed, and a rejected `set` never writes
-//! anything back, so a parse failure here is the correct, final outcome.
-//! Every other `$defs` entry (`item`, `batch`, `amendment`, `decision`,
-//! `parkedItem`, and their file wrappers) named a type here through batch
-//! 17 T2's first cut and back it out in this fix round (task-2-review.json,
-//! issue 5): `backlog::commands::get_items`/`set_item` must reproduce each
-//! item's own on-disk key order byte-for-byte, which a struct's fixed
-//! declaration order cannot (verified against this repository's own
-//! `HR-052`, whose real field order does not match any type's declared
-//! one), and `backlog::commands::check_backlog` must tolerate a malformed
-//! item -- an invalid `type`, an unknown field -- the way `rules::model`'s
-//! loader tolerates one for the knowledge base, which a
-//! `#[serde(deny_unknown_fields)]` round-trip cannot; see `load.rs`'s
-//! module doc for the fuller account. Neither constraint applies to
-//! `ItemStatus`: `set_item` reads it as a bare string, never round-trips a
-//! whole `Item`, and correctly refuses malformed input.
+//! schema-pinned enum instead of a hand-typed string array that could
+//! drift from `backlog/schema.json` unnoticed, and a rejected `set` never
+//! writes anything back, so a parse failure here is the correct, final
+//! outcome. Every other `$defs` entry (`item`, `batch`, `amendment`,
+//! `decision`, `parkedItem`, and their file wrappers) stays untyped here:
+//! `backlog::commands::get_items`/`set_item` must reproduce each item's
+//! own on-disk key order byte-for-byte, which a struct's fixed
+//! declaration order cannot, since a real item's own field order varies
+//! from item to item; and `backlog::commands::check_backlog` must
+//! tolerate a malformed item -- an invalid `type`, an unknown field -- the
+//! way `rules::model`'s loader tolerates one for the knowledge base,
+//! which a `#[serde(deny_unknown_fields)]` round-trip cannot; see
+//! `load.rs`'s module doc for the fuller account. Neither constraint
+//! applies to `ItemStatus`: `set_item` reads it as a bare string, never
+//! round-trips a whole `Item`, and correctly refuses malformed input.
 
 use serde::{Deserialize, Serialize};
 
@@ -52,9 +48,9 @@ mod tests {
     use super::*;
     use crate::schema_pin::assert_enum_pinned;
 
-    /// `template/backlog/schema.json` -- the vendored backlog schema (spec
-    /// §3: "the JSON Schema files stay the vendored source of truth").
-    /// Differs from this repository's own copy (`backlog/schema.json`)
+    /// `template/backlog/schema.json` -- the vendored backlog schema, the
+    /// JSON Schema files' own source of truth. Differs from this
+    /// repository's own copy (`backlog/schema.json`)
     /// only in the item-id regex prefix (`WI-` vendored, `HR-` this
     /// repository's own), which the enum pin below does not read.
     fn schema() -> Value {

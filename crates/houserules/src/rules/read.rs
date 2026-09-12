@@ -1,15 +1,12 @@
 //! The knowledge-base read commands: `topics`, `index`, `for`, and
-//! `standing` -- `tools/kb.mjs`'s `cmdTopics`/`cmdIndex`/`cmdFor`/
-//! `cmdStanding`, ported (batch 17 T4, docs/specs/2026-09-04-batch-15-
-//! tier2-spec.md §5 phase 2). `cmdGet`'s port, [`get_entries`], lives here
-//! too, but carries no `cmd_get` CLI wrapper of its own: the flat surface's
-//! `get` (spec §3) resolves an id by SHAPE between a backlog item and a
-//! knowledge entry, so its dispatch lives at the crate root (`crate::get`,
-//! next to `crate::emit`) rather than in either feature module -- see that
-//! file's own doc for why.
+//! `standing`. [`get_entries`] lives here too, but carries no `cmd_get`
+//! CLI wrapper of its own: the flat surface's `get` resolves an id by
+//! SHAPE between a backlog item and a knowledge entry, so its dispatch
+//! lives at the crate root (`crate::get`, next to `crate::emit`) rather
+//! than in either feature module -- see that file's own doc for why.
 //!
 //! Every command here reads [`Base::raw_entries`], never [`Base::entries`]:
-//! the spec §3 data-layer rule already established for `backlog`'s own
+//! the same data-layer rule already established for `backlog`'s own
 //! `get`/`set` applies just as much here, for two concrete reasons
 //! `Entry`'s reduced field set cannot answer. First, `get` and `for --full`
 //! must print an entry's ENTIRE original JSON, in its own on-disk key
@@ -35,26 +32,20 @@ use super::model::{Base, load_base};
 use super::render::{AREA_FILE_KINDS, RULE_KINDS};
 
 /// The command a `for` result points readers at, to see the full standing
-/// set -- `tools/kb.mjs`'s `STANDING_COMMAND`. Rewritten to the flat form
-/// (batch 18 T5 fix round 1, spec §3 boundary clarification at commit
-/// 878265b): `standing`'s command string reaches `for`'s JSON output, so
-/// the read-parity slices that carry it join the rewrite boundary exactly
-/// as the render and check slices did, moving to reviewed, Rust-generated
-/// goldens (`tests/goldens/read-parity/`) instead of staying frozen-JS-
-/// pinned. `tools/find-shell-tool-refs`'s own exceptions list no longer
-/// carries this file for that reason.
+/// set. `standing`'s command string reaches `for`'s JSON output, so the
+/// read-parity slices that carry it live at reviewed, Rust-generated
+/// goldens (`tests/goldens/read-parity/`).
 const STANDING_COMMAND: &str = "houserules standing";
 
 /// Entry kinds `for` includes by area membership alone (no `verify` match
-/// needed) -- `tools/kb.mjs`'s `FOR_KINDS`, `AREA_FILE_KINDS` plus
-/// `procedure`.
+/// needed): `AREA_FILE_KINDS` plus `procedure`.
 fn is_for_kind(kind: &str) -> bool {
     AREA_FILE_KINDS.contains(&kind) || kind == "procedure"
 }
 
 /// `entry.get("id")` as a plain `&str`, `""` for a missing or non-string
-/// id -- every sort in this module orders by this, matching `tools/kb.mjs`'s
-/// `byId` (`a.id < b.id`, a plain string comparison).
+/// id -- every sort in this module orders by this, a plain string
+/// comparison.
 fn entry_id(entry: &Value) -> &str {
     entry.get("id").and_then(Value::as_str).unwrap_or("")
 }
@@ -64,26 +55,20 @@ fn sort_by_id(entries: &mut [Value]) {
 }
 
 /// Copies `entry[key]` into `map` under the same name, or omits the key
-/// entirely when `entry` does not carry it. This is `JSON.stringify`'s own
-/// treatment of an object literal's `undefined`-valued property: `e.kind`
-/// reads `undefined` for an entry missing `kind`, and `JSON.stringify`
-/// drops an `undefined`-valued key rather than printing it -- a bare
-/// `unwrap_or(Value::Null)` instead prints the key with a JSON `null`
-/// value, a byte-shape divergence on malformed data, not a tolerance
-/// (batch 17 T4 fix round 1, review issue 3: unlike `has_tag`'s and
-/// `for_result`'s malformed-data decisions below, this one is parity, not
-/// a ruling -- indexRow's own missing-key behavior is exactly this).
+/// entirely when `entry` does not carry it: a bare
+/// `unwrap_or(Value::Null)` would instead print the key with a JSON
+/// `null` value, a different output shape on malformed data, not a
+/// tolerance.
 fn copy_present(map: &mut serde_json::Map<String, Value>, entry: &Value, key: &str) {
     if let Some(value) = entry.get(key) {
         map.insert(key.to_string(), value.clone());
     }
 }
 
-/// `{id, kind, area, standing, summary}` -- `tools/kb.mjs`'s `indexRow`.
-/// `standing` is `Boolean(e.standing)`, JS truthiness coerced to a real
-/// JSON boolean, always present regardless of the raw field; the other
-/// four fields are omitted, not null, when `entry` lacks them
-/// (`copy_present`'s own doc).
+/// `{id, kind, area, standing, summary}`. `standing` is coerced through
+/// `falsy` to a real JSON boolean, always present regardless of the raw
+/// field; the other four fields are omitted, not null, when `entry`
+/// lacks them (`copy_present`'s own doc).
 fn index_row(entry: &Value) -> Value {
     let mut map = serde_json::Map::new();
     copy_present(&mut map, entry, "id");
@@ -97,8 +82,7 @@ fn index_row(entry: &Value) -> Value {
     Value::Object(map)
 }
 
-/// Every filter `index` accepts -- `tools/kb.mjs`'s loosely-typed `opts`
-/// object as `filterEntries` reads it. `standing` (`index --standing`, no
+/// Every filter `index` accepts. `standing` (`index --standing`, no
 /// value) is a plain flag; every other field is `None` unless the caller
 /// gave that flag a value.
 pub(crate) struct IndexOpts {
@@ -110,17 +94,12 @@ pub(crate) struct IndexOpts {
 }
 
 /// `Ok(true)` when `entry`'s `tags` array contains `tag`; `Err(id)` when
-/// `entry`'s `tags` field is missing or not an array -- `tools/kb.mjs`'s
-/// `e.tags.includes(...)` crashes uncaught (`TypeError: e.tags.includes is
-/// not a function`) on exactly that shape, verified live. Named rather
-/// than silent (batch 17 T4 fix round 1, review issue 3's crash-path
-/// decision for this instance): `for_result`'s own malformed-`verify`
-/// decision below is the same call for the same reason -- a crash the
-/// frozen JS reaches on this data is reported, not reproduced and not
-/// swallowed (spec §6's crash-path ruling), so `index --tag` on a base
-/// carrying a malformed entry is consistent with `for` on one, not a
-/// softer, entry-skipping answer for one read command and a hard failure
-/// for the other.
+/// `entry`'s `tags` field is missing or not an array. Named rather than
+/// silent (`houserules.crash-paths-are-named`): `for_result`'s own
+/// malformed-`verify` decision below is the same call for the same
+/// reason, so `index --tag` on a base carrying a malformed entry is
+/// consistent with `for` on one, not a softer, entry-skipping answer for
+/// one read command and a hard failure for the other.
 fn has_tag<'a>(entry: &'a Value, tag: &str) -> Result<bool, &'a str> {
     match entry.get("tags") {
         Some(Value::Array(tags)) => Ok(tags.iter().any(|t| t.as_str() == Some(tag))),
@@ -129,12 +108,10 @@ fn has_tag<'a>(entry: &'a Value, tag: &str) -> Result<bool, &'a str> {
 }
 
 /// Every loaded entry (raw, unsorted) matching every filter `opts` sets,
-/// then sorted by id -- `tools/kb.mjs`'s `filterEntries`. `Err` only from
-/// the `--tag` filter, and only for an entry that survives every filter
-/// applied before it (`has_tag`'s own doc) -- matching JS's own filter
-/// order and short-circuiting exactly: an entry a `--tag` filter never
-/// reaches (excluded already by `--area`/`--topic`) never has its `tags`
-/// field read at all.
+/// then sorted by id. `Err` only from the `--tag` filter, and only for an
+/// entry that survives every filter applied before it (`has_tag`'s own
+/// doc): an entry a `--tag` filter never reaches (excluded already by
+/// `--area`/`--topic`) never has its `tags` field read at all.
 fn filter_entries(base: &Base, opts: &IndexOpts) -> Result<Vec<Value>, String> {
     let mut entries: Vec<Value> = base.raw_entries.values().cloned().collect();
     if let Some(area) = &opts.area {
@@ -168,15 +145,13 @@ fn filter_entries(base: &Base, opts: &IndexOpts) -> Result<Vec<Value>, String> {
     Ok(entries)
 }
 
-/// Index rows for entries matching every given filter, sorted by id --
-/// `tools/kb.mjs`'s `cmdIndex`. `Err` only from `filter_entries`'s own
-/// `--tag` malformed-data case.
+/// Index rows for entries matching every given filter, sorted by id.
+/// `Err` only from `filter_entries`'s own `--tag` malformed-data case.
 pub(crate) fn index_entries(base: &Base, opts: &IndexOpts) -> Result<Vec<Value>, String> {
     Ok(filter_entries(base, opts)?.iter().map(index_row).collect())
 }
 
-/// `{topic, entries, title}` per loaded topic file, in load order --
-/// `tools/kb.mjs`'s `cmdTopics`.
+/// `{topic, entries, title}` per loaded topic file, in load order.
 pub(crate) fn topic_rows(base: &Base) -> Vec<Value> {
     base.topics
         .iter()
@@ -185,11 +160,9 @@ pub(crate) fn topic_rows(base: &Base) -> Vec<Value> {
 }
 
 /// The stored entries (raw JSON, `topic` field included, per
-/// [`Base::raw_entries`]) for the given ids, in the order given --
-/// `tools/kb.mjs`'s `cmdGet`. Fails on the first unknown id, matching
-/// `Array.prototype.map`'s throw-on-first-error behavior; the crate-root
-/// `get` command is this function's only caller, reached only for an id
-/// shaped like a knowledge entry.
+/// [`Base::raw_entries`]) for the given ids, in the order given. Fails on
+/// the first unknown id; the crate-root `get` command is this function's
+/// only caller, reached only for an id shaped like a knowledge entry.
 pub(crate) fn get_entries(base: &Base, ids: &[String]) -> Result<Vec<Value>, String> {
     ids.iter()
         .map(|id| {
@@ -201,12 +174,12 @@ pub(crate) fn get_entries(base: &Base, ids: &[String]) -> Result<Vec<Value>, Str
         .collect()
 }
 
-/// The rule package one or more changed paths pull in -- `tools/kb.mjs`'s
-/// `cmdFor`: every entry whose kind is rule-shaped (`is_for_kind`) AND
-/// whose area one of `paths` resolves to (`areas_for`), plus every entry
-/// whose own `verify` names one of `paths` directly, regardless of area or
-/// kind. `full` prints each matching entry whole (`get`'s own shape);
-/// otherwise each is reduced through `index_row`.
+/// The rule package one or more changed paths pull in: every entry whose
+/// kind is rule-shaped (`is_for_kind`) AND whose area one of `paths`
+/// resolves to (`areas_for`), plus every entry whose own `verify` names
+/// one of `paths` directly, regardless of area or kind. `full` prints
+/// each matching entry whole (`get`'s own shape); otherwise each is
+/// reduced through `index_row`.
 ///
 /// `Err` from two causes. First, a declared area glob failing to compile
 /// -- unreachable in practice, since `model::load_base` already compiles
@@ -214,29 +187,19 @@ pub(crate) fn get_entries(base: &Base, ids: &[String]) -> Result<Vec<Value>, Str
 /// as a named error rather than `.expect()`-panicking on that guarantee,
 /// matching `audit.rs`'s own `area_files`/`areas_for` call sites. Second,
 /// an entry's `verify` array holding a non-string element REACHED BEFORE
-/// ANY MATCH: `tools/kb.mjs`'s `stripDot` crashes uncaught on it
-/// (`path.replace is not a function`, verified live), the exact
-/// malformed-data class spec §6's crash-path ruling covers (`check.rs`'s
-/// own `check_base` already reports a non-string `verify` entry as a
-/// named finding for the same reason, there via `path.join`'s divergent
-/// tolerance rather than a crash) -- reported here as a named error
-/// rather than reproduced as a crash or silently excluded (batch 17 T4
-/// fix round 1, review issue 3).
+/// ANY MATCH is a named error (`houserules.crash-paths-are-named`; `check.
+/// rs`'s own `check_base` reports the same shape as a named finding for
+/// its own `verify` walk, there via a divergent tolerance rather than an
+/// error).
 ///
-/// The two short-circuits this reproduces, both required for parity, not
-/// only the outer one (fix round 2, review new_breakage 1: fix round 1's
-/// own doc claimed both but the code only had the first). Outer: `verify`
-/// is read at all only when `area_match` is false for that entry, matching
-/// JS's own `||` -- an entry `for` already includes by area never has its
-/// `verify` field read, malformed or not, since JS's own evaluation never
-/// reaches it either. Inner: the loop over `items` stops at the FIRST
-/// element whose stripped path is in `wanted`, matching
-/// `Array.prototype.some`'s own element-level short-circuit -- a
-/// malformed element AFTER a match is never type-checked, verified live
-/// with `verify: ["<matched path>", 123]` on a `decision`-kind entry
-/// (`tools/kb.sh for` exits 0 and includes the entry; the pre-fix binary
-/// wrongly errored on the trailing `123`, since it kept scanning every
-/// element regardless of an earlier match).
+/// Two short-circuits, both load-bearing, not only the outer one. Outer:
+/// `verify` is read at all only when `area_match` is already false for
+/// that entry -- an entry `for` already includes by area never has its
+/// `verify` field read, malformed or not. Inner: the loop over `items`
+/// stops at the FIRST element whose stripped path is in `wanted` -- a
+/// malformed element AFTER a match is never type-checked: `verify:
+/// ["<matched path>", 123]` on a `decision`-kind entry exits 0 and
+/// includes the entry, rather than erroring on the trailing `123`.
 pub(crate) fn for_result(base: &Base, paths: &[String], full: bool) -> Result<Value, String> {
     let path_refs: Vec<&str> = paths.iter().map(String::as_str).collect();
     let areas = areas_for(&path_refs, &base.areas).map_err(|error| error.to_string())?;
@@ -286,12 +249,12 @@ pub(crate) fn for_result(base: &Base, paths: &[String], full: bool) -> Result<Va
     }))
 }
 
-/// `{id, summary}` for every standing rule, then every standing invariant,
-/// each group sorted by id -- `tools/kb.mjs`'s `cmdStanding`
-/// (`standingEntries`, inlined: it and `render::standing_lines` need
-/// different output shapes from the same filter-and-order logic, and nothing
-/// else needs a shared name for it). Omits `id`/`summary` rather than
-/// printing it null when an entry lacks it (`copy_present`'s own doc).
+/// `{id, summary}` for every standing rule, then every standing
+/// invariant, each group sorted by id. Inlined rather than shared with
+/// `render::standing_lines`: the two need different output shapes from
+/// the same filter-and-order logic, and nothing else needs a shared name
+/// for it. Omits `id`/`summary` rather than printing it null when an
+/// entry lacks it (`copy_present`'s own doc).
 pub(crate) fn standing_rows(base: &Base) -> Vec<Value> {
     RULE_KINDS
         .iter()
@@ -359,10 +322,10 @@ pub(crate) fn cmd_index(dir: Option<PathBuf>, opts: IndexOpts) -> ExitCode {
     }
 }
 
-/// Runs `for`: prints the rule package `paths` pulls in, or `main`'s own
-/// "needs at least one path" usage error when `paths` is empty (checked
-/// after the base has loaded, matching the frozen JS's own order -- every
-/// command's usage checks run after `loadBase`, never before).
+/// Runs `for`: prints the rule package `paths` pulls in, or a "needs at
+/// least one path" usage error when `paths` is empty, checked after the
+/// base has loaded -- every command's usage checks run after the base
+/// loads, never before.
 pub(crate) fn cmd_for(dir: Option<PathBuf>, paths: Vec<String>, full: bool) -> ExitCode {
     let base = match load(dir) {
         Ok(base) => base,
@@ -405,7 +368,7 @@ mod tests {
     use super::*;
 
     /// A standing `process.sequential` rule, with every field a caller
-    /// might override -- Rust port of `tests/kb.test.mjs`'s `entry()`.
+    /// might override.
     fn entry(overrides: Value) -> Value {
         let mut base = json!({
             "id": "process.sequential",
@@ -425,8 +388,8 @@ mod tests {
         base
     }
 
-    /// Groups `entries` by their id prefix and writes each group as its own
-    /// topic file -- Rust port of `tests/kb.test.mjs`'s `writeTopics`.
+    /// Groups `entries` by their id prefix and writes each group as its
+    /// own topic file.
     fn write_topics(root: &Path, entries: &[Value]) {
         let mut by_topic: std::collections::BTreeMap<String, Vec<Value>> =
             std::collections::BTreeMap::new();
@@ -453,9 +416,8 @@ mod tests {
 
     /// A knowledge base under `root`: a project-extended seed schema, a
     /// minimal `areas.json` covering `process`/`rust`/`global`, and
-    /// `entries` split into topic files -- Rust port of
-    /// `tests/kb.test.mjs`'s `makeRepo` (its git init/commit are dropped,
-    /// like `check.rs`'s own `make_repo`: `--dir` bypasses git resolution).
+    /// `entries` split into topic files. No git init or commit, like
+    /// `check.rs`'s own `make_repo`: `--dir` bypasses git resolution.
     fn make_repo(root: &Path, entries: &[Value]) {
         fs::create_dir_all(root.join("knowledge")).unwrap();
         let mut schema: Value = serde_json::from_str(
@@ -485,9 +447,9 @@ mod tests {
         write_topics(root, entries);
     }
 
-    /// `tests/kb.test.mjs`, `describe('read commands')`'s own fixture
-    /// entries: a standing rule and a standing invariant in `process`, a
-    /// non-standing gotcha and a `history`-kind entry in `rust`.
+    /// Fixture entries: a standing rule and a standing invariant in
+    /// `process`, a non-standing gotcha and a `history`-kind entry in
+    /// `rust`.
     fn fixture_entries() -> Vec<Value> {
         vec![
             entry(json!({})),
@@ -509,8 +471,7 @@ mod tests {
         ]
     }
 
-    /// tests/kb.test.mjs, describe('read commands'): "topics lists name,
-    /// count, title".
+    /// Topics lists name, count, title.
     #[test]
     fn topics_lists_name_count_title() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -539,8 +500,8 @@ mod tests {
         }
     }
 
-    /// tests/kb.test.mjs, describe('read commands'): "index filters by
-    /// area, topic, tag, kind, standing and sorts by id".
+    /// Index filters by area, topic, tag, kind, standing and sorts by
+    /// id.
     #[test]
     fn index_filters_by_area_topic_tag_kind_standing_and_sorts_by_id() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -657,13 +618,10 @@ mod tests {
         );
     }
 
-    /// Batch 17 T4 fix round 1, review issue 3 (byte-shape divergence, not
-    /// a tolerance ruling): an entry missing `kind`/`area`/`summary`
-    /// prints an `index` row that OMITS those keys, matching
-    /// `JSON.stringify`'s own drop of an `undefined`-valued property --
-    /// not `"kind": null`, which `unwrap_or(Value::Null)` printed before
-    /// this fix. `standing` stays present regardless (`Boolean(undefined)`
-    /// is a real `false`, never omitted).
+    /// An entry missing `kind`/`area`/`summary` prints an `index` row
+    /// that OMITS those keys, not `"kind": null`. `standing` stays
+    /// present regardless (`falsy` of a missing field is a real `false`,
+    /// never omitted).
     #[test]
     fn index_row_omits_a_missing_field_instead_of_printing_it_null() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -678,14 +636,11 @@ mod tests {
         );
     }
 
-    /// Batch 17 T4 fix round 1, review issue 3: `index --tag` on an entry
-    /// whose `tags` field is missing or not an array is a named error
-    /// naming that entry, not a silently excluded one -- the frozen JS's
-    /// `e.tags.includes(...)` crashes uncaught on exactly this shape,
-    /// verified live, and spec §6's crash-path ruling covers it the same
-    /// way `for`'s own malformed-`verify` case below does. An entry the
-    /// `--tag` filter never reaches (already excluded by an earlier
-    /// filter) is never checked, matching JS's own filter order.
+    /// `index --tag` on an entry whose `tags` field is missing or not an
+    /// array is a named error naming that entry, not a silently excluded
+    /// one -- the same crash-path decision `for`'s own malformed-`verify`
+    /// case below makes. An entry the `--tag` filter never reaches
+    /// (already excluded by an earlier filter) is never checked.
     #[test]
     fn index_tag_filter_reports_a_named_error_for_an_entry_with_malformed_tags() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -724,9 +679,8 @@ mod tests {
         assert_eq!(scoped.len(), 1);
     }
 
-    /// tests/kb.test.mjs, describe('read commands'): "get returns the
-    /// stored entries plus topic, in the order of the ids given, and
-    /// rejects unknown ids".
+    /// Get returns the stored entries plus topic, in the order of the ids
+    /// given, and rejects unknown ids.
     #[test]
     fn get_returns_stored_entries_plus_topic_in_order_and_rejects_unknown_ids() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -756,8 +710,7 @@ mod tests {
         assert_eq!(error, "unknown id \"nope.x\"");
     }
 
-    /// tests/kb.test.mjs, describe('read commands'): "for resolves areas
-    /// and lists rule, invariant, gotcha entries only".
+    /// For resolves areas and lists rule, invariant, gotcha entries only.
     #[test]
     fn for_resolves_areas_and_lists_rule_invariant_gotcha_entries_only() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -772,10 +725,7 @@ mod tests {
                 "areas": ["global", "rust"],
                 "entries": [row("rust.clean", "gotcha", "rust", false, "Clean before retry.")],
                 // The literal, not the constant: a change to STANDING_COMMAND's
-                // own value must still fail this test (mirrors task-4-review.json
-                // fix round 1, finding 7, on the JS side of this same case).
-                // Batch 18 T5 fix round 1 consciously changed it; this literal
-                // moved with it.
+                // own value must still fail this test.
                 "standing": "houserules standing",
             })
         );
@@ -794,8 +744,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs, describe('read commands'): "for includes
-    /// procedures and entries whose verify names a path".
+    /// For includes procedures and entries whose verify names a path.
     #[test]
     fn for_includes_procedures_and_entries_whose_verify_names_a_path() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -847,16 +796,10 @@ mod tests {
         );
     }
 
-    /// Batch 17 T4 fix round 1, review issue 3: an entry's `verify` array
-    /// holding a non-string element is a named error naming that entry --
-    /// the frozen JS's `stripDot` crashes uncaught on it
-    /// (`path.replace is not a function`, verified live), and spec §6's
-    /// crash-path ruling covers this malformed-data class (`check.rs`'s
-    /// own `check_base` already names a non-string `verify` entry as a
-    /// finding for the same class, there via a divergent tolerance rather
-    /// than a crash). The entry's own `kind` (`decision`) is not
-    /// `for`-eligible by area, so its `verify` is the only route to a
-    /// match and is reached.
+    /// An entry's `verify` array holding a non-string element is a named
+    /// error naming that entry (`houserules.crash-paths-are-named`). The
+    /// entry's own `kind` (`decision`) is not `for`-eligible by area, so
+    /// its `verify` is the only route to a match and is reached.
     #[test]
     fn for_reports_a_named_error_for_a_non_string_verify_entry() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -875,12 +818,10 @@ mod tests {
         );
     }
 
-    /// Batch 17 T4 fix round 2, review new_breakage 1: the verify loop
-    /// stops at the FIRST matching element, like `Array.prototype.some`'s
-    /// own element-level short-circuit -- a malformed element AFTER a
-    /// match is never type-checked. `README.md` matches first; the
-    /// trailing `123` must never be reached, so this must succeed, not
-    /// error.
+    /// The verify loop stops at the FIRST matching element: a malformed
+    /// element AFTER a match is never type-checked. `README.md` matches
+    /// first; the trailing `123` must never be reached, so this must
+    /// succeed, not error.
     #[test]
     fn for_matches_a_verify_entry_before_a_later_malformed_one_without_checking_it() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -905,13 +846,11 @@ mod tests {
         );
     }
 
-    /// Batch 17 T4 fix round 1, review issue 3: `for`'s own area-then-
-    /// verify check short-circuits exactly like the frozen JS's `||` --
-    /// an entry `for` already includes by area (a `rule` in `global`,
+    /// An entry `for` already includes by area (a `rule` in `global`,
     /// which every path resolves to) never has its `verify` field read,
-    /// so a malformed one there does not surface. Without this, the fix
-    /// above would wrongly turn every `for` call into an error whenever
-    /// ANY entry anywhere carried a malformed `verify`, matched or not.
+    /// so a malformed one there does not surface. Without this
+    /// short-circuit, every `for` call would error whenever ANY entry
+    /// anywhere carried a malformed `verify`, matched or not.
     #[test]
     fn for_does_not_check_verify_when_the_entry_already_matches_by_area() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -933,8 +872,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs, describe('read commands'): "includes a
-    /// non-standing global rule in for, for any path".
+    /// Includes a non-standing global rule in for, for any path.
     #[test]
     fn includes_a_non_standing_global_rule_in_for_for_any_path() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -965,8 +903,7 @@ mod tests {
         }
     }
 
-    /// tests/kb.test.mjs, describe('read commands'): "standing lists rules
-    /// before invariants".
+    /// Standing lists rules before invariants.
     #[test]
     fn standing_lists_rules_before_invariants() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -981,11 +918,10 @@ mod tests {
         );
     }
 
-    /// Batch 17 T4 fix round 1, review issue 3: a standing entry missing
-    /// `summary` prints a `standing` row that OMITS the key, matching
-    /// `JSON.stringify`'s own drop of an `undefined`-valued property --
-    /// the same fix `index_row_omits_a_missing_field_instead_of_printing_it_null`
-    /// pins for `index`.
+    /// A standing entry missing `summary` prints a `standing` row that
+    /// OMITS the key, the same shape
+    /// `index_row_omits_a_missing_field_instead_of_printing_it_null` pins
+    /// for `index`.
     #[test]
     fn standing_omits_a_missing_field_instead_of_printing_it_null() {
         let dir = tempfile::tempdir().expect("tempdir");

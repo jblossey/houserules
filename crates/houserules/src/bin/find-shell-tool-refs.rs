@@ -1,16 +1,7 @@
 //! Enumerates every shipped reference to `tools/kb.sh` and `tools/
 //! backlog.sh` across `template/` and the Rust source files that hold the
-//! CLI's own generated-output literals -- ported from `tools/
-//! find-shell-tool-refs.mjs` (batch 18 T5 fix round 1, HR-062, review
-//! finding "no-Node ruling"): the owner's standing "no Node tools in this
-//! codebase" ruling (docs/design.md decision 30) applies to this script
-//! same as it did to `check-report-claims.mjs`, and no interim label like
-//! `tools/make-corpus.mjs`'s is available for a script this batch adds
-//! from scratch. Dev-only: not shipped in `template/` or the payload, the
-//! same status `gen-goldens.rs` has (batch 20 T2, HR-066: `check-report-
-//! claims.rs` left this list when it moved behind the flat surface as a
-//! shipped subcommand -- `crate::report_claims`'s own module doc has the
-//! full account).
+//! CLI's own generated-output literals. Dev-only: not shipped in
+//! `template/` or the payload, the same status `gen-goldens.rs` has.
 //!
 //! Bounds the reference rewrite's closure claim
 //! (process.closure-claims-carry-enumeration): the pre-rewrite run is the
@@ -22,42 +13,36 @@
 //! Every file under `template/` (recursive), and five Rust source files
 //! that hold literals the CLI prints or embeds in generated output:
 //! `rules/render.rs`, `rules/check.rs`, `install.rs`, `rules/read.rs`, and
-//! `main.rs` (added at fix round 1, review finding "enumeration": its
-//! struct doc comment IS `houserules --help`'s "about" text verbatim, so a
-//! stale reference there is adopter-visible, not internal history). Every
-//! OTHER Rust source file under `crates/` narrates the frozen JS's own,
-//! permanently fixed naming for porting-parity documentation -- not an
-//! adopter-facing instruction a rewrite could make true or false -- so
-//! this script does not search there.
+//! `main.rs` (its struct doc comment IS `houserules --help`'s "about" text
+//! verbatim, so a stale reference there is adopter-visible). Every OTHER
+//! Rust source file under `crates/` is source the compiler and the test
+//! suite verify, not instructional prose an adopter follows -- a stale
+//! reference there cannot mislead anyone the way an adopter-facing string
+//! can -- so this script does not search there.
 //!
 //! `PATTERNS` matches `kb.sh`/`backlog.sh` bare, without requiring a
-//! `tools/` prefix (widened at fix round 1, review finding "enumeration"):
-//! the pre-rewrite `template/tools/claude-session-start.sh` invoked
-//! `"$dir/kb.sh" standing` by relative path, a real shipped reference the
-//! prefixed pattern never saw.
+//! `tools/` prefix: `template/tools/claude-session-start.sh` can invoke
+//! either by relative path (`"$dir/kb.sh" standing`), a real shipped
+//! reference a prefixed pattern would miss.
 //!
 //! # Exceptions (found, but deliberately not rewritten)
 //!
 //! Named here, not hidden in a blanket file skip -- the "zero remaining"
 //! claim means "zero UNEXPECTED", not "the search saw nothing":
-//!   - `template/tools/kb.mjs` (whole file): the frozen-but-shipped JS
-//!     engine this exception named through phase 4, while it stayed
-//!     shipped-but-inert, live-invoked only by this repository's own dev
-//!     tests and by `tools/make-corpus.mjs`'s frozen-worktree
-//!     regeneration. Retired at phase 5 (batch 20 T3, HR-047) along with
-//!     every caller named above; the exception matches nothing now that
-//!     the file is gone, kept as the record of why it once did.
-//!   - `crates/houserules/src/rules/read.rs` (whole file): its one
-//!     remaining hit narrates a batch 17 fix's measured JS behaviour, not
-//!     an adopter-facing instruction. STANDING_COMMAND itself no longer
-//!     needs this exception (fix round 1 rewrote it to the flat form).
-//!   - `crates/houserules/src/install.rs`: narrowed at fix round 1 (review
-//!     finding "enumeration") to exactly the `RETIRED` constant's own item
-//!     doc and declaration, plus the doc and body of its test function --
-//!     not the whole file. The prior, broader exception swallowed the two
-//!     adopter-facing `next: tools/kb.sh check && tools/backlog.sh check`
-//!     println literals this task had to rewrite; this file's own
-//!     `install_rs_exempt_lines` states the exact, auditable rule.
+//!   - `template/tools/kb.mjs` (whole file): matches nothing today -- the
+//!     file does not exist. HR-101 tracks removing this entry.
+//!   - `crates/houserules/src/rules/read.rs` (whole file): also matches
+//!     nothing today -- the one line it named is gone. HR-101 tracks
+//!     removing this entry too.
+//!   - `crates/houserules/src/install.rs`: narrowed to exactly the
+//!     `RETIRED` constant's own item doc and declaration, plus the doc and
+//!     body of its test function -- not the whole file, since `RETIRED`
+//!     and its own item doc and test literally are the two shell-wrapper
+//!     paths the deletion mechanism removes (FILE PATHS, not command
+//!     instructions a rewrite could flip), and a whole-file exception
+//!     would also swallow any other, unrelated hit this file might later
+//!     carry. This file's own `install_rs_exempt_lines` states the exact,
+//!     auditable rule.
 //!
 //! Usage: `cargo run --quiet --bin find-shell-tool-refs`. Prints every
 //! match, then a summary line, then exits 0 if every match is either
@@ -76,14 +61,11 @@ use walkdir::WalkDir;
 const PATTERNS: [&str; 2] = ["kb.sh", "backlog.sh"];
 
 /// The one test function `install_rs_exempt_lines` opens a body window
-/// for -- named exactly, not matched by substring (fix round 2, review
-/// new_breakage: a bare `contains("retired")` also opened a window over
-/// the production `delete_retired` and its three `delete_retired_*` unit
-/// tests, none of which this file's own doc names). Batch 20 T3 (HR-047)
-/// renamed the test from `retired_holds_the_shell_tools_moved_at_t5`
-/// once it grew to pin the four JS engines alongside the two shell
-/// wrappers; this constant renames with it, or its own window silently
-/// stops opening.
+/// for -- named exactly, not matched by substring: a bare
+/// `contains("retired")` would also open a window over the production
+/// `delete_retired` and its three `delete_retired_*` unit tests, none of
+/// which this file's own doc names. This constant renames whenever the
+/// test does, or its own window silently stops opening.
 const RETIRED_TEST_FN: &str = "retired_holds_the_shell_tools_and_the_js_engines_they_fronted";
 
 /// The Rust source files holding literals the CLI prints or embeds in
@@ -114,24 +96,15 @@ fn repo_root() -> PathBuf {
         .unwrap_or_else(|error| panic!("canonicalize {}: {error}", root.display()))
 }
 
-/// Every regular file under `dir`, recursed, sorted by name at each level
-/// (matching the JS original's `readdirSync(...).toSorted()` order) --
-/// walkdir (HR-079) sorts each directory's own entries before descending,
-/// the same per-level sort the hand-rolled walker did, and follows a
-/// symlinked directory the way `Path::is_dir` (metadata, not the link
-/// itself) always did here. An entry walkdir cannot read is a named,
-/// fatal error, never a silent skip (houserules.crash-paths-are-named) --
-/// a narrower posture than the walker this replaces on two counts: the old
-/// code pushed every non-directory entry regardless of type, where this
-/// one pushes only `entry.file_type().is_file()` and so now skips a
-/// non-regular entry (a socket, FIFO, or device file) it once counted as
-/// scanned; and the old code's `filter_map(|entry| entry.ok())` counted a
-/// broken symlink as a scanned entry and let `find_matches` skip it
-/// downstream with no error at all, where walkdir's `follow_links(true)`
-/// turns that same broken link into an `Err` this function now panics on
-/// (batch 21 T3 fix round 1, review issue 5; neither tree this binary
+/// Every regular file under `dir`, recursed, sorted by name at each
+/// level: `WalkDir` sorts each directory's own entries before descending,
+/// and follows a symlinked directory. An entry `WalkDir` cannot read is a
+/// named, fatal error, never a silent skip
+/// (`houserules.crash-paths-are-named`); a non-regular entry (a socket,
+/// FIFO, or device file) is skipped rather than scanned, since only
+/// `entry.file_type().is_file()` is pushed. Neither tree this binary
 /// walks holds a symlink or a non-regular file today, so no pinned
-/// capture exercises either difference).
+/// capture exercises either path.
 fn walk_files(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in WalkDir::new(dir)
         .follow_links(true)
@@ -147,7 +120,7 @@ fn walk_files(dir: &Path, out: &mut Vec<PathBuf>) {
 /// Every line in `abs_path` containing a `PATTERNS` substring, as `Hit`s
 /// with `file` relative to `root`. A file this process cannot read as
 /// UTF-8 (a binary asset under `template/`, say) carries no text
-/// reference and is silently skipped, matching the JS original.
+/// reference and is silently skipped.
 fn find_matches(root: &Path, abs_path: &Path) -> Vec<Hit> {
     let rel = abs_path
         .strip_prefix(root)
@@ -176,9 +149,9 @@ fn find_matches(root: &Path, abs_path: &Path) -> Vec<Hit> {
 /// exception): the item doc immediately preceding `const RETIRED` plus
 /// that declaration itself, and the item doc, `#[test]` attribute, and
 /// full body of `RETIRED_TEST_FN` -- named exactly, never matched by
-/// substring (fix round 2, review new_breakage: a `contains("retired")`
-/// match also opened this same window over the production
-/// `fn delete_retired` and its own three `delete_retired_*` unit tests).
+/// substring, since a `contains("retired")` match would also open this
+/// same window over the production `fn delete_retired` and its own three
+/// `delete_retired_*` unit tests.
 ///
 /// The item-doc walk stops at the first line that is not `///`-prefixed
 /// (module-level `//!` doc lines do not count, so the file's general
@@ -196,11 +169,10 @@ fn install_rs_exempt_lines(text: &str) -> HashSet<usize> {
             exempt.insert(above); // 1-based line number for 0-based index above-1
             above -= 1;
         }
-        // Batch 20 T3 reflowed `RETIRED` from a single line to one path per
-        // line (HR-047): tracking `[`/`]` depth from the declaration's own
-        // line, the same technique `RETIRED_TEST_FN`'s body window uses
-        // below, keeps every element line -- and the array's own closing
-        // `];` -- exempt regardless of how many lines the literal spans.
+        // Tracking `[`/`]` depth from the declaration's own line, the same
+        // technique `RETIRED_TEST_FN`'s body window uses below, keeps
+        // every element line -- and the array's own closing `];` --
+        // exempt regardless of how many lines the literal spans.
         let mut depth = 0i32;
         let mut opened = false;
         let mut cursor = decl_index;
@@ -391,10 +363,10 @@ mod tests {
 
     /// A minimal install.rs-shaped fixture: `RETIRED`'s own doc and
     /// declaration, then a production `fn delete_retired` (the same
-    /// doc-then-signature-then-body shape as the reviewer's measured HEAD
-    /// window, install.rs:448-464), then the one test this file's own doc
-    /// names. Built as a standalone string, not read from the real
-    /// install.rs, so this test does not drift with unrelated edits there.
+    /// doc-then-signature-then-body shape install.rs itself uses), then
+    /// the one test this file's own doc names. Built as a standalone
+    /// string, not read from the real install.rs, so this test does not
+    /// drift with unrelated edits there.
     const FIXTURE: &str = "\
 /// The two paths `update` deletes from an existing install, in call
 /// order (`delete_retired`'s own doc explains why the order matters).
@@ -444,12 +416,10 @@ mod tests {
             + 1
     }
 
-    /// Review new_breakage (fix round 2): a `fn ` line matched by
-    /// `to_lowercase().contains("retired")` wrongly opened a body window
-    /// over the production `fn delete_retired`, not only over
-    /// `RETIRED_TEST_FN`. Reverting the fix -- matching that looser
-    /// substring again instead of `RETIRED_TEST_FN` exactly -- flips this
-    /// test red: the disclosed-mutation RED this task report cites.
+    /// A `fn ` line matched by a bare `contains("retired")` substring
+    /// test would wrongly open a body window over the production `fn
+    /// delete_retired`, not only over `RETIRED_TEST_FN`. Reverting to
+    /// that looser match flips this test red.
     #[test]
     fn delete_retired_is_never_exempt() {
         let exempt = install_rs_exempt_lines(FIXTURE);
@@ -465,8 +435,8 @@ mod tests {
         }
     }
 
-    /// The fix narrows the match, it does not remove the mechanism:
-    /// `RETIRED`'s own declaration and the one named test still open
+    /// Matching `RETIRED_TEST_FN` by exact name, not by substring, still
+    /// lets `RETIRED`'s own declaration and the one named test open
     /// their windows.
     #[test]
     fn retired_declaration_and_its_named_test_stay_exempt() {
@@ -491,12 +461,9 @@ mod tests {
         }
     }
 
-    /// Batch 20 T3 reflowed `RETIRED` from a single line to six, one path
-    /// per line (HR-047) -- the shape `FIXTURE`'s own `RETIRED` above now
-    /// matches. Every element line and the closing `];` are still
-    /// `RETIRED`'s own array literal, the same FILE-PATH content the
-    /// single-line declaration's exemption already covered before T3,
-    /// only reflowed across more lines: none of them is a command
+    /// Every element line of `RETIRED`'s own multi-line array literal,
+    /// and the closing `];`, stay exempt: each is FILE-PATH content, the
+    /// same kind the declaration's own exemption covers, not a command
     /// instruction a rewrite could flip.
     #[test]
     fn retired_array_continuation_lines_stay_exempt() {

@@ -1,16 +1,15 @@
-//! `update` CLI-level tests (HR-047 phase-3 slice, batch 18 T4,
-//! docs/specs/2026-09-05-batch-18-phase3.md §1). Follows `install.rs`'s own
-//! structural pattern (a real subprocess against a real scratch git
-//! repository, its own small copy of the shared helpers) for the same
-//! reason that file gives (`check_commit.rs`'s module doc): this file needs
-//! none of `install.rs`'s other test-only helpers, so a `mod` share would
-//! only add dead-code warnings there. The deletion mechanism itself
-//! (`RETIRED`) is exercised at the unit level in `install.rs`'s own tests,
-//! which inject their own list directly at the `delete_retired` call site;
-//! these CLI-level tests cover the two production shapes instead: no
-//! deletion when the retired paths are absent (a fresh, post-T5 `init`
-//! never seeds them), and `update_deletes_retired_shell_tools_from_an_old_
-//! install` below, `RETIRED`'s first production use, batch 18 T5.
+//! `update` CLI-level tests. Follows `install.rs`'s own structural pattern
+//! (a real subprocess against a real scratch git repository, its own small
+//! copy of the shared helpers) for the same reason that file gives
+//! (`check_commit.rs`'s module doc): this file needs none of `install.rs`'s
+//! other test-only helpers, so a `mod` share would only add dead-code
+//! warnings there. The deletion mechanism itself (`RETIRED`) is exercised
+//! at the unit level in `install.rs`'s own tests, which inject their own
+//! list directly at the `delete_retired` call site; these CLI-level tests
+//! cover the two production shapes instead: no deletion when the retired
+//! paths are absent (a fresh `init` never seeds them), and
+//! `update_deletes_retired_shell_tools_from_an_old_install` below,
+//! `RETIRED`'s production use against an old install that still has them.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -47,11 +46,8 @@ fn scratch_git_repo() -> tempfile::TempDir {
 
 /// A scratch repository already seeded by a fresh `houserules init` --
 /// `update`'s own tests all start from this, since `update` presupposes an
-/// already-`init`ed install. Measured live on both engines for this task
-/// (captures retained at
-/// `.superpowers/sdd/2026-09-05-batch-18/t4-evidence/fr3-bin-never-init.out`
-/// and `fr3-js-never-init.out`), the binary does not crash on a target
-/// that was never `init`ed.
+/// already-`init`ed install. The binary does not crash on a target that
+/// was never `init`ed.
 /// `update_over_a_never_init_ed_target_is_a_named_error_exit_2` below pins
 /// it as one named stderr line naming `<target>/knowledge/schema.json`,
 /// and exit 2 -- the exact `io::Error` text and path separator are
@@ -77,9 +73,8 @@ fn seeded_repo() -> tempfile::TempDir {
 }
 
 /// `update` over a target that was never `init`ed is a named error, exit 2
-/// -- NOT a reproduced crash (`houserules.crash-paths-are-named`) --
-/// measured live on both engines for this task (`seeded_repo`'s own doc
-/// has the full account and the retained captures). `update` still writes
+/// -- NOT a reproduced crash (`houserules.crash-paths-are-named`),
+/// `seeded_repo`'s own doc has the full account. `update` still writes
 /// every `KIT_OWNED` file before it fails: the marker-absent default seeds
 /// cleanly (`update_renders_none_when_the_marker_file_is_missing` already
 /// pins that), and only the render step, which needs the `SEED_ONCE`
@@ -94,27 +89,24 @@ fn seeded_repo() -> tempfile::TempDir {
 /// exactly as `rules::model::LoadError::Io`'s `Display` does (`"{path}:
 /// {source}"`).
 ///
-/// A hardcoded Unix message broke this on Windows (batch-18 PR #6,
-/// windows-latest, run 34056836063/job 101550164150): the real failure was
-/// `...\knowledge\schema.json: The system cannot find the path specified.
-/// (os error 3)`, not the `.../knowledge/schema.json: No such file or
-/// directory (os error 2)` the old hardcoded string assumed -- two
-/// independent divergences at once. The path separator differs because
-/// `PathBuf::join` inserts the platform's own `MAIN_SEPARATOR` (`\` on
-/// Windows, `/` on Unix) between components it joins itself, but a
-/// separator typed literally inside one string argument (the old
-/// `.join("knowledge/schema.json")`) is never normalized -- this test now
-/// joins `"knowledge"` and `"schema.json"` as two separate calls, matching
-/// production's own two `.join()` calls byte-for-byte. The message and
-/// code differ because a missing PARENT directory is a different Windows
+/// On Windows, the real failure is `...\knowledge\schema.json: The system
+/// cannot find the path specified. (os error 3)`, not the
+/// `.../knowledge/schema.json: No such file or directory (os error 2)` a
+/// hardcoded Unix message would assume -- two independent divergences at once.
+/// The path separator differs because `PathBuf::join` inserts the platform's
+/// own `MAIN_SEPARATOR` (`\` on Windows, `/` on Unix) between components it
+/// joins itself, but a separator typed literally inside one string argument (a
+/// single `.join("knowledge/schema.json")` call) is never normalized -- this
+/// test joins `"knowledge"` and `"schema.json"` as two separate calls,
+/// matching production's own two `.join()` calls byte-for-byte. The message
+/// and code differ because a missing PARENT directory is a different Windows
 /// error than a missing leaf file: `ERROR_PATH_NOT_FOUND` (3, "The system
-/// cannot find the path specified.") applies here since `knowledge/`
-/// itself does not exist, where `ERROR_FILE_NOT_FOUND` (2, "The system
-/// cannot find the file specified.") would apply if only `schema.json`
-/// were missing (Microsoft's own System Error Codes reference, WinError.h,
-/// entries 2 and 3). Deriving the path and the error text from a real
-/// syscall on this platform, this run, keeps the assertion exact
-/// everywhere with zero `cfg`.
+/// cannot find the path specified.") applies here since `knowledge/` itself
+/// does not exist, where `ERROR_FILE_NOT_FOUND` (2, "The system cannot find
+/// the file specified.") would apply if only `schema.json` were missing
+/// (Microsoft's own System Error Codes reference, WinError.h, entries 2 and
+/// 3). Deriving the path and the error text from a real syscall on this
+/// platform, this run, keeps the assertion exact everywhere with zero `cfg`.
 #[test]
 fn update_over_a_never_init_ed_target_is_a_named_error_exit_2() {
     let dir = scratch_git_repo();
@@ -135,8 +127,7 @@ fn update_over_a_never_init_ed_target_is_a_named_error_exit_2() {
 
 /// Every `KIT_OWNED` path -- `install.rs`'s own copy. `tools/kb.mjs`,
 /// `tools/backlog.mjs`, `tools/lib/cli.mjs`, and `tools/lib/json-store.mjs`
-/// left this list at batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-
-/// phase5.md §2), joining `RETIRED`.
+/// are not in this list -- they joined `RETIRED` instead.
 const KIT_OWNED: &[&str] = &[
     "tools/claude-session-start.sh",
     ".githooks/commit-msg",
@@ -186,8 +177,7 @@ fn sha256_hex(content: &[u8]) -> String {
 
 /// `env!("CARGO_PKG_VERSION")` at THIS test binary's own compile time --
 /// `install.rs`'s own copy of `kit_version` (that function's own doc has
-/// the account of batch 20 T3's retirement of the earlier package.json-
-/// reading form).
+/// the account).
 fn kit_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
@@ -399,17 +389,16 @@ fn update_restores_a_deleted_kit_owned_file() {
 /// writing the same file, which POSIX mode bits give directly and Windows
 /// does not.
 ///
-/// A directory standing in for the file is not a genuine reproduction here:
-/// both the old and the new code end up naming a similar-shaped error for
-/// that shape, because the file write the old code attempts next fails on
-/// a directory too. A file the owner can WRITE but not READ is the
-/// reproduction that actually discriminates: the old code's blanket
-/// `Err(_) => Status::AtBaseline` treated the read failure as "safe to
-/// overwrite", and the subsequent write silently SUCCEEDED (write-only
-/// permission is enough for `fs::write`'s open call), replacing the file's
-/// content with the payload's with no error and no report naming what
-/// happened. The fix must instead exit 2 and leave the content exactly as
-/// it was.
+/// A directory standing in for the file is not a genuine reproduction
+/// here: a directory read failure looks similar-shaped, since a
+/// directory also fails the subsequent write attempt. A file the owner
+/// can WRITE but not READ is the reproduction that actually
+/// discriminates: a read failure that is not `io::ErrorKind::NotFound`
+/// must exit 2 and leave the file's content untouched, never fall
+/// through to a write -- write-only permission is enough for
+/// `fs::write`'s open call, so treating the read failure as "safe to
+/// overwrite" would silently replace the file's content with the
+/// payload's, with no error and no report naming what happened.
 #[cfg(unix)]
 #[test]
 fn update_reports_a_named_error_instead_of_silently_overwriting_an_unreadable_kit_owned_file() {
@@ -1075,12 +1064,12 @@ fn update_migration_run_reconciles_kit_owned_files_with_no_baselines_recorded() 
     );
 }
 
-/// Batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2): the
-/// four JS engines the shell wrappers used to front (`update_deletes_
-/// retired_shell_tools_from_an_old_install`'s own doc explains why
-/// `tools/kb.sh`/`tools/backlog.sh` get their own, separate test) are
-/// `RETIRED` too now -- an install seeded before this batch still carries
-/// them, and `update` deletes all four in the same run.
+/// `tools/kb.mjs`, `tools/backlog.mjs`, `tools/lib/cli.mjs`, and
+/// `tools/lib/json-store.mjs` (`update_deletes_retired_shell_tools_from_
+/// an_old_install`'s own doc explains why `tools/kb.sh`/`tools/backlog.sh`
+/// get their own, separate test) are `RETIRED` too -- an install seeded
+/// before they retired still carries them, and `update` deletes all four
+/// in the same run.
 #[test]
 fn update_deletes_retired_js_engines_from_an_old_install() {
     let dir = seeded_repo();
@@ -1171,7 +1160,7 @@ fn update_leaves_seed_once_files_and_settings_untouched() {
     );
 }
 
-/// A post-T5 `init` never seeds `RETIRED`'s two paths (they left
+/// A fresh `init` never seeds `RETIRED`'s two paths (they are not in
 /// `KIT_OWNED`), so a plain `update` over a freshly seeded install finds
 /// neither present and reports no deletion (`install.rs`'s own "Deletion"
 /// doc section); the mechanism itself is unit-tested there with an
@@ -1204,12 +1193,11 @@ fn update_reports_no_deletions_when_the_retired_paths_are_absent() {
     assert_eq!(before, after, "update changed the set of files present");
 }
 
-/// Batch 18 T5: `RETIRED`'s first production use. An install seeded before
-/// this task (or by the still-frozen `node bin/houserules.mjs init`, which
-/// still writes both) carries `tools/kb.sh` and `tools/backlog.sh`; the
-/// next `update` deletes both, reports each `removed <path>` in `RETIRED`'s
-/// own call order, and still resyncs every current `KIT_OWNED` file
-/// alongside them in the same run.
+/// An install seeded before `tools/kb.sh`/`tools/backlog.sh` retired (or
+/// by the still-frozen `node bin/houserules.mjs init`, which still writes
+/// both) carries them; the next `update` deletes both, reports each
+/// `removed <path>` in `RETIRED`'s own call order, and still resyncs
+/// every current `KIT_OWNED` file alongside them in the same run.
 #[test]
 fn update_deletes_retired_shell_tools_from_an_old_install() {
     let dir = seeded_repo();
@@ -1439,15 +1427,10 @@ fn update_rejects_a_malformed_id_prefix_flag_exit_2() {
     );
 }
 
-/// Every invalid `.houserules.json` shape below was measured against the
-/// real `node bin/houserules.mjs update`, not assumed from `init`'s own
-/// account, per this task's brief. This task's `live_run` entries hold all
-/// ten runs (JS and the binary, over each of the five shapes below);
-/// `install.rs`'s own "Failure paths" doc section cites that coverage.
-/// All five print one named stderr line (`<marker path>: <suffix>`), exit
-/// 2, with no `wrote <file>` line ahead of it on either engine. Seeds its
-/// own scratch repo so the expected message's marker path and the actual
-/// one always agree.
+/// Every invalid `.houserules.json` shape below prints one named stderr
+/// line (`<marker path>: <suffix>`), exit 2, with no `wrote <file>` line
+/// ahead of it. Seeds its own scratch repo so the expected message's
+/// marker path and the actual one always agree.
 fn assert_named_error_before_any_write(marker_content: &[u8], expected_stderr_suffix: &str) {
     let dir = seeded_repo();
     let marker_path = dir.path().join(".houserules.json");

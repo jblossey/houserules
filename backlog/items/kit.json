@@ -1716,6 +1716,31 @@
         "Found incidentally while live-running HR-105's archive sweep (docs/plans/2026-09-11-batch-22-stewardship.md, T1); out of that task's own scope, so filed here rather than fixed in place.",
         "Consequence recorded at batch 22 T1 fix round 1 (task-1-review.json, issue 3): this gap is not only latent. houserules archive makes it active -- a WI-prefixed item's archived record becomes unreachable by get in ANY project once swept, not merely unreached before the sweep the way it was before HR-105. get's own archive fallback works around the consequence by trying both archive lookups regardless of routing (fix round 1); this item still tracks the underlying matcher fix."
       ]
+    },
+    {
+      "id": "HR-101",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "find-shell-tool-refs.rs carries two exception entries that now match nothing",
+      "body": [
+        "`exceptions()` in crates/houserules/src/bin/find-shell-tool-refs.rs names two exceptions -- `template/tools/kb.mjs` and `crates/houserules/src/rules/read.rs` -- that a live run (`cargo run --bin find-shell-tool-refs`) shows currently matching zero hits: kb.mjs no longer exists in the tree, and read.rs's own sole `kb.sh`-naming line was removed by the batch 22 T3a comment sweep. Only the `install.rs` exception still fires (4 hits).",
+        "Found while sweeping this file's comments at batch 22 T3b: correcting a stale doc claim about read.rs's hit count surfaced that the underlying exception entry is now dead weight, not only the sentence describing it.",
+        "Removing the two dead `Exception` entries (and `RUST_FILES`'s `rules/read.rs` member, if nothing else in that file still needs the scan) is a code change, out of scope for a comment-only sweep; filed here rather than fixed in place.",
+        "The surviving `install.rs` exception's own `reason` string literal narrates its own history (batch/phase/fix-round references) the same way the two removed entries' reasons did. It is user-facing output, not a comment, so the comment-only sweep correctly left it alone -- but once the two dead entries are deleted, rewrite this one's `reason` to the present-tense rule it states (RETIRED's own doc/test are FILE PATHS the deletion mechanism removes, narrowed to exactly that window so a whole-file exception cannot swallow an unrelated hit) in the same commit."
+      ]
+    },
+    {
+      "id": "HR-102",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": ".gitattributes carries the same history narration HR-106's keep/drop line prunes from code",
+      "body": [
+        "HR-106's keep/drop line (docs/specs/2026-09-11-batch-22-stewardship.md §3) drops batch/task/round references, commit SHAs, and CI run/job ids from comments, keeping only the current constraint. The repository root's own .gitattributes carries exactly that class of history narration in its four comment blocks, confirmed present at HEAD: PR #6 and CI run 34056471594 (the tests/goldens/** block), commit e36c4b2 (the tests/fixtures/** block, alongside batch 20 T3 and HR-084), commits 0bb27a0 and 2174a9f (the .claude/rules/**/.claude/skills/project-knowledge/** block, alongside batch 20 T6), and HR-054 (the tests/corpus/** block).",
+        "Found during HR-106's own T3c comment sweep of crates/houserules/tests/**; .gitattributes is not a code file under any of spec §3's three file lists (crates/houserules/src/**, crates/houserules/tests/**, tools/*.sh, .githooks/*, and the template shell copies), so the sweep left it untouched, per scope.",
+        "Prune each block to the current constraint it states (which paths get -text, and why -text specifically, not the discovery history), the same rewrite HR-106's own sweeps already applied across crates/houserules/src/** and crates/houserules/tests/**."
+      ]
     }
   ]
 }

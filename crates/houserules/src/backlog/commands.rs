@@ -1,10 +1,9 @@
-//! The backlog command surface's pure logic -- `tools/backlog.mjs`'s
-//! `checkBacklog`, `cmdGet`, `cmdList`, `cmdBatch`, and `cmdSet`, ported
-//! (batch 17 T2). Every function here takes an already-loaded
-//! `LoadedBacklog` and returns its result value or a `CommandError`; the
-//! `cli` module resolves `--dir`, loads, calls these, and turns the
-//! result into stdout/stderr text and an `ExitCode`, the same split
-//! `rules::check`'s `check_base`/`cmd_check_knowledge` and `rules::render`'s
+//! The backlog command surface's pure logic. Every function here takes
+//! an already-loaded `LoadedBacklog` and returns its result value or a
+//! `CommandError`; the `cli` module resolves `--dir`, loads, calls
+//! these, and turns the result into stdout/stderr text and an
+//! `ExitCode`, the same split `rules::check`'s
+//! `check_base`/`cmd_check_knowledge` and `rules::render`'s
 //! `render`/`cmd_render` already use.
 //!
 //! See `load.rs`'s module doc for why every value here is a raw
@@ -22,38 +21,29 @@ use super::load::{LoadedBacklog, read_json_value};
 use super::model::ItemStatus;
 
 /// One backlog command's usage or runtime failure: printed as a single
-/// stderr line, exit 2. Three arms, all rendering identically: (1)
-/// `template/tools/lib/cli.mjs`'s `UsageError`, caught by
-/// `tools/backlog.mjs`'s `main` (unknown id, bad `field=value`, missing
-/// args); (2) `set_item`'s mid-command re-read failure -- the items file
+/// stderr line, exit 2. Three arms, all rendering identically: (1) a
+/// usage error (unknown id, bad `field=value`, missing args); (2)
+/// `set_item`'s mid-command re-read failure -- the items file
 /// disappeared or turned invalid between load and write, a narrow TOCTOU
 /// window, via `read_json_value`'s own `LoadError`; (3) `set_item`'s
-/// target item vanishing from that same re-read -- edited out of its file
-/// in that same window -- which the frozen JS never guards at all
-/// (`Object.assign(undefined, changes)` throws an uncaught `TypeError`).
-/// Spec §6's crash-path deviation is why (3) is a named `CommandError`
-/// arm, not a panic: it is exactly the class of crash the deviation rules
-/// against reproducing (task-2-review.json, issue 10 -- an earlier cut of
-/// (3) was a `.expect(...)` panic, and this doc comment claimed only (1)
-/// and (2)).
+/// target item vanishing from that same re-read -- edited out of its
+/// file in that same window. (3) is a named `CommandError` arm, not a
+/// panic (`houserules.crash-paths-are-named`).
 #[derive(Debug)]
 pub(crate) struct CommandError(pub String);
 
-/// Valid `set status=<value>` values, in the schema's own declared order --
-/// `tools/backlog.mjs`'s `STATUSES` constant, expressed here as
-/// `model::ItemStatus`'s own variants (schema-pinned by `model.rs`'s build
-/// test, `item_status_is_pinned`) rather than a second hand-typed array
-/// that could drift from `backlog/schema.json`'s `$defs/status` enum
-/// unnoticed. This is the one place `set_item` validates a raw CLI string
-/// against a closed set of values, so it is `model::ItemStatus`'s one
-/// caller and the only type `backlog::model` still holds: the spec §3
-/// data-layer rule (typed models only for a path that never re-serializes
-/// its data back to the source and can accept a parse failure) has no
-/// other consumer to give -- `get`/`set` need each item's own on-disk key
-/// order, and `check-backlog` needs to tolerate malformed data, neither of
-/// which a typed struct can do -- so every other type that file once
-/// declared is deleted, not dormant (see `load.rs`'s module doc for the
-/// full reasoning).
+/// Valid `set status=<value>` values, in the schema's own declared
+/// order, expressed here as `model::ItemStatus`'s own variants
+/// (schema-pinned by `model.rs`'s build test, `item_status_is_pinned`)
+/// rather than a second hand-typed array that could drift from
+/// `backlog/schema.json`'s `$defs/status` enum unnoticed. This is the
+/// one place `set_item` validates a raw CLI string against a closed set
+/// of values, so it is `model::ItemStatus`'s one caller and the only
+/// type `backlog::model` still holds: `get`/`set` need each item's own
+/// on-disk key order, and `check-backlog` needs to tolerate malformed
+/// data, neither of which a typed struct can do -- so `backlog::model`
+/// holds no type for any other `$defs` entry (see `load.rs`'s module doc
+/// for the full reasoning).
 const STATUS_VALUES: [ItemStatus; 4] = [
     ItemStatus::Open,
     ItemStatus::Partial,
@@ -81,12 +71,10 @@ fn is_positive_integer(value: &str) -> bool {
     }
 }
 
-/// `{id, status, milestone, batch, title}`, in that key order --
-/// `tools/backlog.mjs`'s `listRow`. `milestone`/`batch` substitute `null`
-/// for a missing key, matching `item.milestone ?? null` /
-/// `item.batch ?? null`; the others are copied as-is (always present on a
-/// schema-valid item, the only kind `cmd_list`/`cmd_batch` build rows
-/// from).
+/// `{id, status, milestone, batch, title}`, in that key order.
+/// `milestone`/`batch` substitute `null` for a missing key; the others
+/// are copied as-is (always present on a schema-valid item, the only
+/// kind `cmd_list`/`cmd_batch` build rows from).
 fn list_row(item: &Value) -> Value {
     json!({
         "id": item.get("id").cloned().unwrap_or(Value::Null),
@@ -99,14 +87,11 @@ fn list_row(item: &Value) -> Value {
 
 /// Verifies that `relative` (a backlog JSON file under `root`, already
 /// loaded as `value`) round-trips byte-identical through the SHIPPED
-/// emitter (HR-076): `crate::emit::emit`, the exact function `set_item`'s
-/// own rewrite calls (`emit(&file_value)`, below) -- never a second,
-/// re-implemented serializer, which is the incident this check exists to
-/// close recurring inside its own fix (batch 20 branch review: a
-/// controller edit re-serialized `kit.json` with ASCII escapes, diverging
-/// from the emitter's raw-UTF-8 form, caught only by the review). A file
-/// this process cannot re-read is not reported here -- `load_backlog`
-/// already required it to read successfully to reach this point at all.
+/// emitter: `crate::emit::emit`, the exact function `set_item`'s own
+/// rewrite calls (`emit(&file_value)`, below) -- never a second,
+/// re-implemented serializer. A file this process cannot re-read is not
+/// reported here -- `load_backlog` already required it to read
+/// successfully to reach this point at all.
 fn check_emitter_round_trip(root: &Path, relative: &str, value: &Value, errors: &mut Vec<String>) {
     let Ok(on_disk) = fs::read(root.join(relative)) else {
         return;
@@ -121,16 +106,13 @@ fn check_emitter_round_trip(root: &Path, relative: &str, value: &Value, errors: 
 }
 
 /// The one-sentence, actionable remedy `check_emitter_round_trip` names
-/// beside a divergence (fix round 1, minor issue 8): an items file has a
-/// shipped writer (`set_item`, below) that reaches it through the exact
-/// same `emit` call the check compares against, so any assignment on any
-/// item in the file re-canonicalizes the whole thing; the other five
-/// backlog files have no shipped writer at all (`emit` is reached from
-/// exactly one production call site, `set_item`'s own), so the remedy
-/// names the canonical form directly rather than a command that cannot
-/// produce it. HR-088 (filed alongside this fix) tracks a `--fix` arm as
-/// a possible future replacement for this second branch; not built this
-/// round.
+/// beside a divergence: an items file has a shipped writer (`set_item`,
+/// below) that reaches it through the exact same `emit` call the check
+/// compares against, so any assignment on any item in the file
+/// re-canonicalizes the whole thing; the other five backlog files have
+/// no shipped writer at all (`emit` is reached from exactly one
+/// production call site, `set_item`'s own), so the remedy names the
+/// canonical form directly rather than a command that cannot produce it.
 fn round_trip_remedy(relative: &str) -> &'static str {
     if relative.starts_with("backlog/items/") {
         "Run `houserules set <id> <field>=<value>` on any item in this file; the rewrite \
@@ -200,10 +182,9 @@ fn check_archive(b: &LoadedBacklog, errors: &mut Vec<String>) -> HashSet<String>
 }
 
 /// Validates a loaded backlog against its schema and every cross-file
-/// invariant -- `checkBacklog`, ported. Returns `(errors, warnings)`; an
-/// empty `errors` with `check-backlog` printing `warn:` lines for each
-/// warning, "backlog: ok", and exiting 0 matches a clean `tools/backlog.sh
-/// check` run (`cli.rs`).
+/// invariant. Returns `(errors, warnings)`; an empty `errors` has
+/// `check-backlog` print `warn:` lines for each warning, then "backlog:
+/// ok", and exit 0 (`cli.rs`).
 pub(crate) fn check_backlog(b: &LoadedBacklog) -> (Vec<String>, Vec<String>) {
     let mut archive_errors = Vec::new();
     let archived_ids = check_archive(b, &mut archive_errors);
@@ -416,20 +397,17 @@ pub(crate) fn check_backlog(b: &LoadedBacklog) -> (Vec<String>, Vec<String>) {
     (errors, warnings)
 }
 
-/// `validate(value, { $ref: "#/$defs/<def>" }, at, errors, b.schema)` --
-/// `checkBacklog`'s own `check` closure, ported. Reuses `rules::validate`,
-/// the same JSON-Schema-subset engine `check-knowledge` validates against
-/// (`template/tools/lib/json-store.mjs`'s `validate`, the one function the
-/// frozen `kb.mjs` and `backlog.mjs` both import).
+/// `validate(value, { $ref: "#/$defs/<def>" }, at, errors, b.schema)`.
+/// Reuses `rules::validate`, the same JSON-Schema-subset engine
+/// `check-knowledge` validates against.
 fn check_ref(value: &Value, def: &str, at: &str, b: &LoadedBacklog, errors: &mut Vec<String>) {
     let ref_schema = json!({"$ref": format!("#/$defs/{def}")});
     crate::rules::validate(value, &ref_schema, at, errors, &b.schema);
 }
 
-/// The stored records (items with `section`/`file`, amendments, or parked
-/// items with `batch`) for the given ids -- `cmdGet`, ported. Fails on the
-/// first unknown id, matching `Array.prototype.map`'s throw-on-first
-/// behavior.
+/// The stored records (items with `section`/`file`, amendments, or
+/// parked items with `batch`) for the given ids. Fails on the first
+/// unknown id.
 pub(crate) fn get_items(b: &LoadedBacklog, ids: &[String]) -> Result<Vec<Value>, CommandError> {
     ids.iter()
         .map(|id| {
@@ -476,9 +454,9 @@ pub(crate) fn get_items(b: &LoadedBacklog, ids: &[String]) -> Result<Vec<Value>,
         .collect()
 }
 
-/// Every filter `list` accepts -- `tools/backlog.mjs`'s `opts` object,
-/// typed. Each field mirrors JS's own loose comparison exactly (see
-/// `item_matches`'s doc), not a stricter Rust-native one.
+/// Every filter `list` accepts, typed. Each field uses the same loose
+/// comparison `item_matches`'s own doc describes, not a stricter
+/// Rust-native one.
 pub(crate) struct ListOpts {
     pub open: bool,
     pub status: Option<String>,
@@ -488,7 +466,7 @@ pub(crate) struct ListOpts {
     pub batch: Option<String>,
 }
 
-/// List rows for items matching every given filter -- `cmdList`, ported.
+/// List rows for items matching every given filter.
 pub(crate) fn list_items(b: &LoadedBacklog, opts: &ListOpts) -> Vec<Value> {
     b.items
         .iter()
@@ -498,12 +476,12 @@ pub(crate) fn list_items(b: &LoadedBacklog, opts: &ListOpts) -> Vec<Value> {
         .collect()
 }
 
-/// `true` when `item` passes every filter set on `opts` -- `cmdList`'s
-/// chain of `items.filter(...)` calls, folded into one predicate.
-/// `milestone`/`batch` reproduce JS's own coercions (`??`/`String()`)
-/// exactly, including their type-sensitive edge: a non-string milestone or
-/// a batch of some other JSON type (unreachable for schema-valid data)
-/// never matches a CLI-supplied string filter, the same as JS's `===`.
+/// `true` when `item` passes every filter set on `opts`, folded into one
+/// predicate. `milestone`/`batch` use `milestone_or_dash`/
+/// `batch_as_string`'s own coercions, including their type-sensitive
+/// edge: a non-string milestone or a batch of some other JSON type
+/// (unreachable for schema-valid data) never matches a CLI-supplied
+/// string filter.
 fn item_matches(item: &Value, opts: &ListOpts) -> bool {
     if opts.open {
         let status = item
@@ -565,7 +543,7 @@ fn batch_as_string(item: &Value) -> Option<String> {
 }
 
 /// The batch record with its number, summary, kickoff, status, and item
-/// rows -- `cmdBatch`, ported.
+/// rows.
 pub(crate) fn batch_record(b: &LoadedBacklog, number: &str) -> Result<Value, CommandError> {
     if number.is_empty() || !number.chars().all(|c| c.is_ascii_digit()) {
         return Err(CommandError("batch needs a number".to_string()));
@@ -603,9 +581,9 @@ pub(crate) fn batch_record(b: &LoadedBacklog, number: &str) -> Result<Value, Com
     }))
 }
 
-/// `Value`'s JavaScript `ToString` for exactly the two shapes `set_item`'s
-/// `changes` map ever holds -- a status string as-is, a batch number in
-/// its decimal form -- for the `field=value` echo `set_item` returns.
+/// The string form `set_item`'s `changes` map ever needs, for exactly
+/// the two value shapes it holds: a status string as-is, a batch number
+/// in its decimal form, for the `field=value` echo `set_item` returns.
 fn display_change(value: &Value) -> String {
     match value {
         Value::String(s) => s.clone(),
@@ -614,16 +592,15 @@ fn display_change(value: &Value) -> String {
     }
 }
 
-/// Applies `field=value` assignments to an item's file on disk and reports
-/// what changed -- `cmdSet`, ported. Re-reads the items file fresh from
-/// disk (matching JS, not reusing `b`'s in-memory copy), merges `changes`
-/// into the target item's own `serde_json::Map` (an `IndexMap` under the
-/// crate-wide `preserve_order` feature: `.insert` updates an existing key
-/// in place and appends a new one at the end, exactly `Object.assign`'s
-/// own behavior), and writes the whole file back through `emit` -- see
-/// `load.rs`'s module doc for why this, not a typed-struct round-trip
-/// (`backlog::model` has no such type; the data-layer rule, spec §3, is
-/// why), is what reproduces JS's write-formatting byte-for-byte.
+/// Applies `field=value` assignments to an item's file on disk and
+/// reports what changed. Re-reads the items file fresh from disk, not
+/// reusing `b`'s in-memory copy, merges `changes` into the target item's
+/// own `serde_json::Map` (an `IndexMap` under the crate-wide
+/// `preserve_order` feature: `.insert` updates an existing key in place
+/// and appends a new one at the end), and writes the whole file back
+/// through `emit` -- see `load.rs`'s module doc for why this, not a
+/// typed-struct round-trip (`backlog::model` has no such type), keeps
+/// each item's own on-disk key order.
 pub(crate) fn set_item(
     b: &LoadedBacklog,
     id: Option<&str>,
@@ -730,9 +707,8 @@ mod tests {
         json!({"id": id, "status": status, "milestone": milestone, "batch": batch, "title": title})
     }
 
-    /// tests/backlog.test.mjs, describe('read commands'): "get returns
-    /// items with section and file, an amendment record, and a parked item
-    /// with batch; rejects unknown ids".
+    /// `get` returns items with section and file, an amendment record,
+    /// and a parked item with batch; rejects unknown ids.
     #[test]
     fn get_returns_items_amendments_and_parked_items_rejects_unknown_ids() {
         let dir = make_repo(default_items());
@@ -769,8 +745,8 @@ mod tests {
         assert!(get_items(&b, &["WI-999".to_string()]).is_err());
     }
 
-    /// tests/backlog.test.mjs: "list filters and returns one row per item,
-    /// with null for a missing milestone or batch".
+    /// `list` filters and returns one row per item, with null for a
+    /// missing milestone or batch.
     #[test]
     fn list_filters_and_returns_one_row_per_item() {
         let dir = make_repo(default_items());
@@ -850,7 +826,7 @@ mod tests {
         }
     }
 
-    /// tests/backlog.test.mjs: "batch returns the record and its item rows".
+    /// `batch` returns the record and its item rows.
     #[test]
     fn batch_returns_the_record_and_its_item_rows() {
         let dir = make_repo(default_items());
@@ -872,8 +848,8 @@ mod tests {
         assert!(batch_record(&b, "x").is_err());
     }
 
-    /// tests/backlog.test.mjs, describe('set'): "updates status and batch
-    /// in the item file, keeping the file formatting".
+    /// `set` updates status and batch in the item file, keeping the file
+    /// formatting.
     #[test]
     fn set_updates_status_and_batch_keeping_the_file_formatting() {
         let dir = make_repo(default_items());
@@ -922,8 +898,8 @@ mod tests {
             batch_error.0
         );
 
-        // Not in the brief: covers the `value ?? ''` fallback in the batch
-        // check -- an assignment with no `=` at all leaves `value` `None`.
+        // Covers the `value ?? ''` fallback in the batch check: an
+        // assignment with no `=` at all leaves `value` `None`.
         let batch_bare_error = set_item(&b2, Some("WI-001"), &["batch".to_string()]).unwrap_err();
         assert!(
             batch_bare_error
@@ -945,16 +921,11 @@ mod tests {
         assert!(unknown_item.0.contains("unknown item"));
     }
 
-    /// `emit`'s one known formatting boundary (task-2-review.json, issue
-    /// 7): a JSON number already in the file, untouched by this `set`,
-    /// keeps its own on-disk form through the round trip rather than
-    /// JSON.stringify's lossy `f64` re-render -- `2.0` stays `2.0` (not
-    /// `2`), and `12345678901234567890` (past `2^53`, still within `u64`)
-    /// stays exact (not JS's rounded `12345678901234567000`). Verified
-    /// live against the frozen JS before pinning Rust's own answer here
-    /// (mode: reconstructed -- this pins `serde_json`'s own, unchanged
-    /// number formatting, not logic this crate wrote, so no first-party
-    /// mutation demonstrates the same divergence).
+    /// `emit`'s one known formatting boundary: a JSON number already in
+    /// the file, untouched by this `set`, keeps its own on-disk form
+    /// through the round trip -- `2.0` stays `2.0` (not `2`), and
+    /// `12345678901234567890` (past `2^53`, still within `u64`) stays
+    /// exact.
     #[test]
     fn set_preserves_a_pre_existing_items_own_number_form() {
         let dir = make_repo(vec![
@@ -977,12 +948,9 @@ mod tests {
         );
     }
 
-    /// `set_item`'s target item vanishing from its own file in the narrow
-    /// window between load and re-read -- a named `CommandError`, never a
-    /// panic (task-2-review.json, issue 10; spec §6's crash-path
-    /// deviation, since the frozen JS's `Object.assign(undefined, ...)`
-    /// throws an uncaught `TypeError` here, the one crash class this port
-    /// does not reproduce).
+    /// `set_item`'s target item vanishing from its own file in the
+    /// narrow window between load and re-read is a named `CommandError`,
+    /// never a panic (`houserules.crash-paths-are-named`).
     #[test]
     fn set_item_reports_a_command_error_when_the_target_vanishes_before_the_rewrite() {
         let dir = make_repo(default_items());
@@ -1003,13 +971,9 @@ mod tests {
         assert!(error.0.contains("no longer exists"), "{}", error.0);
     }
 
-    /// `checkBacklog`, ported: a schema error early-returns before stage
-    /// two runs, then (once fixed) duplicate ids, dangling references, and
-    /// batch problems all report together -- tests/backlog.test.mjs,
-    /// describe('loadBacklog and checkBacklog'): "reports schema errors,
-    /// duplicate ids, dangling references, and batch problems" (task-2-
-    /// review.json, issue 1: the first cut of this port only carried the
-    /// second phase below, dropping the schema-error/early-return proof).
+    /// A schema error early-returns before stage two runs, then (once
+    /// fixed) duplicate ids, dangling references, and batch problems all
+    /// report together.
     #[test]
     fn check_backlog_reports_a_schema_error_first_then_duplicate_ids_dangling_references_and_batch_problems()
      {
@@ -1066,8 +1030,8 @@ mod tests {
         );
     }
 
-    /// tests/backlog.test.mjs: "warns about done items without a batch and
-    /// a section whose name differs from its file".
+    /// Warns about done items without a batch, and reports a section
+    /// whose name differs from its file.
     #[test]
     fn warns_about_done_without_a_batch_and_reports_a_section_name_mismatch() {
         let dir = make_repo(vec![item(json!({"status": "done"}))]);
@@ -1091,14 +1055,11 @@ mod tests {
         );
     }
 
-    /// HR-076: a backlog file that no longer round-trips byte-identical
-    /// through the shipped emitter (`crate::emit::emit`, the same function
-    /// `set_item` writes through) fails, naming the file -- the incident
-    /// this closes (batch 20 branch review: the HR-047 tick re-serialized
-    /// kit.json with ASCII escapes, diverging from the emitter's raw-UTF-8
-    /// form, caught only by the branch review). Reproduces that exact
-    /// shape: `emit`'s raw UTF-8 never re-renders `é` as `é`, so a
-    /// file hand-escaped that way can never round-trip back to itself.
+    /// A backlog file that does not round-trip byte-identical through the
+    /// shipped emitter (`crate::emit::emit`, the same function `set_item`
+    /// writes through) fails, naming the file. `emit`'s raw UTF-8 form
+    /// never re-renders a literal `é` as the escape sequence `\u00e9`, so
+    /// a file hand-escaped that way can never round-trip back to itself.
     #[test]
     fn check_backlog_reports_a_file_that_diverges_from_the_shipped_emitter() {
         // `id: WI-002` matches `test_support::make_repo`'s own hardcoded
@@ -1128,10 +1089,9 @@ mod tests {
         );
     }
 
-    /// Fix round 1, minor issue 8 (task-1-review.json): the five backlog
-    /// files with no shipped writer (`batches.json` here) get the OTHER
-    /// remedy sentence -- no command to run, so the message states the
-    /// canonical form directly.
+    /// The five backlog files with no shipped writer (`batches.json`
+    /// here) get the OTHER remedy sentence -- no command to run, so the
+    /// message states the canonical form directly.
     #[test]
     fn check_backlog_names_the_no_writer_remedy_for_a_diverging_top_level_file() {
         let dir = make_repo(default_items());

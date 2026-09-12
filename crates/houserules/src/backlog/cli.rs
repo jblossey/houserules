@@ -1,16 +1,15 @@
-//! CLI wrappers for the backlog command surface (batch 17 T2): resolves
-//! `--dir` or the enclosing git repository the same way `render` and
-//! `check-knowledge` do, loads the backlog, dispatches to `commands`, and
-//! prints `tools/backlog.mjs`'s `main` output and exit codes exactly --
-//! the same `cmd_*`-returns-`ExitCode` split `rules::render`'s
-//! `cmd_render` and `rules::check`'s `cmd_check_knowledge` already use.
+//! CLI wrappers for the backlog command surface: resolves `--dir` or the
+//! enclosing git repository the same way `render` and `check-knowledge`
+//! do, loads the backlog, and dispatches to `commands` -- the same
+//! `cmd_*`-returns-`ExitCode` split `rules::render`'s `cmd_render` and
+//! `rules::check`'s `cmd_check_knowledge` already use.
 //!
-//! `get` carries no wrapper here (batch 17 T4 removed the one T2 wrote):
-//! the flat surface's `get` resolves an id by shape between a backlog item
-//! and a knowledge entry (spec §3), so its one dispatcher lives at the
-//! crate root (`crate::get`) instead, calling `load_backlog` and
-//! `commands::get_items` directly -- `mod.rs` re-exports
-//! `LoadedBacklog`/`load_backlog`/`get_items` for exactly that caller.
+//! `get` carries no wrapper here: the flat surface's `get` resolves an id
+//! by shape between a backlog item and a knowledge entry, so its one
+//! dispatcher lives at the crate root (`crate::get`) instead, calling
+//! `load_backlog` and `commands::get_items` directly -- `mod.rs`
+//! re-exports `LoadedBacklog`/`load_backlog`/`get_items` for exactly that
+//! caller.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -21,10 +20,8 @@ use super::commands::{self, CommandError, ListOpts, emit};
 use super::load::{LoadedBacklog, load_backlog};
 
 /// Resolves `dir` (via `crate::root::resolve_root`) and loads the backlog
-/// there. A resolution or load failure prints one named stderr line and
-/// signals exit 2 -- `main`'s own `loadBacklog(repoRoot(cwd))` call, whose
-/// failure (missing file, invalid JSON) is an uncaught `Error` in JS, per
-/// the CLI-failure-path deviation this whole crate follows (spec §6).
+/// there. A resolution or load failure (missing file, invalid JSON)
+/// prints one named stderr line and signals exit 2.
 fn load(dir: Option<PathBuf>) -> Result<LoadedBacklog, ExitCode> {
     let root = crate::root::resolve_root(dir)?;
     load_backlog(&root).map_err(|error| {
@@ -33,8 +30,7 @@ fn load(dir: Option<PathBuf>) -> Result<LoadedBacklog, ExitCode> {
     })
 }
 
-/// Prints `error`'s message and yields exit 2 -- `main`'s `UsageError`
-/// catch arm (`io.err(\`${error.message}\n\`); return 2;`).
+/// Prints `error`'s message and yields exit 2.
 fn command_error(error: CommandError) -> ExitCode {
     eprintln!("{}", error.0);
     ExitCode::from(2)
@@ -51,10 +47,9 @@ pub(crate) fn cmd_list(dir: Option<PathBuf>, opts: ListOpts) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// Runs `batch`: prints the one named batch's record, or `main`'s own
-/// "needs one number" usage error when `numbers` does not hold exactly
-/// one value (checked here, not in `commands::batch_record`, matching the
-/// frozen JS's `positional.length !== 1` guard in `main` itself).
+/// Runs `batch`: prints the one named batch's record, or a "needs one
+/// number" usage error when `numbers` does not hold exactly one value
+/// (checked here, not in `commands::batch_record`).
 pub(crate) fn cmd_batch(dir: Option<PathBuf>, numbers: Vec<String>) -> ExitCode {
     let b = match load(dir) {
         Ok(b) => b,
@@ -74,8 +69,7 @@ pub(crate) fn cmd_batch(dir: Option<PathBuf>, numbers: Vec<String>) -> ExitCode 
 }
 
 /// Runs `set`: `args`' first element is the item id (if any), the rest
-/// its `field=value` assignments -- `main`'s own `positional[0]` /
-/// `positional.slice(1)` split.
+/// its `field=value` assignments.
 pub(crate) fn cmd_set(dir: Option<PathBuf>, args: Vec<String>) -> ExitCode {
     let b = match load(dir) {
         Ok(b) => b,
@@ -93,8 +87,8 @@ pub(crate) fn cmd_set(dir: Option<PathBuf>, args: Vec<String>) -> ExitCode {
 }
 
 /// Runs `check-backlog`: prints each warning as `warn: <text>`, then
-/// either every error on stderr with exit 1, or `backlog: ok` with exit 0
-/// -- `main`'s `'check'` case, ported.
+/// either every error on stderr with exit 1, or `backlog: ok` with exit
+/// 0.
 pub(crate) fn cmd_check_backlog(dir: Option<PathBuf>) -> ExitCode {
     let b = match load(dir) {
         Ok(b) => b,

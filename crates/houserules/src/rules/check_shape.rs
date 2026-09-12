@@ -1,18 +1,16 @@
 //! The knowledge-check-shape model: `knowledge/schema.json`'s `$defs/check`
-//! typed, for the audit engine T3 ports (`runCheck`, `tools/kb.mjs:530-670`
-//! at the frozen sha) to match on instead of reading raw `serde_json::Value`
-//! fields by name. `check.rs`'s existing `check_shape`/`check_fields`
-//! functions are a different concern and stay as they are: they validate a
-//! knowledge entry's `check` object for `check-knowledge` (dynamic,
-//! per-`type` field requirements the JSON schema itself does not encode --
-//! its own `required` is only `[type, level]`), while `CheckDef` here
-//! mirrors that JSON schema definition exactly, matching what the
-//! schema-pin build test below can actually pin.
+//! typed, for the audit engine's `run_check` to match on instead of
+//! reading raw `serde_json::Value` fields by name. `check.rs`'s existing
+//! `check_shape`/`check_fields` functions are a different concern and
+//! stay as they are: they validate a knowledge entry's `check` object
+//! for `check-knowledge` (dynamic, per-`type` field requirements the
+//! JSON schema itself does not encode -- its own `required` is only
+//! `[type, level]`), while `CheckDef` here mirrors that JSON schema
+//! definition exactly, matching what the schema-pin build test below can
+//! actually pin.
 //!
-//! Batch 17 T3 wires `CheckDef` into `rules::model::Entry.check` and the
-//! `audit` engine's `run_check` (docs/specs/2026-09-04-batch-15-tier2-spec.md
-//! §5 phase 2), so every type here now has a real caller and the file-level
-//! `#[allow(dead_code)]` this module carried through T1/T2 is dropped.
+//! `CheckDef` wires into `rules::model::Entry.check` and the `audit`
+//! engine's `run_check`, so every type here has a real caller.
 
 use serde::{Deserialize, Serialize};
 
@@ -28,8 +26,8 @@ pub(crate) enum Glob {
     Many(Vec<String>),
 }
 
-/// A knowledge entry's `check.type` -- which deterministic check `runCheck`
-/// runs, and which of `CheckDef`'s other fields it reads.
+/// A knowledge entry's `check.type` -- which deterministic check
+/// `run_check` runs, and which of `CheckDef`'s other fields it reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum CheckType {
@@ -102,9 +100,8 @@ mod tests {
     use super::{CheckDef, CheckLevel, CheckType, Scope};
     use crate::schema_pin::{assert_enum_pinned, assert_object_pinned};
 
-    /// `template/knowledge/schema.json` -- the vendored knowledge schema
-    /// (spec §3: "the JSON Schema files stay the vendored source of
-    /// truth"), the same file `check.rs`'s own tests read (`template_root`).
+    /// `template/knowledge/schema.json` -- the vendored knowledge schema,
+    /// the same file `check.rs`'s own tests read (`template_root`).
     fn schema() -> Value {
         let path =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../template/knowledge/schema.json");

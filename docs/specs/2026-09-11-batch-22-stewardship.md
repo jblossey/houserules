@@ -204,7 +204,13 @@ never touches again" contract is rewritten to the new one.
    the first sweep stamps the entries whose summaries already
    say RETIRED.
 2. HR-106: both standing-rule wordings adopted as drafted in
-   §3.
+   §3. Amended (owner-ruled 2026-09-11, design.md 5.62): the
+   doc-comments wording exceeds the schema's 160-character
+   summary cap; the shipped summary trims to "Document every
+   exported symbol with the language's doc-comment convention:
+   the current contract. Name things so the code reads without
+   comments." — dropping only "concise and complete". The cap
+   stays at 160.
 3. HR-099: `sha2` adopted (exact-pinned via `cargo add`,
    vetting recorded in the task report); entry-level upsert
    for SEED_ONCE knowledge topics.

@@ -1,25 +1,14 @@
-//! Ports `tests/kb.test.mjs`'s `describe('the repository knowledge base')`,
-//! "matches a range requirement with the exact-pins pattern, and no glob"
-//! (batch 20 T1 fix round 1, HR-047; `.superpowers/sdd/2026-09-07-batch-20/
-//! t1-evidence/mapping.md` row 9's corrected disposition): the shipped
-//! `security-hygiene.exact-pins` knowledge entry's `check.pattern` is the
-//! deterministic gate every `package.json`/`Cargo.toml` change runs under
-//! `houserules audit` -- its subject, `template/knowledge/
-//! security-hygiene.json`, is a `SEED_ONCE` payload file that does not
-//! retire, so the JS unit test pinning it had no home to retire WITH; the
-//! review (round 1, finding 1/2) found it dropped uncovered instead.
-//!
-//! The JS original compiled the pattern with V8's own `RegExp`, an engine
-//! the shipped binary never runs; this port is strictly stronger,
-//! compiling the same pattern with `regress` -- the engine
-//! `rules::audit::compile_check_regex` actually uses in production (that
-//! function is private to the `audit` module and unreachable from an
-//! integration test, so this file calls `regress::Regex::with_flags`
-//! directly, the same call `compile_check_regex`'s own doc names, rather
-//! than linking to it). The pattern itself is read live from the real
-//! payload file, not copied inline, so an edit to the shipped entry's
-//! `check.pattern` changes what this test compiles the same way it would
-//! change what `houserules audit` compiles.
+//! Compiles the shipped `security-hygiene.exact-pins` knowledge entry's
+//! `check.pattern` -- the deterministic gate every `package.json`/
+//! `Cargo.toml` change runs under `houserules audit` -- with `regress`, the
+//! engine `rules::audit::compile_check_regex` uses in production, then
+//! asserts it matches and rejects a fixed set of sample lines.
+//! `compile_check_regex` is private to the `audit` module and unreachable
+//! from an integration test, so this file calls `regress::Regex::with_flags`
+//! directly instead of linking to it. The pattern is read live from the
+//! shipped payload file, not copied inline, so an edit to the entry's
+//! `check.pattern` changes what this test compiles the same way it changes
+//! what `houserules audit` compiles.
 
 use std::path::{Path, PathBuf};
 
@@ -36,11 +25,9 @@ fn repo_root() -> PathBuf {
 
 /// The `security-hygiene.exact-pins` entry's own `check.pattern` and
 /// `check.flags`, read live from the shipped `template/knowledge/
-/// security-hygiene.json` -- `tests/kb.test.mjs`'s own `loadBase(TEMPLATE_
-/// ROOT)` plus `base.entries.get(...)`, read directly here since this file
-/// has no knowledge-base loader of its own to reuse. `flags` defaults to
-/// an empty string when absent, matching the JS test's own `check.flags ??
-/// ''` and `compile_check_regex`'s own `&str` parameter (never `Option`).
+/// security-hygiene.json` since this file has no knowledge-base loader of
+/// its own to reuse. `flags` defaults to an empty string when absent,
+/// matching `compile_check_regex`'s own `&str` parameter (never `Option`).
 fn exact_pins_check_pattern() -> (String, String) {
     let path = repo_root().join("template/knowledge/security-hygiene.json");
     let text = std::fs::read_to_string(&path)
@@ -62,11 +49,9 @@ fn exact_pins_check_pattern() -> (String, String) {
     (pattern, flags)
 }
 
-/// Ports the JS case's 12 matching and 8 non-matching lines verbatim
-/// (`tests/kb.test.mjs:183-208`) against the compiled pattern, the way the
-/// JS test called `pattern.test(line)` -- `regress::Regex::find` returns
-/// `Some` on any match anywhere in `line` (the pattern carries no `^`/`$`
-/// anchor), the same unanchored semantics `RegExp.test` has.
+/// Checks 12 matching and 8 non-matching sample lines against the compiled
+/// pattern. `regress::Regex::find` returns `Some` on any match anywhere in
+/// `line`, since the pattern carries no `^`/`$` anchor.
 #[test]
 fn exact_pins_pattern_matches_the_shipped_lines_regress_compiles() {
     let (pattern, flags) = exact_pins_check_pattern();

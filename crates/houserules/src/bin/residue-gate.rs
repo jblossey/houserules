@@ -1,49 +1,40 @@
-//! The permanent post-JS residue gate (spec §7/§5.39, batch 20 T4, HR-047's
-//! closing sweep): a zero-hit sweep of the retired forms' INVOCATION
-//! patterns -- `node`, `npm`, `pnpm`, `npx`, `vitest`, `.mjs`/`.mts`, and
-//! `package.json` -- across every file this repository tracks, outside a
-//! declared sanctioned-history allowlist. A sibling to `find-shell-tool-
-//! refs` in shape (dev-only, not shipped in `template/` or the payload),
-//! and to `diff-shape-gate` until HR-093 retired that one as a spent
-//! one-time proof; unlike those one-time rewrite proofs, this gate is
-//! meant to fire forever: it is wired into `mise run lint` (`mise.toml`'s
+//! The permanent post-JS residue gate: a zero-hit sweep of the retired
+//! forms' INVOCATION patterns -- `node`, `npm`, `pnpm`, `npx`, `vitest`,
+//! `.mjs`/`.mts`, and `package.json` -- across every file this repository
+//! tracks, outside a declared sanctioned-history allowlist. A sibling to
+//! `find-shell-tool-refs` in shape (dev-only, not shipped in `template/`
+//! or the payload); unlike a one-time rewrite proof, this gate is meant
+//! to fire forever: it is wired into `mise run lint` (`mise.toml`'s
 //! `lint` task), so every future PR and the CI checks job run it too.
 //!
-//! # Scope: the tracked-file list minus a declared exclusion list, not a
-//! hand-typed inclusion list (fix round 1, important finding 1)
+//! # Scope: the tracked-file list minus a declared exclusion list
 //!
-//! The first shipped version of this gate named ten files to walk by
-//! hand. A hand-typed inclusion list cannot cover a file that does not
-//! exist yet, and it already missed ones that did: the reviewer seeded
-//! `pnpm test` into this repository's own root `CLAUDE.md` and `npx
-//! some-tool` into `tools/claude-session-start.sh` and both passed with
-//! "0 unexpected", because neither file was ever added to the list. A
-//! gate declared permanent has to default to gated, not to remembering.
-//!
-//! So the walk set is now derived: every path `git ls-files` names,
+//! A hand-typed inclusion list cannot cover a file that does not exist
+//! yet. So the walk set is derived: every path `git ls-files` names,
 //! minus `EXCLUDED_PREFIXES` (`is_excluded`'s own doc names the reason
 //! for each). A new file lands in the walk automatically the moment it is
-//! tracked, unless it falls under a prefix already declared sanctioned.
+//! tracked, unless it falls under a prefix already declared sanctioned
+//! (`quality.gates-derive-their-scope`).
 //!
 //! Invocation pattern vs mention is still the content-side boundary this
-//! gate draws within that walk (the spec's own stated trap): a bare
-//! content sweep of the WHOLE repository would flag the knowledge base's
-//! own `RETIRED at batch 20 T3` histories, `crates/houserules/`'s
-//! permanent JS-porting-parity narration (every doc comment explaining
-//! what the frozen JS did, verified live against `node 24.18.1`, so a
-//! future port stays byte-exact), and the ecosystem-agnostic multi-
-//! language examples `security-hygiene.exact-pins`/`process.no-tech-debt`
-//! ship generically to every adopter (JS included) -- none of them a
-//! residue of THIS repository's own retired toolchain. `EXCLUDED_PREFIXES`
-//! keeps those out of the walk; `exceptions()` handles the few remaining
-//! legitimate mentions the walk still reaches.
+//! gate draws within that walk: a bare content sweep of the WHOLE
+//! repository would flag the knowledge base's own historical narration,
+//! `crates/houserules/`'s own source and test comments (compiler- and
+//! suite-verified, not instructional prose an adopter follows), and the
+//! ecosystem-agnostic multi-language examples
+//! `security-hygiene.exact-pins`/`process.no-tech-debt` ship generically
+//! to every adopter (JS included) -- none of them a residue of THIS
+//! repository's own retired toolchain. `EXCLUDED_PREFIXES` keeps those
+//! out of the walk; `exceptions()` handles the few remaining legitimate
+//! mentions the walk still reaches.
 //!
 //! # `EXCLUDED_PREFIXES` (a tracked path starting with one of these is
 //! never walked)
 //!
-//! - `crates/` -- source and tests narrate the frozen JS's permanently-
-//!   fixed porting-parity history forever (`find-shell-tool-refs`'s own
-//!   module doc states the identical boundary for its narrower sweep).
+//! - `crates/` -- source and tests the compiler and the test suite
+//!   verify, not instructional prose an adopter follows
+//!   (`find-shell-tool-refs`'s own module doc states the identical
+//!   boundary for its narrower sweep).
 //! - `knowledge/`, `backlog/` -- `knowledge-base.state-only-the-source`
 //!   and the batch process already govern every word here by hand at
 //!   each closing sweep; `security-hygiene.exact-pins`'s own multi-
@@ -60,13 +51,10 @@
 //!   `tests/fixtures/mini/` and `tests/goldens/` are live input data and
 //!   generated golden output the Rust suites themselves exercise and
 //!   regenerate (`gen-goldens.rs`, `common::FROZEN_SHA`), not
-//!   instructional prose a residue could mislead a reader with (fix
-//!   round 1, important finding 3: the first version of this doc called
-//!   the whole directory frozen "byte for byte", which is only true of
-//!   `batch14-workspace/` -- this same task edits `tests/fixtures/mini/
-//!   CLAUDE.md`). Excluding the whole `tests/` prefix is still correct on
-//!   the right ground: none of it is a live instruction this repository's
-//!   own contributors follow.
+//!   instructional prose a residue could mislead a reader with. Excluding
+//!   the whole `tests/` prefix is still correct on the right ground: none
+//!   of it is a live instruction this repository's own contributors
+//!   follow.
 //! - `.superpowers/` -- batch workspaces: dated session history.
 //! - `.claude/evals/` -- eval scenarios model adopter repositories across
 //!   ecosystems and are governed by `process.evals-rerun`, never touched
@@ -74,18 +62,14 @@
 //!   prefix -- it stays walked, with its own named exception below,
 //!   because it ships inside the payload template/ itself covers.)
 //!
-//! # Unreadable and binary paths (fix round 1, important finding 2)
+//! # Unreadable and binary paths
 //!
 //! A walked path `git` tracks but the filesystem does not have (removed,
 //! renamed on disk without `git mv`, permission denied) is a named error
-//! that fails the gate: the first version silently `continue`d past a
-//! read failure, so renaming `CONTRIBUTING.md` on disk dropped it from
-//! both the read count and the hit list while the summary line still
-//! claimed the old file count -- the seeded violation in the renamed file
-//! passed unnoticed. A walked path that reads but is not valid UTF-8 (a
-//! genuinely binary payload asset under `template/`) is not an error: it
-//! is counted and printed as a skip, separately from the scanned count,
-//! which now names only the files actually read as text.
+//! that fails the gate. A walked path that reads but is not valid UTF-8
+//! (a genuinely binary payload asset under `template/`) is not an error:
+//! it is counted and printed as a skip, separately from the scanned
+//! count, which names only the files actually read as text.
 //!
 //! # Named exceptions within the walked scope
 //!
@@ -154,31 +138,27 @@ fn repo_root() -> PathBuf {
 /// paths, in the order git prints them, alongside every entry that was
 /// NOT valid UTF-8 (rendered lossily, for display only) -- the walk set
 /// this gate audits is exactly the first list minus `EXCLUDED_PREFIXES`,
-/// so a newly tracked file is gated by default (this module's own doc,
-/// "Scope", has the finding this replaced).
+/// so a newly tracked file is gated by default.
 ///
-/// `-z` is not optional (fix round 2, new_breakage 1, task-1-
-/// review-r2.json: `check.rs`'s `git_ls_files` carried the identical bug,
-/// this function its cited pattern source): without it, git's own
-/// `core.quotePath` (on by default) double-quotes and octal-escapes any
-/// path byte outside printable ASCII, so a tracked `café.md` prints as
-/// the escaped literal `"caf\303\251.md"` -- a string this gate would
-/// then walk as a nonexistent file -- and a plain `.lines()` split has
-/// the same failure for an embedded newline. `-z` disables that quoting
-/// and NUL-terminates each entry instead, so the split below recovers
-/// the exact tracked path; `-z`'s own trailing NUL leaves one empty
-/// element, filtered out.
+/// `-z` is not optional: without it, git's own `core.quotePath` (on by
+/// default) double-quotes and octal-escapes any path byte outside
+/// printable ASCII, so a tracked `café.md` prints as the escaped literal
+/// `"caf\303\251.md"` -- a string this gate would then walk as a
+/// nonexistent file -- and a plain `.lines()` split has the same failure
+/// for an embedded newline. `-z` disables that quoting and NUL-
+/// terminates each entry instead, so the split below recovers the exact
+/// tracked path; `-z`'s own trailing NUL leaves one empty element,
+/// filtered out.
 ///
-/// Decoding happens per entry, not once over the whole buffer (fix round
-/// 3, new_breakage 1, task-1-review-r3.json: `check.rs`'s `git_ls_files`
-/// carried the identical bug, this function its cited pattern source): a
-/// single `String::from_utf8` over the joined output would let ONE
-/// tracked path with non-UTF-8 bytes turn the WHOLE call into a panic,
-/// losing every other, perfectly valid path's classification along with
-/// it. An undecodable entry is instead a named, non-fatal skip -- `main`
-/// reports it the same "counted, printed, never fatal" way it already
-/// reports a binary asset (`ReadOutcome::Binary`'s own doc) -- and never
-/// changes how any other tracked path is walked.
+/// Decoding happens per entry, not once over the whole buffer: a single
+/// `String::from_utf8` over the joined output would let one tracked path
+/// with non-UTF-8 bytes turn the whole call into a panic, losing every
+/// other, perfectly valid path's classification along with it. An
+/// undecodable entry is instead a named, non-fatal skip -- `main` reports
+/// it the same "counted, printed, never fatal" way it already reports a
+/// binary asset (`ReadOutcome::Binary`'s own doc) -- and never changes
+/// how any other tracked path is walked. `check.rs`'s `git_ls_files`
+/// carries the identical fix, for the identical reason.
 fn tracked_files(root: &Path) -> (Vec<String>, Vec<String>) {
     let output = Command::new("git")
         .args(["ls-files", "-z"])
@@ -255,15 +235,11 @@ fn find_matches(rel_path: &str, text: &str) -> Vec<Hit> {
 /// `## ` heading, or end of file): explains `release-please`'s own
 /// third-party internals -- a Node-based tool this repository's CI still
 /// legitimately depends on (`.github/workflows/release-please.yml`) -- to
-/// derive HR-073's fix from the pinned source
+/// derive a fix from the pinned source
 /// (`process.wiring-checks-run-the-resolution`), never an instruction
 /// this repository's own toolchain follows. Heading-bounded rather than a
 /// whole-file exception so the rest of the runbook -- the release and
-/// restamp procedures -- stays gated. Batch 20 T5 renamed the section
-/// from "Known gap" once HR-073 closed pre-merge; this function's own
-/// heading match moved with it (this module's own doc, "Scope", names
-/// the wider principle a gate this narrowly anchored has to keep up
-/// with).
+/// restamp procedures -- stays gated.
 fn runbook_release_please_section_lines(text: &str) -> HashSet<usize> {
     let lines: Vec<&str> = text.split('\n').collect();
     let mut exempt = HashSet::new();
@@ -464,35 +440,30 @@ mod tests {
     /// Registers `raw_path` (arbitrary bytes, not required to be valid
     /// UTF-8) as a tracked file in `root`'s git index, through git's
     /// plumbing layer -- never `fs::write` on a non-UTF-8 name, which
-    /// panics on macOS: PR #14's macos-latest CI job (run 34605787940,
-    /// job 103283751346) failed at exactly that `unwrap()` with `Os error
-    /// 92, Illegal byte sequence`, because APFS rejects an invalid-UTF-8
-    /// byte sequence at file CREATION. `#[cfg(unix)]` alone only gates the
-    /// COMPILER capability this test needs (`OsStrExt`); the FILESYSTEM
-    /// capability a real write also needs is Linux-only, a second,
-    /// distinct layer (`houserules.platform-gated-tests`'s own body now
-    /// carries this lesson). Git's object database and index are
-    /// byte-oriented and never touch a real path on disk for this, so
-    /// APFS never sees the name: `git hash-object -w --stdin` writes
-    /// `content` as a blob and returns its id, and `git update-index
-    /// --add --cacheinfo <mode> <id> <path>` (the three-separate-
-    /// arguments form -- git's own docs name it "for backward
-    /// compatibility" beside the single comma-joined form, kept here for
-    /// the opposite reason: the comma form cannot carry a path with
-    /// invalid UTF-8 bytes, since a Rust `&str` cannot hold one either)
-    /// registers `raw_path` at that blob without writing it anywhere.
-    /// `git ls-files -z` then reports it identically to a real file. This
-    /// module's own copy of the identical helper `check.rs`'s test module
-    /// keeps (this file's own `tracked_files` doc names that module as
-    /// this function's cited pattern source).
+    /// panics on macOS: APFS rejects an invalid-UTF-8 byte sequence at
+    /// file creation. `#[cfg(unix)]` alone only gates the COMPILER
+    /// capability this test needs (`OsStrExt`); the FILESYSTEM capability
+    /// a real write also needs is Linux-only, a second, distinct layer
+    /// (`houserules.platform-gated-tests`). Git's object database and
+    /// index are byte-oriented and never touch a real path on disk for
+    /// this, so APFS never sees the name: `git hash-object -w --stdin`
+    /// writes `content` as a blob and returns its id, and `git
+    /// update-index --add --cacheinfo <mode> <id> <path>` (the
+    /// three-separate-arguments form -- git's own docs name it "for
+    /// backward compatibility" beside the single comma-joined form, kept
+    /// here for the opposite reason: the comma form cannot carry a path
+    /// with invalid UTF-8 bytes, since a Rust `&str` cannot hold one
+    /// either) registers `raw_path` at that blob without writing it
+    /// anywhere. `git ls-files -z` then reports it identically to a real
+    /// file. `check.rs`'s test module keeps an identical copy of this
+    /// helper.
     ///
     /// `#[cfg(unix)]`: its only caller is itself `#[cfg(unix)]`
     /// (`raw_path`'s own construction needs `OsStrExt`), so on every
     /// other target this function is unused -- ungated, it would fail
     /// `cargo clippy --all-targets -- -D warnings` on windows-latest CI
     /// (`.github/workflows/ci.yml`'s rust job) with a `dead_code` warning
-    /// turned error, the same class of failure this whole branch-fix
-    /// round exists to close.
+    /// turned error.
     #[cfg(unix)]
     fn seed_undecodable_tracked_path(root: &Path, raw_path: &std::ffi::OsStr, content: &str) {
         let hash_output = Command::new("git")
@@ -548,27 +519,23 @@ mod tests {
         assert!(find_matches("CONTRIBUTING.md", text).is_empty());
     }
 
-    /// Fix round 1, important finding 1's own two seeds: `CLAUDE.md` and
-    /// `tools/claude-session-start.sh` are walked (not excluded) under
-    /// the new prefix list -- reproduced live at fix round 1's BASE
-    /// (t4-evidence/fix1/important1-red.txt: seeding both left the old
-    /// WALK_FILES-based gate at "0 unexpected").
+    /// `CLAUDE.md` and `tools/claude-session-start.sh` are walked, not
+    /// excluded, under `EXCLUDED_PREFIXES`.
     #[test]
     fn claude_md_and_session_start_sh_are_not_excluded() {
         assert!(!is_excluded("CLAUDE.md"));
         assert!(!is_excluded("tools/claude-session-start.sh"));
     }
 
-    /// The reviewer's exact first seed, reproduced as a pure match: a
-    /// `pnpm test` line in `CLAUDE.md`'s content is caught.
+    /// A `pnpm test` line in `CLAUDE.md`'s content is caught.
     #[test]
     fn a_seeded_pnpm_line_in_claude_md_is_caught() {
         let text = "# Project\n\nRun `pnpm test` before committing.\n";
         assert!(!find_matches("CLAUDE.md", text).is_empty());
     }
 
-    /// The reviewer's exact second seed, reproduced as a pure match: an
-    /// `npx` line in `tools/claude-session-start.sh`'s content is caught.
+    /// An `npx` line in `tools/claude-session-start.sh`'s content is
+    /// caught.
     #[test]
     fn a_seeded_npx_line_in_session_start_sh_is_caught() {
         let text = "#!/bin/sh\nnpx some-tool\n";
@@ -618,11 +585,9 @@ mod tests {
 
     /// Live regression, against this checkout's own real tracked-file
     /// list: every file `git ls-files` names is classified (excluded or
-    /// walked) without panicking, and the reviewer's two seeds land in
-    /// the walked set while a representative excluded file does not --
-    /// fix round 1, important finding 1's own remedy ("add a test that
-    /// fails when a tracked path is neither walked nor excluded").
-    /// Read-only: lists tracked files, writes nothing
+    /// walked) without panicking, and two representative live-instruction
+    /// files land in the walked set while a representative excluded file
+    /// does not. Read-only: lists tracked files, writes nothing
     /// (`houserules.tests-clean-scratch-dirs`).
     #[test]
     fn every_real_tracked_file_is_classified_and_key_files_land_correctly() {
@@ -649,11 +614,9 @@ mod tests {
         assert!(is_excluded("knowledge/houserules.json"));
     }
 
-    /// Fix round 2, new_breakage 1 (task-1-review-r2.json): the same
-    /// quoting bug `check.rs`'s `git_ls_files` carried -- this repository
-    /// has zero non-ASCII tracked paths, so the bug is latent here and
-    /// this seeded scratch repo is the only way to exercise it. Without
-    /// `-z`, git's own `core.quotePath` would return a tracked
+    /// This repository has zero non-ASCII tracked paths, so a seeded
+    /// scratch repo is the only way to exercise git's own quoting
+    /// behavior: without `-z`, `core.quotePath` would return a tracked
     /// `docs/café.md` as the escaped literal `"docs/caf\303\251.md"`.
     #[test]
     fn tracked_files_returns_a_non_ascii_path_unescaped() {
@@ -675,29 +638,26 @@ mod tests {
         assert_eq!(undecodable, Vec::<String>::new());
     }
 
-    /// Fix round 3, new_breakage 1 (task-1-review-r3.json): the same
-    /// whole-buffer-decode bug `check.rs`'s `git_ls_files` carried -- this
-    /// repository has zero non-UTF-8 tracked paths, so a seeded scratch
-    /// repo is the only way to exercise it. A tracked path with genuinely
-    /// invalid UTF-8 bytes must not panic the whole call, and must not
-    /// silently vanish from the result: it lands in the second, named
-    /// list, while every other, valid tracked path still lands in the
-    /// first.
+    /// This repository has zero non-UTF-8 tracked paths, so a seeded
+    /// scratch repo is the only way to exercise the per-entry decode. A
+    /// tracked path with genuinely invalid UTF-8 bytes must not panic the
+    /// whole call, and must not silently vanish from the result: it lands
+    /// in the second, named list, while every other, valid tracked path
+    /// still lands in the first.
     ///
-    /// Unix-only (branch review, critical issue 1): `OsStrExt::from_bytes`
-    /// is a Unix-only extension trait (`std::os::unix::ffi`), so this test
-    /// does not compile on Windows at all -- `crates/houserules/tests/
-    /// install.rs`'s own `init_marks_shell_scripts_and_the_git_hook_
-    /// executable` is the crate's precedent for gating a whole test this
-    /// way rather than only the one line that needs it.
+    /// Unix-only: `OsStrExt::from_bytes` is a Unix-only extension trait
+    /// (`std::os::unix::ffi`), so this test does not compile on Windows at
+    /// all -- `crates/houserules/tests/install.rs`'s own
+    /// `init_marks_shell_scripts_and_the_git_hook_executable` is the
+    /// crate's precedent for gating a whole test this way rather than
+    /// only the one line that needs it.
     ///
-    /// Seeded through the git index, not the filesystem (branch-fix round
-    /// 2: PR #14's macos-latest job panicked at an `fs::write` unwrap on
-    /// this exact name -- `seed_undecodable_tracked_path`'s own doc has
-    /// the full account). Safe here specifically because `tracked_files`
-    /// returns the raw path list and never opens a single file to read
-    /// its content, so an index-only entry with no file on disk at all
-    /// exercises the identical code path a real file would.
+    /// Seeded through the git index, not the filesystem
+    /// (`seed_undecodable_tracked_path`'s own doc has the full account).
+    /// Safe here specifically because `tracked_files` returns the raw
+    /// path list and never opens a single file to read its content, so an
+    /// index-only entry with no file on disk at all exercises the
+    /// identical code path a real file would.
     #[cfg(unix)]
     #[test]
     fn tracked_files_names_an_undecodable_path_instead_of_dropping_it() {

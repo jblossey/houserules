@@ -1,5 +1,4 @@
-//! Integration test for the `houserules --version` flag: the crate's first
-//! behavior (HR-054).
+//! Integration test for the `houserules --version` flag.
 
 use std::process::Command;
 

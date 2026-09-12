@@ -1,26 +1,24 @@
-//! Pins HR-073's release-please rewiring (batch 20 T5, ruled design.md
-//! §5.43): `release-please-config.json`'s one package moved from `"."`
-//! (`release-type: "node"`, reading the `package.json` batch 20 T3
-//! retired) to `"crates/houserules"` (`release-type: "rust"`, reading
-//! that crate's own `Cargo.toml`). `docs/runbook.md`'s "release-please's
-//! release-type" section carries the full source derivation
-//! (`googleapis/release-please@v17.11.2`'s `Rust.getDefaultPackageName`
-//! versus the retired `Node` strategy's `getPkgJsonContents`); this file
-//! pins only the config shape that derivation depends on, cheaply, with
-//! no release-please run.
+//! Pins `release-please-config.json`'s package shape: the one package
+//! sits at `"crates/houserules"` (`release-type: "rust"`, reading that
+//! crate's own `Cargo.toml`), not at `"."`. `docs/runbook.md`'s
+//! "release-please's release-type" section carries the full source
+//! derivation (`googleapis/release-please@v17.11.2`'s
+//! `Rust.getDefaultPackageName`); this file pins only the config shape
+//! that derivation depends on, cheaply, with no release-please run.
 //!
 //! `BaseStrategy.addPath` (`src/strategies/base.ts`, v17.11.2) prefixes
 //! every non-absolute extra-file path with the package's own path unless
 //! that package sits at the repository root (`ROOT_PROJECT_PATH`, `"."`)
-//! or the path itself starts with `/`. Moving the package off root turns
-//! every extra-file path lacking a leading `/` into a path under
-//! `crates/houserules/` that does not exist -- a silent no-op release-please
-//! only logs, never fails on (`github.ts`'s `buildChangeSet` continues
-//! past a missing `createIfMissing: false` file). The extra-files test
-//! below pins the leading-`/` fix against a repeat of that regression, and
-//! two more tests pin the settings whose own loss would be just as silent:
-//! `include-component-in-tag` (would flip the tag shape, not fail) and
-//! `changelog-path` (would fork a second, empty changelog, not fail).
+//! or the path itself starts with `/`. With the package off root, an
+//! extra-file path lacking a leading `/` resolves under
+//! `crates/houserules/` instead of the repository root -- a silent no-op
+//! release-please only logs, never fails on (`github.ts`'s
+//! `buildChangeSet` continues past a missing `createIfMissing: false`
+//! file). The extra-files test below pins the leading-`/` requirement,
+//! and two more tests pin the settings whose own loss would be just as
+//! silent: `include-component-in-tag` (would flip the tag shape, not
+//! fail) and `changelog-path` (would fork a second, empty changelog, not
+//! fail).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -81,7 +79,7 @@ fn manifest_key_matches_the_configs_package_path() {
 
 /// The one package names the `rust` release-type (`src/factory.ts`,
 /// v17.11.2, maps it to the `Rust` strategy) -- not `node`, which reads a
-/// `package.json` this repository no longer has.
+/// `package.json` absent from this repository.
 #[test]
 fn package_release_type_is_rust() {
     let config = config();
@@ -93,8 +91,8 @@ fn package_release_type_is_rust() {
 
 /// Every `extra-files` entry is repository-root-relative (a leading `/`,
 /// or an object whose own `path` carries one): the package's `addPath`
-/// no longer sits at `ROOT_PROJECT_PATH`, so an entry without one would
-/// resolve under `crates/houserules/` instead of the repository root.
+/// is not `ROOT_PROJECT_PATH`, so an entry without one would resolve
+/// under `crates/houserules/` instead of the repository root.
 #[test]
 fn extra_files_are_anchored_to_the_repository_root() {
     let config = config();
@@ -120,8 +118,8 @@ fn extra_files_are_anchored_to_the_repository_root() {
     }
 }
 
-/// The config never names the `package.json` batch 20 T3 (HR-047)
-/// retired -- as a `package-name` override, an extra-file, or otherwise.
+/// The config never names `package.json` -- as a `package-name`
+/// override, an extra-file, or otherwise.
 #[test]
 fn config_names_no_retired_package_json() {
     let raw = fs::read_to_string(repo_root().join("release-please-config.json"))
@@ -159,9 +157,7 @@ fn include_component_in_tag_stays_false_at_the_config_root() {
 /// sits off `ROOT_PROJECT_PATH` -- a new, empty `crates/houserules/
 /// CHANGELOG.md` would spring up while the real changelog at the
 /// repository root goes stale. That root file is not cosmetic: `dist
-/// plan` packages it as `[misc]` into every one of the five release
-/// archives (`.superpowers/sdd/2026-09-07-batch-20/t5-evidence/
-/// dist-plan-v0.2.0-alpha.log`).
+/// plan` packages it as `[misc]` into every release archive.
 #[test]
 fn package_changelog_path_stays_the_root_changelog() {
     let config = config();

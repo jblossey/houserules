@@ -1,43 +1,20 @@
-//! The glob matcher: `tools/kb.mjs`'s `globMatch` ported for `area_files`/
-//! `areas_for`, which `audit` (kb.mjs:707) and `cmdFor` (kb.mjs:927) call
-//! in the frozen JS source -- both phase-2 surfaces (docs/specs/
-//! 2026-09-04-batch-15-tier2-spec.md §5). Batch 17 T3 wired `area_files`
-//! (and, through it, `glob_match`/`strip_dot`) into the `audit` engine's
-//! rule-package assembly, dropping their `#[allow(dead_code)]`; `audit`
-//! also calls `glob_match` directly for its checks' own glob matching
-//! (`matchAny` in the frozen JS). Batch 17 T4 wires `areas_for` into
-//! `read::for_result` (`cmdFor`'s port), dropping ITS `#[allow(dead_code)]`
-//! too -- the crate's last one on a function ever meant to ship (see
-//! `model::load_areas`'s own doc for the one that stays, by a different
-//! route: it never had a production caller planned at all). `compile` and
-//! `GlobError` are not dead: `model::load_areas` calls `compile` to
-//! validate every area's globs at load time (see its doc).
+//! The glob matcher: `area_files`/`areas_for` group and resolve paths
+//! against `knowledge/areas.json`'s declared globs; `audit` and
+//! `read::for_result` are the production callers, `audit` also calling
+//! `glob_match` directly for its checks' own glob matching. `compile` and
+//! `GlobError` also serve `model::load_areas`, which validates every
+//! area's globs at load time.
 //!
-//! Ruled 2026-09-04 (design.md §5.25, decisions.json, the
-//! `houserules.glob-union-matcher` gotcha's fourth bullet, this spec's §3
-//! glob bullet): the globset crate is the single matching engine, not a
-//! port of `tools/kb.mjs`'s two-engine union (`matchesGlob(path, glob) ||
-//! globToRegExp(glob).test(path)`). Every divergence from that frozen
-//! union is pinned by a counterexample test asserting globset's answer,
-//! named against the union's in the test's doc comment; malformed globs
-//! are named errors, never panics; extglob (`+(...)`, `!(...)`, `@(...)`)
-//! is not in the vocabulary. Verified live against globset 0.4.20 and the
-//! frozen union (node 24.18.1 at af13303) for every glob this repository's
-//! `knowledge/areas.json` actually declares (`**`, `*`, literals): the
-//! answers agree. The known divergences, each pinned below:
-//! - Extglob narrows: the union treats `+(...)`/`!(...)`/`@(...)` as
-//!   matching (verified live), globset treats the parens/pipe/bang/at as
-//!   literal characters and does not.
-//! - A bracket class, brace list, or `?` crossing a dot-segment under
-//!   `**` widens: the union's `matchesGlob` half excludes a leading-dot
-//!   segment there (the gotcha's original subject); globset does not.
-//! - Nested brace lists now match, correctly: globset supports them
-//!   natively, unlike this module's first cut (a hand-rolled translator
-//!   whose brace parser did not nest -- fix round 1, finding 1).
+//! globset is the single matching engine (`houserules.glob-union-matcher`).
+//! Malformed globs are named errors, never panics. Extglob syntax
+//! (`+(...)`, `!(...)`, `@(...)`) is not in the vocabulary: globset treats
+//! the parens/pipe/bang/at as literal characters. Nested brace lists
+//! match correctly (`a/{b,{c,d}}/c`). A bracket class, brace list, or `?`
+//! crosses a leading-dot path segment under `**` (`src/[ab]/**` matches
+//! `src/a/.x/y`).
 //!
 //! `GlobBuilder::literal_separator(true)` is set explicitly: without it,
-//! globset's own default lets a bare `*` cross `/` (verified live), which
-//! the union's `*` never does (`globToRegExp` translates it to `[^/]*`).
+//! globset's own default lets a bare `*` cross `/`.
 
 use std::fmt;
 
@@ -46,13 +23,12 @@ use indexmap::IndexMap;
 
 use super::model::AreaDef;
 
-/// Removes a single leading `./` from `path`, the same normalization
-/// `tools/kb.mjs`'s `stripDot` applies before matching (a path is matched
-/// relative-clean even when a caller passes it `git diff --name-only`
-/// style with a leading `./`). `pub(super)` (batch 17 T4): `read::for_result`
-/// needs the identical normalization for `cmdFor`'s own `paths.map(stripDot)`
-/// and `wanted`/`verify` comparison, and a second hand-written copy could
-/// drift from this one silently.
+/// Removes a single leading `./` from `path` before matching, so a path
+/// is matched relative-clean even when a caller passes it
+/// `git diff --name-only` style with a leading `./`. `pub(super)`:
+/// `read::for_result` needs the identical normalization for its own
+/// `paths`/`wanted`/`verify` comparison, and a second hand-written copy
+/// could drift from this one silently.
 pub(super) fn strip_dot(path: &str) -> &str {
     path.strip_prefix("./").unwrap_or(path)
 }
@@ -60,7 +36,7 @@ pub(super) fn strip_dot(path: &str) -> &str {
 /// A glob that failed to compile, naming the offending pattern and the
 /// underlying globset error -- never a panic. `Display` reads as one line
 /// suitable for a CLI error surface (`render`'s named-error, exit-2
-/// contract, docs/specs/2026-09-04-batch-15-tier2-spec.md §6).
+/// contract).
 #[derive(Debug)]
 pub(crate) struct GlobError {
     glob: String,
@@ -81,11 +57,9 @@ impl std::error::Error for GlobError {
 
 /// Compiles `glob` into a matcher with a literal path separator (`*` stops
 /// at `/`; only `**` crosses it), or a named `GlobError` when `glob` fails
-/// to compile. Verified live with globset 0.4.20: `a[z-a]b` (a descending
-/// range) errors this way; `a[[]b` is valid POSIX bracket-class syntax --
-/// a class containing the single literal character `[` -- and compiles
-/// and matches fine, contrary to this module's first cut, which panicked
-/// building a `regex` pattern for both (fix round 1, finding 2).
+/// to compile: `a[z-a]b` (a descending range) errors this way. `a[[]b` is
+/// valid POSIX bracket-class syntax -- a class containing the single
+/// literal character `[` -- and compiles and matches fine, not an error.
 pub(crate) fn compile(glob: &str) -> Result<globset::GlobMatcher, GlobError> {
     GlobBuilder::new(glob)
         .literal_separator(true)
@@ -99,9 +73,9 @@ pub(crate) fn compile(glob: &str) -> Result<globset::GlobMatcher, GlobError> {
 
 /// Matches `path` against `glob`, or the `GlobError` `compile` returns
 /// when `glob` fails to compile -- never a panic. `area_files` calls it
-/// internally; batch 17 T3's `audit` engine calls it directly too, for the
+/// internally; `audit` also calls it directly for the
 /// `report-field`/`grep-absent`/`co-change`/`diff-append-only` checks'
-/// `matchAny`-equivalent glob matching.
+/// own glob matching.
 pub(crate) fn glob_match(path: &str, glob: &str) -> Result<bool, GlobError> {
     compile(glob).map(|matcher| matcher.is_match(path))
 }
@@ -109,26 +83,16 @@ pub(crate) fn glob_match(path: &str, glob: &str) -> Result<bool, GlobError> {
 /// Groups `paths` by every area whose globs match, each area mapped to
 /// the paths that matched it, in insertion order: `global` first (it has no
 /// globs of its own but applies to every path), then every other area in
-/// the order its FIRST matching path touches it -- `tools/kb.mjs`'s
-/// `areaFiles` builds a plain object the same way (`found[area] ??= []`
-/// inserts the key on first touch), and that key order is observable in
-/// `audit`'s own `area_files` JSON field (fix round 1, issue 6: a prior cut
-/// sorted the keys instead, which `cargo test`'s field-identical corpus
-/// comparison could not see -- `serde_json::Value` equality under this
-/// crate's `preserve_order` feature ignores object key order -- but every
-/// live `houserules audit`/`--json` run could, and did, diverge from
-/// `tools/kb.sh audit` byte-for-byte on every range touching a non-global
-/// area). `IndexMap` is this crate's existing `serde_json`/`preserve_order`
-/// dependency's own map type, already resolved in `Cargo.lock` before this
-/// fix pinned it directly; `.entry().or_default()` preserves first-touch
-/// order exactly like a JS object literal's `??=`, so swapping the
-/// container is the whole fix. Stops at the first `GlobError` a glob
-/// raises, matching `.some()`'s short-circuit on the JS side: an area
-/// whose earlier glob already matched never reaches a later, possibly-
-/// malformed one. Batch 17 T3's `audit` engine is its first production
-/// caller (the rule-package's touched-areas computation, `tools/kb.mjs:707`
-/// at the frozen sha); `areas_for` (below) is T4's `for` command's own
-/// caller.
+/// the order its FIRST matching path touches it. This key order is
+/// observable in `audit`'s own `area_files` JSON field, so `IndexMap`
+/// (`.entry().or_default()` preserves first-touch order) matters here:
+/// `serde_json::Value` equality under this crate's `preserve_order`
+/// feature ignores object key order, but a live `houserules
+/// audit --json` run does not. Stops at the first `GlobError` a glob
+/// raises: an area whose earlier glob already matched never reaches a
+/// later, possibly-malformed one. `audit`'s rule-package assembly (its
+/// touched-areas computation) and `areas_for` (below, the `for` command's
+/// own caller) are its production callers.
 pub(crate) fn area_files(
     paths: &[&str],
     areas: &[(String, AreaDef)],
@@ -157,8 +121,7 @@ pub(crate) fn area_files(
 }
 
 /// Resolves `paths` to their areas through the glob map; `global` always
-/// applies. `read::for_result` (batch 17 T4, `cmdFor`'s own `areasFor`
-/// call) is its production caller.
+/// applies. `read::for_result` is its production caller.
 pub(crate) fn areas_for(
     paths: &[&str],
     areas: &[(String, AreaDef)],
@@ -189,9 +152,8 @@ mod tests {
             .collect()
     }
 
-    /// tests/kb.test.mjs, describe('areasFor'): "maps paths to areas
-    /// through the globs, always including global, sorted and
-    /// deduplicated".
+    /// Maps paths to areas through the globs, always including `global`,
+    /// sorted and deduplicated.
     #[test]
     fn areas_for_maps_paths_through_globs_always_including_global_sorted_deduplicated() {
         let areas = areas(&[
@@ -225,9 +187,9 @@ mod tests {
         assert_eq!(areas_for(&[], &areas).unwrap(), vec!["global"]);
     }
 
-    /// tests/kb.test.mjs, describe('areasFor'): "includes template for a
-    /// path under template/.claude, crossing the dot-segment" (HR-019),
-    /// against this repository's own real `knowledge/areas.json`.
+    /// Includes `template` for a path under `template/.claude`, crossing
+    /// the dot-segment, against this repository's own real
+    /// `knowledge/areas.json`.
     #[test]
     fn areas_for_includes_template_crossing_the_dot_segment_hr_019() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -239,10 +201,8 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs, describe('areasFor'): "still matches ?,
-    /// bracket-class, and brace-list globs, not only ** and *". Re-verified
-    /// under globset after the fix round 1 engine swap (finding 1): still
-    /// true on all three.
+    /// Still matches `?`, bracket-class, and brace-list globs, not only
+    /// `**` and `*`.
     #[test]
     fn areas_for_still_matches_question_bracket_class_and_brace_list_globs() {
         let vocab = areas(&[
@@ -268,8 +228,8 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs, describe('areaFiles'): "groups changed files by
-    /// every area their globs match, plus global always empty".
+    /// Groups changed files by every area their globs match, plus
+    /// `global` always empty.
     #[test]
     fn area_files_groups_changed_files_by_every_area_their_globs_match() {
         let areas = areas(&[
@@ -303,13 +263,11 @@ mod tests {
         assert_eq!(empty, expected_empty);
     }
 
-    /// Fix round 1, issue 6: `area_files` must reproduce `tools/kb.mjs`'s
-    /// own object-literal insertion order (`found[area] ??= []` inserts a
-    /// key on the FIRST path that touches it), not sort it -- the frozen
-    /// JS's own order for this fixture is `global, infra, docs` (the first
-    /// path, `tools/a.mjs`, touches `infra` before the second path,
-    /// `docs/x.md`, touches `docs`), which is neither insertion order by
-    /// area declaration nor alphabetical.
+    /// `area_files` orders its keys by first-touch, not sorted: `global,
+    /// infra, docs` for this fixture (the first path, `tools/a.mjs`,
+    /// touches `infra` before the second path, `docs/x.md`, touches
+    /// `docs`), which is neither insertion order by area declaration nor
+    /// alphabetical.
     #[test]
     fn area_files_key_order_follows_first_touch_by_path_order_not_area_declaration_order() {
         let areas = areas(&[
@@ -324,86 +282,57 @@ mod tests {
         );
     }
 
-    /// Fix round 1, finding 1: the owner's globset ruling names nested
-    /// brace lists as a case where globset must now match the frozen JS
-    /// union's answer (`matchesGlob('a/c/c', 'a/{b,{c,d}}/c')` is `true`
-    /// at the frozen sha, verified live), unlike this module's first cut:
-    /// `find_brace_end` stopped at the first `}`, so `a/{b,{c,d}}/c`
-    /// compiled to `a/(?:b|\{c|d)\}/c`, which did not match. This is the
-    /// one instance of the review's five where the old engine's own
-    /// answer actually diverged from the chosen one, so it is the natural
-    /// RED for this fix round: it failed against the old `bool`-returning
-    /// glob_match before the globset swap.
+    /// Nested brace lists match correctly: `a/{b,{c,d}}/c` matches
+    /// `a/c/c`.
     #[test]
     fn glob_match_supports_nested_brace_lists() {
         assert!(glob_match("a/c/c", "a/{b,{c,d}}/c").unwrap());
     }
 
-    /// Fix round 1, finding 1, review issue 1, divergence 1 of 3: the
-    /// frozen union treats extglob as matching
-    /// (`matchesGlob('src/x.js', 'src/+(x|y).js')` is `true`, verified
-    /// live on node 24.18.1 at af13303). The owner's ruling takes extglob
-    /// out of the vocabulary; globset treats `+`, `(`, `)`, `|` as literal
-    /// characters, so this pins globset's answer: `false`.
+    /// Extglob is out of the vocabulary: globset treats `+`, `(`, `)`,
+    /// `|` as literal characters, so `src/+(x|y).js` does not match
+    /// `src/x.js`.
     #[test]
     fn glob_match_leaves_plus_extglob_out_of_the_vocabulary() {
         assert!(!glob_match("src/x.js", "src/+(x|y).js").unwrap());
     }
 
-    /// Fix round 1, finding 1, divergence 2 of 3: the union's
-    /// `matchesGlob('src/x.js', 'src/!(y).js')` is `true` (verified live);
-    /// globset's `!` extglob form is not in the vocabulary either. Pins
-    /// globset's answer: `false`.
+    /// globset's `!` extglob form is not in the vocabulary either:
+    /// `src/!(y).js` does not match `src/x.js`.
     #[test]
     fn glob_match_leaves_bang_extglob_out_of_the_vocabulary() {
         assert!(!glob_match("src/x.js", "src/!(y).js").unwrap());
     }
 
-    /// Fix round 1, finding 1, divergence 3 of 3: the union's
-    /// `matchesGlob('src/x.js', 'src/@(x|y).js')` is `true` (verified
-    /// live); globset's `@` extglob form is not in the vocabulary either.
-    /// Pins globset's answer: `false`.
+    /// globset's `@` extglob form is not in the vocabulary either:
+    /// `src/@(x|y).js` does not match `src/x.js`.
     #[test]
     fn glob_match_leaves_at_extglob_out_of_the_vocabulary() {
         assert!(!glob_match("src/x.js", "src/@(x|y).js").unwrap());
     }
 
-    /// Fix round 1, finding 1, review issue 1, "widens" divergence: the
-    /// union's `matchesGlob` half excludes a dot-segment under `**`
-    /// (`houserules.glob-union-matcher`'s original subject), so
-    /// `matchesGlob('src/a/.x/y', 'src/[ab]/**')` is `false` (verified
-    /// live). globset has no such exclusion: this pins globset's answer,
-    /// `true`, the deliberately chosen divergence.
+    /// A bracket class crosses a leading-dot segment under `**`:
+    /// `src/[ab]/**` matches `src/a/.x/y`.
     #[test]
     fn glob_match_crosses_a_dot_segment_after_a_bracket_class() {
         assert!(glob_match("src/a/.x/y", "src/[ab]/**").unwrap());
     }
 
-    /// Fix round 2, finding 1: the `?` sibling of the bracket-class
-    /// dot-segment crossing above. The union's `matchesGlob` half excludes
-    /// a leading-dot segment under `**`, so
-    /// `matchesGlob('src/a/.x/y', 'src/?/**')` is `false` (verified live);
-    /// globset has no such exclusion: this pins globset's answer, `true`.
+    /// The `?` sibling of the bracket-class dot-segment crossing above:
+    /// `src/?/**` matches `src/a/.x/y`.
     #[test]
     fn glob_match_crosses_a_dot_segment_after_a_question_mark() {
         assert!(glob_match("src/a/.x/y", "src/?/**").unwrap());
     }
 
-    /// Fix round 2, finding 1: the brace-list sibling of the bracket-class
-    /// dot-segment crossing above. The union's `matchesGlob` half excludes
-    /// a leading-dot segment under `**`, so
-    /// `matchesGlob('src/a/.x/y', 'src/{a,b}/**')` is `false` (verified
-    /// live); globset has no such exclusion: this pins globset's answer,
-    /// `true`. With this and the two tests above, the review's 1853-cell
-    /// matrix closes 7/7: every divergence between globset and the frozen
-    /// union over this repository's globs and vocabulary is now pinned.
+    /// The brace-list sibling of the bracket-class dot-segment crossing
+    /// above: `src/{a,b}/**` matches `src/a/.x/y`.
     #[test]
     fn glob_match_crosses_a_dot_segment_after_a_brace_list() {
         assert!(glob_match("src/a/.x/y", "src/{a,b}/**").unwrap());
     }
 
-    /// Fix round 1, finding 2: a malformed descending range must be a
-    /// named error, never a panic. Verified live with globset 0.4.20:
+    /// A malformed descending range is a named error, never a panic:
     /// `Glob::new("a[z-a]b")` returns `Err`.
     #[test]
     fn glob_match_names_a_descending_range_as_an_error_not_a_panic() {
@@ -411,12 +340,11 @@ mod tests {
         assert!(error.to_string().contains("a[z-a]b"));
     }
 
-    /// Fix round 1, finding 2: `a[[]b` looks malformed (an unclosed `[`
-    /// inside a class) but is valid POSIX bracket-class syntax -- a class
-    /// containing the single literal character `[` -- so it must not
-    /// panic either, and here it correctly compiles and matches. Verified
-    /// live with globset 0.4.20: `Glob::new("a[[]b")` is `Ok`, and
-    /// `"a[b"` matches it (`[` from the class, then `b`).
+    /// `a[[]b` looks malformed (an unclosed `[` inside a class) but is
+    /// valid POSIX bracket-class syntax -- a class containing the single
+    /// literal character `[` -- so it does not panic, and correctly
+    /// compiles and matches: `Glob::new("a[[]b")` is `Ok`, and `"a[b"`
+    /// matches it (`[` from the class, then `b`).
     #[test]
     fn glob_match_treats_a_bracket_literal_class_as_valid_not_a_panic() {
         assert!(glob_match("a[b", "a[[]b").unwrap());

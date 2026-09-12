@@ -1,10 +1,10 @@
 //! Fixture builders shared by `load.rs`'s and `commands.rs`' own
-//! `#[cfg(test)] mod tests` (task-2-review.json, issue 9): both modules
-//! load a backlog to exercise different parts of it, and a fixture that
-//! drifts between two copies would let one module's tests silently stop
-//! covering the shape the other module's tests assume. Test-only
-//! (`#[cfg(test)]` on the `mod test_support` declaration in `mod.rs`), so
-//! this file compiles into nothing outside `cargo test`.
+//! `#[cfg(test)] mod tests`: both modules load a backlog to exercise
+//! different parts of it, and a fixture that drifts between two copies
+//! would let one module's tests silently stop covering the shape the
+//! other module's tests assume. Test-only (`#[cfg(test)]` on the `mod
+//! test_support` declaration in `mod.rs`), so this file compiles into
+//! nothing outside `cargo test`.
 
 use std::fs;
 use std::path::Path;
@@ -24,8 +24,8 @@ pub(super) fn write(root: &Path, relative: &str, content: &Value) {
     .unwrap();
 }
 
-/// A minimal, schema-valid backlog item, shallow-merged with `overrides` --
-/// Rust port of `tests/backlog.test.mjs`'s `item()` helper.
+/// A minimal, schema-valid backlog item, shallow-merged with
+/// `overrides`.
 pub(super) fn item(overrides: Value) -> Value {
     let mut base = json!({
         "id": "WI-001",
@@ -43,19 +43,18 @@ pub(super) fn item(overrides: Value) -> Value {
     base
 }
 
-/// The vendored backlog schema, read once so every fixture repo carries the
-/// real `$defs` -- Rust port of `tests/backlog.test.mjs`'s module-level
-/// `SCHEMA` constant.
+/// The vendored backlog schema, read once so every fixture repo carries
+/// the real `$defs`.
 pub(super) fn vendored_schema() -> Value {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../template/backlog/schema.json");
     serde_json::from_str(&fs::read_to_string(path).expect("read the vendored backlog schema"))
         .expect("parse the vendored backlog schema")
 }
 
-/// `tests/backlog.test.mjs`'s module-level `DEFAULT_ITEMS`: the `read
-/// commands`/`set` tests assert against these literals directly, never
-/// against `LoadedBacklog::items`, so a bug in `load_backlog` cannot hide
-/// behind a fixture that mirrors the same bug.
+/// The `read commands`/`set` tests assert against these literals
+/// directly, never against `LoadedBacklog::items`, so a bug in
+/// `load_backlog` cannot hide behind a fixture that mirrors the same
+/// bug.
 pub(super) fn default_items() -> Vec<Value> {
     vec![
         item(json!({})),
@@ -66,7 +65,7 @@ pub(super) fn default_items() -> Vec<Value> {
     ]
 }
 
-/// `tests/backlog.test.mjs`'s module-level `DEFAULT_AMENDMENT`.
+/// A minimal, schema-valid amendment record.
 pub(super) fn default_amendment() -> Value {
     json!({
         "id": "A-01", "type": "constraint", "status": "done",
@@ -76,7 +75,7 @@ pub(super) fn default_amendment() -> Value {
 
 /// A minimal backlog under a fresh temp root, one items file (`E01`,
 /// carrying `items`), one amendment, one batch, one decision, and one
-/// parked group -- Rust port of `tests/backlog.test.mjs`'s `makeRepo`.
+/// parked group.
 pub(super) fn make_repo(items: Vec<Value>) -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();

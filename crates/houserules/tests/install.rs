@@ -1,16 +1,14 @@
-//! `init` and `files` CLI-level tests (HR-047 phase-3 slice, batch 18 T3,
-//! docs/specs/2026-09-05-batch-18-phase3.md §§1-2): the payload now lives
-//! inside the binary (`rust-embed`, `debug-embed` -- `install.rs`'s own
-//! module doc has the vetting and configuration account), so these tests
-//! run the compiled binary as a real subprocess against real scratch git
-//! repositories, following `check_commit.rs`'s structural pattern (its own
-//! doc explains why each `tests/*.rs` file keeps its own small copy of
-//! these helpers rather than sharing `mod common;`). `update` is T4's; no
-//! test here exercises it. The JS-vs-Rust byte-identity diff and the
-//! release-build embed spot check are live-run proofs
-//! (`.superpowers/sdd/2026-09-05-batch-18/t3-evidence/`), not `cargo test`
-//! cases: they need a real `node` invocation and a real `--release`
-//! rebuild respectively, neither of which belongs in this suite.
+//! `init` and `files` CLI-level tests: the payload lives inside the binary
+//! (`rust-embed`, `debug-embed` -- `install.rs`'s own module doc has the
+//! configuration account), so these tests run the compiled binary as a real
+//! subprocess against real scratch git repositories, following
+//! `check_commit.rs`'s structural pattern (its own doc explains why each
+//! `tests/*.rs` file keeps its own small copy of these helpers rather than
+//! sharing `mod common;`). No test here exercises `update`. The JS-vs-Rust
+//! byte-identity diff and the release-build embed spot check are live-run
+//! proofs, not `cargo test` cases: they need a real `node` invocation and a
+//! real `--release` rebuild respectively, neither of which belongs in this
+//! suite.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -52,8 +50,8 @@ fn scratch_git_repo() -> tempfile::TempDir {
 /// Every `KIT_OWNED` path -- `install.rs`'s own copy, which this file
 /// cannot import (a bare CLI binary crate, no `pub` library surface):
 /// `tools/kb.mjs`, `tools/backlog.mjs`, `tools/lib/cli.mjs`, and
-/// `tools/lib/json-store.mjs` left this list at batch 20 T3 (HR-047,
-/// docs/specs/2026-09-07-batch-20-phase5.md §2), joining `RETIRED`.
+/// `tools/lib/json-store.mjs` are not in this list -- they joined
+/// `RETIRED` instead.
 const KIT_OWNED: &[&str] = &[
     "tools/claude-session-start.sh",
     ".githooks/commit-msg",
@@ -65,8 +63,8 @@ const KIT_OWNED: &[&str] = &[
     ".claude/skills/migrating-knowledge/SKILL.md",
 ];
 
-/// Every `SEED_ONCE` path, `bin/houserules.mjs`'s own array, same
-/// live-verified source as `KIT_OWNED`.
+/// Every `SEED_ONCE` path -- `install.rs`'s own array, duplicated here
+/// for the same reason `KIT_OWNED` above is.
 const SEED_ONCE: &[&str] = &[
     "knowledge/schema.json",
     "knowledge/areas.json",
@@ -93,8 +91,7 @@ const SEED_ONCE: &[&str] = &[
 
 /// `env!("CARGO_PKG_VERSION")` at THIS test binary's own compile time --
 /// the same value `install::kit_version` bakes in for the binary under
-/// test (that function's own doc has the account: batch 20 T3, HR-047,
-/// retired the earlier package.json-reading form both copies used).
+/// test (that function's own doc has the account).
 fn kit_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
@@ -124,13 +121,13 @@ fn init_bare_dir_flag_exits_2_with_claps_value_required_message() {
     // `--dir` is a real, load-bearing option in the frozen JS too (`files`'s
     // sibling test above pins the one JS-parity-relevant `--dir` divergence
     // this command has), so its argv edges belong beside its own behavior.
-    // Fix round 1, issue 2: measured live, a bare trailing `--dir` (nothing
-    // follows it) never reaches `tools/lib/cli.mjs`'s `parseArgs` as a
-    // flag at all -- `opts.dir` stays `undefined`, so `node
-    // bin/houserules.mjs init --dir` from a scratch git repo exits 0 and
-    // seeds that repo, the CURRENT directory, exactly as a bare `init`
-    // would. clap's own stricter "a value is required" refusal is a ruled
-    // divergence (the batch's argv-closure ruling), not an unnoticed one.
+    // A bare trailing `--dir` (nothing follows it) never reaches
+    // `tools/lib/cli.mjs`'s `parseArgs` as a flag at all -- `opts.dir`
+    // stays `undefined`, so `node bin/houserules.mjs init --dir` from a
+    // scratch git repo exits 0 and seeds that repo, the CURRENT
+    // directory, exactly as a bare `init` would. clap's own stricter "a
+    // value is required" refusal is a ruled divergence, not an unnoticed
+    // one.
     let output = houserules()
         .args(["init", "--dir"])
         .output()
@@ -145,12 +142,12 @@ fn init_bare_dir_flag_exits_2_with_claps_value_required_message() {
 
 #[test]
 fn init_duplicated_dir_flag_exits_2_with_claps_cannot_be_used_multiple_times_message() {
-    // Fix round 1, issue 2: measured live, `node bin/houserules.mjs init
-    // --dir <a> --dir <b>` exits 0 and seeds <b> only -- `parseArgs`
-    // consumes each `--dir` occurrence in order, the second overwriting
-    // the first in `opts.dir`, so the last one silently wins. clap's own
-    // "cannot be used multiple times" refusal is the same ruled divergence
-    // the bare-flag test above names, not an unnoticed one.
+    // `node bin/houserules.mjs init --dir <a> --dir <b>` exits 0 and
+    // seeds <b> only -- `parseArgs` consumes each `--dir` occurrence in
+    // order, the second overwriting the first in `opts.dir`, so the last
+    // one silently wins. clap's own "cannot be used multiple times"
+    // refusal is the same ruled divergence the bare-flag test above
+    // names, not an unnoticed one.
     let output = houserules()
         .args(["init", "--dir", "a", "--dir", "b"])
         .output()
@@ -206,11 +203,9 @@ fn init_into_a_fresh_repo_writes_every_kit_owned_and_seed_once_file_then_renders
     }
     assert!(dir.path().join(".claude/settings.json").is_file());
 
-    // Ports tests/init.test.mjs:226's "seeds a start hook for startup,
-    // resume, clear, and fork sessions, and a compact hook" (batch 20 T1
-    // fix round 2, review r2 new_breakage 4): the fresh-seed arm, with no
-    // pre-existing settings.json to merge into, had no cargo assertion on
-    // TEMPLATE_MATCHERS -- only the three merge-scenario tests below did.
+    // The fresh-seed arm, with no pre-existing settings.json to merge
+    // into, has no other assertion on TEMPLATE_MATCHERS -- only the
+    // merge-scenario tests below do.
     let settings: serde_json::Value = serde_json::from_str(
         &fs::read_to_string(dir.path().join(".claude/settings.json")).expect("read settings.json"),
     )
@@ -224,15 +219,12 @@ fn init_into_a_fresh_repo_writes_every_kit_owned_and_seed_once_file_then_renders
     assert_eq!(matchers, TEMPLATE_MATCHERS);
 }
 
-/// Ports `tests/init.test.mjs`'s `describe('init')`, "defaults the target
-/// to the given cwd" (batch 20 T1 fix round 1, HR-047; review finding 4):
-/// with `--dir` omitted entirely, `cmd_init` resolves `dir.as_deref().
-/// unwrap_or_else(|| Path::new("."))` against the PROCESS's own working
-/// directory, not an ancestor -- the arm `crates/houserules/tests/
-/// install.rs`'s other tests never exercise, since every other test here
-/// passes `--dir` explicitly. `Command::current_dir` is this file's own
-/// equivalent of the JS test's `main(['init'], capture(), dir)`, whose
-/// third argument overrides `process.cwd()` the same way.
+/// With `--dir` omitted entirely, `cmd_init` resolves
+/// `dir.as_deref().unwrap_or_else(|| Path::new("."))` against the
+/// PROCESS's own working directory, not an ancestor -- the arm this
+/// file's other tests never exercise, since every other test here passes
+/// `--dir` explicitly. `Command::current_dir` sets that working
+/// directory for the child process.
 #[test]
 fn init_with_no_dir_flag_seeds_the_current_working_directory() {
     let dir = scratch_git_repo();
@@ -249,10 +241,9 @@ fn init_with_no_dir_flag_seeds_the_current_working_directory() {
     assert!(dir.path().join(".githooks/commit-msg").is_file());
 }
 
-/// Batch 18 T5 (spec §1): `tools/kb.sh` and `tools/backlog.sh` left
-/// `KIT_OWNED`, so a fresh `init` no longer seeds either -- the flat
-/// `houserules` command surface is the only entry point a freshly seeded
-/// project gets.
+/// `tools/kb.sh` and `tools/backlog.sh` are not in `KIT_OWNED`, so a
+/// fresh `init` does not seed either -- the flat `houserules` command
+/// surface is the only entry point a freshly seeded project gets.
 #[test]
 fn init_no_longer_seeds_the_retired_shell_tools() {
     let dir = scratch_git_repo();
@@ -272,9 +263,9 @@ fn init_no_longer_seeds_the_retired_shell_tools() {
     assert!(!dir.path().join("tools/backlog.sh").exists());
 }
 
-/// Batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2): the
-/// four JS engines the shell wrappers above used to front left `KIT_OWNED`
-/// too, in the same commit -- a fresh `init` no longer seeds any of them.
+/// `tools/kb.mjs`, `tools/backlog.mjs`, `tools/lib/cli.mjs`, and
+/// `tools/lib/json-store.mjs` are not in `KIT_OWNED` either -- a fresh
+/// `init` does not seed any of them.
 #[test]
 fn init_no_longer_seeds_the_retired_js_engines() {
     let dir = scratch_git_repo();
@@ -757,12 +748,12 @@ fn write_settings(dir: &Path, value: &serde_json::Value) {
 /// `SessionStart` array carries.
 const TEMPLATE_MATCHERS: [&str; 2] = ["compact", "startup|resume|clear|fork"];
 
-/// Fix round 1, issue 1: a JSON `null` at `hooks` seeds cleanly under the
-/// frozen JS. Measured live, `.claude/settings.json = {"hooks": null}`:
-/// `node bin/houserules.mjs init --dir <scratch>` exits 0, prints `merged
-/// .claude/settings.json (SessionStart hooks added)`, and writes both
-/// template matchers into `hooks.SessionStart` -- `settings.hooks ??= {}`
-/// replaces `null` the same as a missing key, so this is not a crash arm.
+/// A JSON `null` at `hooks` seeds cleanly under the frozen JS. With
+/// `.claude/settings.json = {"hooks": null}`, `node bin/houserules.mjs
+/// init --dir <scratch>` exits 0, prints `merged .claude/settings.json
+/// (SessionStart hooks added)`, and writes both template matchers into
+/// `hooks.SessionStart` -- `settings.hooks ??= {}` replaces `null` the
+/// same as a missing key, so this is not a crash arm.
 #[test]
 fn init_seeds_a_null_hooks_settings_file_exactly_as_the_js_does() {
     let dir = scratch_git_repo();
@@ -794,12 +785,11 @@ fn init_seeds_a_null_hooks_settings_file_exactly_as_the_js_does() {
     assert_eq!(merged_matchers, TEMPLATE_MATCHERS);
 }
 
-/// Fix round 1, issue 1: a JSON `null` at `hooks.SessionStart` (with
-/// `hooks` itself a genuine object) also seeds cleanly. Measured live,
-/// `.claude/settings.json = {"hooks": {"SessionStart": null}}`: `node
-/// bin/houserules.mjs init` exits 0, prints the same `merged` line, and
-/// writes both template matchers -- `settings.hooks.SessionStart ??= []`
-/// replaces `null` the same way.
+/// A JSON `null` at `hooks.SessionStart` (with `hooks` itself a genuine
+/// object) also seeds cleanly. With `.claude/settings.json = {"hooks":
+/// {"SessionStart": null}}`, `node bin/houserules.mjs init` exits 0,
+/// prints the same `merged` line, and writes both template matchers --
+/// `settings.hooks.SessionStart ??= []` replaces `null` the same way.
 #[test]
 fn init_seeds_a_null_session_start_settings_file_exactly_as_the_js_does() {
     let dir = scratch_git_repo();
@@ -834,17 +824,17 @@ fn init_seeds_a_null_session_start_settings_file_exactly_as_the_js_does() {
     assert_eq!(merged_matchers, TEMPLATE_MATCHERS);
 }
 
-/// Fix round 1, issue 1: a `hooks` value that is itself a JSON ARRAY is a
-/// genuine JS quirk, not a crash. Measured live,
-/// `.claude/settings.json = {"hooks": []}`: `node bin/houserules.mjs
-/// init` exits 0, prints the `merged` line (`changed` is unconditionally
-/// `true` -- `settings.hooks.SessionStart ??= []` lands a non-index
-/// property on the array, every template matcher is pushed into it, and
-/// `JSON.stringify` then drops that property because it serializes only
-/// an array's indexed elements), and the file reads back byte-for-byte
-/// `{"hooks": []}` -- the array's own (empty) elements untouched, no
-/// matcher visible anywhere. `install::merge_settings`'s own doc has the
-/// full mechanism; this pins its measured, matched output.
+/// A `hooks` value that is itself a JSON ARRAY is a genuine JS quirk, not
+/// a crash. With `.claude/settings.json = {"hooks": []}`, `node
+/// bin/houserules.mjs init` exits 0, prints the `merged` line (`changed`
+/// is unconditionally `true` -- `settings.hooks.SessionStart ??= []`
+/// lands a non-index property on the array, every template matcher is
+/// pushed into it, and `JSON.stringify` then drops that property because
+/// it serializes only an array's indexed elements), and the file reads
+/// back byte-for-byte `{"hooks": []}` -- the array's own (empty)
+/// elements untouched, no matcher visible anywhere.
+/// `install::merge_settings`'s own doc has the full mechanism; this pins
+/// its matched output.
 #[test]
 fn init_matches_the_js_silently_dropping_the_merge_when_hooks_is_an_array() {
     let dir = scratch_git_repo();
@@ -868,14 +858,14 @@ fn init_matches_the_js_silently_dropping_the_merge_when_hooks_is_an_array() {
     assert_eq!(merged, "{\n  \"hooks\": []\n}\n");
 }
 
-/// Fix round 1, issue 1: `hooks` holding a bare number is the genuine JS
-/// crash shape and stays a named error. Measured live,
-/// `.claude/settings.json = {"hooks": 5}`: `node bin/houserules.mjs init`
-/// exits 1 with an uncaught `TypeError: Cannot create property
-/// 'SessionStart' on number '5'` and a full stack trace (ES modules run
-/// in strict mode, where assigning a property onto a primitive throws) --
-/// `houserules.crash-paths-are-named` converts that crash into one named
-/// stderr line and exit 2, never the reproduced trace.
+/// `hooks` holding a bare number is the genuine JS crash shape and stays
+/// a named error. With `.claude/settings.json = {"hooks": 5}`, `node
+/// bin/houserules.mjs init` exits 1 with an uncaught `TypeError: Cannot
+/// create property 'SessionStart' on number '5'` and a full stack trace
+/// (ES modules run in strict mode, where assigning a property onto a
+/// primitive throws) -- `houserules.crash-paths-are-named` converts that
+/// crash into one named stderr line and exit 2, never the reproduced
+/// trace.
 #[test]
 fn init_reports_a_scalar_hooks_value_as_a_named_error_exit_2() {
     let dir = scratch_git_repo();
@@ -894,11 +884,11 @@ fn init_reports_a_scalar_hooks_value_as_a_named_error_exit_2() {
     );
 }
 
-/// Fix round 1, issue 1: `hooks.SessionStart` holding a bare number is the
-/// other genuine JS crash shape. Measured live,
-/// `.claude/settings.json = {"hooks": {"SessionStart": 5}}`: `node
-/// bin/houserules.mjs init` exits 1 with an uncaught `TypeError:
-/// settings.hooks.SessionStart.map is not a function` -- named here too.
+/// `hooks.SessionStart` holding a bare number is the other genuine JS
+/// crash shape. With `.claude/settings.json = {"hooks": {"SessionStart":
+/// 5}}`, `node bin/houserules.mjs init` exits 1 with an uncaught
+/// `TypeError: settings.hooks.SessionStart.map is not a function` --
+/// named here too.
 #[test]
 fn init_reports_a_scalar_session_start_value_as_a_named_error_exit_2() {
     let dir = scratch_git_repo();

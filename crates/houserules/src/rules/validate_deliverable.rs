@@ -1,21 +1,15 @@
 //! The `validate` command: schema-validates one or more deliverable JSON
 //! files against `.claude/schemas/deliverables.json`, plus the two
-//! task-report invariants the schema's shape rules cannot express --
-//! `tools/kb.mjs`'s `validateDeliverable` and `checkTaskReportAudit`,
-//! ported byte-for-byte (batch 17 T3, docs/specs/2026-09-04-batch-15-tier2-
-//! spec.md §5 phase 2).
+//! task-report invariants the schema's shape rules cannot express.
 //!
-//! Data-layer rule (spec §3): this validates a deliverable file's *shape*,
-//! so it stays on the generic, already-ported JSON-Schema-subset engine
-//! (`super::validate`, `check.rs`) run directly against the raw
-//! `serde_json::Value`, exactly as `rules::mod`'s own module doc already
-//! anticipated for this surface -- a typed `TaskReport`/`TaskReview`/
-//! `ReReview`/`BranchReview` parse is not this command's validation path
-//! and would duplicate the schema engine's semantics a second time in the
-//! type system (`quality.principles`: one write path). There is
-//! consequently no typed deliverable model layer left for this crate to
-//! carry forward -- see this module's sibling doc comment on the deletion
-//! of `rules::deliverables` and `json_shape` for the full account.
+//! This validates a deliverable file's *shape* directly against the raw
+//! `serde_json::Value`, using the generic JSON-Schema-subset engine
+//! (`super::validate`, `check.rs`) rather than a typed
+//! `TaskReport`/`TaskReview`/`ReReview`/`BranchReview` parse, which is not
+//! this command's validation path and would duplicate the schema engine's
+//! semantics a second time in the type system (`quality.principles`: one
+//! write path). There is consequently no typed deliverable model layer
+//! for this crate to carry.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -32,7 +26,7 @@ use super::model::load_base;
 const DELIVERABLES_SCHEMA: &str = ".claude/schemas/deliverables.json";
 
 /// Maps a deliverable's `kind` field to its definition name in
-/// `DELIVERABLES_SCHEMA` -- `tools/kb.mjs`'s `DELIVERABLE_KINDS`.
+/// `DELIVERABLES_SCHEMA`.
 const DELIVERABLE_KINDS: [(&str, &str); 4] = [
     ("task-report", "taskReport"),
     ("task-review", "taskReview"),
@@ -40,13 +34,11 @@ const DELIVERABLE_KINDS: [(&str, &str); 4] = [
     ("branch-review", "branchReview"),
 ];
 
-/// `task-report` statuses that claim the task is genuinely finished --
-/// `tools/kb.mjs`'s `TERMINAL_STATUSES`.
+/// `task-report` statuses that claim the task is genuinely finished.
 const TERMINAL_STATUSES: [&str; 2] = ["DONE", "DONE_WITH_CONCERNS"];
 
 /// One validated deliverable: the file it read, the deliverable `kind` it
-/// found, and every schema/invariant violation (empty when valid) --
-/// `validateDeliverable`'s return shape.
+/// found, and every schema/invariant violation (empty when valid).
 #[derive(Debug)]
 pub(super) struct ValidatedDeliverable {
     pub file: PathBuf,
@@ -59,8 +51,7 @@ pub(super) struct ValidatedDeliverable {
 /// filled `self_audit`, and that audit's `summary.skipped` must be 0 -- a
 /// nonzero count means the audit ran without `--report` and skipped every
 /// report-field check, so its rows are not trustworthy. BLOCKED and
-/// NEEDS_CONTEXT reports are exempt -- `tools/kb.mjs`'s
-/// `checkTaskReportAudit`, ported.
+/// NEEDS_CONTEXT reports are exempt.
 fn check_task_report_audit(value: &Value, path: &str, errors: &mut Vec<String>) {
     let Some(status) = value.get("status").and_then(Value::as_str) else {
         return;
@@ -97,10 +88,7 @@ fn check_task_report_audit(value: &Value, path: &str, errors: &mut Vec<String>) 
 /// capture (`process.evidence-outlives-the-session`'s invariant), not a
 /// hand-trimmed excerpt:
 /// - Leading bytes: `output.find('{')` skips past any prose before the
-///   JSON starts (a shell prompt echo, a blank line) -- batch 18 branch
-///   review issue 4, `rejects_a_fix_round_audit_output_with_one_prose_line
-///   _before_the_json` pins it. Before this, the scan started at byte 0,
-///   so a single leading line silently defeated the whole check.
+///   JSON starts (a shell prompt echo, a blank line).
 /// - Trailing bytes: `Deserializer::from_str(..).into_iter().next()`
 ///   reads only the FIRST top-level value and tolerates bytes after it,
 ///   unlike `serde_json::from_str`, which rejects anything but trailing
@@ -112,19 +100,13 @@ fn check_task_report_audit(value: &Value, path: &str, errors: &mut Vec<String>) 
 /// point. `find` returns the first occurrence unconditionally, so the
 /// parse is attempted from the prose's own brace; when that slice is not
 /// valid JSON the whole function returns `None` -- a silent miss, the
-/// same shape this fix closes for a plain leading line, just for a
-/// leading line that happens to contain `{`.
+/// same shape a plain leading line would cause, just for a leading line
+/// that happens to contain `{` --
 /// `accepts_a_fix_round_test_whose_prose_contains_a_brace_before_the_json`
 /// pins this residual gap rather than leaving it unmeasured. Retrying at
-/// each subsequent `{` until one parses would close it, but checking
-/// every `fix_rounds[].tests[].output` across the frozen corpus fixtures
-/// and every committed batch report found no case of a stray brace ahead
-/// of a real, skipped-carrying audit JSON in the same capture (the one
-/// non-brace-leading output found, a Node crash trace whose `{ errno:
-/// -2, ... }` is JS object-literal syntax, not JSON, and carries no audit
-/// summary either side of it, already returns `None` before and after
-/// this fix); adding the retry loop now would be speculative complexity
-/// YAGNI already rules against.
+/// each subsequent `{` until one parses would close it, but no observed
+/// capture in this project's own history needs it; adding the retry loop
+/// now would be speculative complexity YAGNI already rules against.
 fn parse_audit_summary_skipped(output: &str) -> Option<serde_json::Number> {
     let start = output.find('{')?;
     let value = serde_json::Deserializer::from_str(&output[start..])
@@ -137,14 +119,11 @@ fn parse_audit_summary_skipped(output: &str) -> Option<serde_json::Number> {
     }
 }
 
-/// HR-051a (docs/specs/2026-09-05-batch-18-phase3.md §5, parent spec
-/// docs/specs/2026-09-04-batch-15-tier2-spec.md §6): `check_task_report_audit`
-/// inspected only the top-level `self_audit`, so a fix round whose OWN
-/// audit test ran without `--report` -- the batch 12 shape, recurred at
-/// batch 14 T1 fix round 0 -- still validated. Scans every
-/// `fix_rounds[].tests[].output` for an embedded audit result carrying a
-/// nonzero `summary.skipped`, the same threshold `check_task_report_audit`
-/// already applies to the top-level audit.
+/// Scans every `fix_rounds[].tests[].output` for an embedded audit result
+/// carrying a nonzero `summary.skipped`, the same threshold
+/// `check_task_report_audit` already applies to the top-level audit: a
+/// fix round whose OWN audit test ran without `--report` must also fail
+/// validation, not only a top-level `self_audit` in that state.
 fn check_fix_round_audits(value: &Value, path: &str, errors: &mut Vec<String>) {
     let Some(fix_rounds) = value.get("fix_rounds").and_then(Value::as_array) else {
         return;
@@ -170,9 +149,8 @@ fn check_fix_round_audits(value: &Value, path: &str, errors: &mut Vec<String>) {
 /// `kind` names in `root`'s `DELIVERABLES_SCHEMA`, plus
 /// `check_task_report_audit` for a `task-report`. `path` is used verbatim
 /// as the returned `file` and as every error message's location prefix --
-/// callers resolve it to an absolute path first (`cmd_validate` does, the
-/// same as `tools/kb.mjs`'s `main` resolving each CLI argument against
-/// `cwd` before calling `validateDeliverable`).
+/// callers resolve it to an absolute path first (`cmd_validate` does,
+/// against `cwd`).
 fn validate_deliverable(root: &Path, path: &Path) -> Result<ValidatedDeliverable, String> {
     let schema = read_deliverable_value(&root.join(DELIVERABLES_SCHEMA))?;
     let value = read_deliverable_value(path)?;
@@ -215,22 +193,15 @@ fn validate_deliverable(root: &Path, path: &Path) -> Result<ValidatedDeliverable
 /// Runs the `validate` subcommand: resolves `root` (`--dir`, or the
 /// enclosing git repository's top level) and loads the knowledge base
 /// there before dispatching -- see `stats::cmd_stats`'s doc for why this
-/// replicates `tools/kb.mjs`'s own unconditional `loadBase` call even
-/// though `validate_deliverable` needs only `root`'s path, not the loaded
-/// base's contents. Validates every file in `files` (each absolutized the
-/// same way `tools/kb.mjs`'s `main` resolves its CLI arguments against
-/// `cwd`) and prints the JSON results array.
+/// runs even though `validate_deliverable` needs only `root`'s path, not
+/// the loaded base's contents. Validates every file in `files` (each
+/// absolutized against `cwd`) and prints the JSON results array.
 pub(crate) fn cmd_validate(dir: Option<PathBuf>, files: Vec<PathBuf>) -> ExitCode {
-    // Root resolution and `load_base` run before the arity check, matching
-    // `tools/kb.mjs`'s own `main`: `loadBase(repoRoot(cwd))` always runs
-    // ahead of the command `switch`, so `validate`'s own `if
-    // (!positional.length) throw ...` is reached only after it. Fix round
-    // 1, issue 9 (task-3-review.json): the earlier cut checked arity
-    // first, inverting this order for `validate` alone (`cmd_stats`
-    // already matched JS here) -- observable on a repository whose
-    // `knowledge/schema.json` is invalid: `tools/kb.sh validate` with no
-    // files printed the schema load error, `houserules validate` printed
-    // "validate needs at least one file" instead, both exit 2.
+    // Root resolution and `load_base` run before the arity check: on a
+    // repository whose `knowledge/schema.json` is invalid, `validate`
+    // with no files must print the schema load error, not "validate needs
+    // at least one file" -- checking arity first would print the wrong
+    // one, both exit 2.
     let root = match crate::root::resolve_root(dir) {
         Ok(root) => root,
         Err(code) => return code,
@@ -347,8 +318,7 @@ mod tests {
         file
     }
 
-    /// tests/kb.test.mjs, describe('validate'): "validates a well-formed
-    /// task report with no errors".
+    /// Validates a well-formed task report with no errors.
     #[test]
     fn validates_a_well_formed_task_report_with_no_errors() {
         let root = schema_root();
@@ -358,8 +328,7 @@ mod tests {
         assert_eq!(result.errors, Vec::<String>::new());
     }
 
-    /// tests/kb.test.mjs, describe('validate'): "rejects a DONE report with
-    /// a null self_audit" (HR-041).
+    /// Rejects a DONE report with a null self_audit.
     #[test]
     fn rejects_a_done_report_with_a_null_self_audit() {
         let root = schema_root();
@@ -376,8 +345,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "rejects a DONE_WITH_CONCERNS report with a null
-    /// self_audit".
+    /// Rejects a DONE_WITH_CONCERNS report with a null self_audit.
     #[test]
     fn rejects_a_done_with_concerns_report_with_a_null_self_audit() {
         let root = schema_root();
@@ -395,9 +363,8 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "rejects a DONE report whose
-    /// self_audit.summary.skipped is greater than 0" (batch 12 branch
-    /// review, template_defects 2).
+    /// Rejects a DONE report whose self_audit.summary.skipped is greater
+    /// than 0.
     #[test]
     fn rejects_a_done_report_whose_self_audit_summary_skipped_is_greater_than_0() {
         let root = schema_root();
@@ -414,11 +381,8 @@ mod tests {
         );
     }
 
-    /// HR-086: the batch 20 T6 incident, reproduced -- a `+=` of a string
-    /// onto a textList field appends one list item per character. 25
-    /// single-character `self_review` items (the exact count the incident's
-    /// own probe carried, `.superpowers/sdd/2026-09-07-batch-20/
-    /// t6-fix3-evidence/degenerate-self-review-probe.json`) must now fail,
+    /// A `+=` of a string onto a textList field appends one list item per
+    /// character. 25 single-character `self_review` items must fail,
     /// naming the first shredded item's own minLength floor.
     #[test]
     fn rejects_a_self_review_shredded_into_one_character_per_item() {
@@ -446,8 +410,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "accepts a BLOCKED report with a null
-    /// self_audit".
+    /// Accepts a BLOCKED report with a null self_audit.
     #[test]
     fn accepts_a_blocked_report_with_a_null_self_audit() {
         let root = schema_root();
@@ -461,8 +424,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "accepts a NEEDS_CONTEXT report with a null
-    /// self_audit".
+    /// Accepts a NEEDS_CONTEXT report with a null self_audit.
     #[test]
     fn accepts_a_needs_context_report_with_a_null_self_audit() {
         let root = schema_root();
@@ -476,10 +438,9 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "accepts a BLOCKED report whose
-    /// self_audit.summary.skipped is greater than 0" -- a non-terminal
-    /// report's skipped audit rows are never inspected, pinning
-    /// `check_task_report_audit`'s early return.
+    /// Accepts a BLOCKED report whose self_audit.summary.skipped is
+    /// greater than 0 -- a non-terminal report's skipped audit rows are
+    /// never inspected, pinning `check_task_report_audit`'s early return.
     #[test]
     fn accepts_a_blocked_report_whose_self_audit_summary_skipped_is_greater_than_0() {
         let root = schema_root();
@@ -493,8 +454,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "rejects a task report without live_run"
-    /// (HR-016).
+    /// Rejects a task report without live_run.
     #[test]
     fn rejects_a_task_report_without_live_run() {
         let root = schema_root();
@@ -508,7 +468,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "rejects a live_run that is not an array".
+    /// Rejects a live_run that is not an array.
     #[test]
     fn rejects_a_live_run_that_is_not_an_array() {
         let root = schema_root();
@@ -522,7 +482,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "rejects a live_run entry without a command".
+    /// Rejects a live_run entry without a command.
     #[test]
     fn rejects_a_live_run_entry_without_a_command() {
         let root = schema_root();
@@ -539,7 +499,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "rejects a tdd cycle without mode" (HR-017).
+    /// Rejects a tdd cycle without mode.
     #[test]
     fn rejects_a_tdd_cycle_without_mode() {
         let root = schema_root();
@@ -553,7 +513,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "rejects a tdd cycle with an unknown mode".
+    /// Rejects a tdd cycle with an unknown mode.
     #[test]
     fn rejects_a_tdd_cycle_with_an_unknown_mode() {
         let root = schema_root();
@@ -570,8 +530,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "accepts a self_audit summary stamped
-    /// empty_range: true" (HR-024).
+    /// Accepts a self_audit summary stamped empty_range: true.
     #[test]
     fn accepts_a_self_audit_summary_stamped_empty_range_true() {
         let root = schema_root();
@@ -594,10 +553,9 @@ mod tests {
         );
     }
 
-    /// HR-051a (docs/specs/2026-09-05-batch-18-phase3.md §5): a fix round's
-    /// own audit output can carry a skipped report-field check the same
-    /// way the top-level `self_audit` can (the batch 12 shape, recurred at
-    /// batch 14 T1 fix round 0) -- rejects it there too.
+    /// A fix round's own audit output can carry a skipped report-field
+    /// check the same way the top-level `self_audit` can -- rejects it
+    /// there too.
     #[test]
     fn rejects_a_fix_round_audit_output_with_a_nonzero_skipped_summary() {
         let root = schema_root();
@@ -628,11 +586,10 @@ mod tests {
         );
     }
 
-    /// Batch 18 branch review, issue 4: a verbatim capture can carry one
-    /// prose line before the audit JSON starts (a shell prompt echo, a
-    /// leading blank line) -- `parse_audit_summary_skipped` must still
-    /// find the nonzero `skipped` past it, not only when the JSON is the
-    /// very first byte.
+    /// A verbatim capture can carry one prose line before the audit JSON
+    /// starts (a shell prompt echo, a leading blank line) --
+    /// `parse_audit_summary_skipped` must still find the nonzero
+    /// `skipped` past it, not only when the JSON is the very first byte.
     #[test]
     fn rejects_a_fix_round_audit_output_with_one_prose_line_before_the_json() {
         let root = schema_root();
@@ -665,15 +622,13 @@ mod tests {
         );
     }
 
-    /// Batch 18 branch review, issue 4 (the fix's own documented residual
-    /// limitation): a stray `{` inside the PROSE ahead of the real audit
-    /// JSON -- not the JSON's own opening brace -- defeats the scan the
-    /// same way a bare leading line used to. `parse_audit_summary_skipped`
-    /// finds this earlier, invalid brace first, fails to parse from it,
-    /// and returns `None` without ever reaching the real, nonzero-skipped
-    /// JSON later in the same capture. This is the one shape the fix
-    /// does not close; the function's own doc names it and this test
-    /// measures it rather than leaving it asserted only in prose.
+    /// A stray `{` inside the PROSE ahead of the real audit JSON -- not
+    /// the JSON's own opening brace -- defeats the scan:
+    /// `parse_audit_summary_skipped` finds this earlier, invalid brace
+    /// first, fails to parse from it, and returns `None` without ever
+    /// reaching the real, nonzero-skipped JSON later in the same
+    /// capture. This is a limit the function's own doc names, measured
+    /// here rather than left asserted only in prose.
     #[test]
     fn accepts_a_fix_round_test_whose_prose_contains_a_brace_before_the_json() {
         let root = schema_root();
@@ -752,8 +707,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "rejects a self_audit summary with empty_range:
-    /// false".
+    /// Rejects a self_audit summary with empty_range: false.
     #[test]
     fn rejects_a_self_audit_summary_with_empty_range_false() {
         let root = schema_root();
@@ -780,7 +734,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "reports a bad enum value and an unknown field".
+    /// Reports a bad enum value and an unknown field.
     #[test]
     fn reports_a_bad_enum_value_and_an_unknown_field() {
         let root = schema_root();
@@ -801,7 +755,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "accepts a run whose exit code is an integer".
+    /// Accepts a run whose exit code is an integer.
     #[test]
     fn accepts_a_run_whose_exit_code_is_an_integer() {
         let root = schema_root();
@@ -814,8 +768,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "rejects a run whose exit code is not an
-    /// integer".
+    /// Rejects a run whose exit code is not an integer.
     #[test]
     fn rejects_a_run_whose_exit_code_is_not_an_integer() {
         let root = schema_root();
@@ -829,8 +782,8 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "validates a task-review, rejecting a
-    /// rule_adherence result the schema forbids".
+    /// Validates a task-review, rejecting a rule_adherence result the
+    /// schema forbids.
     #[test]
     fn validates_a_task_review_rejecting_a_forbidden_rule_adherence_result() {
         let root = schema_root();
@@ -869,7 +822,7 @@ mod tests {
         })
     }
 
-    /// tests/kb.test.mjs: "accepts a re-review verdict with text" (HR-021).
+    /// Accepts a re-review verdict with text.
     #[test]
     fn accepts_a_re_review_verdict_with_text() {
         let root = schema_root();
@@ -883,7 +836,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "accepts a re-review verdict without text".
+    /// Accepts a re-review verdict without text.
     #[test]
     fn accepts_a_re_review_verdict_without_text() {
         let root = schema_root();
@@ -895,8 +848,7 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "rejects a re-review verdict.text of the wrong
-    /// type".
+    /// Rejects a re-review verdict.text of the wrong type.
     #[test]
     fn rejects_a_re_review_verdict_text_of_the_wrong_type() {
         let root = schema_root();
@@ -913,8 +865,7 @@ mod tests {
 
     /// A minimal, schema-valid branch review: one retrospective
     /// `violated_rules` entry whose own `tasks` list names task numbers,
-    /// not prose (HR-086's own scoping question -- this module's doc has
-    /// the measured reasoning).
+    /// not prose.
     fn branch_review_sample() -> Value {
         json!({
             "kind": "branch-review", "base": "abc1234", "head": "abc1235",
@@ -932,10 +883,8 @@ mod tests {
         })
     }
 
-    /// tests/kb.test.mjs has no branch-review sample; HR-086 needs one to
-    /// prove both directions in a single document -- confirms the new
-    /// floor accepted a task-number reference just as short as the
-    /// incident's shredded characters.
+    /// A single-character `tasks` reference is accepted, unlike a
+    /// single-character prose field.
     #[test]
     fn accepts_a_well_formed_branch_review_with_no_errors() {
         let root = schema_root();
@@ -951,18 +900,16 @@ mod tests {
         );
     }
 
-    /// HR-086's scoping question, settled by measuring the real corpus
-    /// (this module's own doc on the schema copy has the numbers): the
-    /// nine-field blast radius splits into seven PROSE fields (self_review,
-    /// concerns, strengths, out_of_scope, verdict.open, recommendations)
-    /// and the two retrospective `tasks` lists, which legitimately hold
-    /// single-digit task-number references ("1", "2") -- the measured
-    /// corpus's own `tasks` items ranged from 1 to 137 characters, so no
-    /// single floor could gate them without also gating real task
-    /// numbers. This document carries a single-character `tasks` item
-    /// (legitimate, unflagged) alongside a single-character
-    /// `recommendations` item (illegitimate, flagged) to prove the split
-    /// in one assertion.
+    /// The schema's `prose` type (`minLength: 3`, used by `self_review`,
+    /// `concerns`, `strengths`, `out_of_scope`, `verdict.open`,
+    /// `recommendations`) and its `text` type (`minLength: 1`, used by
+    /// the retrospective `tasks` lists) enforce two different floors on
+    /// purpose: a `tasks` entry legitimately holds a single-digit
+    /// task-number reference ("1", "2"), which no single floor could gate
+    /// without also gating real task numbers. This document carries a
+    /// single-character `tasks` item (legitimate, unflagged) alongside a
+    /// single-character `recommendations` item (illegitimate, flagged) to
+    /// prove the split in one assertion.
     #[test]
     fn accepts_a_single_character_task_reference_while_rejecting_an_equally_short_recommendation() {
         let root = schema_root();
@@ -980,8 +927,8 @@ mod tests {
         );
     }
 
-    /// tests/kb.test.mjs: "rejects an unknown kind, a missing file, and
-    /// invalid JSON as usage errors".
+    /// Rejects an unknown kind, a missing file, and invalid JSON as usage
+    /// errors.
     #[test]
     fn rejects_an_unknown_kind_a_missing_file_and_invalid_json() {
         let root = schema_root();

@@ -2,21 +2,15 @@
 //! `knowledge/schema.json`, `knowledge/areas.json`, every topic file under
 //! `knowledge/`, and the entries they declare.
 //!
-//! Ports the slice of `tools/kb.mjs`'s `loadBase` the render, check, and
-//! audit surfaces need (docs/specs/2026-09-04-batch-15-tier2-spec.md §3,
-//! HR-054 tasks 3 and 4; batch 17 T3 adds `Entry.check` for the audit
-//! engine). `load_base` mirrors `loadBase`'s own tolerance exactly:
-//! a knowledge file must exist and parse as JSON, but its *shape* is never
-//! enforced here -- neither a topic file whose `entries` array holds a
-//! malformed item (missing `id`, wrong type, `null`), nor `areas.json`
-//! being something other than an object of `{paths: [...]}` values (fix
-//! round 1, finding 1); both still load. `checkBase` (`check.rs`) is the
-//! only surface that reports shape problems, as CHECK FINDINGS (exit 1),
-//! never as a load failure (exit 2). `schema.json`'s content is now used
-//! (`checkBase` validates every knowledge file against it); `renderAll`
-//! still never reads it, but `load_base` requires it to parse, exactly
-//! like `tools/kb.mjs`'s `loadBase`, which calls
-//! `readJson(join(dir, 'schema.json'))` unconditionally.
+//! `load_base`'s tolerance: a knowledge file must exist and parse as
+//! JSON, but its *shape* is never enforced here -- neither a topic file
+//! whose `entries` array holds a malformed item (missing `id`, wrong
+//! type, `null`), nor `areas.json` being something other than an object
+//! of `{paths: [...]}` values; both still load. `check_base` (`check.rs`)
+//! is the only surface that reports shape problems, as CHECK FINDINGS
+//! (exit 1), never as a load failure (exit 2). `schema.json`'s content is
+//! used (`check_base` validates every knowledge file against it);
+//! `render_all` never reads it, but `load_base` requires it to parse.
 
 use std::collections::HashMap;
 use std::fmt;
@@ -34,7 +28,7 @@ use super::glob::{GlobError, compile};
 /// One area's glob membership, as declared under its key in
 /// `knowledge/areas.json`. A path with no matching glob in any area still
 /// belongs to `global`, which conventionally declares no paths of its own
-/// (`renderAll` and `areaFiles` both special-case it).
+/// (`render_all` and `area_files` both special-case it).
 #[derive(Deserialize)]
 pub(crate) struct AreaDef {
     #[serde(default)]
@@ -42,27 +36,22 @@ pub(crate) struct AreaDef {
 }
 
 /// One knowledge entry's render-relevant fields, extracted leniently from
-/// its topic file's raw JSON (see the module doc): a field absent or of the
-/// wrong JSON type falls back to its default rather than failing the load,
-/// the same tolerance `tools/kb.mjs`'s `loadBase` gives every field it
-/// spreads onto an indexed entry (`{...item, topic: topic.name}`, no shape
-/// check beyond `typeof item.id === 'string'`).
+/// its topic file's raw JSON (see the module doc): a field absent or of
+/// the wrong JSON type falls back to its default rather than failing the
+/// load.
+///
 /// The three states an entry's raw `check` JSON field takes once
-/// "malformed" is told apart from "absent" -- fix round 1, issue 7
-/// (task-3-review.json): a plain `Option<CheckDef>` could not distinguish
-/// them, so `audit` treated a JS-truthy-but-invalid `check` (an unknown
-/// `type`, a missing required field, or a non-object truthy value) exactly
-/// like no `check` at all, silently downgrading a checked, possibly
-/// *standing*, entry to a judged row. `tools/kb.mjs`'s own `audit` has no
-/// such tolerance: a truthy `e.check` always reaches `runCheck`'s `switch
-/// (c.type)`, which returns `undefined` with no matching arm, crashing the
-/// caller downstream (docs/specs/2026-09-04-batch-15-tier2-spec.md §6's
-/// crash-path ruling: report a NAMED finding for this, not silence --
-/// `audit.rs`'s own row-building is `CheckField`'s one production
-/// consumer, and reports `Malformed` as a named, exit-2 error). `check-
-/// knowledge` (`check.rs`) already reports a malformed `check` as its own
-/// check finding via the untyped `check_shape` function there, independent
-/// of this field, and is unaffected by it either way.
+/// "malformed" is told apart from "absent": a plain `Option<CheckDef>`
+/// could not distinguish them, so `audit` would treat an invalid `check`
+/// (an unknown `type`, a missing required field, or a non-object truthy
+/// value) exactly like no `check` at all, silently downgrading a
+/// checked, possibly *standing*, entry to a judged row. `audit.rs`'s own
+/// row-building is `CheckField`'s one production consumer, and reports
+/// `Malformed` as a named, exit-2 error
+/// (`houserules.crash-paths-are-named`). `check-knowledge` (`check.rs`)
+/// already reports a malformed `check` as its own check finding via the
+/// untyped `check_shape` function there, independent of this field, and
+/// is unaffected by it either way.
 #[derive(Clone)]
 pub(crate) enum CheckField {
     /// No `check` key, or one whose value is falsy in the JS sense
@@ -97,8 +86,7 @@ pub(crate) struct Entry {
 /// listed in the knowledge skill's `## Topics` section regardless of
 /// which of those entries are the standing or area-file kinds, and
 /// regardless of whether every entry is itself well-formed -- it is the
-/// raw `entries` array's length, matching `tools/kb.mjs`'s
-/// `topicEntryCount`).
+/// raw `entries` array's length).
 pub(crate) struct TopicMeta {
     pub name: String,
     pub title: String,
@@ -106,27 +94,26 @@ pub(crate) struct TopicMeta {
 }
 
 /// The loaded knowledge base: every area (in `areas.json`'s declared
-/// order — `renderAll`'s area-file iteration and the `render`/`render
-/// --check` stdout it drives depend on that order surviving the load), every
-/// entry indexed by id (the first occurrence across topic files wins, the
-/// same as `tools/kb.mjs`'s `loadBase`), each topic's render metadata, and
-/// the raw JSON `checkBase` (`check.rs`) validates: the parsed
-/// `schema.json` content, `areas.json`'s content before it is narrowed to
-/// `AreaDef`, and every topic file's full parsed content paired with its
-/// repo-relative path and file-stem name.
+/// order -- `render_all`'s area-file iteration and the `render`/`render
+/// --check` stdout it drives depend on that order surviving the load),
+/// every entry indexed by id (the first occurrence across topic files
+/// wins), each topic's render metadata, and the raw JSON `check_base`
+/// (`check.rs`) validates: the parsed `schema.json` content,
+/// `areas.json`'s content before it is narrowed to `AreaDef`, and every
+/// topic file's full parsed content paired with its repo-relative path
+/// and file-stem name.
 ///
-/// `raw_entries` (batch 17 T4) is `entries`' own tie-broken id index again,
-/// but each value is the entry's ENTIRE original JSON object -- every field
+/// `raw_entries` is `entries`' own tie-broken id index again, but each
+/// value is the entry's ENTIRE original JSON object -- every field
 /// `Entry` keeps, plus every field it drops (`body`, `tags`, `source`,
-/// `see`, `verify`, `check`'s own raw shape), in the item's own on-disk key
-/// order, with `topic` appended (or, if an entry's JSON somehow already
-/// carried that key, overwritten in place) exactly the way `loadBase`'s own
-/// `{ ...item, topic: topic.name }` spread builds `base.entries`. `get`,
-/// `for --full`, and `index`'s `--topic`/`--tag` filters (`read.rs`) all
-/// need this: `Entry`'s reduced field set cannot answer a `--tag` filter at
-/// all, and reconstructing an entry through any typed struct would reorder
-/// a hand-edited file's own key order on print -- the spec §3 data-layer
-/// rule the `backlog` module's `get`/`set` already follow.
+/// `see`, `verify`, `check`'s own raw shape), in the item's own on-disk
+/// key order, with `topic` appended (or, if an entry's JSON somehow
+/// already carried that key, overwritten in place). `get`, `for --full`,
+/// and `index`'s `--topic`/`--tag` filters (`read.rs`) all need this:
+/// `Entry`'s reduced field set cannot answer a `--tag` filter at all,
+/// and reconstructing an entry through any typed struct would reorder a
+/// hand-edited file's own key order on print -- the same reason the
+/// `backlog` module's `get`/`set` keep every item as a raw `Value` too.
 pub(crate) struct Base {
     pub root: PathBuf,
     pub areas: Vec<(String, AreaDef)>,
@@ -173,10 +160,8 @@ impl fmt::Display for LoadError {
 impl std::error::Error for LoadError {}
 
 /// Reads `path` and parses it as JSON, naming the file in any read or
-/// parse failure -- the one place `load_base` and `load_areas` both read a
-/// knowledge file from disk, matching `tools/lib/json-store.mjs`'s
-/// `readJson` (a missing or unreadable file and invalid JSON are both
-/// possible on the JS side too; `checkBase`'s own shape validation runs
+/// parse failure -- the one place `load_base` and `load_areas` both read
+/// a knowledge file from disk (`check_base`'s own shape validation runs
 /// only after this succeeds).
 fn read_json_value(path: &Path) -> Result<Value, LoadError> {
     let text = fs::read_to_string(path).map_err(|source| LoadError::Io {
@@ -191,8 +176,7 @@ fn read_json_value(path: &Path) -> Result<Value, LoadError> {
 
 /// Extracts a string field from a raw JSON object leniently: absent, or
 /// present with a non-string value, both fall back to `""` rather than
-/// failing -- the same tolerance `tools/kb.mjs`'s plain property access
-/// gives a field it never destructures with a required shape.
+/// failing.
 fn string_field(item: &Value, key: &str) -> String {
     item.get(key)
         .and_then(Value::as_str)
@@ -301,29 +285,22 @@ pub(crate) fn load_base(root: &Path) -> Result<Base, LoadError> {
 /// content, preserving its declared key order (the `serde_json::Map`
 /// `preserve_order` feature backs `raw` with an `IndexMap` instead of the
 /// default `BTreeMap`, which would silently alphabetize the areas and
-/// reorder every consumer of this list). Never fails on a malformed shape
-/// -- neither `raw` being something other than an object, nor one area's
-/// value failing to deserialize into `AreaDef` -- because `tools/kb.mjs`'s
-/// `loadBase` does not either: a shape problem is `checkBase`'s schema
-/// validator's finding to report (exit 1), not a load failure (exit 2)
-/// (fix round 1, finding 1; the report's `implemented` claimed this
-/// invariant for topic entries only, task-4-review.json issue 1 caught
-/// that it did not yet hold for `areas.json`). A malformed area is simply
-/// excluded from the returned list -- `check.rs`'s `check_base` runs its
-/// schema validation directly against `raw` (`base.areas_raw`), not
-/// against this typed list, so the exclusion never hides a finding; it
-/// only means `render_all` cannot render that one area, which is moot
-/// whenever the shape is bad, since `check_base` never reaches `render_all`
-/// on an unclean first stage, and `render`'s own contract for a malformed
-/// `areas.json` was never pinned by a test.
+/// reorder every consumer of this list). Never fails on a malformed
+/// shape -- neither `raw` being something other than an object, nor one
+/// area's value failing to deserialize into `AreaDef` -- since a shape
+/// problem is `check_base`'s schema validator's finding to report (exit
+/// 1), not a load failure (exit 2). A malformed area is simply excluded
+/// from the returned list -- `check.rs`'s `check_base` runs its schema
+/// validation directly against `raw` (`base.areas_raw`), not against
+/// this typed list, so the exclusion never hides a finding; it only
+/// means `render_all` cannot render that one area, which is moot
+/// whenever the shape is bad, since `check_base` never reaches
+/// `render_all` on an unclean first stage.
 ///
-/// The one load failure this still raises is the sanctioned one (fix
-/// round 1, finding 2 and finding 4): a glob that fails to compile, for
-/// every area whose shape DID type-check. `tools/kb.mjs`'s own
-/// `loadAreas` performs no such check, since `matchesGlob`/`globToRegExp`
-/// never raise; this is a deliberate strengthening the ruling's "malformed
-/// globs are named errors" line sanctions, not a parity claim. `path`
-/// names `areas.json` in that error.
+/// The one load failure this still raises: a glob that fails to
+/// compile, for every area whose shape DID type-check
+/// (`houserules.crash-paths-are-named`). `path` names `areas.json` in
+/// that error.
 fn build_areas(raw: &Value, path: &Path) -> Result<Vec<(String, AreaDef)>, LoadError> {
     let Some(map) = raw.as_object() else {
         return Ok(Vec::new());
@@ -344,19 +321,16 @@ fn build_areas(raw: &Value, path: &Path) -> Result<Vec<(String, AreaDef)>, LoadE
     Ok(areas)
 }
 
-/// Reads and parses `knowledge/areas.json` at `path`, then builds its typed
-/// area list (see `build_areas`). Kept as its own entry point -- distinct
-/// from `load_base`, which also needs the raw parsed value `build_areas`
-/// consumes -- for the matcher's own tests (`glob.rs`), which need only the
-/// typed list; production code reaches `build_areas` through `load_base`
-/// instead, so this has no production caller planned at all. `#[cfg(test)]`
-/// (batch 17 T4, replacing an `#[allow(dead_code)]`): the crate's last
-/// dead-code allow dropped without becoming a lie, since a genuinely
+/// Reads and parses `knowledge/areas.json` at `path`, then builds its
+/// typed area list (see `build_areas`). Kept as its own entry point --
+/// distinct from `load_base`, which also needs the raw parsed value
+/// `build_areas` consumes -- for the matcher's own tests (`glob.rs`),
+/// which need only the typed list; production code reaches
+/// `build_areas` through `load_base` instead, so this has no production
+/// caller. `#[cfg(test)]`, not `#[allow(dead_code)]`: a genuinely
 /// test-only function that says so compiles out of every non-test target
-/// entirely, the same convention `backlog::test_support`'s own module doc
-/// already uses -- an `#[allow]` here would have kept asserting "this is
-/// dead code, and that's fine" forever, where `#[cfg(test)]` asserts the
-/// truer "this does not exist outside `cargo test`".
+/// entirely, the same convention `backlog::test_support`'s own module
+/// doc uses.
 #[cfg(test)]
 pub(crate) fn load_areas(path: &Path) -> Result<Vec<(String, AreaDef)>, LoadError> {
     let raw = read_json_value(path)?;

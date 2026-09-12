@@ -1,35 +1,19 @@
-//! `houserules check-commit` (HR-062, batch 18 T2, spec §6): runs every
-//! knowledge entry's `commits`-type check (`process.conventional-commits`'s
-//! subject pattern and body-line budget, `security-hygiene.no-coauthor`'s
-//! trailer gate, and any other entry a project adds with `check.type:
-//! commits` -- read from the loaded base, never a hardcoded pair) against
-//! either a not-yet-committed message or a range of already-committed
-//! history.
+//! `houserules check-commit`: runs every knowledge entry's `commits`-type
+//! check (`process.conventional-commits`'s subject pattern and body-line
+//! budget, `security-hygiene.no-coauthor`'s trailer gate, and any other
+//! entry a project adds with `check.type: commits` -- read from the
+//! loaded base, never a hardcoded pair) against either a not-yet-committed
+//! message or a range of already-committed history.
 //!
-//! ## The two real call sites this command's shape is derived from
+//! ## Two call shapes
 //!
-//! commitlint is the retired shape both arms were derived from, at the two
-//! call sites that used to exec it: `template/.githooks/commit-msg` (the
-//! hook arm) ran `commitlint --edit "$msg_file"` -- git hands the hook the
-//! proposed message's path as `$1` before the commit exists, so there was
-//! no git range to read yet, only one message. `.github/workflows/ci.yml`'s
-//! `commitlint` job (the CI arm) instead ran `pnpm exec commitlint --from
-//! <base-sha> --to <head-sha> --verbose` over an already-merged range. This
-//! command's own two arms mirror those call shapes directly: a positional
-//! message-file argument for the hook, `--from`/`--to` (the same flag names
-//! commitlint's own CI invocation used) for the range, defaulting `--to` to
-//! `HEAD` the way `audit`'s own `--head` already does. Exactly one arm
+//! A positional message-file argument runs the hook arm (`template/
+//! .githooks/commit-msg` probes `houserules check-commit --help` and
+//! execs this command directly); `--from`/`--to`, defaulting `--to` to
+//! `HEAD` the way `audit`'s own `--head` already does, runs the range
+//! arm (`.github/workflows/ci.yml`'s `check-commit` job). Exactly one arm
 //! applies per invocation; `cmd_check_commit` reports the other
 //! combinations as named usage errors, exit 2.
-//!
-//! Batch 18 T6 (the reference rewrite's own repository flip) retired
-//! commitlint from both call sites: the hook now probes `houserules
-//! check-commit --help` and execs this command directly (`template/
-//! .githooks/commit-msg`'s own doc comment has the exact probe-and-exec
-//! text); the CI job is `check-commit`, not `commitlint` (`.github/
-//! workflows/ci.yml`). commitlint itself left the repository (`package.json`,
-//! `pnpm-lock.yaml`, `commitlint.config.mjs` deleted); the shape above is
-//! historical, not a live pointer.
 //!
 //! ## Reuse, not reimplementation
 //!
@@ -41,24 +25,22 @@
 //! full account). The range arm reads its commits through `audit::rev` and
 //! `audit::commits_in`, the exact same git-plumbing `audit` itself uses for
 //! a `commits`-type check -- no second `git log` invocation of this file's
-//! own. Only the message-file arm is genuinely new: it makes two git calls
-//! of its own on the raw message -- a repository-local `core.commentChar`
-//! lookup, then `git stripspace` (the Measured-parity section below has the
-//! full account) -- and `split_message` then turns the stripped result into
-//! the same `Commit` shape `commits_in` reads back off real
-//! history (see that function's own doc for the deliberately simple split
-//! it uses).
+//! own. The message-file arm makes two git calls of its own on the raw
+//! message -- a repository-local `core.commentChar` lookup, then `git
+//! stripspace` (the "What the message-file arm strips" section below has
+//! the full account) -- and `split_message` then turns the stripped result
+//! into the same `Commit` shape `commits_in` reads back off real history
+//! (see that function's own doc for the deliberately simple split it
+//! uses).
 //!
 //! ## Output shape
 //!
 //! Unlike `audit`'s one row per checked id, `check-commit` reports one line
 //! per violating `(check, commit)` pair -- every commit in a range is
 //! checked against every `commits`-type entry, not only the first that
-//! fails, matching commitlint's own range behavior (it reports every
-//! offending commit, not merely the first). A violated check's own `level`
-//! survives onto its finding (spec §6's level-survives ruling, T2 review
-//! issue 4): a warn-level violation prints as `warn: <id>: <evidence>` and
-//! never fails the run, exactly as `audit` records the same violation as a
+//! fails. A violated check's own `level` survives onto its finding: a
+//! warn-level violation prints as `warn: <id>: <evidence>` and never
+//! fails the run, exactly as `audit` records the same violation as a
 //! non-fatal `warn` row rather than a `fail` one --
 //! `backlog::commands::check_backlog`'s own `(errors, warnings)` shape and
 //! its `cmd_check_backlog`'s `warn: ` prefix are the precedent this
@@ -69,23 +51,20 @@
 //! malformed check pattern) -- one named line, never a panic
 //! (`houserules.crash-paths-are-named`).
 //!
-//! ## Measured parity with commitlint (spec §6, T2 review issue 3)
+//! ## What the message-file arm strips
 //!
-//! The message-file arm evaluates the same text commitlint evaluates at
-//! the hook's own call site, not the raw file `git` hands the hook:
 //! `git commit --verbose` leaves the proposed message, git's own comment
-//! template, a scissors line, and the staged diff all in that one file, and
-//! commitlint's `--edit` mode discards everything from the scissors line
-//! onward and every comment line before it ever reads a subject or body.
-//! `strip_verbose_and_comments` reproduces that exactly: a scissors marker
-//! built from `comment_char` (a repository-local `git config
-//! core.commentChar` lookup, mirroring commitlint's own, `#` when unset)
-//! cuts the diff (which can hold arbitrarily long lines with nothing to do
-//! with the real message), then `git stripspace --strip-comments` -- git's
-//! own plumbing, no new crate -- removes the comment lines above it, honoring
-//! the same repository-local `core.commentChar` on its own. See
-//! `comment_char`'s own doc for the one naivety deliberately mirrored from
-//! commitlint rather than fixed (a persisted `core.commentChar=auto`).
+//! template, a scissors line, and the staged diff all in one file.
+//! `strip_verbose_and_comments` evaluates only the message a reviewer
+//! would read: a scissors marker built from `comment_char` (a
+//! repository-local `git config core.commentChar` lookup, `#` when
+//! unset) cuts the diff (which can hold arbitrarily long lines with
+//! nothing to do with the real message), then `git stripspace
+//! --strip-comments` -- git's own plumbing, no new crate -- removes the
+//! comment lines above it, honoring the same repository-local
+//! `core.commentChar` on its own. See `comment_char`'s own doc for the
+//! one naivety this deliberately does not resolve (a persisted
+//! `core.commentChar=auto`).
 
 use std::fs;
 use std::io::{self, Write};
@@ -101,37 +80,24 @@ use super::model::{Base, CheckField, load_base};
 /// part git derives it from.
 const SCISSORS_SUFFIX: &str = " ------------------------ >8 ------------------------";
 
-/// Reads `core.commentChar` from the repository at `root`, mirroring
-/// commitlint's own `--edit` lookup byte for byte -- `@commitlint/cli`'s
-/// `cli.js` (`git config core.commentChar`, trimmed stdout, `#` on a
-/// nonzero exit or empty output) -- so the scissors marker this file
-/// builds names the same character commitlint would use, on the same
-/// repository, for the same message (spec §6's measured-parity ruling; a
-/// controller-ruled fix over the T2 re-review r2 escalation, which had
-/// found this file hardcoded to `#`). An absent config value (`git
-/// config`'s own "not found" exit) is the common case and not a failure;
-/// an unlaunchable git is not distinguished from it here for the same
-/// reason commitlint's own lookup does not either -- `run_stripspace`,
-/// called right after with the same `root`, already turns a genuinely
-/// broken `git` into its own named `Err` for this arm.
+/// Reads `core.commentChar` from the repository at `root`: `git config
+/// core.commentChar`, trimmed stdout, `#` on a nonzero exit or empty
+/// output. An absent config value (`git config`'s own "not found" exit)
+/// is the common case and not a failure; an unlaunchable git is not
+/// distinguished from it here -- `run_stripspace`, called right after
+/// with the same `root`, already turns a genuinely broken `git` into its
+/// own named `Err` for this arm. The lookup matches commitlint's own
+/// `--edit` lookup: this file's own tests pin exact agreement with
+/// commitlint's observed behavior on real, persisted `core.commentChar`
+/// values.
 ///
-/// One naivety is deliberately mirrored, not fixed, per spec §6's own
-/// ruling on this exact corner: neither commitlint nor this function
-/// resolves git's own deprecated `core.commentChar=auto` into the real
-/// character git picks (`git help config` has that resolution rule); both
-/// instead treat the four-byte string `auto` itself as the comment
-/// character, which never matches the scissors line a real commit
-/// actually wrote.
-///
-/// Retained, not merely asserted: a repository with `core.commentChar`
-/// persisted as `auto` (`t2-evidence/commentchar-auto-repo`) and the
-/// `git commit --verbose` file it produced
-/// (`t2-evidence/verbose-message-fixture-commentchar-auto.txt`,
-/// byte-identical to `VERBOSE_MESSAGE_FIXTURE` in this file's own tests --
-/// git's own resolution picked `#` for it, the common outcome) both live
-/// under `t2-evidence/`. `commitlint --edit` and `check-commit` are each
-/// captured against it (`live_run`): exit 1 both, same
-/// `body-max-line-length` failure, not exit 0.
+/// One naivety is deliberate, for the same reason: this function does
+/// not resolve git's own deprecated `core.commentChar=auto` into the real
+/// character git picks (`git help config` has that resolution rule); it
+/// treats the four-byte string `auto` itself as the comment character,
+/// which never matches the scissors line a real commit actually wrote --
+/// commitlint does not resolve `auto` either, so matching its naivety
+/// keeps that same pinned agreement on this corner too.
 fn comment_char(root: &Path) -> String {
     let output = Command::new("git")
         .args(["config", "--get", "core.commentChar"])
@@ -151,16 +117,14 @@ fn comment_char(root: &Path) -> String {
 }
 
 /// Removes `git commit --verbose`'s scissors block, then every comment
-/// line, from a raw not-yet-committed message -- the exact text commitlint
-/// evaluates at the hook's own call site (spec §6's measured-parity
-/// ruling). The scissors cut is a plain line search built from
-/// `comment_char` (see that function's own doc for the one naivety it
-/// deliberately mirrors from commitlint rather than fixing); the comment
-/// strip runs `git stripspace --strip-comments` inside `root`, so a
-/// repository-local `core.commentChar` applies to it too -- git's own
-/// plumbing, not a reimplementation, matching the mechanism the T2 review
-/// verified live (`git stripspace --strip-comments` alone leaves the diff
-/// below the scissors line untouched; cutting first is required).
+/// line, from a raw not-yet-committed message. The scissors cut is a
+/// plain line search built from `comment_char` (see that function's own
+/// doc for the one naivety it deliberately does not resolve); the
+/// comment strip runs `git stripspace --strip-comments` inside `root`,
+/// so a repository-local `core.commentChar` applies to it too -- git's
+/// own plumbing, not a reimplementation. Cutting the scissors block first
+/// is required: `git stripspace --strip-comments` alone leaves the diff
+/// below the scissors line untouched.
 fn strip_verbose_and_comments(root: &Path, raw: &str) -> Result<String, String> {
     let scissors_line = format!("{}{SCISSORS_SUFFIX}", comment_char(root));
     let cut = match raw.lines().position(|line| line == scissors_line) {
@@ -191,10 +155,10 @@ fn writer_outcome(result: std::thread::Result<io::Result<()>>) -> Result<(), Str
 }
 
 /// Runs `git stripspace --strip-comments` over `text` inside `root` --
-/// git's own commit-message cleanup plumbing (no new crate; `git help
-/// stripspace`, verified live: `-s`/`--strip-comments` "skip and remove
-/// all lines starting with comment character (core.commentChar, default
-/// #)", read from whichever repository `current_dir` places it in).
+/// git's own commit-message cleanup plumbing (no new crate): `-s`/
+/// `--strip-comments` skips and removes every line starting with the
+/// comment character (`core.commentChar`, default `#`), read from
+/// whichever repository `current_dir` places it in.
 /// Writes `text` to the child's stdin on its own thread rather than inline
 /// before `wait_with_output` -- the standard fix for the classic deadlock
 /// where a large enough `text` fills the child's stdout pipe before this
@@ -246,18 +210,17 @@ fn run_stripspace(root: &Path, text: &str) -> Result<String, String> {
 /// unchecked subject.
 ///
 /// `split_message` itself stays git-free and comment-blind: on the
-/// message-file arm, by the time this function runs, its `raw` argument
-/// is already the output of `strip_verbose_and_comments` (the
-/// Measured-parity section above has that pass's own account), so this
-/// function never sees a comment-prefixed line or a scissors block in
-/// practice, whatever the repository's own `core.commentChar` resolves
-/// to. That leaves an asymmetry with the hook's own hard-coded
-/// trailer grep, which is NOT run through that stripping: it reads the
-/// raw, unstripped message file directly and exits before `houserules
-/// check-commit` is even invoked, so a `Co-Authored-By` trailer sitting
-/// only in a `git commit --verbose` file's comment template or diff still
-/// trips the grep, even though the stripped text this function sees would
-/// no longer carry it.
+/// message-file arm, by the time this function runs, its `raw` argument is
+/// already the output of `strip_verbose_and_comments` (the "What the
+/// message-file arm strips" section above has that pass's own account), so
+/// this function never sees a comment-prefixed line or a scissors block in
+/// practice, whatever the repository's own `core.commentChar` resolves to.
+/// That leaves an asymmetry with the hook's own hard-coded trailer grep,
+/// which is NOT run through that stripping: it reads the raw, unstripped
+/// message file directly and exits before `houserules check-commit` is
+/// even invoked, so a `Co-Authored-By` trailer sitting only in a `git
+/// commit --verbose` file's comment template or diff still trips the grep,
+/// even though this function's own stripped text does not carry it.
 fn split_message(raw: &str) -> (String, String) {
     match raw.split_once('\n') {
         Some((subject, rest)) => (subject.to_string(), rest.to_string()),
@@ -676,9 +639,8 @@ mod tests {
         );
     }
 
-    /// Spec §6's level-survives ruling (T2 review issue 4): a warn-level
-    /// commits check's violation lands in `warns`, not `fails`, on the
-    /// message-file arm.
+    /// A warn-level commits check's violation lands in `warns`, not
+    /// `fails`, on the message-file arm.
     #[test]
     fn a_warn_level_commits_check_lands_in_warns_not_fails_on_the_message_file_arm() {
         let dir = make_repo(&[soft_subject_entry()]);
@@ -719,19 +681,16 @@ mod tests {
         assert!(error.starts_with("process.badpattern: "), "{error}");
     }
 
-    /// A message file `git commit --verbose` really produced, captured
-    /// live via a `commit-msg` hook that copied `$1` before git's own
-    /// cleanup ran: one file staged whose only line is 161 `x` characters,
-    /// `GIT_EDITOR` inserting the subject `feat: a real subject` above
-    /// git's own comment template. Spec §6's measured-parity ruling names
-    /// this exact reproduction: `commitlint --edit` on this file exits 0
-    /// (verified live, `live_run`), and so must `check-commit`.
+    /// A message file `git commit --verbose` really produced, captured via
+    /// a `commit-msg` hook that copied `$1` before git's own cleanup ran:
+    /// one file staged whose only line is 161 `x` characters, `GIT_EDITOR`
+    /// inserting the subject `feat: a real subject` above git's own
+    /// comment template.
     const VERBOSE_MESSAGE_FIXTURE: &str = "feat: a real subject\n\n# Please enter the commit message for your changes. Lines starting\n# with '#' will be ignored, and an empty message aborts the commit.\n#\n# On branch main\n#\n# Initial commit\n#\n# Changes to be committed:\n#\tnew file:   long.txt\n#\n# ------------------------ >8 ------------------------\n# Do not modify or remove the line above.\n# Everything below it will be ignored.\ndiff --git a/long.txt b/long.txt\nnew file mode 100644\nindex 0000000..e63bcf0\n--- /dev/null\n+++ b/long.txt\n@@ -0,0 +1 @@\n+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n";
 
-    /// T2 review issue 3, reproduced and pinned: the 161-character diff
-    /// line lives only below the scissors marker, so it must never reach
-    /// `body_line_max` -- `check-commit` on the real captured file passes
-    /// clean, matching commitlint's own verdict on the identical bytes.
+    /// The 161-character diff line lives only below the scissors marker,
+    /// so it must never reach `body_line_max` -- `check-commit` on the
+    /// real captured file passes clean.
     #[test]
     fn message_file_arm_matches_commitlints_verdict_on_a_real_verbose_commit_message() {
         let dir = make_repo(&[conventional_commits_entry()]);
@@ -742,10 +701,10 @@ mod tests {
         assert_eq!(warns, Vec::<String>::new());
     }
 
-    /// The control the T2 review verified live: the same over-limit line,
-    /// promoted to real body content (no scissors block, no comments),
-    /// still fails -- proving the fix above narrows what gets removed
-    /// rather than neutering `body_line_max` outright.
+    /// The control: the same over-limit line, promoted to real body
+    /// content (no scissors block, no comments), still fails -- proving
+    /// the scissors-and-comment strip narrows what gets removed rather
+    /// than neutering `body_line_max` outright.
     #[test]
     fn a_body_line_over_the_limit_still_fails_when_it_is_not_behind_the_scissors_block() {
         let dir = make_repo(&[conventional_commits_entry()]);
@@ -760,8 +719,8 @@ mod tests {
 
     /// Persists `core.commentChar` on `root` via `git config` (not a
     /// one-off `-c` override) -- the realistic way an adopter sets it, and
-    /// the only form `comment_char`'s own `git config --get` lookup (and
-    /// commitlint's identical one) actually reads back.
+    /// the only form `comment_char`'s own `git config --get` lookup
+    /// actually reads back.
     fn persist_comment_char(root: &Path, comment_char: &str) {
         git(root, &["config", "core.commentChar", comment_char]);
     }
@@ -773,11 +732,8 @@ mod tests {
     /// 161-`x`-character file, same `GIT_EDITOR`-inserted subject).
     const VERBOSE_MESSAGE_FIXTURE_SEMICOLON: &str = "feat: a real subject\n\n; Please enter the commit message for your changes. Lines starting\n; with ';' will be ignored, and an empty message aborts the commit.\n;\n; On branch main\n;\n; Initial commit\n;\n; Changes to be committed:\n;\tnew file:   long.txt\n;\n; ------------------------ >8 ------------------------\n; Do not modify or remove the line above.\n; Everything below it will be ignored.\ndiff --git a/long.txt b/long.txt\nnew file mode 100644\nindex 0000000..e63bcf0\n--- /dev/null\n+++ b/long.txt\n@@ -0,0 +1 @@\n+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n";
 
-    /// The controller-ruled fix over the T2 re-review r2 escalation: a
-    /// repository with `core.commentChar` genuinely persisted is no
-    /// longer a divergence from commitlint. `commitlint --edit` on this
-    /// exact file, run from a repository with the same persisted value,
-    /// exits 0 (`live_run`); so must `check-commit`.
+    /// A repository with `core.commentChar` genuinely persisted as `;`
+    /// still passes clean, the same way the default `#` case does above.
     #[test]
     fn message_file_arm_matches_commitlints_verdict_with_a_persisted_semicolon_comment_char() {
         let dir = make_repo(&[conventional_commits_entry()]);
@@ -806,20 +762,14 @@ mod tests {
         assert_eq!(fails.len(), 1, "{fails:#?}");
     }
 
-    /// The mirrored naivety spec §6 rules (`comment_char`'s own doc points
-    /// here): a persisted `core.commentChar=auto` is taken literally, not
-    /// resolved the way git itself would. `VERBOSE_MESSAGE_FIXTURE` is
-    /// this exact fixture: retained separately as
-    /// `t2-evidence/commentchar-auto-repo` (a repository with
-    /// `core.commentChar` persisted as `auto`) and
-    /// `t2-evidence/verbose-message-fixture-commentchar-auto.txt` (the
-    /// `git commit --verbose` file it produced -- git's own "auto"
-    /// resolution picked `#` for it, the common outcome, byte-identical to
-    /// this constant), with both `commitlint --edit` (`live_run`, exit 1,
-    /// `body-max-line-length`) and `check-commit` (`live_run`, exit 1)
-    /// captured against it. Pinned here the same way: check-commit still
-    /// fails, matching commitlint's own measured verdict on the identical
-    /// bytes and repository state.
+    /// The deliberate naivety `comment_char`'s own doc names: a persisted
+    /// `core.commentChar=auto` is taken literally, not resolved the way
+    /// git itself would. Git resolved `auto` to `#` when it produced
+    /// `VERBOSE_MESSAGE_FIXTURE`'s own scissors line, but this function
+    /// builds its scissors marker from the literal string `auto`, so the
+    /// two never match: `strip_verbose_and_comments` cuts nothing, the
+    /// over-limit diff line stays in the message body, and `check-commit`
+    /// still fails.
     #[test]
     fn a_persisted_auto_comment_char_still_fails_mirroring_commitlints_own_naivety() {
         let dir = make_repo(&[conventional_commits_entry()]);
@@ -916,9 +866,8 @@ mod tests {
         assert_eq!(fails.len(), 1);
     }
 
-    /// Spec §6's level-survives ruling, the range arm: a warn-level
-    /// commits check's violation over a real range lands in `warns`, not
-    /// `fails`.
+    /// The range arm: a warn-level commits check's violation over a real
+    /// range lands in `warns`, not `fails`.
     #[test]
     fn a_warn_level_commits_check_lands_in_warns_not_fails_on_the_range_arm() {
         let dir = make_repo(&[soft_subject_entry()]);
