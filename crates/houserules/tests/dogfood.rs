@@ -246,9 +246,22 @@ fn retired_paths_are_absent_from_both_root_and_template() {
 /// installed version and the HR id prefix": this repository's own
 /// `.houserules.json` names `env!("CARGO_PKG_VERSION")` and the `HR`
 /// backlog id prefix -- proof this repository dogfoods its own `init`/
-/// `update` output rather than a hand-written stamp. Read from
-/// `package.json` before batch 20 T3 (HR-047) retired that file;
-/// `install::kit_version`'s own doc has the account.
+/// `update` output rather than a hand-written stamp. `baselines` is not
+/// pinned here byte-for-byte: it holds one hash per `KIT_OWNED` file and
+/// kit-shipped knowledge entry, which grows with the payload itself, so
+/// this only checks that `update` has stamped one at all; the two
+/// `install.rs` unit tests inject their own list directly and cover the
+/// stamping mechanism's own behavior.
+///
+/// `overrides` IS pinned exactly, because these three paths are load-
+/// bearing: without them, `update --dir .` here would backfill each one.
+/// `backlog/items/general.json` is absent because this repository's own
+/// backlog items live at `backlog/items/kit.json` instead. `.github/
+/// workflows/knowledge.yml` is absent because this repository's CI is its
+/// own workflow set (`ci.yml` and the rest), not the generic seeded gate.
+/// `docs/README.md` is absent because this directory already holds this
+/// repository's real specs, plans, and design notes in place of the
+/// generic starter file.
 #[test]
 fn houserules_json_stamps_the_installed_version_and_the_hr_id_prefix() {
     let root = repo_root();
@@ -257,8 +270,19 @@ fn houserules_json_stamps_the_installed_version_and_the_hr_id_prefix() {
     )
     .expect("parse .houserules.json");
     assert_eq!(
-        stamp,
-        serde_json::json!({"version": env!("CARGO_PKG_VERSION"), "idPrefix": "HR"})
+        stamp["version"],
+        serde_json::json!(env!("CARGO_PKG_VERSION"))
+    );
+    assert_eq!(stamp["idPrefix"], serde_json::json!("HR"));
+    assert!(stamp["baselines"].is_object(), "got {stamp}");
+    assert_eq!(
+        stamp["overrides"],
+        serde_json::json!([
+            "backlog/items/general.json",
+            ".github/workflows/knowledge.yml",
+            "docs/README.md",
+        ]),
+        "got {stamp}"
     );
 }
 

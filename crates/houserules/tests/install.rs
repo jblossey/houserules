@@ -373,9 +373,32 @@ fn init_stamps_the_marker_with_the_kit_version_and_the_default_id_prefix() {
         &fs::read_to_string(dir.path().join(".houserules.json")).expect("read marker"),
     )
     .expect("parse marker");
-    assert_eq!(
-        marker,
-        serde_json::json!({"version": kit_version(), "idPrefix": "WI"})
+    assert_eq!(marker["version"], serde_json::json!(kit_version()));
+    assert_eq!(marker["idPrefix"], serde_json::json!("WI"));
+    assert!(marker.get("overrides").is_none(), "got {marker:?}");
+    assert_baselines_cover_every_kit_owned_file(&marker);
+}
+
+/// `init` and `update` both stamp a baseline for every `KIT_OWNED` path (a
+/// fresh install's own content trivially matches the payload it was just
+/// written from), plus one for every kit-shipped knowledge entry --
+/// `install.rs`'s own `baseline` module has the full account. This checks
+/// the `KIT_OWNED` half, common to every stamping test in both files;
+/// knowledge-entry baselines are pinned by the entry-upsert tests instead,
+/// since their exact set depends on `template/knowledge/`'s own content.
+fn assert_baselines_cover_every_kit_owned_file(marker: &serde_json::Value) {
+    let baselines = marker["baselines"]
+        .as_object()
+        .unwrap_or_else(|| panic!("baselines is not an object in {marker:?}"));
+    for file in KIT_OWNED {
+        assert!(
+            baselines.contains_key(*file),
+            "baselines missing {file} in {baselines:?}"
+        );
+    }
+    assert!(
+        baselines.len() > KIT_OWNED.len(),
+        "expected knowledge-entry baselines alongside the KIT_OWNED ones, got {baselines:?}"
     );
 }
 
@@ -452,30 +475,26 @@ fn init_rejects_a_malformed_id_prefix_flag_exit_2() {
     assert_eq!(entries, vec![std::ffi::OsString::from(".git")]);
 }
 
-/// Ports `tests/init.test.mjs`'s `describe('init')`, "reports a render
-/// failure on broken project data as one usage error" (batch 20 T1 fix
-/// round 2, HR-047; review r2 new_breakage 3): a pre-existing `knowledge/
-/// process.json` holding invalid JSON is a `SEED_ONCE` file already
-/// present, so `seed`'s own write loop `kept`s it unmodified and
-/// `render_and_report` (`install.rs`, the `seed` arm's own call site) is
-/// the first and only step that ever reads its content -- proved by
-/// mutation (round-2 review): neutering only this call site's `?` (`let _
-/// = crate::rules::render_and_report(target);`) leaves the rest of this
-/// suite green and turns this one test's exit-2 assertion into a silent
-/// exit 0. No earlier `install.rs` test reaches this arm: every other
-/// error-path test here fails before any file write, at the target's
-/// `.git` check, the id-prefix flag, or a pre-existing `.houserules.json`
-/// -- none of them plants broken data under `knowledge/` first.
+/// A pre-existing `knowledge/process.json` holding invalid JSON is a
+/// `SEED_ONCE` file already present, so `seed`'s own write loop `kept`s it
+/// unmodified; the first step that reads its content is the baseline stamp
+/// `seed` runs for each `knowledge_topic_files` path (`install.rs`'s own
+/// `stamp_topic_baselines`), which fails here with the same named-JSON-error
+/// shape `render_and_report` would raise later if this step did not exist.
+/// No earlier `install.rs` test reaches this arm: every other error-path
+/// test here fails before any file write, at the target's `.git` check, the
+/// id-prefix flag, or a pre-existing `.houserules.json` -- none of them
+/// plants broken data under `knowledge/` first.
 ///
 /// The expected path is built one component at a time, the way
-/// `rules::model::load_base` builds the name it prints: it joins
-/// `"knowledge"` onto the root, then joins each topic file name onto
-/// that. A single `join("knowledge/process.json")` fails on Windows
-/// alone: rustc 1.98.1's `library/std/src/path.rs` (`PathBuf::_push`)
-/// appends a relative path verbatim after one `MAIN_SEPARATOR_STR`, so
-/// the expectation keeps its embedded `/` while the binary prints `\`.
-/// That one character was the whole of the `windows-latest` failure in
-/// run 34220012072, job 102040656623 (HR-085).
+/// `rules::model::load_base` builds the name it prints, and the way
+/// `install.rs`'s own `join_components` now builds the path
+/// `stamp_topic_baselines` reads: joining `"knowledge"` onto the root, then
+/// each topic file name onto that. A single `join("knowledge/process.json")`
+/// diverges from both on Windows alone: `Path::join` inserts the platform's
+/// own separator only between components it joins itself, so a literal `/`
+/// embedded in one string argument survives untouched, while the code's own
+/// two-step join always uses the platform separator.
 #[test]
 fn init_reports_a_render_failure_on_broken_project_data_as_one_usage_error() {
     let dir = scratch_git_repo();
@@ -595,6 +614,79 @@ fn a_second_init_keeps_seed_once_files_and_settings_but_still_overwrites_kit_own
         );
     }
     assert!(stdout.contains("kept .claude/settings.json (hooks already present)\n"));
+}
+
+/// `init` over a target that already carries a knowledge topic file of its
+/// own -- the documented path for adopting the kit into a codebase with
+/// existing knowledge -- keeps that file exactly as found (`kept`,
+/// unchanged) and stamps a baseline for none of the kit entries it does not
+/// contain: a baseline is a claim that specific content is on disk, and
+/// none of the kit's own entries are. Those entries are not lost forever,
+/// though -- the very next `update` writes every one of them, since an
+/// entry `init` never stamped a baseline for is indistinguishable from one
+/// that simply has not arrived at this install yet.
+#[test]
+fn init_over_a_pre_existing_topic_file_stamps_no_baseline_for_entries_it_never_wrote() {
+    let dir = scratch_git_repo();
+    fs::create_dir_all(dir.path().join("knowledge")).expect("mkdir knowledge");
+    let adopters_own_file = r#"{"$schema": "./schema.json", "topic": "process", "title": "Adopter's own", "entries": []}"#;
+    fs::write(dir.path().join("knowledge/process.json"), adopters_own_file)
+        .expect("write adopter's own process.json");
+
+    let output = houserules()
+        .args(["init", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run init");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(
+        stdout.contains("kept knowledge/process.json\n"),
+        "got:\n{stdout}"
+    );
+
+    let marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(dir.path().join(".houserules.json")).unwrap())
+            .unwrap();
+    let baselines = marker["baselines"].as_object().expect("baselines object");
+    assert!(
+        !baselines.contains_key("process.ask-when-missing"),
+        "init stamped a baseline for an entry it never wrote: {baselines:?}"
+    );
+    assert_eq!(
+        fs::read_to_string(dir.path().join("knowledge/process.json")).unwrap(),
+        adopters_own_file,
+        "init modified a pre-existing topic file it should only have kept"
+    );
+
+    let update_output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        update_output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&update_output.stderr)
+    );
+    let update_stdout = String::from_utf8(update_output.stdout).expect("utf8 stdout");
+    assert!(!update_stdout.contains("skipped"), "got:\n{update_stdout}");
+
+    let after_update: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(dir.path().join("knowledge/process.json")).unwrap(),
+    )
+    .unwrap();
+    let entries = after_update["entries"].as_array().unwrap();
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry["id"] == "process.ask-when-missing"),
+        "the next update did not write the kit entries an adopter's own file never had: {entries:?}"
+    );
 }
 
 #[test]

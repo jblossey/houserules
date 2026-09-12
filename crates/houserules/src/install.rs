@@ -94,47 +94,72 @@
 //! risk drifting from `cmd_render`'s own (`rules::render`'s own module doc
 //! has the shared-helper account).
 //!
-//! # `update` (spec §1, plan T4)
+//! # `update` and the ownership baseline
 //!
-//! Ports `bin/houserules.mjs`'s `install(io, opts, { seed: false }, cwd)`:
-//! target resolution, the `.git` check, and the marker read-and-validate
-//! (`read_marker`, shared with `seed` unmodified -- the JS source shares
-//! one function for both, and this binary now does too) are byte-for-byte
-//! the same code `init` already runs, since the JS never branches on
-//! `seed` until after that point. What differs from `init`: `update`
-//! writes `KIT_OWNED` only (no `SEED_ONCE`, no settings merge -- those stay
-//! `init`-only, spec §1 and the T3 review that moved the settings merge
-//! there), then reports the version drift as one `kit <stamped> -> <running>`
-//! line, reusing the marker read before the restamp overwrote it. Before T5
-//! rewrote `template/`, a fresh `node bin/houserules.mjs update` and a fresh
-//! `houserules update` over the same already-`init`ed install produced
-//! identical trees, stdout, and exit codes (T4's own `live_run` `diff -r`)
-//! -- `wrote <file>` for every `KIT_OWNED` path, `render: up to date` (the
-//! freshly-seeded knowledge base has nothing stale to render), `kit <old>
-//! -> <new>`, then `houserules: updated <target>` and the literal `next:`
-//! line. T5 (this commit) is where that literal changes, and where
-//! `update` gains its first real deletion to report: an install seeded by
-//! the OLD JS (or the OLD binary) still carries both retired shell
-//! wrappers; this binary's `update` now reports each `removed <path>` for
-//! them (`delete_retired`, below, and `RETIRED`'s own doc has their exact
-//! names) in the same run that resyncs every other `KIT_OWNED` file.
+//! `update` resolves the target the same way `init` does, runs the same
+//! `.git` check and marker read-and-validate (`read_marker`), then
+//! reconciles four kinds of kit-shipped content against `.houserules.json`'s
+//! `baselines` map (`baseline::classify`'s own doc has the decision rule
+//! every one of them shares) and its `overrides` list (a hand-edited JSON
+//! array of paths and knowledge-entry ids the adopter has declared their
+//! own, documented for adopters at `docs/README.md`):
 //!
-//! The drift line's `none` token (`quality.absence-is-designed`) covers two
-//! measured shapes, not one. An install whose `.houserules.json` is
-//! entirely absent (a project that deleted its own stamp) restores it with
-//! `idPrefix` defaulted from `--id-prefix`/`WI`, same as `init`'s own
-//! missing-marker default. An install whose stamp exists but carries no
-//! `version` key (only `idPrefix`, hand-edited or from a pre-drift-tracking
-//! release) keeps that `idPrefix`. Both shapes were measured on both
-//! engines for this task, not assumed. This task's `live_run` entries hold
-//! all four runs, JS and the binary, one per shape; every pair prints `kit
-//! none -> <version>` and restamps the marker identically.
+//! - Every `KIT_OWNED` file not in `overrides`: at its recorded baseline
+//!   (or, with none recorded yet, identical to the running payload) gets
+//!   overwritten and restamped, same as an unconditional sync would;
+//!   content that diverges is kept and reported once (`kept <path> (locally
+//!   modified)`); a path the adopter deleted outright is RESTORED, the same
+//!   as the at-baseline case, since kit machinery an adopter has not
+//!   claimed with an override is always present after `update` -- it is
+//!   never merely reported absent. A path in `overrides` is left exactly as
+//!   found, present or absent, with no report line at all.
+//! - Every knowledge-topic path (a `SEED_ONCE` path under `knowledge/` other
+//!   than `schema.json` and `areas.json`): listed in `overrides`, the whole
+//!   file is left exactly as found, with no report line; absent and not
+//!   overridden, the whole file is backfilled and every entry stamped,
+//!   reported once (`wrote <path>`); otherwise entry-level reconciliation
+//!   takes over, the same four outcomes at the granularity of one knowledge
+//!   entry rather than one file (`upsert_topic_entries`'s own doc has the
+//!   mechanics), with an id in `overrides` governing that one entry alone.
+//!   An id the payload does not ship at all -- adopter-authored -- is never
+//!   touched, whether or not any of its siblings drifted.
+//! - Every other `SEED_ONCE` path: written when entirely absent (a later
+//!   kit release can add one after an install's `init` already ran) unless
+//!   overridden; left untouched when already present, since these files are
+//!   adopter data once seeded, not kit content this baseline mechanism
+//!   tracks.
+//! - Any `RETIRED` path still present, deleted and reported
+//!   (`delete_retired`, below).
 //!
-//! A JSON `null` at `version` is NOT this arm. `marker.version !==
-//! undefined` is true for `null`, so it falls through to the same "must be
-//! a non-empty string" named error every other invalid `version` shape
-//! gets, not to `none`. This shape too was measured on both engines, in
-//! this task's `live_run`.
+//! An install with no `baselines` recorded at all needs no separate
+//! migration step: `baseline::classify` already treats an unrecorded item
+//! the same way whether the whole map is missing (an install from before
+//! this mechanism existed) or just one key is (a single new entry a later
+//! release adds) -- compare its current content directly against the
+//! payload, stamp a baseline on a match, and report a divergence without
+//! overwriting anything. Nothing already on disk is ever overwritten by a
+//! bare reconciliation run; only a genuine at-baseline match triggers a
+//! write.
+//!
+//! An install that was never `init`ed at all -- no `knowledge/schema.json`
+//! present before this run starts -- skips both the entry reconciliation
+//! and the `SEED_ONCE` backfill entirely and fails at the same render step
+//! every other `update` failure path already names (this module's own
+//! "Failure paths" section); there is no kit-shipped knowledge base yet to
+//! reconcile against. `update` still writes every `KIT_OWNED` file and
+//! deletes any `RETIRED` path present before that failure, exactly as it
+//! always has.
+//!
+//! `update`'s own report ends with the version drift as one
+//! `kit <stamped> -> <running> ` line, reusing the marker read before the
+//! restamp overwrote it. The `none` token
+//! (`quality.absence-is-designed`) covers two shapes: an install whose
+//! `.houserules.json` is entirely absent restores it with `idPrefix`
+//! defaulted from `--id-prefix`/`WI`; one whose stamp exists but carries no
+//! `version` key keeps its `idPrefix`. A JSON `null` at `version` is NOT
+//! this arm -- `marker.version !== undefined` is true for `null`, so it
+//! fails the same "must be a non-empty string" named error every other
+//! invalid `version` shape gets.
 //!
 //! # Deletion (spec §1, new capability, no JS predecessor)
 //!
@@ -217,13 +242,16 @@
 //! expected line from a real error on this platform instead, fixing both;
 //! its own doc comment and `seeded_repo`'s carry the fuller account.
 
+use std::collections::HashSet;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use rust_embed::RustEmbed;
 use serde_json::{Map, Value, json};
 
+use crate::baseline::{self, Status};
 use crate::emit::emit;
 use crate::node_path::resolve_like_node;
 
@@ -254,14 +282,14 @@ const KIT_OWNED: &[&str] = &[
     ".claude/skills/migrating-knowledge/SKILL.md",
 ];
 
-/// Project-data files `init` seeds once and never touches again.
-/// `bin/houserules.mjs`'s own `SEED_ONCE`, ported verbatim, plus
-/// `docs/README.md` (HR-087, fix round 1, important issue 3): without it
-/// a fresh `init`'s own `docs` area (`knowledge/areas.json`) declares
-/// `docs/**` over a directory the seed otherwise never creates, so
-/// `check-knowledge` -- the very next step `init` prints -- failed on
-/// every fresh install until this file gave that glob something real to
-/// match.
+/// Project-data files `init` seeds once, and `update` never overwrites once
+/// they exist: an adopter's own edits to backlog items, evals, or `CLAUDE.md`
+/// are never kit-owned content. `update` still BACKFILLS a `SEED_ONCE` path
+/// that is entirely absent (this module's own "update" doc section has the
+/// full account) -- a later kit release can add a new path to this list, and
+/// an install seeded by an older release never had a chance to receive it.
+/// A subset of these paths -- `knowledge_topic_files`, below -- gets finer,
+/// entry-level reconciliation instead of this whole-file treatment.
 const SEED_ONCE: &[&str] = &[
     "knowledge/schema.json",
     "knowledge/areas.json",
@@ -285,6 +313,29 @@ const SEED_ONCE: &[&str] = &[
     "docs/README.md",
     "CLAUDE.md",
 ];
+
+/// The `SEED_ONCE` paths that hold knowledge entries: `knowledge/*.json`
+/// other than `schema.json` and `areas.json`, the same split
+/// `rules::model::load_base` draws when it collects topic files. Each entry
+/// inside one of these files, not just the file as a whole, has its own
+/// recorded baseline (`baseline::classify`'s own doc explains the
+/// mechanism). `update` reconciles each entry by id -- replacing one the
+/// adopter left at baseline, keeping one they modified, respecting one they
+/// deleted, and leaving an adopter-authored id untouched -- instead of
+/// treating the file as one opaque unit the way every other `SEED_ONCE`
+/// path still is. Derived from `SEED_ONCE` rather than retyped, so a topic
+/// added there never needs a matching, easily-forgotten edit here.
+fn knowledge_topic_files() -> Vec<&'static str> {
+    SEED_ONCE
+        .iter()
+        .copied()
+        .filter(|file| {
+            file.starts_with("knowledge/")
+                && *file != "knowledge/schema.json"
+                && *file != "knowledge/areas.json"
+        })
+        .collect()
+}
 
 /// Seed files that carry the backlog id prefix; `--id-prefix` rewrites
 /// them. `bin/houserules.mjs`'s own `PREFIXED`.
@@ -375,6 +426,20 @@ fn payload_content(file: &str, prefix: &str) -> Result<Vec<u8>, String> {
     Ok(text.replace("WI-", &format!("{prefix}-")).into_bytes())
 }
 
+/// Joins `target` and `relative` (a `/`-separated path string) one
+/// component at a time, matching `rules::model::load_base`'s own join
+/// chain: `Path::join` inserts the platform's own separator only between
+/// components it joins itself. A single `target.join("a/b")` keeps a
+/// literal `/`. A component-wise `target.join("a").join("b")` does not.
+/// Windows is the one platform where this shows: reading a topic file back
+/// from disk must build the same path the code that seeded it did, or a
+/// named error naming that path prints the wrong separator.
+fn join_components(target: &Path, relative: &str) -> PathBuf {
+    relative
+        .split('/')
+        .fold(target.to_path_buf(), |path, part| path.join(part))
+}
+
 /// Writes `content` to `file` under `target`, keeping shell scripts and
 /// git hooks executable -- `bin/houserules.mjs`'s own `writeInto`.
 fn write_into(target: &Path, file: &str, content: &[u8]) -> Result<(), String> {
@@ -433,7 +498,12 @@ fn read_json_object(path: &Path) -> Result<Map<String, Value>, String> {
 /// but is not a JSON object, its `idPrefix` is present but fails
 /// `is_id_prefix`, or its `version` is present but is not a non-empty
 /// string -- a JSON `null` at `version` included, since `null` is a
-/// present value, not an absent key.
+/// present value, not an absent key. `overrides` and `baselines` are
+/// adopter-hand-edited fields this same function now owns validating:
+/// present but not an array of strings, or not an object of string values
+/// respectively, is one more named error beside the two above -- never a
+/// silent default, since a malformed override or baseline would otherwise
+/// vanish exactly where an adopter needs it to hold.
 fn read_marker(marker_path: &Path, prefix: &str) -> Result<Map<String, Value>, String> {
     let marker = if marker_path.exists() {
         read_json_object(marker_path)?
@@ -456,7 +526,275 @@ fn read_marker(marker_path: &Path, prefix: &str) -> Result<Map<String, Value>, S
             marker_path.display()
         ));
     }
+    if let Some(overrides) = marker.get("overrides")
+        && !overrides
+            .as_array()
+            .is_some_and(|entries| entries.iter().all(Value::is_string))
+    {
+        return Err(format!(
+            "{}: overrides must be an array of strings",
+            marker_path.display()
+        ));
+    }
+    if let Some(baselines) = marker.get("baselines")
+        && !baselines
+            .as_object()
+            .is_some_and(|entries| entries.values().all(Value::is_string))
+    {
+        return Err(format!(
+            "{}: baselines must be an object of strings",
+            marker_path.display()
+        ));
+    }
     Ok(marker)
+}
+
+/// Reads `marker`'s `overrides` field: a JSON array of strings, each one a
+/// `KIT_OWNED`/`RETIRED` path, a `SEED_ONCE` path, or a knowledge-entry id
+/// the adopter has declared their own. `read_marker` has already rejected a
+/// present `overrides` that is not an array of strings, so an absent field
+/// is the only remaining case this handles, as an empty list.
+fn read_overrides(marker: &Map<String, Value>) -> Vec<String> {
+    marker
+        .get("overrides")
+        .and_then(Value::as_array)
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Reads `marker`'s `baselines` field: a JSON object mapping each
+/// `KIT_OWNED` path or knowledge-entry id to the hex SHA-256 the kit last
+/// wrote for it (`baseline::hash`). `read_marker` has already rejected a
+/// present `baselines` that is not an object of string values, so an
+/// absent field is the only remaining case this handles, as an empty map.
+fn read_baselines(marker: &Map<String, Value>) -> Map<String, Value> {
+    marker
+        .get("baselines")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// The recorded baseline hash for `key`, or `None` when `key` has never
+/// been stamped.
+fn baseline_hash<'a>(baselines: &'a Map<String, Value>, key: &str) -> Option<&'a str> {
+    baselines.get(key).and_then(Value::as_str)
+}
+
+/// `true` when `key` (a path or a knowledge-entry id) appears in `overrides`.
+fn is_overridden(overrides: &[String], key: &str) -> bool {
+    overrides.iter().any(|item| item == key)
+}
+
+/// The `entries` array declared in a knowledge topic file's parsed JSON, or
+/// empty for any other shape -- the same tolerance
+/// `rules::model::load_base` gives a topic file's `entries` field.
+fn entries_array(value: &Value) -> &[Value] {
+    value
+        .get("entries")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[])
+}
+
+/// The entry in `value`'s `entries` array whose `id` field is `id`, if any.
+fn find_entry<'a>(value: &'a Value, id: &str) -> Option<&'a Value> {
+    entries_array(value)
+        .iter()
+        .find(|entry| entry.get("id").and_then(Value::as_str) == Some(id))
+}
+
+/// The canonical bytes one knowledge entry hashes to: a plain, compact JSON
+/// re-serialization of its parsed value. Deterministic for a given `Value`
+/// regardless of the on-disk file's own whitespace, since `serde_json`'s
+/// `preserve_order` feature keeps an object's key order exactly as parsed.
+fn canonical_entry_bytes(value: &Value) -> Vec<u8> {
+    serde_json::to_vec(value).expect("a JSON Value always serializes")
+}
+
+/// Stamps a baseline for every kit-shipped entry in `topic_file` that is
+/// actually present on disk and matches the payload's own current content
+/// -- true trivially for every entry in a file `seed`'s own `SEED_ONCE` loop
+/// just wrote fresh, and true for an entry a pre-existing file already
+/// carried unchanged. An entry already recorded, one whose on-disk content
+/// diverges from the payload, and -- critically -- one the on-disk file
+/// does not contain at all are all left unstamped, for `update` to
+/// reconcile on its own first run over this install: a baseline is a claim
+/// that specific content is on disk, so it is never recorded for content
+/// that is not. Stamping an absent entry here would tell the next `update`
+/// "the adopter deleted this on purpose", when what actually happened is
+/// that `seed` never wrote it into a topic file it found already present.
+fn stamp_topic_baselines(
+    target: &Path,
+    topic_file: &str,
+    prefix: &str,
+    baselines: &mut Map<String, Value>,
+) -> Result<(), String> {
+    let payload_value: Value = serde_json::from_slice(&payload_content(topic_file, prefix)?)
+        .expect("the embedded topic file is valid JSON");
+    let on_disk = Value::Object(read_json_object(&join_components(target, topic_file))?);
+    for entry in entries_array(&payload_value) {
+        let Some(id) = entry.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        if baselines.contains_key(id) {
+            continue;
+        }
+        let Some(current) = find_entry(&on_disk, id).map(canonical_entry_bytes) else {
+            continue;
+        };
+        let payload_bytes = canonical_entry_bytes(entry);
+        if current == payload_bytes {
+            baselines.insert(id.to_string(), json!(baseline::hash(&payload_bytes)));
+        }
+    }
+    Ok(())
+}
+
+/// Reconciles one knowledge-topic path against the payload. Whole-file
+/// absence is one decision, made before any entry is ever looked at: a
+/// `topic_file` path listed in `overrides` is never written at all, kept or
+/// absent exactly as found, with no report line, since the adopter has
+/// declared the whole file their own; one that is simply absent, and not
+/// overridden, is backfilled in full -- every entry written and stamped in
+/// the payload's own order, reported once (`wrote <topic_file>`) -- the same
+/// "never arrived yet" contract every other missing `SEED_ONCE` path gets.
+/// Only once the file is confirmed present does reconciliation drop to
+/// entry granularity, by id: an entry at its recorded baseline is written
+/// and (re)stamped, silently; one the adopter modified is kept, reported
+/// once (`kept <id> (locally modified)`); one the adopter deleted outright
+/// is left absent, reported once (`skipped <id> (deleted)`) unless
+/// overridden; one in `overrides` is left exactly as found, with no report
+/// line. An id the payload does not ship at all is adopter-authored and is
+/// never touched, regardless of what its siblings in the same file do.
+/// Existing entries keep their on-disk position; a newly written entry
+/// appends at the end, in the payload's own order, so the resulting diff
+/// stays reviewable. Returns the report lines produced, in encounter order;
+/// the caller prints them.
+fn upsert_topic_entries(
+    target: &Path,
+    topic_file: &str,
+    prefix: &str,
+    baselines: &mut Map<String, Value>,
+    overrides: &[String],
+) -> Result<Vec<String>, String> {
+    let path = join_components(target, topic_file);
+    if is_overridden(overrides, topic_file) {
+        return Ok(Vec::new());
+    }
+
+    let payload_bytes = payload_content(topic_file, prefix)?;
+    let payload_value: Value =
+        serde_json::from_slice(&payload_bytes).expect("the embedded topic file is valid JSON");
+    let payload_entries = entries_array(&payload_value).to_vec();
+
+    if !path.exists() {
+        write_into(target, topic_file, &payload_bytes)?;
+        for entry in &payload_entries {
+            if let Some(id) = entry.get("id").and_then(Value::as_str) {
+                baselines.insert(
+                    id.to_string(),
+                    json!(baseline::hash(&canonical_entry_bytes(entry))),
+                );
+            }
+        }
+        return Ok(vec![format!("wrote {topic_file}")]);
+    }
+
+    let existing_value = Value::Object(read_json_object(&path)?);
+    let existing_entries = entries_array(&existing_value).to_vec();
+
+    let mut reports = Vec::new();
+    let mut merged: Vec<Value> = Vec::with_capacity(existing_entries.len());
+    let mut seen: HashSet<&str> = HashSet::new();
+    let mut changed = 0usize;
+
+    for entry in &existing_entries {
+        let Some(id) = entry.get("id").and_then(Value::as_str) else {
+            merged.push(entry.clone());
+            continue;
+        };
+        let Some(payload_entry) = payload_entries
+            .iter()
+            .find(|candidate| candidate.get("id").and_then(Value::as_str) == Some(id))
+        else {
+            merged.push(entry.clone());
+            continue;
+        };
+        seen.insert(id);
+        let payload_bytes = canonical_entry_bytes(payload_entry);
+        let current_bytes = canonical_entry_bytes(entry);
+        let baseline = baseline_hash(baselines, id).map(str::to_string);
+        match baseline::classify(
+            baseline.as_deref(),
+            Some(&current_bytes),
+            &payload_bytes,
+            is_overridden(overrides, id),
+        ) {
+            Status::AtBaseline => {
+                if current_bytes != payload_bytes {
+                    changed += 1;
+                }
+                merged.push(payload_entry.clone());
+                baselines.insert(id.to_string(), json!(baseline::hash(&payload_bytes)));
+            }
+            Status::Modified => {
+                merged.push(entry.clone());
+                reports.push(format!("kept {id} (locally modified)"));
+            }
+            Status::Overridden => merged.push(entry.clone()),
+            Status::Deleted => unreachable!("current is Some for an entry read back from disk"),
+        }
+    }
+
+    for payload_entry in &payload_entries {
+        let Some(id) = payload_entry.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        if seen.contains(id) {
+            continue;
+        }
+        let payload_bytes = canonical_entry_bytes(payload_entry);
+        let baseline = baseline_hash(baselines, id).map(str::to_string);
+        match baseline::classify(
+            baseline.as_deref(),
+            None,
+            &payload_bytes,
+            is_overridden(overrides, id),
+        ) {
+            Status::AtBaseline => {
+                changed += 1;
+                merged.push(payload_entry.clone());
+                baselines.insert(id.to_string(), json!(baseline::hash(&payload_bytes)));
+            }
+            Status::Deleted => reports.push(format!("skipped {id} (deleted)")),
+            Status::Overridden => {}
+            Status::Modified => unreachable!("current is None for an entry absent from disk"),
+        }
+    }
+
+    let mut file_value = existing_value;
+    if let Value::Object(map) = &mut file_value {
+        map.insert("entries".to_string(), Value::Array(merged));
+    }
+    let content = emit(&file_value);
+    let unchanged = fs::read_to_string(&path).is_ok_and(|current| current == content);
+    if !unchanged {
+        write_into(target, topic_file, content.as_bytes())?;
+    }
+    if changed > 0 {
+        let entry_word = if changed == 1 { "entry" } else { "entries" };
+        reports.push(format!(
+            "updated {topic_file} ({changed} {entry_word} changed)"
+        ));
+    }
+    Ok(reports)
 }
 
 /// Deletes each `retired` path found under `target`, returning the ones
@@ -570,8 +908,13 @@ fn merge_settings(path: &Path, prefix: &str) -> Result<bool, String> {
 /// Seeds `target` from the embedded payload: writes every `KIT_OWNED` file,
 /// then every `SEED_ONCE` file absent from `target` (an existing one is
 /// left untouched, reported `kept`), seeds or merges `.claude/settings.json`,
-/// stamps `.houserules.json`, and renders the generated markdown --
-/// `bin/houserules.mjs`'s own `install(io, opts, { seed: true }, cwd)`.
+/// stamps `.houserules.json` -- `overrides` and `baselines` included -- and
+/// renders the generated markdown. Every payload file this writes is
+/// rewritten with `effective_id_prefix`'s resolution: the marker's own
+/// stamped `idPrefix` when one is already on record, falling back to the
+/// `--id-prefix` flag and then `WI` -- never the flag alone, so a re-`init`
+/// over an install that already committed to a prefix cannot backfill a
+/// `PREFIXED` file under a different one.
 fn seed(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
     if !target.join(".git").exists() {
         return Err(format!(
@@ -585,22 +928,29 @@ fn seed(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
     }
     let marker_path = target.join(MARKER_PATH);
     let marker = read_marker(&marker_path, &prefix)?;
+    let mut baselines = read_baselines(&marker);
+    let effective_prefix = effective_id_prefix(&marker, &prefix);
 
     for file in KIT_OWNED {
-        write_into(target, file, &payload_content(file, &prefix)?)?;
+        let payload_bytes = payload_content(file, &effective_prefix)?;
+        write_into(target, file, &payload_bytes)?;
         println!("wrote {file}");
+        baselines.insert(file.to_string(), json!(baseline::hash(&payload_bytes)));
     }
     for file in SEED_ONCE {
         if target.join(file).exists() {
             println!("kept {file}");
             continue;
         }
-        write_into(target, file, &payload_content(file, &prefix)?)?;
+        write_into(target, file, &payload_content(file, &effective_prefix)?)?;
         println!("wrote {file}");
+    }
+    for topic_file in knowledge_topic_files() {
+        stamp_topic_baselines(target, topic_file, &effective_prefix, &mut baselines)?;
     }
     let settings_path = target.join(SETTINGS_PATH);
     if settings_path.exists() {
-        if merge_settings(&settings_path, &prefix)? {
+        if merge_settings(&settings_path, &effective_prefix)? {
             println!("merged {SETTINGS_PATH} (SessionStart hooks added)");
         } else {
             println!("kept {SETTINGS_PATH} (hooks already present)");
@@ -609,24 +959,57 @@ fn seed(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
         write_into(
             target,
             SETTINGS_PATH,
-            &payload_content(SETTINGS_PATH, &prefix)?,
+            &payload_content(SETTINGS_PATH, &effective_prefix)?,
         )?;
         println!("wrote {SETTINGS_PATH}");
     }
 
-    let stamped_id_prefix = marker
-        .get("idPrefix")
-        .and_then(Value::as_str)
-        .unwrap_or(&prefix);
     fs::write(
         &marker_path,
-        emit(&json!({"version": kit_version(), "idPrefix": stamped_id_prefix})),
+        emit(&new_marker(
+            &marker,
+            kit_version(),
+            &effective_prefix,
+            baselines,
+        )),
     )
     .map_err(|error| format!("{}: {error}", marker_path.display()))?;
     crate::rules::render_and_report(target)?;
     println!("houserules: initialized {}", target.display());
     println!("next: houserules check-knowledge && houserules check-backlog");
     Ok(())
+}
+
+/// The id prefix payload content is rewritten with: `marker`'s own stamped
+/// `idPrefix` when it has one, falling back to `flag_prefix` (the resolved
+/// `--id-prefix` value, already defaulted to `WI`). An install that has
+/// already committed to a prefix keeps writing every `PREFIXED` file under
+/// that same prefix regardless of what a later `--id-prefix` flag says;
+/// only an install with no stamped prefix yet -- a fresh `init`, or a
+/// marker predating this field -- takes the flag's value.
+fn effective_id_prefix(marker: &Map<String, Value>, flag_prefix: &str) -> String {
+    marker
+        .get("idPrefix")
+        .and_then(Value::as_str)
+        .unwrap_or(flag_prefix)
+        .to_string()
+}
+
+/// Builds `.houserules.json`'s content for a restamp: starts from `marker`
+/// as read, so any field this module does not itself own -- an adopter's
+/// own hand-added key included -- survives untouched, then overwrites only
+/// `version`, `idPrefix`, and `baselines` in place.
+fn new_marker(
+    marker: &Map<String, Value>,
+    version: String,
+    id_prefix: &str,
+    baselines: Map<String, Value>,
+) -> Value {
+    let mut next = marker.clone();
+    next.insert("version".to_string(), json!(version));
+    next.insert("idPrefix".to_string(), json!(id_prefix));
+    next.insert("baselines".to_string(), Value::Object(baselines));
+    Value::Object(next)
 }
 
 /// Runs the `init` subcommand: resolves `dir` like Node's own
@@ -651,12 +1034,19 @@ pub(crate) fn cmd_init(dir: Option<PathBuf>, id_prefix: Option<String>) -> ExitC
     }
 }
 
-/// Syncs `target`'s `KIT_OWNED` files from the embedded payload, deletes
-/// any `RETIRED` file still present, restamps `.houserules.json`, and
-/// reports the stamped-to-running version drift -- `bin/houserules.mjs`'s
-/// own `install(io, opts, { seed: false }, cwd)` (this module's own
-/// `update` doc section has the full account, including the deletion step
-/// the JS has no counterpart for).
+/// Syncs `target` from the embedded payload against its recorded ownership
+/// baseline (this module's own "`update` and the ownership baseline" doc
+/// section has the full account): every `KIT_OWNED` file is overwritten,
+/// kept, or -- unless overridden -- restored if the adopter deleted it,
+/// since kit machinery an adopter has not claimed with an override is
+/// always present after `update`; every knowledge-topic entry is
+/// overwritten, kept, or respected as deleted at the same per-item
+/// granularity; every other `SEED_ONCE` path missing entirely is
+/// backfilled; any `RETIRED` path present is deleted; `.houserules.json` is
+/// restamped, and the stamped-to-running version drift is reported. Every
+/// payload file this writes is rewritten with `effective_id_prefix`'s
+/// resolution (`seed`'s own doc explains why the marker's stamped prefix
+/// wins over the flag).
 fn update(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
     if !target.join(".git").exists() {
         return Err(format!(
@@ -670,13 +1060,63 @@ fn update(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
     }
     let marker_path = target.join(MARKER_PATH);
     let marker = read_marker(&marker_path, &prefix)?;
+    let overrides = read_overrides(&marker);
+    let mut baselines = read_baselines(&marker);
+    let previously_seeded = target.join("knowledge/schema.json").exists();
+    let effective_prefix = effective_id_prefix(&marker, &prefix);
 
     for file in KIT_OWNED {
-        write_into(target, file, &payload_content(file, &prefix)?)?;
-        println!("wrote {file}");
+        if is_overridden(&overrides, file) {
+            continue;
+        }
+        let payload_bytes = payload_content(file, &effective_prefix)?;
+        let path = target.join(file);
+        let status = match fs::read(&path) {
+            Ok(current) => baseline::classify(
+                baseline_hash(&baselines, file),
+                Some(&current),
+                &payload_bytes,
+                false,
+            ),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Status::AtBaseline,
+            Err(error) => return Err(format!("{}: {error}", path.display())),
+        };
+        match status {
+            Status::AtBaseline => {
+                write_into(target, file, &payload_bytes)?;
+                println!("wrote {file}");
+                baselines.insert(file.to_string(), json!(baseline::hash(&payload_bytes)));
+            }
+            Status::Modified => println!("kept {file} (locally modified)"),
+            Status::Overridden | Status::Deleted => {
+                unreachable!("overridden is handled above; a missing file is never classified")
+            }
+        }
     }
     for file in delete_retired(target, RETIRED)? {
         println!("removed {file}");
+    }
+
+    if previously_seeded {
+        let topic_files = knowledge_topic_files();
+        for topic_file in &topic_files {
+            for line in upsert_topic_entries(
+                target,
+                topic_file,
+                &effective_prefix,
+                &mut baselines,
+                &overrides,
+            )? {
+                println!("{line}");
+            }
+        }
+        for file in SEED_ONCE.iter().filter(|file| !topic_files.contains(*file)) {
+            if target.join(file).exists() || is_overridden(&overrides, file) {
+                continue;
+            }
+            write_into(target, file, &payload_content(file, &effective_prefix)?)?;
+            println!("wrote {file}");
+        }
     }
 
     let stamped_version = marker
@@ -684,14 +1124,15 @@ fn update(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
         .and_then(Value::as_str)
         .unwrap_or("none")
         .to_string();
-    let stamped_id_prefix = marker
-        .get("idPrefix")
-        .and_then(Value::as_str)
-        .unwrap_or(&prefix);
     let running_version = kit_version();
     fs::write(
         &marker_path,
-        emit(&json!({"version": running_version, "idPrefix": stamped_id_prefix})),
+        emit(&new_marker(
+            &marker,
+            running_version.clone(),
+            &effective_prefix,
+            baselines,
+        )),
     )
     .map_err(|error| format!("{}: {error}", marker_path.display()))?;
     crate::rules::render_and_report(target)?;

@@ -55,6 +55,7 @@
 
 mod archive;
 mod backlog;
+mod baseline;
 mod emit;
 mod get;
 mod install;

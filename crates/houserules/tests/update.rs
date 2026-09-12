@@ -16,6 +16,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use sha2::{Digest, Sha256};
+
 /// A `Command` for the compiled `houserules` binary under test --
 /// `install.rs`'s own copy of this helper.
 fn houserules() -> Command {
@@ -171,6 +173,17 @@ const SEED_ONCE: &[&str] = &[
     "CLAUDE.md",
 ];
 
+/// The lowercase hex SHA-256 digest of `content` -- this test file's own
+/// copy of `install::baseline::hash`, computed independently with the same
+/// `sha2` crate so a hand-stamped baseline in these tests matches exactly
+/// what the binary under test would compute for the same bytes.
+fn sha256_hex(content: &[u8]) -> String {
+    Sha256::digest(content)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
 /// `env!("CARGO_PKG_VERSION")` at THIS test binary's own compile time --
 /// `install.rs`'s own copy of `kit_version` (that function's own doc has
 /// the account of batch 20 T3's retirement of the earlier package.json-
@@ -180,21 +193,8 @@ fn kit_version() -> String {
 }
 
 #[test]
-fn update_syncs_every_kit_owned_file_reports_the_drift_line_and_leaves_adopter_files_alone() {
+fn update_syncs_every_unmodified_kit_owned_file_and_leaves_adopter_files_alone() {
     let dir = seeded_repo();
-    // Corrupt a KIT_OWNED file and an unrelated adopter file the same way,
-    // so the assertions below can tell "update overwrote this" from "update
-    // never touched this" by content alone. `.claude/agents/implementer.md`,
-    // not `tools/kb.mjs`: batch 20 T3 (HR-047) moved the four JS engines
-    // from `KIT_OWNED` to `RETIRED`, so a fresh `seeded_repo()` no longer
-    // carries `tools/kb.mjs` at all -- an old install still holding one is
-    // its own, separate scenario, covered by `update_deletes_retired_
-    // js_engines_from_an_old_install` below.
-    fs::write(
-        dir.path().join(".claude/agents/implementer.md"),
-        b"corrupted",
-    )
-    .expect("corrupt .claude/agents/implementer.md");
     fs::write(dir.path().join("adopter-notes.md"), b"mine").expect("write adopter file");
 
     let output = houserules()
@@ -218,18 +218,860 @@ fn update_syncs_every_kit_owned_file_reports_the_drift_line_and_leaves_adopter_f
     let actual_lines: Vec<&str> = stdout.lines().collect();
     assert_eq!(actual_lines, expected_lines);
 
-    let restored = fs::read(dir.path().join(".claude/agents/implementer.md"))
-        .expect("read .claude/agents/implementer.md after update");
-    let template = fs::read(repo_root().join("template/.claude/agents/implementer.md"))
-        .expect("read template");
-    assert_eq!(
-        restored, template,
-        ".claude/agents/implementer.md was not resynced"
-    );
     assert_eq!(
         fs::read(dir.path().join("adopter-notes.md")).expect("read adopter file"),
         b"mine",
         "update touched an adopter-owned file"
+    );
+}
+
+/// A `KIT_OWNED` file the adopter has edited since the last `update`
+/// diverges from its recorded baseline: `update` keeps the adopter's own
+/// content, reports it once, and does NOT resync it -- the behavior this
+/// module's own "update and the ownership baseline" doc section describes,
+/// replacing the unconditional overwrite an earlier release always ran.
+#[test]
+fn update_keeps_a_locally_modified_kit_owned_file_and_reports_it_once() {
+    let dir = seeded_repo();
+    fs::write(
+        dir.path().join(".claude/agents/implementer.md"),
+        b"corrupted",
+    )
+    .expect("corrupt .claude/agents/implementer.md");
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("kept .claude/agents/implementer.md (locally modified)\n"),
+        "got:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("wrote .claude/agents/implementer.md\n"),
+        "got:\n{stdout}"
+    );
+
+    assert_eq!(
+        fs::read(dir.path().join(".claude/agents/implementer.md")).unwrap(),
+        b"corrupted",
+        "update overwrote the adopter's own change"
+    );
+}
+
+/// A `KIT_OWNED` file the adopter has NOT changed since the kit last wrote
+/// it -- still at its recorded baseline -- gets replaced with whatever the
+/// running kit ships now, even when that differs from both the adopter's
+/// current content and the running binary's own `template/` copy. A real
+/// version bump is simulated by hand: the file on disk is set to one
+/// string, its recorded baseline stamped to that same string's hash (so
+/// `update` reads it as untouched), proving the replacement is driven by
+/// the baseline comparison, not by a byte-for-byte match with the payload.
+#[test]
+fn update_replaces_an_at_baseline_kit_owned_file_with_the_running_kits_content() {
+    let dir = seeded_repo();
+    let file = ".claude/agents/implementer.md";
+    let old_kit_content = b"content from an older kit release\n";
+    fs::write(dir.path().join(file), old_kit_content).expect("write old kit content");
+
+    let marker_path = dir.path().join(".houserules.json");
+    let mut marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    marker["baselines"][file] = serde_json::json!(sha256_hex(old_kit_content));
+    fs::write(&marker_path, serde_json::to_string_pretty(&marker).unwrap()).unwrap();
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains(&format!("wrote {file}\n")),
+        "got:\n{stdout}"
+    );
+
+    let running_content = fs::read(repo_root().join("template").join(file)).unwrap();
+    assert_eq!(
+        fs::read(dir.path().join(file)).unwrap(),
+        running_content,
+        "an at-baseline file was not replaced with the running kit's content"
+    );
+
+    let restamped: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    assert_eq!(
+        restamped["baselines"][file],
+        serde_json::json!(sha256_hex(&running_content))
+    );
+}
+
+/// An override silences reporting for a locally modified `KIT_OWNED` file
+/// entirely: no report line, and the adopter's own content is kept exactly
+/// as a plain modified file's would be, but with nothing printed about it.
+#[test]
+fn update_silences_a_locally_modified_kit_owned_file_listed_in_overrides() {
+    let dir = seeded_repo();
+    let file = ".claude/agents/implementer.md";
+    fs::write(dir.path().join(file), b"adopter owns this now").expect("corrupt file");
+
+    let marker_path = dir.path().join(".houserules.json");
+    let mut marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    marker["overrides"] = serde_json::json!([file]);
+    fs::write(&marker_path, serde_json::to_string_pretty(&marker).unwrap()).unwrap();
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(!stdout.contains(file), "got:\n{stdout}");
+    assert_eq!(
+        fs::read(dir.path().join(file)).unwrap(),
+        b"adopter owns this now"
+    );
+
+    let restamped: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    assert_eq!(
+        restamped["overrides"],
+        serde_json::json!([file]),
+        "update did not preserve the overrides field"
+    );
+}
+
+/// A `KIT_OWNED` file the adopter deleted outright, with no override, is
+/// kit machinery the adopter has not claimed: `update` restores it, the
+/// same outcome an at-baseline file gets, rather than merely reporting it
+/// gone.
+#[test]
+fn update_restores_a_deleted_kit_owned_file() {
+    let dir = seeded_repo();
+    let file = ".claude/agents/implementer.md";
+    fs::remove_file(dir.path().join(file)).expect("delete file");
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains(&format!("wrote {file}\n")),
+        "got:\n{stdout}"
+    );
+    assert!(!stdout.contains("skipped"), "got:\n{stdout}");
+
+    let restored = fs::read(dir.path().join(file)).expect("file was restored");
+    let template = fs::read(repo_root().join("template").join(file)).unwrap();
+    assert_eq!(restored, template);
+}
+
+/// A `KIT_OWNED` path that fails to read for a reason OTHER than absence is
+/// a named error, exit 2 -- never silently classified as at-baseline. Only
+/// `io::ErrorKind::NotFound` means "restore it"; every other read failure
+/// is reported instead. Unix-only (`houserules.platform-gated-tests`): the
+/// reproduction needs a real permission distinction between reading and
+/// writing the same file, which POSIX mode bits give directly and Windows
+/// does not.
+///
+/// A directory standing in for the file is not a genuine reproduction here:
+/// both the old and the new code end up naming a similar-shaped error for
+/// that shape, because the file write the old code attempts next fails on
+/// a directory too. A file the owner can WRITE but not READ is the
+/// reproduction that actually discriminates: the old code's blanket
+/// `Err(_) => Status::AtBaseline` treated the read failure as "safe to
+/// overwrite", and the subsequent write silently SUCCEEDED (write-only
+/// permission is enough for `fs::write`'s open call), replacing the file's
+/// content with the payload's with no error and no report naming what
+/// happened. The fix must instead exit 2 and leave the content exactly as
+/// it was.
+#[cfg(unix)]
+#[test]
+fn update_reports_a_named_error_instead_of_silently_overwriting_an_unreadable_kit_owned_file() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = seeded_repo();
+    let file = ".githooks/commit-msg";
+    let path = dir.path().join(file);
+    let original = fs::read(&path).expect("read the seeded file before restricting it");
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o200))
+        .expect("chmod the file write-only, unreadable even to its own owner");
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+
+    // Restore a readable mode so the assertion below can read the file back.
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).expect("restore a readable mode");
+
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(
+        stderr.starts_with(&format!("{}: ", path.display())),
+        "got {stderr:?}"
+    );
+    assert_eq!(
+        fs::read(&path).expect("read the file back"),
+        original,
+        "update silently overwrote a file it could not read"
+    );
+}
+
+/// An override on a deleted `KIT_OWNED` file's path is the adopter's own
+/// declaration that they deleted it on purpose: `update` leaves it absent
+/// and reports nothing.
+#[test]
+fn update_leaves_an_overridden_deleted_kit_owned_file_absent() {
+    let dir = seeded_repo();
+    let file = ".claude/agents/implementer.md";
+    fs::remove_file(dir.path().join(file)).expect("delete file");
+
+    let marker_path = dir.path().join(".houserules.json");
+    let mut marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    marker["overrides"] = serde_json::json!([file]);
+    fs::write(&marker_path, serde_json::to_string_pretty(&marker).unwrap()).unwrap();
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(!stdout.contains(file), "got:\n{stdout}");
+    assert!(
+        !dir.path().join(file).exists(),
+        "update restored an overridden file"
+    );
+}
+
+/// The one knowledge entry the entry-upsert tests below all exercise.
+const TEST_ENTRY_ID: &str = "process.ask-when-missing";
+const TEST_ENTRY_TOPIC_FILE: &str = "knowledge/process.json";
+
+/// Reads `dir`'s `topic_file` and returns its `entries` array, in on-disk
+/// order.
+fn read_topic_entries(dir: &Path, topic_file: &str) -> Vec<serde_json::Value> {
+    let content = fs::read_to_string(dir.join(topic_file)).expect("read topic file");
+    let value: serde_json::Value = serde_json::from_str(&content).expect("parse topic file");
+    value["entries"]
+        .as_array()
+        .expect("entries is an array")
+        .clone()
+}
+
+/// Rewrites `dir`'s `topic_file` with `entries` as its new `entries` array,
+/// in the same pretty-printed, trailing-newline shape `update` itself
+/// writes, so a later byte comparison against `update`'s own output stays
+/// meaningful.
+fn write_topic_entries(dir: &Path, topic_file: &str, entries: Vec<serde_json::Value>) {
+    let path = dir.join(topic_file);
+    let mut value: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    value["entries"] = serde_json::Value::Array(entries);
+    fs::write(
+        &path,
+        format!("{}\n", serde_json::to_string_pretty(&value).unwrap()),
+    )
+    .expect("write topic file");
+}
+
+/// The canonical bytes one knowledge entry hashes to -- this test file's own
+/// copy of `install::canonical_entry_bytes`: a plain `serde_json::to_vec`,
+/// deterministic for a given parsed `Value` because `serde_json`'s
+/// `preserve_order` feature (this crate's own `Cargo.toml`) keeps an
+/// object's key order exactly as parsed.
+fn canonical_entry_bytes(value: &serde_json::Value) -> Vec<u8> {
+    serde_json::to_vec(value).expect("a JSON Value always serializes")
+}
+
+/// Sets `dir`'s `.houserules.json` `baselines.<key>` to `hash`.
+fn set_marker_baseline(dir: &Path, key: &str, hash: &str) {
+    let marker_path = dir.join(".houserules.json");
+    let mut marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    marker["baselines"][key] = serde_json::json!(hash);
+    fs::write(
+        &marker_path,
+        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
+    )
+    .unwrap();
+}
+
+/// An entry the adopter has NOT changed since the kit last wrote it gets
+/// replaced with whatever the running kit ships now, even when that differs
+/// from the entry's current content -- the same hand-stamped-baseline proof
+/// `update_replaces_an_at_baseline_kit_owned_file_with_the_running_kits_
+/// content` runs for a whole `KIT_OWNED` file, here at one entry's
+/// granularity: the entry on disk is set to an "older release" shape, its
+/// recorded baseline stamped to that shape's own hash, and `update` is
+/// proven to replace it with the real, running `template/` content rather
+/// than leaving the older shape in place.
+#[test]
+fn update_replaces_an_at_baseline_knowledge_entry_with_the_running_kits_content() {
+    let dir = seeded_repo();
+    let mut entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
+    let index = entries
+        .iter()
+        .position(|entry| entry["id"] == TEST_ENTRY_ID)
+        .expect("test entry present in a fresh seed");
+    let running_entry = entries[index].clone();
+
+    let mut old_release_entry = running_entry.clone();
+    old_release_entry["summary"] = serde_json::json!("an older release's summary text");
+    entries[index] = old_release_entry.clone();
+    write_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE, entries);
+    set_marker_baseline(
+        dir.path(),
+        TEST_ENTRY_ID,
+        &sha256_hex(&canonical_entry_bytes(&old_release_entry)),
+    );
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(!stdout.contains(TEST_ENTRY_ID), "got:\n{stdout}");
+    assert!(
+        stdout.contains(&format!(
+            "updated {TEST_ENTRY_TOPIC_FILE} (1 entry changed)\n"
+        )),
+        "got:\n{stdout}"
+    );
+
+    let entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
+    let entry = entries
+        .iter()
+        .find(|entry| entry["id"] == TEST_ENTRY_ID)
+        .expect("entry still present");
+    assert_eq!(
+        entry, &running_entry,
+        "an at-baseline entry was not replaced with the running kit's content"
+    );
+
+    let marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(dir.path().join(".houserules.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        marker["baselines"][TEST_ENTRY_ID],
+        serde_json::json!(sha256_hex(&canonical_entry_bytes(&running_entry)))
+    );
+}
+
+/// An entry the adopter edited diverges from its recorded baseline:
+/// `update` keeps the adopter's own content and reports it once, the same
+/// contract a `KIT_OWNED` file gets.
+#[test]
+fn update_keeps_a_locally_modified_knowledge_entry_and_reports_it_once() {
+    let dir = seeded_repo();
+    let mut entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
+    let index = entries
+        .iter()
+        .position(|entry| entry["id"] == TEST_ENTRY_ID)
+        .expect("test entry present");
+    entries[index]["summary"] = serde_json::json!("the adopter's own wording");
+    let modified = entries.clone();
+    write_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE, entries);
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains(&format!("kept {TEST_ENTRY_ID} (locally modified)\n")),
+        "got:\n{stdout}"
+    );
+
+    assert_eq!(
+        read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE),
+        modified
+    );
+}
+
+/// An entry the adopter deleted outright -- present at baseline, then
+/// removed from the file entirely -- is left absent and reported once;
+/// nothing restores it.
+#[test]
+fn update_respects_an_adopter_deleted_knowledge_entry_and_reports_it_once() {
+    let dir = seeded_repo();
+    let mut entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
+    entries.retain(|entry| entry["id"] != TEST_ENTRY_ID);
+    write_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE, entries);
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains(&format!("skipped {TEST_ENTRY_ID} (deleted)\n")),
+        "got:\n{stdout}"
+    );
+
+    let entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
+    assert!(!entries.iter().any(|entry| entry["id"] == TEST_ENTRY_ID));
+}
+
+/// An override on a deleted entry's id silences the report entirely; the
+/// entry stays absent either way.
+#[test]
+fn update_silences_an_adopter_deleted_knowledge_entry_listed_in_overrides() {
+    let dir = seeded_repo();
+    let mut entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
+    entries.retain(|entry| entry["id"] != TEST_ENTRY_ID);
+    write_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE, entries);
+
+    let marker_path = dir.path().join(".houserules.json");
+    let mut marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    marker["overrides"] = serde_json::json!([TEST_ENTRY_ID]);
+    fs::write(
+        &marker_path,
+        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
+    )
+    .unwrap();
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(!stdout.contains(TEST_ENTRY_ID), "got:\n{stdout}");
+    assert!(
+        !read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE)
+            .iter()
+            .any(|entry| entry["id"] == TEST_ENTRY_ID)
+    );
+}
+
+/// An entry the install never had -- absent from the file, with no baseline
+/// ever recorded for its id -- is written for the first time and stamped,
+/// silently: the same shape a genuinely new entry a later kit release adds
+/// would take, simulated here by removing both the entry and its baseline
+/// from an already-seeded install.
+#[test]
+fn update_writes_a_knowledge_entry_the_install_never_had() {
+    let dir = seeded_repo();
+    let mut entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
+    let index = entries
+        .iter()
+        .position(|entry| entry["id"] == TEST_ENTRY_ID)
+        .expect("test entry present");
+    let expected_entry = entries.remove(index);
+    write_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE, entries);
+
+    let marker_path = dir.path().join(".houserules.json");
+    let mut marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    marker["baselines"]
+        .as_object_mut()
+        .unwrap()
+        .remove(TEST_ENTRY_ID);
+    fs::write(
+        &marker_path,
+        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
+    )
+    .unwrap();
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(!stdout.contains(TEST_ENTRY_ID), "got:\n{stdout}");
+    assert!(
+        stdout.contains(&format!(
+            "updated {TEST_ENTRY_TOPIC_FILE} (1 entry changed)\n"
+        )),
+        "got:\n{stdout}"
+    );
+
+    let entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
+    assert!(entries.contains(&expected_entry), "got {entries:?}");
+
+    let marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    assert_eq!(
+        marker["baselines"][TEST_ENTRY_ID],
+        serde_json::json!(sha256_hex(&canonical_entry_bytes(&expected_entry)))
+    );
+}
+
+/// A `SEED_ONCE` path a later kit release adds is missing from an install
+/// seeded by an earlier one. `update` backfills it, since absence with no
+/// override means "never arrived", not "deleted on purpose".
+#[test]
+fn update_backfills_a_missing_seed_once_file() {
+    let dir = seeded_repo();
+    fs::remove_file(dir.path().join("docs/README.md")).expect("remove docs/README.md");
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("wrote docs/README.md\n"), "got:\n{stdout}");
+
+    let backfilled = fs::read(dir.path().join("docs/README.md")).unwrap();
+    let template = fs::read(repo_root().join("template/docs/README.md")).unwrap();
+    assert_eq!(backfilled, template);
+}
+
+/// An override on a missing `SEED_ONCE` path means "deleted on purpose":
+/// `update` leaves it absent and prints nothing about it.
+#[test]
+fn update_does_not_backfill_an_overridden_seed_once_file() {
+    let dir = seeded_repo();
+    fs::remove_file(dir.path().join("docs/README.md")).expect("remove docs/README.md");
+
+    let marker_path = dir.path().join(".houserules.json");
+    let mut marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    marker["overrides"] = serde_json::json!(["docs/README.md"]);
+    fs::write(
+        &marker_path,
+        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
+    )
+    .unwrap();
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(!stdout.contains("docs/README.md"), "got:\n{stdout}");
+    assert!(!dir.path().join("docs/README.md").exists());
+}
+
+/// A knowledge-topic file the adopter deleted outright is backfilled in
+/// full, the same "never arrived" contract every other missing `SEED_ONCE`
+/// path gets -- never a half-populated husk that reports every one of its
+/// entries deleted.
+#[test]
+fn update_backfills_a_missing_knowledge_topic_file_in_full() {
+    let dir = seeded_repo();
+    fs::remove_file(dir.path().join(TEST_ENTRY_TOPIC_FILE)).expect("remove topic file");
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains(&format!("wrote {TEST_ENTRY_TOPIC_FILE}\n")),
+        "got:\n{stdout}"
+    );
+    assert!(!stdout.contains("skipped"), "got:\n{stdout}");
+    assert!(!stdout.contains("deleted"), "got:\n{stdout}");
+
+    let backfilled = fs::read(dir.path().join(TEST_ENTRY_TOPIC_FILE)).unwrap();
+    let template = fs::read(repo_root().join("template").join(TEST_ENTRY_TOPIC_FILE)).unwrap();
+    assert_eq!(backfilled, template);
+
+    let entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
+    assert!(
+        entries.iter().any(|entry| entry["id"] == TEST_ENTRY_ID),
+        "the backfilled file is missing its own kit entries: {entries:?}"
+    );
+
+    let marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(dir.path().join(".houserules.json")).unwrap())
+            .unwrap();
+    assert!(
+        marker["baselines"][TEST_ENTRY_ID].is_string(),
+        "the backfilled file's entries were not stamped: {marker}"
+    );
+}
+
+/// An override on a knowledge-topic file's own path governs the whole file,
+/// not just one entry id: the file stays exactly as the adopter left it --
+/// absent, in this case -- and update prints nothing about it.
+#[test]
+fn update_leaves_an_overridden_missing_knowledge_topic_file_absent() {
+    let dir = seeded_repo();
+    fs::remove_file(dir.path().join(TEST_ENTRY_TOPIC_FILE)).expect("remove topic file");
+
+    let marker_path = dir.path().join(".houserules.json");
+    let mut marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    marker["overrides"] = serde_json::json!([TEST_ENTRY_TOPIC_FILE]);
+    fs::write(
+        &marker_path,
+        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
+    )
+    .unwrap();
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(!stdout.contains(TEST_ENTRY_TOPIC_FILE), "got:\n{stdout}");
+    assert!(!dir.path().join(TEST_ENTRY_TOPIC_FILE).exists());
+}
+
+/// An override on a knowledge-topic file's own path also governs a file
+/// that is PRESENT but has locally modified entries: the whole file is left
+/// exactly as found, and no per-entry report line fires for it either.
+#[test]
+fn update_leaves_an_overridden_present_knowledge_topic_file_untouched() {
+    let dir = seeded_repo();
+    let mut entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
+    let index = entries
+        .iter()
+        .position(|entry| entry["id"] == TEST_ENTRY_ID)
+        .expect("test entry present");
+    entries[index]["summary"] = serde_json::json!("the adopter's own wording");
+    write_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE, entries.clone());
+
+    let marker_path = dir.path().join(".houserules.json");
+    let mut marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    marker["overrides"] = serde_json::json!([TEST_ENTRY_TOPIC_FILE]);
+    fs::write(
+        &marker_path,
+        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
+    )
+    .unwrap();
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(!stdout.contains(TEST_ENTRY_ID), "got:\n{stdout}");
+    assert!(!stdout.contains(TEST_ENTRY_TOPIC_FILE), "got:\n{stdout}");
+    assert_eq!(
+        read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE),
+        entries
+    );
+}
+
+/// The `SEED_ONCE` backfill rewrites `PREFIXED` payload content with the
+/// install's own stamped `idPrefix`, never the `--id-prefix` flag's value
+/// (which defaults to `WI`): backfilling into a non-`WI` install must not
+/// hand it ids `check-backlog` then rejects.
+#[test]
+fn update_backfills_a_prefixed_file_with_the_installs_own_stamped_prefix() {
+    let dir = scratch_git_repo();
+    let init = houserules()
+        .args(["init", "--dir"])
+        .arg(dir.path())
+        .args(["--id-prefix", "FOO"])
+        .output()
+        .expect("run init");
+    assert!(
+        init.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+    fs::remove_file(dir.path().join("backlog/items/general.json"))
+        .expect("remove backlog/items/general.json");
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update (no --id-prefix flag: must not default to WI)");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("wrote backlog/items/general.json\n"),
+        "got:\n{stdout}"
+    );
+
+    let backfilled = fs::read_to_string(dir.path().join("backlog/items/general.json")).unwrap();
+    assert!(backfilled.contains("\"FOO-001\""), "{backfilled}");
+    assert!(!backfilled.contains("WI-"), "{backfilled}");
+
+    let check_backlog = houserules()
+        .args(["check-backlog", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run check-backlog");
+    assert!(
+        check_backlog.status.success(),
+        "check-backlog failed after the backfill: {}",
+        String::from_utf8_lossy(&check_backlog.stderr)
+    );
+}
+
+/// An install stamped by the pre-baseline format -- `.houserules.json` with
+/// no `baselines` field at all -- needs no separate migration code path:
+/// `update` treats every item's unrecorded baseline as "compare directly
+/// against the current payload". This one run proves both of `baseline::
+/// classify`'s no-baseline arms at once, each on a different `KIT_OWNED`
+/// file: `.claude/agents/task-reviewer.md`, left exactly as `seeded_repo`
+/// wrote it, matches the payload and is silently written and stamped
+/// (`Status::AtBaseline`); `.claude/agents/implementer.md`, hand-corrupted
+/// below, diverges from the payload and is kept, reported once, and left
+/// unstamped for a later run to reconcile (`Status::Modified`). Nothing on
+/// disk is overwritten by the divergent file; both outcomes coexist in one
+/// `update` invocation, since neither file has a recorded baseline yet.
+#[test]
+fn update_migration_run_reconciles_kit_owned_files_with_no_baselines_recorded() {
+    let dir = seeded_repo();
+    let unmodified_file = ".claude/agents/task-reviewer.md";
+    let modified_file = ".claude/agents/implementer.md";
+    fs::write(dir.path().join(modified_file), b"pre-baseline adopter edit")
+        .expect("corrupt modified_file");
+
+    let marker_path = dir.path().join(".houserules.json");
+    let mut marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    marker
+        .as_object_mut()
+        .unwrap()
+        .remove("baselines")
+        .expect("seeded_repo stamps baselines");
+    fs::write(
+        &marker_path,
+        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
+    )
+    .unwrap();
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains(&format!("wrote {unmodified_file}\n")),
+        "got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains(&format!("kept {modified_file} (locally modified)\n")),
+        "got:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains(&format!("wrote {modified_file}\n")),
+        "got:\n{stdout}"
+    );
+
+    assert_eq!(
+        fs::read(dir.path().join(modified_file)).unwrap(),
+        b"pre-baseline adopter edit",
+        "the divergent file was overwritten during migration"
+    );
+
+    let restamped: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    let baselines = restamped["baselines"]
+        .as_object()
+        .expect("baselines object");
+    assert!(baselines.contains_key(unmodified_file), "got {baselines:?}");
+    assert!(
+        !baselines.contains_key(modified_file),
+        "a divergent file should stay unstamped until the adopter resolves it: got {baselines:?}"
     );
 }
 
@@ -458,10 +1300,9 @@ fn update_renders_none_when_the_marker_file_is_missing() {
         &fs::read_to_string(dir.path().join(".houserules.json")).expect("read marker"),
     )
     .expect("parse marker");
-    assert_eq!(
-        marker,
-        serde_json::json!({"version": version, "idPrefix": "WI"})
-    );
+    assert_eq!(marker["version"], serde_json::json!(version));
+    assert_eq!(marker["idPrefix"], serde_json::json!("WI"));
+    assert!(marker["baselines"].is_object(), "got {marker:?}");
 }
 
 #[test]
@@ -490,10 +1331,9 @@ fn update_renders_none_when_the_markers_version_field_is_absent_but_keeps_its_id
         &fs::read_to_string(dir.path().join(".houserules.json")).expect("read marker"),
     )
     .expect("parse marker");
-    assert_eq!(
-        marker,
-        serde_json::json!({"version": version, "idPrefix": "FOO"})
-    );
+    assert_eq!(marker["version"], serde_json::json!(version));
+    assert_eq!(marker["idPrefix"], serde_json::json!("FOO"));
+    assert!(marker["baselines"].is_object(), "got {marker:?}");
 }
 
 #[test]
@@ -559,10 +1399,9 @@ fn update_defaults_the_id_prefix_from_the_flag_when_the_marker_has_no_id_prefix_
         &fs::read_to_string(dir.path().join(".houserules.json")).expect("read marker"),
     )
     .expect("parse marker");
-    assert_eq!(
-        marker,
-        serde_json::json!({"version": version, "idPrefix": "ZED"})
-    );
+    assert_eq!(marker["version"], serde_json::json!(version));
+    assert_eq!(marker["idPrefix"], serde_json::json!("ZED"));
+    assert!(marker["baselines"].is_object(), "got {marker:?}");
 }
 
 #[test]
@@ -664,6 +1503,82 @@ fn update_reports_a_markers_null_version_as_a_named_error_exit_2_not_as_none() {
     assert_named_error_before_any_write(
         br#"{"version":null}"#,
         "version must be a non-empty string\n",
+    );
+}
+
+/// `overrides` is adopter-hand-edited data: a present value that is not an
+/// array of strings is one named error, never a silent empty default -- the
+/// same contract `idPrefix` and `version` already get.
+#[test]
+fn update_reports_a_markers_non_array_overrides_as_a_named_error_exit_2() {
+    assert_named_error_before_any_write(
+        br#"{"overrides":"docs/README.md"}"#,
+        "overrides must be an array of strings\n",
+    );
+}
+
+/// An `overrides` array holding a non-string element is equally malformed.
+#[test]
+fn update_reports_a_markers_overrides_array_with_a_non_string_element_as_a_named_error_exit_2() {
+    assert_named_error_before_any_write(
+        br#"{"overrides":["docs/README.md", 5]}"#,
+        "overrides must be an array of strings\n",
+    );
+}
+
+/// `baselines` is adopter-visible, hand-editable data too (documented at
+/// `docs/README.md`): a present value that is not an object of string
+/// values is one named error, never a silent empty default.
+#[test]
+fn update_reports_a_markers_non_object_baselines_as_a_named_error_exit_2() {
+    assert_named_error_before_any_write(
+        br#"{"baselines":["a","b"]}"#,
+        "baselines must be an object of strings\n",
+    );
+}
+
+/// A `baselines` object holding a non-string value is equally malformed.
+#[test]
+fn update_reports_a_markers_baselines_object_with_a_non_string_value_as_a_named_error_exit_2() {
+    assert_named_error_before_any_write(
+        br#"{"baselines":{"process.ask-when-missing": 5}}"#,
+        "baselines must be an object of strings\n",
+    );
+}
+
+/// `update` rewrites only the marker fields it owns (`version`, `idPrefix`,
+/// `baselines`): any other key an adopter hand-added survives a restamp
+/// untouched.
+#[test]
+fn update_preserves_an_unknown_marker_key_across_a_restamp() {
+    let dir = seeded_repo();
+    let marker_path = dir.path().join(".houserules.json");
+    let mut marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    marker["notes"] = serde_json::json!("adopter's own field");
+    fs::write(
+        &marker_path,
+        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
+    )
+    .unwrap();
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let restamped: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    assert_eq!(
+        restamped["notes"],
+        serde_json::json!("adopter's own field"),
+        "update dropped an unknown marker key"
     );
 }
 
