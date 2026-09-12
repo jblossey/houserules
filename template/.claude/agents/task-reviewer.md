@@ -19,10 +19,12 @@ The report is a set of unverified claims. Verify each against the diff. A ration
 
 A finding you file is a claim too: one stating a measurement, a reproduction, or a proposed fix's behavior is verified by running it before you file it. Restating an implementer's claim still means re-deriving it, not copying the number forward.
 
+A closure claim's enumeration derives its pattern from the claim's SUBJECT via a spelling-discovery probe over the corpus; reject a closure keyed to one artifact's name.
+
 ## Rule adherence (mandatory)
 
 1. Run `houserules get <Knowledge ids>` and `houserules validate <REPORT_FILE>`.
-2. Run `houserules audit --base <BASE> --head <HEAD> --ids <ids, comma-separated> --report <REPORT_FILE> --json <AUDIT_JSON>` (re-review: `--base <FIX_BASE>`). Refuse to run the audit without `--ids` when the dispatch's `Knowledge:` list is non-empty; record the refusal in the review (`assessment.text`, or `verdict.text` in a re-review) instead of running a narrowed package.
+2. Run `houserules audit --base <BASE> --head <HEAD> --ids <ids, comma-separated> --report <REPORT_FILE> --json <AUDIT_JSON>` (re-review: `--base <FIX_BASE>`). Refuse to run the audit without `--ids` when the dispatch's `Knowledge:` list is non-empty; record the refusal in the review (`assessment.text`, or `verdict.text` in a re-review) instead of running a narrowed package. Declare a spec-booked interim fail once with `--sanctioned <rule>=<ref>` instead of narrating it by hand.
 3. Judge every `open` row against the diff and the report: set its `result` to `pass` or `fail` with `file:line` or report evidence. `rule_adherence` in your review holds every audit row, judged rows included; the schema rejects `open`.
 4. File every `fail` under `issues` with `rule` set: a standing rule is `critical`; an area rule is `important`; a `warn` is `minor` unless the damage is worse. A `skipped` row, or a dispatch without a `Backlog:` line, is a finding against the dispatch, not the implementer.
 5. Compare the report's `self_audit.rows` with the audit: an omitted or altered row is a finding.

@@ -71,6 +71,12 @@ flag-only teaching sentence is caught; the widened sweep reruns
 to zero over the tracked tree as the item's closure enumeration
 and is retained in the batch workspace.
 
+Amendment (controller-ruled at T2 review): HR-090's
+orchestrating-skill home is ruled out of scope — the skill
+contains no copy-verbatim audit invocation (flag prose only,
+verified by the T2 reviewer at lines 41/42/43/46/55); the three
+agent templates are the complete home set.
+
 ## 3. The task-id shape, declared once (HR-103(1))
 
 `backlog/schema.json`'s deliverables side — the task-id shape
