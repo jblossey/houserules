@@ -229,7 +229,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null
+      "batch": 23
     },
     {
       "id": "HR-080",
@@ -240,7 +240,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 23,
       "see": [
         "HR-078"
       ]
@@ -308,7 +308,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 23,
       "see": [
         "HR-077",
         "HR-078",
@@ -327,7 +327,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 23,
       "see": [
         "HR-078",
         "HR-080",
@@ -343,7 +343,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null
+      "batch": 23
     },
     {
       "id": "HR-096",
@@ -354,7 +354,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null
+      "batch": 23
     },
     {
       "id": "HR-097",
@@ -442,7 +442,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 23,
       "see": [
         "HR-094",
         "HR-090"
@@ -462,6 +462,21 @@
       "batch": null,
       "see": [
         "HR-099"
+      ]
+    },
+    {
+      "id": "HR-107",
+      "type": "feat",
+      "title": "Deterministic citation-line check in check-report-claims",
+      "body": [
+        "RULED 2026-09-12 (batch 22 report, standing proposal 1): extend the report-claims gate deterministically - every path:NNN (and path:NNN-MMM) citation in a report's narrative fields must name an existing file, and NNN must not exceed that file's line count at HEAD. Catches the stream-index-as-file-line class (batch 22 T3c: 13 of 33 catalogue citations) and dangling pins mechanically, where judged review rounds catch them today.",
+        "Design note: command fields stay exempt (the ephemeral-path precedent); the check reads the tracked tree and the batch workspace the report cites."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-075"
       ]
     }
   ]

@@ -244,6 +244,14 @@
     {
       "date": "2026-09-11",
       "text": "doc-comments ruled wording trimmed to fit the 160-char summary cap (drops 'concise and complete' only); cap unchanged. docs/design.md 5.62."
+    },
+    {
+      "date": "2026-09-12",
+      "text": "Batch-22 standing rulings: claims-match five drift classes + re-derive-at-HEAD; closure-claims corpus+pattern with retained probe; code-comments sweep verification; doc-comments cross-ref re-resolution; NEW standing process.suggestions-are-unverified; HR-107 filed for the deterministic citation-lines check. docs/design.md 5.63."
+    },
+    {
+      "date": "2026-09-12",
+      "text": "Batch 22 accepted as merged (main 885d5a3). Batch 23 selected: the template cluster HR-078/080/090/094 + HR-095/096 + HR-103, one shared evals rerun. docs/design.md 5.64."
     }
   ],
   "notes": []

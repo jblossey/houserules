@@ -773,3 +773,24 @@ Each item records the ruling with its date, or stays marked open.
     "concise and complete", which writing-style.principles
     already demands. The cap stays at 160 for all adopters.
     Source: owner, 2026-09-11, batch-22 T3a escalation.
+63. **Batch-22 standing rulings — ruled 2026-09-12.** Four
+    applied: claims-match gains the five drift classes (rewritten
+    commands, unmeasured counts, stream-index citations, false
+    universals, unchecked transcriptions) plus re-derive-at-final-
+    HEAD; closure-claims gains corpus-plus-pattern derivation with
+    a retained spelling probe; code-comments gains survey-derived
+    sweep verification; doc-comments gains same-commit cross-
+    reference re-resolution. Plus one new standing entry,
+    process.suggestions-are-unverified (another agent's suggested
+    wording is a draft, not evidence). The deterministic
+    citation-lines check files as HR-107. Source: owner,
+    2026-09-12, batch 22 report.
+64. **Batch 22 accepted; batch 23 is the template cluster —
+    ruled 2026-09-12.** The stewardship batch accepted as merged
+    (main 885d5a3, 18 checks green on the third run; the two
+    .gitattributes rounds included). Batch 23 selected: the
+    template cluster HR-078/080/090/094 with riders HR-095/096
+    and HR-103's five template defects, all under one shared
+    evals rerun. The owner-attended release set (HR-068 first)
+    stays parked for the owner. Source: owner, 2026-09-12,
+    batch 22 acceptance.
