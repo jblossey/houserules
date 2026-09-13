@@ -804,3 +804,53 @@ Each item records the ruling with its date, or stays marked open.
     directs that the batch after batch 23 makes the whole
     repository and the setup around it right. Source: owner,
     2026-09-12, batch-23 spec gate.
+66. **Batch 23 accepted; batch 24 is the repo-and-setup batch —
+    ruled 2026-09-12.** The template cluster accepted as merged
+    (main 296781b, all eight required checks green on the first
+    push). Batch 24 proceeds per HR-108's direction: the
+    releases page (no source zip, no binaries), the broken
+    installation methods, and the whole setup around the
+    repository, absorbing HR-048/068/081/082 and the runbook
+    step-two set (HR-049/063/064/069/070); the owner-attended
+    decisions in that set (HR-068's token choice first) surface
+    as gate questions. Source: owner, 2026-09-12, batch 23
+    acceptance.
+67. **Batch-24 gate rulings — ruled 2026-09-12.** Four: the
+    release trigger is a fine-grained PAT in a repository
+    Actions secret (the Dependabot-token precedent); every
+    documented install path pins to the releases/latest
+    download alias so a release never forces a README edit
+    (HR-049 closes by design change — nothing version-bearing
+    remains to follow); the version is 0.3.0 with the -alpha
+    suffix dropped (the latest alias excludes prereleases, and
+    0.x already signals pre-1.0 — supersedes release PR #18's
+    1.0.0-alpha); the 0.2.0-alpha remains stay as history.
+    Source: owner, 2026-09-12, batch-24 spec gate.
+68. **Batch 25 directed: the v1-readiness batch — ruled
+    2026-09-12.** After batch 24, batch 25 makes the repository
+    v1-ready: everything the controller deems necessary for v1,
+    plus a complete owner review of every default the template
+    ships — delivered as a complete list/spreadsheet where the
+    owner ticks each item template-appropriate or not, requests
+    specific changes, and adds items still missing (HR-113; the
+    row set derives from template/** itself). Source: owner,
+    2026-09-12, during batch 24.
+69. **Batch-25 sweep addition: the gap rows — ruled
+    2026-09-12.** The template-defaults review list (5.68,
+    HR-113) also enumerates what is used but NOT shipped: this
+    repository's own machinery versus template/, and the
+    tag-pilot checkout's evolved state versus template/ —
+    tag-pilot read strictly read-only, per its standing rule.
+    Each gap row carries the same tick/change/add affordances.
+    Source: owner, 2026-09-12, during batch 24.
+70. **Agent effort levels pinned — ruled 2026-09-12.** The
+    controller session runs at effort high (settings.json
+    effortLevel, both copies), task and branch reviews at high,
+    implementers at xhigh — pinned in the agent templates'
+    frontmatter (effort:, verified against Claude Code's
+    current sub-agents and settings docs) and recorded as a
+    process.model-policy body bullet in both knowledge copies.
+    The template edits to implementer.md and task-reviewer.md
+    trigger process.evals-rerun; the rerun is booked before
+    this batch's branch review. Source: owner, 2026-09-12,
+    during batch 24.

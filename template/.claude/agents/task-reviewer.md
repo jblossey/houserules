@@ -1,6 +1,7 @@
 ---
 name: task-reviewer
 description: Reviews one task's diff for spec compliance, code quality, and rule adherence. Use for every task review and scoped re-review in this repository.
+effort: high
 model: opus
 disallowedTools: Agent, Edit, Write, NotebookEdit
 skills:

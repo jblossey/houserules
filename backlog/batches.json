@@ -41,7 +41,28 @@
       "kickoff": "docs/specs/2026-09-12-batch-23-template-cluster.md",
       "status": {
         "state": "done",
-        "text": "Done 2026-09-12: all seven items delivered - the task-id shape declared once and parity-pinned with the batch-17 exclusion ruled (HR-103(1)); the HR-095 Limits bullet; the nine HR-096 restatements closing to zero on the retained enumeration; every owner-ruled template sentence verbatim in the three agent templates and the orchestrating skill with the HR-090 sweep widened to 45/45 (HR-078/080/090/094, HR-103's template bullets); the evals rerun 14/14 clearing the sanctioned fail. Two tasks, three fix rounds, a fable branch review (ready with-fixes, both landed). HR-108/109/110/111/112 filed; rulings 5.65 + two controller amendments homed in-branch. Acceptance pending."
+        "text": "Done 2026-09-12: all seven items delivered - the task-id shape declared once and parity-pinned with the batch-17 exclusion ruled (HR-103(1)); the HR-095 Limits bullet; the nine HR-096 restatements closing to zero on the retained enumeration; every owner-ruled template sentence verbatim in the three agent templates and the orchestrating skill with the HR-090 sweep widened to 45/45 (HR-078/080/090/094, HR-103's template bullets); the evals rerun 14/14 clearing the sanctioned fail. Two tasks, three fix rounds, a fable branch review (ready with-fixes, both landed). HR-108/109/110/111/112 filed; rulings 5.65 + two controller amendments homed in-branch. Acceptance pending. ACCEPTED by the owner 2026-09-12 (design.md 5.66)."
+      }
+    },
+    {
+      "number": 24,
+      "items": [
+        "HR-108",
+        "HR-048",
+        "HR-068",
+        "HR-081",
+        "HR-082",
+        "HR-049",
+        "HR-063",
+        "HR-064",
+        "HR-069",
+        "HR-070"
+      ],
+      "summary": "The repo-and-setup batch, per the owner's HR-108 direction: the GitHub releases page ships the source zip and the per-platform binaries, every documented installation method works end to end, and the release machinery around the repository is made right - absorbing the binary delivery channels (HR-048), the release token decision (HR-068), the release-please path attribution gap (HR-081), the Cargo.lock residue (HR-082), and the runbook step-two set (HR-049/063/064/069/070).",
+      "kickoff": "docs/specs/2026-09-12-batch-24-repo-and-setup.md",
+      "status": {
+        "state": "in-progress",
+        "text": "Spec approved as amended 2026-09-12 (design.md 5.67: PAT trigger, the latest structure, 0.3.0, remains-as-history); plan in draft."
       }
     }
   ]

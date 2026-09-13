@@ -256,6 +256,26 @@
     {
       "date": "2026-09-12",
       "text": "Batch-23 spec approved as drafted. Owner records: the releases page ships no source zip and no binaries, and the installation methods do not work (HR-108); batch 24 makes the whole repository and setup right. docs/design.md 5.65."
+    },
+    {
+      "date": "2026-09-12",
+      "text": "Batch 23 accepted as merged (main 296781b, first-push-green). Batch 24 selected per HR-108: the repo-and-setup batch - releases page, binaries, installation methods - absorbing HR-048/068/081/082 and the runbook step-two set. docs/design.md 5.66."
+    },
+    {
+      "date": "2026-09-12",
+      "text": "Batch-24 gate: fine-grained-PAT trigger; the latest-alias install structure (HR-049 closes by design change); version 0.3.0, -alpha dropped; 0.2.0-alpha remains stay. docs/design.md 5.67."
+    },
+    {
+      "date": "2026-09-12",
+      "text": "Batch 25 directed: the v1-readiness batch - v1 gaps plus the owner's full template-defaults review via a tick/change/add list derived from template/** (HR-113). docs/design.md 5.68."
+    },
+    {
+      "date": "2026-09-12",
+      "text": "Batch-25 sweep addition: gap rows for used-but-unshipped items, from this repository and from the read-only tag-pilot checkout (HR-113 extended). docs/design.md 5.69."
+    },
+    {
+      "date": "2026-09-12",
+      "text": "Effort pins: controller high (settings effortLevel), reviews high, implementers xhigh - agent-template frontmatter + model-policy bullet, both copies; evals rerun booked for the batch-24 close. docs/design.md 5.70."
     }
   ],
   "notes": []

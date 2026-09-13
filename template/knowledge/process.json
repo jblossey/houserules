@@ -224,7 +224,8 @@
       "body": [
         "Model order: haiku < sonnet < opus < fable. Mightier is strict: an Opus implementer needs a Fable review, so choosing an Opus implementer is a deliberate, costed decision.",
         "Scoped re-reviews follow the same bar as first reviews: the fix diff's size never lowers the reviewer's tier.",
-        "Name the model on every dispatch; an omitted model inherits the session's most expensive one."
+        "Name the model on every dispatch; an omitted model inherits the session's most expensive one.",
+        "Effort pins (owner-ruled 2026-09-12): the controller session runs at effort high (settings.json effortLevel), task and branch reviews at high, implementers at xhigh - set in the agent templates' frontmatter; a dispatch that deviates names the deviation."
       ],
       "tags": [
         "dispatch",

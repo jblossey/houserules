@@ -38,7 +38,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": 19
+      "batch": 24
     },
     {
       "id": "HR-049",
@@ -56,7 +56,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": 19
+      "batch": 24
     },
     {
       "id": "HR-053",
@@ -140,7 +140,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": 19
+      "batch": 24
     },
     {
       "id": "HR-064",
@@ -159,7 +159,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": 19
+      "batch": 24
     },
     {
       "id": "HR-068",
@@ -173,7 +173,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null
+      "batch": 24
     },
     {
       "id": "HR-069",
@@ -188,7 +188,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null
+      "batch": 24
     },
     {
       "id": "HR-070",
@@ -202,7 +202,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null
+      "batch": 24
     },
     {
       "id": "HR-072",
@@ -232,7 +232,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 24,
       "see": [
         "HR-073"
       ]
@@ -250,7 +250,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 24,
       "see": [
         "HR-073"
       ]
@@ -367,7 +367,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 24,
       "see": [
         "HR-048",
         "HR-068",
@@ -431,6 +431,25 @@
       "batch": null,
       "see": [
         "HR-102"
+      ]
+    },
+    {
+      "id": "HR-113",
+      "type": "feat",
+      "title": "The v1-readiness batch: v1 gaps plus the owner's full template-defaults review",
+      "body": [
+        "Owner direction (2026-09-12, during batch 24): the batch AFTER batch 24 (batch 25) makes the repository v1-ready. Two halves.",
+        "(1) V1 readiness: the controller proposes everything deemed necessary at shaping. Known candidates to complete then: the macOS-signing revisit-at-1.0 ruling; the CLI/schema surface freeze; the open quality-gate items as v1 gates (HR-107 citation-lines, HR-109 silent-keyword engine, HR-110/111 claim cross-checks, HR-112 no-provenance gate); the matcher and restamp refinements (HR-100, HR-104); docs completeness incl. HR-088/089-class update-path gaps; the 1.0 version cut itself.",
+        "(2) The template-defaults review: a complete sweep over every default the template ships. The controller delivers a complete list/spreadsheet - one row per shipped default - where the owner can, per item: tick template-appropriate or not; request changes and specify which; and ADD items they think are still missing. Every owner decision then homes per process.rulings-to-file and the edits ride the batch.",
+        "The list's row set derives from template/** itself (git ls-files template/), never from memory: the seeded knowledge entries per topic (process, quality, security-hygiene, writing-style, knowledge-base - every rule, gotcha, and procedure), the three agent templates' instructions, the skills, the schema constraints (id shapes, required fields, textList floors, the task-id shape), the seeded workflow (knowledge.yml), CLAUDE.md's seeded text, settings.json's hooks, areas.json's defaults, backlog seed files, docs/README.md, and the eval scenarios.",
+        "Addition (owner, 2026-09-12, same day): the sweep list also carries the GAP rows - items currently in use that are NOT in the template. Two gap sources, each its own row set: (a) this repository's own knowledge/backlog machinery versus template/ (entries, rules, and defaults that exist here but never shipped); (b) the tag-pilot checkout's current state versus template/ - tag-pilot has evolved independently and may hold items that became relevant there without surfacing in houserules. Tag-pilot stays STRICTLY read-only (houserules.tag-pilot-is-read-only): the sweep READS it to enumerate, never modifies, commits, or runs anything against it. Each gap row gets the same three affordances: adopt into the template or not, with which changes, plus free additions.",
+        "Deliverable form settled at shaping: an interactive review page or a spreadsheet file, whichever the owner prefers at the gate; the requirements are the three per-row affordances above plus free additions."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-108"
       ]
     }
   ]

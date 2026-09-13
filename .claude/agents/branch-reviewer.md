@@ -1,6 +1,7 @@
 ---
 name: branch-reviewer
 description: Reviews a whole branch before merge and proposes knowledge-base improvements from the batch's audits and reviews. Use for the final whole-branch review of every batch.
+effort: high
 model: fable
 disallowedTools: Agent, Edit, Write, NotebookEdit
 skills:

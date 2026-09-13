@@ -9,9 +9,9 @@
   "baselines": {
     "tools/claude-session-start.sh": "5f9a0b3d4ea66540aeb93435b1d9119799b8f7da8cf800295a69b3645d5ba80a",
     ".githooks/commit-msg": "32b161b8b965d50eee8aad833fad1387a74a72be6ad008fff6a3c3eae0dc9739",
-    ".claude/agents/implementer.md": "a14228f511bf96e0732a23d7316a1236808acfc3f75cec17821abf6564346a27",
-    ".claude/agents/task-reviewer.md": "d7b5119dd88912f68ab925ea5e3eb130aafaa64eb6fb4f864dce5ee514ceb010",
-    ".claude/agents/branch-reviewer.md": "77d54222433c4e005f940677e722c5ea33dcfa9980730edcfb93295aa4f7e390",
+    ".claude/agents/implementer.md": "f1e69de4bc004d2dac73be025526e25553acb2522d4c58f831d1644474760c99",
+    ".claude/agents/task-reviewer.md": "c1654facea851b31293e6f9a922c22d83f15b1c5dac4525582e0fb2c6b18b581",
+    ".claude/agents/branch-reviewer.md": "55325660d0bba581d9e588b66336b623d52b38913135a96700ee2c426435c088",
     ".claude/skills/orchestrating/SKILL.md": "74a83f973ddeb56584bdd44f312565c375543244b10646ba8286206f246db71a",
     ".claude/skills/finishing-a-feature/SKILL.md": "12b104952321f5d0e2535691232f4f602c6c6b72c1e4d742b60e5346bcc3206e",
     ".claude/skills/migrating-knowledge/SKILL.md": "25f13d5d85b5441e7fc558b2d8d76d8577aacbf92dc29ede55a0f8f61eb3a2ab",

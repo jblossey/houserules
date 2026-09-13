@@ -1,6 +1,7 @@
 ---
 name: implementer
 description: Implements one task from a task brief under this repository's rules. Use for every implementer dispatch in this repository.
+effort: xhigh
 model: sonnet
 disallowedTools: Agent
 skills:
