@@ -521,6 +521,21 @@
       "see": [
         "HR-110"
       ]
+    },
+    {
+      "id": "HR-118",
+      "type": "fix",
+      "title": "dist and release-please both create the GitHub release: set create-release = false",
+      "body": [
+        "T2 live (2026-09-13): release-please (PAT) created release v0.3.0 on the tag push; dist's host job then failed at gh release create ('a release with the same tag name already exists'). Fix: create-release = false in dist-workspace.toml + dist generate (lift allow-dirty=[\"ci\"] for the write, restore after; Dependabot re-bumps action pins). Proven against pinned dist 0.32.0 in a scratch clone: the host step becomes gh release upload + gh release edit --draft=false, which cooperates with release-please's published release. Recovery for v0.3.0 was owner-ruled: release object deleted (tag kept), host job re-run. Rides the batch-24 close branch (T3b)."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 24,
+      "see": [
+        "HR-068",
+        "HR-048"
+      ]
     }
   ]
 }

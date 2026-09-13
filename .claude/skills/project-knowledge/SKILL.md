@@ -22,10 +22,13 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [process.deliverables-json] Task reports, reviews, and branch reviews are JSON files that pass `houserules validate` against `.claude/schemas/deliverables.json`.
 - [process.evidence-outlives-the-session] Cite evidence only at paths that outlive the session: the batch workspace or the tracked tree, never a session scratchpad.
 - [process.ff-only-merges] Merge fast-forward only, from the CLI, after aggregating the branch into clean logical commits. No merge commits, no GitHub squash merges.
+- [process.fix-proofs-extend-the-reviewers-run] A fix round's proof re-runs the review's own reproduction, extended to cover the fix -- never a fresh, narrower proof.
+- [process.gates-cover-generated-commits] Walk every commit author class a new gate will hit -- bots and generated commits included -- through the gate on paper before it ships; state each accepted red.
 - [process.knowledge-first] Before you change a file, read its knowledge: the ids in your task and `houserules for <path>`. Cite the ids you relied on in your report.
 - [process.live-run-before-ci] Verify a change live (run the app, service, or tool for real; capture evidence) before any PR, merge, or deploy spend.
 - [process.model-policy] Every review runs on a mightier model than the implementer it reviews. Implementers use the cheapest model that fits the task.
 - [process.no-tech-debt] Fix every review finding, Minor included. Defer a fix only for a stated reason, as a backlog item; never as a TODO in code.
+- [process.owner-rulings-need-owner-supersession] Only the owner supersedes an owner ruling: a controller with latitude proposes the reversal at the next checkpoint and builds nothing on it until ruled.
 - [process.review-findings-are-claims-too] A review finding stating a measurement, a reproduction, or a proposed fix's behavior is verified by running it before filing; restated claims are re-derived.
 - [process.rulings-to-file] Every ruling goes to its home file in the same turn — a deferral’s backlog item included. A ledger and the chat are not home files; neither survives compaction.
 - [process.sequential-agents] Run all agent work strictly sequentially. Never dispatch two implementers or two reviewers at the same time.
@@ -53,7 +56,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 houserules  25  Working in the houserules kit repository
 knowledge-base  5  Authoring knowledge entries
-process  32  How work runs: batches, dispatch, reviews, rulings
+process  35  How work runs: batches, dispatch, reviews, rulings
 quality  6  Quality principles
 security-hygiene  5  Dependency, commit, and test hygiene
 writing-style  4  Writing style for docs, comments, commits, reports

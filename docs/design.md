@@ -952,4 +952,65 @@ Each item records the ruling with its date, or stays marked open.
     Source: controller under the branch-fix task's own ruled
     latitude (spec-compliant per docs/specs/2026-09-12-batch-24-
     repo-and-setup.md §2's "merges green unattended" goal),
-    2026-09-13, branch review issues 1-2.
+    2026-09-13, branch review issues 1-2. RATIFIED by the owner
+    2026-09-13 at the batch-24 report, with release PR #23's
+    live diff as the proof (the version rides the PR; the PR is
+    green unattended).
+74. **HR-081's mechanism ratified: the payload-stamp witness —
+    ruled 2026-09-13.** Template attribution works by
+    construction: `crates/houserules/payload.stamp` carries a
+    SHA-256 digest over `git ls-files -z -- template`, the
+    `payload-stamp-gate` bin verifies it in lint (`--write`
+    regenerates), `check-commit`'s opt-in `per_commit` co-change
+    check pairs every `template/**` commit with the stamp (a
+    parent-tree guard exempts pre-mechanism history), so every
+    template change touches `crates/**` and release-please
+    attributes it with no config extension. Chosen after the
+    5.72 rejection made linked-versions inert and the
+    single-root-package alternative failed at source (the
+    bundled CargoToml updater throws on a `[package]`-less
+    manifest). The close-gate proof (HR-081): the first
+    template-only change on main after v0.3.0 must bump a
+    release PR. Source: owner, 2026-09-13, the batch-24 report.
+75. **Three standing rules adopted from the batch-24
+    retrospective — ruled 2026-09-13.** The owner adopted all
+    three branch-review proposals as standing:
+    `process.gates-cover-generated-commits` (walk every commit
+    author class — bots and generated commits included —
+    through a new gate on paper before it ships),
+    `process.fix-proofs-extend-the-reviewers-run` (a fix
+    round's proof extends the review's own reproduction, never
+    a narrower fresh one), and
+    `process.owner-rulings-need-owner-supersession` (a
+    controller with latitude proposes a reversal of an owner
+    ruling and builds nothing on it until the owner rules).
+    Entries live in `knowledge/process.json` with
+    `standing: true`. Source: owner, 2026-09-13, the batch-24
+    report.
+76. **Batch 24 accepted; T2 runs immediately — ruled
+    2026-09-13.** The owner accepted the batch's built-and-
+    merged state (main eeb5708; first live hop verified;
+    release PR #23 green unattended) and directed the T2
+    release now: PR #23 merges ff-only from the CLI as the
+    watched live release — tag v0.3.0 → dist → five archives +
+    checksums + installer, marked latest. HR-048 and HR-068
+    close on that chain; T3b's live install verification and
+    the batch's ticks/sweep follow on the close branch. Source:
+    owner, 2026-09-13, the batch-24 report.
+77. **T2's create-collision recovery: delete the asset-less
+    release object and re-run the failed host job — ruled
+    2026-09-13.** The live chain broke at its last hop:
+    release-please (on the PAT) created release v0.3.0 on the
+    tag push, then dist's host job failed at `gh release
+    create` ("a release with the same tag name already
+    exists"). Both tools created the release. The owner ruled
+    the pipeline-authored recovery over a manual asset upload:
+    the release object was deleted (tag v0.3.0 kept), the host
+    job re-run, and dist recreated the release with all 16
+    assets; `releases/latest/download/...` verified 200 live.
+    The permanent fix is HR-118: `create-release = false` in
+    dist-workspace.toml (proven against pinned dist 0.32.0 to
+    regenerate the host step into `gh release upload` + `gh
+    release edit`, cooperating with release-please's published
+    release), riding the batch-24 close branch. Source: owner,
+    2026-09-13, T2.

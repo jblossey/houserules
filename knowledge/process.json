@@ -761,6 +761,70 @@
         "by": "review",
         "ref": "batch 23 branch review, retrospective"
       }
+    },
+    {
+      "id": "process.gates-cover-generated-commits",
+      "kind": "rule",
+      "area": "process",
+      "standing": true,
+      "summary": "Walk every commit author class a new gate will hit -- bots and generated commits included -- through the gate on paper before it ships; state each accepted red.",
+      "body": [
+        "Batch 24 shipped a payload-stamp mechanism (tree gate + per-commit co-change + range co-change) proven against 40 human-authored commits, while release-please-config.json's own extra-files entry scheduled a bot commit to template/** that trips all three, plus the dogfood version-stamp test -- discovered only at the branch review.",
+        "The walk is cheap: enumerate the automation that writes commits to this repository (release-please, Dependabot, the restamp step), list the exact files each writes, and run the new check's predicate against those file sets."
+      ],
+      "tags": [
+        "gates",
+        "ci",
+        "release",
+        "bots"
+      ],
+      "source": {
+        "date": "2026-09-13",
+        "by": "user",
+        "ref": "batch 24 branch review issues 1-2; adopted standing at the batch-24 report (design.md 5.75)"
+      }
+    },
+    {
+      "id": "process.fix-proofs-extend-the-reviewers-run",
+      "kind": "rule",
+      "area": "process",
+      "standing": true,
+      "summary": "A fix round's proof re-runs the review's own reproduction, extended to cover the fix -- never a fresh, narrower proof.",
+      "body": [
+        "If the reviewer ran the full pipeline, the fix is proven on the full pipeline.",
+        "Batch 24 T1's record: r1 fell to a source read where the task had read config; r2 fell to a full-pipeline run where the fix had ported the consumer out; r6 fell to CI's real merge base where the report had run the fix-diff base. Each escalation was the reviewer running one level deeper than the fix's own proof; convergence began when the implementer adopted and extended the reviewer's simulation instead of replacing it."
+      ],
+      "tags": [
+        "review",
+        "proofs",
+        "fix-rounds"
+      ],
+      "source": {
+        "date": "2026-09-13",
+        "by": "user",
+        "ref": "batch 24 branch review retrospective, T1 rounds 1-7; adopted standing at the batch-24 report (design.md 5.75)"
+      }
+    },
+    {
+      "id": "process.owner-rulings-need-owner-supersession",
+      "kind": "rule",
+      "area": "process",
+      "standing": true,
+      "summary": "Only the owner supersedes an owner ruling: a controller with latitude proposes the reversal at the next checkpoint and builds nothing on it until ruled.",
+      "body": [
+        "Work that depends on the reversal waits or takes the reversal-free path.",
+        "Batch 24: 5.71 reversed 5.20 (tag shape) mid-task under fix-round latitude, correctly flagged for the checkpoint -- but rounds 2-3 built the linked-versions design on it, and 5.72's rejection discarded that design and reopened the task. The payload-stamp mechanism that finally shipped never needed the reversal, and was reachable on day one under the standing ruling."
+      ],
+      "tags": [
+        "rulings",
+        "owner",
+        "latitude"
+      ],
+      "source": {
+        "date": "2026-09-13",
+        "by": "user",
+        "ref": "batch 24 branch review retrospective; design.md 5.71/5.72; adopted standing at the batch-24 report (design.md 5.75)"
+      }
     }
   ]
 }
