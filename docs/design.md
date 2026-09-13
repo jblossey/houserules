@@ -380,6 +380,7 @@ Each item records the ruling with its date, or stays marked open.
     uniform from the first release, and `houserules-v0.2.0-alpha`
     stays as history. Unblocks HR-048's channels and HR-049. Source:
     owner, 2026-09-04.
+    Supersession by 5.71 was REJECTED at 5.72: plain `v<version>` stands.
 21. **Tier-2 implementation language — ruled 2026-09-04: Rust.**
     Tier-2 spec ruling 2, chosen over Go with the trade-offs on the
     table: type-level correctness (serde models the deliverables and
@@ -854,3 +855,78 @@ Each item records the ruling with its date, or stays marked open.
     trigger process.evals-rerun; the rerun is booked before
     this batch's branch review. Source: owner, 2026-09-12,
     during batch 24.
+71. **HR-081's tag-format ripple: include-component-in-tag
+    reverts to true — ruled 2026-09-12, superseding 5.20 on
+    complete facts.** 5.20's actual rationale (verbatim):
+    "Every binary-delivery channel (mise ubi, asdf, taps)
+    defaults to the `v*` grammar; ruled at the cheapest moment
+    (one release, zero external consumers)." This is a
+    channel-default argument, not a README-URL argument.
+    BaseStrategy.getComponent (src/strategies/base.ts:178-183,
+    the release-please version googleapis/
+    release-please-action@45996ed bundles) returns '' whenever
+    include-component-in-tag is false, before it ever reads
+    either package's configured component, so the
+    linked-versions plugin HR-081 needs (crates/houserules
+    linked to a root package that sees every commit unfiltered)
+    can never match while it stays false: reaching HR-081 at
+    all requires reversing 5.20's tag shape.
+    Channel by channel, verified against each tool's current
+    docs and the tree's own present state: mise's old `ubi:`
+    backend is the one channel spec 2a's releases/latest/
+    download/<asset> alias (and HR-070's move to mise's
+    `github:` backend) dissolves outright. The README does not
+    dissolve yet: README.md:73-77 and :118-126 still pin
+    `releases/download/v0.2.0-alpha/...` today, inside
+    release-please's own `x-release-please-start-version`
+    blocks (`/README.md` is in `extra-files`), so an
+    unretired block would be rewritten to `v0.3.0` -- a tag
+    that will not exist, since the real tag is
+    `houserules-v0.3.0`. The amended plan removes that
+    interval: T3a retires the blocks and their extra-files
+    entry ON THE BATCH BRANCH, before any release PR
+    regenerates against the merged main, so no wrong-shape tag
+    is ever written into the README; the README already says
+    today's URLs 404
+    (README.md:85-95), so this changes which wrong tag a
+    404'ing URL names, not whether it 404s. asdf and
+    a Homebrew/Scoop tap are HR-048's own open deliverables and
+    do NOT require the plain grammar: mise's `github:` backend
+    itself takes a documented `version_prefix` tool option
+    (`version_prefix = "houserules-v"`) for exactly this shape;
+    an asdf plugin's `bin/list-all`/`bin/download` are the
+    plugin author's own shell scripts with no format the asdf
+    core enforces; a Homebrew formula can `url ... , tag:
+    "houserules-v0.3.0"` with an explicit `version` field when
+    auto-detection does not infer one. The flip costs each of
+    these three not-yet-built channels one explicit option or a
+    few lines of parsing, not a blocked or reduced channel --
+    stated plainly since HR-048 has not built any of them yet
+    and each is cheaper to write against the tag shape that will
+    actually exist than to write against one this repository is
+    reversing.
+    The `v0.2.0-alpha` alias tag 5.20 minted stays as the
+    one-time history it already is; no future release mints a
+    matching plain-`v` alias. The README's own plain-v URLs stop
+    being a reason to mint one the moment HR-049's re-walk lands
+    (mise's `github:` backend and asdf/the tap, once built, take
+    `houserules-v<version>` directly) -- until then the README
+    names whichever wrong tag the most recent release-please run
+    last wrote into it, exactly as it 404s today.
+    `true` is also BaseStrategy's own default and restores the
+    `houserules-v<version>` shape the first real release
+    (`houserules-v0.2.0-alpha`) already used; release.yml's
+    tag-push glob matches either shape unaffected.
+    HR-048's own body is updated in this same turn to drop its
+    now-reversed "plain v<version>" prerequisite line. Source:
+    controller under batch-24 T1 fix round 2's own ruled
+    latitude, 2026-09-12.
+72. **The 5.71 supersession REJECTED; 5.20 reaffirmed — ruled
+    2026-09-12.** The owner keeps the plain `v<version>` tag
+    shape. 5.71's channel analysis stands as recorded fact, but
+    the ruling is reversed: releases tag `v0.3.0`, and T1
+    reopens to deliver HR-081's template attribution WITHOUT
+    the component in the tag — the linked-versions mechanism is
+    known inert under that constraint, so a different mechanism
+    is required. Source: owner, 2026-09-12, the batch-24
+    checkpoint.

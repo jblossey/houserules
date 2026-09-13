@@ -276,6 +276,14 @@
     {
       "date": "2026-09-12",
       "text": "Effort pins: controller high (settings effortLevel), reviews high, implementers xhigh - agent-template frontmatter + model-policy bullet, both copies; evals rerun booked for the batch-24 close. docs/design.md 5.70."
+    },
+    {
+      "date": "2026-09-12",
+      "text": "HR-081 tag-format reversal: include-component-in-tag flips back to true, superseding 5.20's plain-v<version> ruling. 5.20's actual reason was that mise ubi, asdf and taps default to the v* grammar, not a README-URL match; verified against each channel's current docs, none of the three requires the plain grammar (mise's github: backend takes a version_prefix option, an asdf plugin's own scripts parse any tag shape, a Homebrew formula sets an explicit version), and BaseStrategy.getComponent needs includeComponentInTag true for linked-versions to match any component at all. HR-048's body updated in the same turn. docs/design.md 5.71."
+    },
+    {
+      "date": "2026-09-12",
+      "text": "5.71 REJECTED at the checkpoint: plain v* tags stand (5.20 reaffirmed); T1 reopens for a component-free attribution mechanism. docs/design.md 5.72."
     }
   ],
   "notes": []

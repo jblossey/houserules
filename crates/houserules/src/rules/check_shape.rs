@@ -86,6 +86,14 @@ pub(crate) struct CheckDef {
     pub if_changed: Option<Glob>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub then: Option<Glob>,
+    /// A `co-change` check's opt-in into per-commit evaluation
+    /// (`check_commit`'s own module doc has the reason it is opt-in, not
+    /// the default): absent or `false` leaves the check range-level only
+    /// (`run_check`'s own `CheckType::CoChange` arm, unaffected either
+    /// way); `true` additionally runs it per commit on `check-commit`'s
+    /// range arm.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub per_commit: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
 }
@@ -113,7 +121,8 @@ mod tests {
     /// exercises `field` alongside `if`, keeping the sample to one shape
     /// while still touching every property `$defs/check` declares (`files`,
     /// `pattern`, `flags`, `scope`, `subject`, `body_absent`,
-    /// `body_line_max`, `if`, `then`, `field`, plus `type`/`level`).
+    /// `body_line_max`, `if`, `then`, `per_commit`, `field`, plus
+    /// `type`/`level`).
     fn full_sample() -> Value {
         json!({
             "type": "report-field",
@@ -127,6 +136,7 @@ mod tests {
             "body_line_max": 100,
             "if": ["**/*.rs"],
             "then": ["**/*.rs"],
+            "per_commit": true,
             "field": "concerns",
         })
     }

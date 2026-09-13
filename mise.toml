@@ -19,7 +19,7 @@ description = "Front the houserules binary (built from crates/houserules); pass 
 run = "cargo run --quiet --bin houserules --"
 
 [tasks.lint]
-description = "shellcheck, cargo deny, a cross-target compile check, the knowledge/backlog gates, a stale-render check, then the residue gate"
+description = "shellcheck, cargo deny, a cross-target compile check, the knowledge/backlog gates, a stale-render check, the residue gate, then the payload-stamp gate"
 run = [
   "shellcheck tools/*.sh template/tools/*.sh .githooks/commit-msg template/.githooks/commit-msg",
   "cargo deny check",
@@ -28,6 +28,7 @@ run = [
   "mise run houserules -- check-backlog",
   "mise run houserules -- render --check",
   "cargo run --quiet --bin residue-gate",
+  "cargo run --quiet --bin payload-stamp-gate",
 ]
 
 [tasks.audit]

@@ -138,6 +138,9 @@
         "then": {
           "$ref": "#/$defs/glob"
         },
+        "per_commit": {
+          "type": "boolean"
+        },
         "field": {
           "type": "string",
           "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$"

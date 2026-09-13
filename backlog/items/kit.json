@@ -28,7 +28,7 @@
       "title": "Binary delivery channels for the rewritten kit (Tier 2)",
       "body": [
         "RULED with HR-047: distribution targets the compiled binary, not npm-first. Deliverables: per-platform release binaries (linux and macOS on x64 and arm64, Windows) built and attached by CI at each release-please release, with checksums and a signing/notarization decision for macOS; mise via the ubi backend; an asdf plugin consuming the release binaries; a Homebrew tap; Scoop or winget; a curl-to-sh installer. npm RETIRES (RULED 2026-09-04, design.md 5.22): binary-only distribution; a wrapper package stays purely additive later if demand appears.",
-        "Prerequisite RULED 2026-09-04 (design.md 5.20): plain v<version>. include-component-in-tag goes false at the next config-touching task; the alias tag v0.2.0-alpha already points at the existing release commit, so every channel builds on the v* grammar from the first release.",
+        "Tag shape: design.md 5.20's original plain v<version> ruling stands (2026-09-04). A same-batch attempt to reverse it (design.md 5.71, include-component-in-tag: true) was RULED OUT at the checkpoint (design.md 5.72, 2026-09-12): every release tags plain v<version>, matching every binary-delivery channel's own default grammar (mise ubi, asdf, taps) exactly as 5.20 intended -- no version_prefix option or non-standard tag handling needed for any of them. The existing houserules-v0.2.0-alpha release keeps its component-prefixed tag as history; the v0.2.0-alpha alias tag 5.20 minted points at the same commit and is what every future release's plain grammar continues.",
         "External acts (the plugin repository, registry PRs, the tap) are owner-attended per the decision 3 precedent. Blocked by HR-047 producing the binary; the spec may land the tag-format ruling and the CI scaffolding earlier.",
         "Source: owner, 2026-09-03 (Tier 2 direct, no Tier 0 or Tier 1 channels)."
       ],
@@ -228,6 +228,8 @@
         "Measured over v0.2.0-alpha..6aa19e0 (batch 20 T5 fix round 1 review): 82 of 119 commits touch no path under crates/houserules/, and 7 of 27 feat/fix commits are unattributed under the new package path -- four of them (7460c77b feat(template), 6ac1aaa7 fix(template), 719d3f58 fix(tools), 101555ef fix(template)) change the embedded payload directly, per t5-evidence/hr081-template-payload-commits.sh's own enumeration by touched path rather than commit subject (fix round 2: a subject-scoped read of the same range missed 719d3f58, 'fix(tools): validate rejects incomplete terminal reports', which touches no crates/houserules/ path and two template/ files). Today enough crate-side commits ride along that a release PR still opens; a cycle whose only changes are template/, README.md, or the knowledge base would silently ship nothing.",
         "The package path is not the thing to change: release-type rust at '.' (the root) would take the Rust strategy's workspace branch and push a CargoToml update for the root manifest, which cargo-toml.ts:37-40 throws on ('is not a package manifest') since the root Cargo.toml carries no [package] section under this workspace's virtual-manifest shape -- reviewer-confirmed and re-verified by the implementer. The gap needs a different remedy, not a reversal of HR-073's ruling.",
         "Candidate remedies (this item carries the question, not the answer): (a) an extra-files or component-mapping addition to release-please-config.json that attributes template/** changes to the crate's own path for commit-attribution purposes; (b) a documented pre-release rule that a payload-changing commit always rides alongside a crate-side commit before a release is cut, checked by hand or by a gate. Owner picks.",
+        "MECHANISM (task-1 fix round 4, provisional pending owner ratification at the batch report): remedy (b), concretized. crates/houserules/payload.stamp records a sha256 digest of template/'s tracked file set, recomputed and compared by payload-stamp-gate (crates/houserules/src/bin/payload-stamp-gate.rs), wired into mise run lint (houserules.payload-stamp-gate). That gate is a TREE-LEVEL check only: a branch splitting the template/ edit from the stamp regeneration across two commits still passes it at the tip. Fix round 5 closed that gap: houserules check-commit now also runs this entry's own co-change check (if template/**, then crates/houserules/payload.stamp) per commit, over the PR's full range in CI, so a split commit pair fails before merge, not only a stale tree.",
+        "Still gating this item's own close: the mechanism above is proven by source-level review and a full-pipeline simulation against real git history (batch-24 task-1's own t1-evidence/), never by a genuine release-please run. The first real template-only change that lands on main after T2 -- one commit touching template/ and crates/houserules/payload.stamp together, nothing else -- is that live proof.",
         "Source: batch 20 T5 fix round 1 review (task-5-review.json), important finding 1."
       ],
       "milestone": null,
@@ -450,6 +452,23 @@
       "batch": null,
       "see": [
         "HR-108"
+      ]
+    },
+    {
+      "id": "HR-114",
+      "type": "feat",
+      "title": "CI check that release-please-config.json's last-release-sha matches main's newest release commit",
+      "body": [
+        "Filed by the task-1 fix round 3 review (important finding 3): HR-081's linked root package `.` carries skip-github-release, so last-release-sha (not a real release tag) is the only thing bounding its commit window (manifest.ts:657, checked before the bootstrap-sha fallback). houserules.post-release-restamp requires bumping it after every release, by hand, in the same commit as the .houserules.json restamp. Nothing detects a skipped bump.",
+        "The real failure mode if it is skipped: the merged release's own Release-As footer commit stays inside `.`'s window, so release-please re-proposes the version that just shipped on every subsequent run, and the PR fails to merge against the tag that already exists -- the pipeline stops advancing until someone notices and fixes the anchor by hand. Not a rescan-and-move-on; a stuck pipeline.",
+        "Candidate: a CI check against main (not a unit test in the cargo suite, which has no git access to main's own history) that release-please-config.json's last-release-sha equals the newest `chore(release):`-prefixed commit reachable from main. Shape and trigger (a scheduled workflow, a check on push to main, a pre-merge check on the release-please PR itself) are open; the invariant is not.",
+        "DROPPED (task-1 fix round 4): the owner rejected the 5.71 tag-shape reversal (design.md 5.72), which reopened HR-081 for a component-free attribution mechanism. The chosen mechanism (crates/houserules/payload.stamp, payload-stamp-gate) reverts release-please-config.json to a single crates/houserules package with no `.` root package and no last-release-sha -- the key this item's own check would have watched. crates/houserules earns a real release tag/sha again (backfillReleasesFromTags resolves the existing v0.2.0-alpha alias tag), so the eternal-window failure mode this item existed to detect no longer has a mechanism to fail through."
+      ],
+      "milestone": null,
+      "status": "dropped",
+      "batch": null,
+      "see": [
+        "HR-081"
       ]
     }
   ]

@@ -361,5 +361,38 @@
         "notes": "Fixture: package.json with ^1.3.0 + helper.mjs, report claiming vetting over a null field with a self_audit dropping both failing rows. The review filed exact-pins and dependency-vetting as deterministic-fail criticals with rule set, named the self_audit omission as a report-vs-audit discrepancy (1/1/0/2 claimed vs 9/7/2/24 audited), validates with zero open rows - and additionally caught the impossible node runs and the upstream deprecation live against the registry."
       }
     ]
+  },
+  {
+    "date": "2026-09-12",
+    "templates": {
+      ".claude/agents/implementer.md": "1e8b4ed7db1d1ea34b7c685709573a107f2a7ab3",
+      ".claude/agents/task-reviewer.md": "ece2f0eac1442dfa529026203cad99f4a537f231"
+    },
+    "runs": [
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 6,
+        "of": 6,
+        "notes": "First run under the effort pins (implementer xhigh): similar =3.2.0 via cargo add --dev; the helper landed as a shared tests/common module with the dead-code allowance correctly scoped; four docs_verified api+source pairs; genuine compile-failure RED; 538 tests green; the implementer explicitly refused the harness attribution trailers citing the hook and the standing rule."
+      },
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 3,
+        "of": 3,
+        "notes": "A knowledge-entry how-to added to docs/runbook.md with a live-captured failure message and the real mise-lint mechanism verified against mise.toml; imperative one-instruction steps; audit 10/10."
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 5,
+        "of": 5,
+        "notes": "Both deterministic fails filed critical with rule set; the self_audit omission named with both summaries quoted (1/1/0/2 vs 9/7/2/24); review validates, zero open rows. Beyond the expected lines: reproduced the impossible node runs (exit 127), read left-pad's own source for the over-length behavior, flagged the WTFPL license-gate gap, and correctly attributed the fixture's dispatch-level gaps as warns rather than implementer faults."
+      }
+    ]
   }
 ]

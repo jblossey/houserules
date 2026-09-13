@@ -5,9 +5,10 @@ Spec: docs/specs/2026-09-12-batch-24-repo-and-setup.md
 Items: HR-108, HR-048, HR-068, HR-081, HR-082, HR-049, HR-063,
 HR-064, HR-069, HR-070.
 Workspace: .superpowers/sdd/2026-09-12-batch-24/.
-Order: T1 (machinery, seeded proofs) → the owner mints the PAT
-→ the seeded chain proof → T2 (the real 0.3.0 release,
-owner-attended) → T3 (docs re-walk with live captures).
+Order: T1 (machinery, seeded proofs) → T3a (the docs rewrite,
+pre-merge) → the owner mints the PAT → the batch merges → T2
+(the real 0.3.0 release, owner-attended) → T3b (the
+post-release live verification, close branch).
 Implementers on sonnet, task reviews on opus, branch review on
 fable, strictly sequential.
 
@@ -95,17 +96,25 @@ post-merge restamp step (finishing skill step 8) runs:
 `houserules update --dir .` reads the new version drift and
 the stamp commits.
 
-## T3 — the docs
+## T3 — the docs (split; amended after T1's fix round 3)
 
-README: every install path to the latest alias (§2a), the
-PENDING paragraphs replaced by live-verified state — each
-channel exercised from a clean environment (scrubbed PATH or
-container; curl installer, mise github: backend per HR-070,
-direct download + sha256 + --version) with captures in the
-workspace. The runbook's release section rewritten to the
-proven procedure, its retired-Node narration swept. HR-049,
-HR-063, HR-064, HR-070 close here; HR-108's umbrella closes
-with the batch.
+T3a (rides the batch, BEFORE the merge): README's install
+paths move to the latest alias (§2a) and the versioned
+x-release-please URL blocks retire — /README.md leaves
+extra-files if nothing remains for it to update — so the
+release PR's regeneration after the batch merges never writes
+a wrong-shape tag into the README. The runbook's release
+section rewritten to the proven procedure, its retired-Node
+narration swept. The mise section moves to the github:
+backend (HR-070).
+
+T3b (after T2's release, on the close branch): each channel
+exercised from a clean environment (scrubbed PATH or
+container; curl installer, mise github: backend, direct
+download + sha256 + --version) with captures in the workspace;
+the PENDING paragraphs replaced by their live-verified state.
+HR-049, HR-063, HR-064, HR-070 close across T3a+T3b; HR-108's
+umbrella closes with the batch.
 
 ## Close
 

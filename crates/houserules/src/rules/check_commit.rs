@@ -3,7 +3,41 @@
 //! budget, `security-hygiene.no-coauthor`'s trailer gate, and any other
 //! entry a project adds with `check.type: commits` -- read from the
 //! loaded base, never a hardcoded pair) against either a not-yet-committed
-//! message or a range of already-committed history.
+//! message or a range of already-committed history. The range arm also
+//! runs every `co-change`-type entry that opts in with `per_commit: true`
+//! per commit: `houserules.payload-stamp-gate` (`if: template/**`,
+//! `then: crates/houserules/payload.stamp`) fails a commit that touches the
+//! first without the second, even when a LATER commit in the same range
+//! repairs it -- the gap this closes over the payload-stamp gate's own
+//! tree-level check (`crates/houserules/src/bin/payload-stamp-gate.rs`'s
+//! own module doc has that gate's narrower scope): a branch that SPLITS an
+//! `if_changed`/`then` pair across two commits passes the tree-level gate
+//! at its tip yet never paired them in any single commit `CommitSplit`
+//! (release-please's own commit-to-package attribution) would read.
+//!
+//! `per_commit` is opt-in, not the default, because per-commit and
+//! range-level are genuinely different invariants, not two strengths of
+//! the same one: `process.evals-rerun`'s own `co-change` entry books a
+//! RANGE-level economy on purpose (one shared eval rerun at a batch's
+//! final template state, not a rerun inside every interim commit that
+//! touches a template), so evaluating it per commit would turn its own
+//! legal, booked economy into a hard failure with no ruling behind it. An
+//! entry without `per_commit: true` is read here for nothing; `run_check`'s
+//! own range-level `CheckType::CoChange` arm still evaluates it,
+//! unaffected either way.
+//!
+//! An opted-in check also only fires against a commit whose PARENT tree
+//! already contains its own `then` target (`CoChangeCheck::mechanism_
+//! exists`, one `tree_files` call per commit): a commit written before
+//! that mechanism existed in the repository at all could not have paired
+//! it, so it is retroactively exempt, never a violation -- without this
+//! guard, every commit that ever touched `template/` before `crates/
+//! houserules/payload.stamp` existed would fail the moment the check
+//! shipped, `houserules.payload-stamp-gate`'s own entry included.
+//!
+//! The message-file arm never evaluates a `co-change` entry, opted in or
+//! not: it reads an as-yet-uncommitted message, with no commit and so no
+//! diffable file list, and no parent tree to check a mechanism against.
 //!
 //! ## Two call shapes
 //!
@@ -71,7 +105,9 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 
-use super::audit::{Commit, CommitsCheck, commits_in, rev};
+use super::audit::{
+    CoChangeCheck, Commit, CommitsCheck, changed_files_for, commits_in, rev, tree_files,
+};
 use super::check_shape::{CheckLevel, CheckType};
 use super::model::{Base, CheckField, load_base};
 
@@ -237,16 +273,25 @@ pub(crate) struct CheckCommitOpts {
     pub to: Option<String>,
 }
 
-/// Runs every `commits`-type knowledge entry in `base` against `opts`'
+/// Runs every `commits`-type knowledge entry, and every `co-change`-type
+/// entry that opts into `per_commit: true`, in `base` against `opts`'
 /// commit(s), returning `(fails, warns)`: one `"<id>: <evidence>"` finding
-/// per violation, sorted into whichever list its own check's `level`
-/// names -- `backlog::commands::check_backlog`'s own `(errors, warnings)`
-/// return shape (`cli.rs`'s own doc). Findings are grouped by commit (the
-/// range arm's own `git log` order, newest first, matching `audit`'s own
-/// `commits_in`), each commit checked against every entry in id order. An
-/// unreadable message file, an unresolvable `--from`/`--to` ref, a failed
-/// `git stripspace`, or a malformed check pattern is a named `Err`, never
-/// a panic (`houserules.crash-paths-are-named`).
+/// per violation, sorted into whichever list its own check's `level` names
+/// -- `backlog::commands::check_backlog`'s own `(errors, warnings)` return
+/// shape (`cli.rs`'s own doc). Findings are grouped by commit (the range
+/// arm's own `git log` order, newest first, matching `audit`'s own
+/// `commits_in`), each commit checked against every entry in id order. A
+/// `co-change` entry lacking `per_commit: true` (`process.evals-rerun`'s
+/// own entry, say) is never evaluated here at all -- `run_check`'s own
+/// range-level `CheckType::CoChange` arm still reads it, unaffected either
+/// way (this file's own module doc has the reason the opt-in exists). An
+/// opted-in entry only ever evaluates on the range arm, and only against a
+/// commit whose PARENT tree already contains its own `then` target
+/// (`CoChangeCheck::mechanism_exists`): a commit written before that
+/// mechanism existed could not have paired it, so it is exempt, not a
+/// violation. An unreadable message file, an unresolvable `--from`/`--to`
+/// ref, a failed `git stripspace`, or a malformed check pattern is a named
+/// `Err`, never a panic (`houserules.crash-paths-are-named`).
 fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<(Vec<String>, Vec<String>), String> {
     let commits = match (&opts.message_file, &opts.from) {
         (Some(path), None) => {
@@ -266,24 +311,57 @@ fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<(Vec<String>, Vec
 
     let mut ids: Vec<&String> = base.entries.keys().collect();
     ids.sort();
-    let mut checks = Vec::new();
+    let mut commit_checks = Vec::new();
+    let mut cochange_checks = Vec::new();
     for id in ids {
         let entry = &base.entries[id];
         let CheckField::Valid(check) = &entry.check else {
             continue;
         };
-        if check.kind != CheckType::Commits {
-            continue;
+        match check.kind {
+            CheckType::Commits => {
+                let compiled =
+                    CommitsCheck::compile(check).map_err(|error| format!("{id}: {error}"))?;
+                commit_checks.push((id, compiled));
+            }
+            CheckType::CoChange if check.per_commit == Some(true) => {
+                cochange_checks.push((id, CoChangeCheck::compile(check)));
+            }
+            _ => {}
         }
-        let compiled = CommitsCheck::compile(check).map_err(|error| format!("{id}: {error}"))?;
-        checks.push((id, compiled));
     }
 
     let mut fails = Vec::new();
     let mut warns = Vec::new();
     for commit in &commits {
-        for (id, compiled) in &checks {
+        for (id, compiled) in &commit_checks {
             if let Some(evidence) = compiled.violation(commit) {
+                let line = format!("{id}: {evidence}");
+                match compiled.level() {
+                    CheckLevel::Fail => fails.push(line),
+                    CheckLevel::Warn => warns.push(line),
+                }
+            }
+        }
+        if cochange_checks.is_empty() || commit.sha.is_empty() {
+            continue;
+        }
+        let files = changed_files_for(&base.root, &commit.sha)?;
+        let parent_tree = match rev(&base.root, &format!("{}^", commit.sha)) {
+            Ok(parent_sha) => tree_files(&base.root, &parent_sha)?,
+            Err(_) => Vec::new(), // a root commit has no parent tree: no mechanism can exist yet
+        };
+        for (id, compiled) in &cochange_checks {
+            if !compiled
+                .mechanism_exists(&parent_tree)
+                .map_err(|error| format!("{id}: {error}"))?
+            {
+                continue;
+            }
+            if let Some(evidence) = compiled
+                .violation(&files)
+                .map_err(|error| format!("{id}: {error}"))?
+            {
                 let line = format!("{id}: {evidence}");
                 match compiled.level() {
                     CheckLevel::Fail => fails.push(line),
@@ -893,5 +971,171 @@ mod tests {
         let base = load_base(dir.path()).expect("load base");
         let error = check_commit(&base, &range_opts("nope", None)).unwrap_err();
         assert_eq!(error, "bad ref \"nope\"");
+    }
+
+    // ---- check_commit: co-change, per commit ----
+
+    fn co_change_entry() -> Value {
+        entry(json!({
+            "id": "template.stamp-co-change", "summary": "template/** pairs with STAMP per commit.",
+            "check": {
+                "type": "co-change", "level": "fail", "per_commit": true,
+                "if": "template/**", "then": "STAMP",
+            },
+        }))
+    }
+
+    fn soft_co_change_entry() -> Value {
+        entry(json!({
+            "id": "template.soft-stamp-co-change", "summary": "A warn-level co-change check.",
+            "check": {
+                "type": "co-change", "level": "warn", "per_commit": true,
+                "if": "template/**", "then": "STAMP",
+            },
+        }))
+    }
+
+    /// `process.evals-rerun`'s own real shape (source files paired with a
+    /// record, no `per_commit`): a RANGE-level economy where the record
+    /// legally lands several commits after its trigger, never re-declared
+    /// with the real id since a fixture must not collide with a base a
+    /// caller loads for real.
+    fn range_only_co_change_entry() -> Value {
+        entry(json!({
+            "id": "docs.evals-rerun-shaped", "summary": "A range-level-only co-change check.",
+            "check": {
+                "type": "co-change", "level": "fail",
+                "if": "agents/*.md", "then": "evals/record.json",
+            },
+        }))
+    }
+
+    /// The invariant `houserules.payload-stamp-gate` needs `check-commit`
+    /// for: a branch that SPLITS `if_changed` from `then` across two
+    /// commits fails once the mechanism (the `then` target) already
+    /// exists -- even though the payload-stamp gate's own tree-level check
+    /// would pass at the branch tip (both paths exist by the last commit).
+    #[test]
+    fn fails_a_split_commit_once_the_mechanism_already_exists() {
+        let dir = make_repo(&[co_change_entry()]);
+        let root = dir.path();
+        let base_sha = commit(root, "chore: base", None);
+        write_file(root, "STAMP", "digest\n");
+        commit(root, "chore: introduce the stamp", None);
+        write_file(root, "template/a.txt", "a\n");
+        commit(root, "feat(template): add a", None);
+        let base = load_base(root).expect("load base");
+        let (fails, _warns) =
+            check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
+        assert_eq!(
+            fails,
+            vec!["template.stamp-co-change: template/a.txt changed without STAMP".to_string()]
+        );
+    }
+
+    /// The joint commit: once the mechanism exists, one commit touching
+    /// both `if_changed` and `then` pairs them itself, so the check never
+    /// triggers on it -- proving genuine pairing is recognized, not merely
+    /// that every commit here happens to be exempt.
+    #[test]
+    fn passes_a_joint_commit_once_the_mechanism_already_exists() {
+        let dir = make_repo(&[co_change_entry()]);
+        let root = dir.path();
+        let base_sha = commit(root, "chore: base", None);
+        write_file(root, "STAMP", "digest\n");
+        commit(root, "chore: introduce the stamp", None);
+        write_file(root, "template/a.txt", "a\n");
+        write_file(root, "STAMP", "digest2\n");
+        commit(root, "feat(template): add a and restamp", None);
+        let base = load_base(root).expect("load base");
+        let (fails, warns) =
+            check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
+        assert_eq!(fails, Vec::<String>::new(), "{fails:#?}");
+        assert_eq!(warns, Vec::<String>::new());
+    }
+
+    /// Retroactivity: a commit written before the mechanism (`then`'s own
+    /// target) existed anywhere in the repository cannot have paired it,
+    /// so it is exempt by construction -- proven in the SAME range as a
+    /// later split that fails once the mechanism exists, so one run
+    /// exercises both sides of the guard.
+    #[test]
+    fn exempts_a_commit_that_predates_the_mechanisms_own_introduction() {
+        let dir = make_repo(&[co_change_entry()]);
+        let root = dir.path();
+        let base_sha = commit(root, "chore: base", None);
+        write_file(root, "template/pre.txt", "pre\n");
+        commit(root, "feat(template): pre-mechanism change", None);
+        write_file(root, "STAMP", "digest\n");
+        commit(root, "chore: introduce the stamp", None);
+        write_file(root, "template/post.txt", "post\n");
+        commit(root, "feat(template): post-mechanism split", None);
+        let base = load_base(root).expect("load base");
+        let (fails, _warns) =
+            check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
+        assert_eq!(
+            fails,
+            vec!["template.stamp-co-change: template/post.txt changed without STAMP".to_string()],
+            "{fails:#?}"
+        );
+    }
+
+    /// A warn-level `co-change` check's violation lands in `warns`, not
+    /// `fails`, the same routing `commits`-type checks already get.
+    #[test]
+    fn a_warn_level_co_change_check_lands_in_warns_not_fails() {
+        let dir = make_repo(&[soft_co_change_entry()]);
+        let root = dir.path();
+        let base_sha = commit(root, "chore: base", None);
+        write_file(root, "STAMP", "digest\n");
+        commit(root, "chore: introduce the stamp", None);
+        write_file(root, "template/a.txt", "a\n");
+        commit(root, "feat(template): add a", None);
+        let base = load_base(root).expect("load base");
+        let (fails, warns) =
+            check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
+        assert_eq!(fails, Vec::<String>::new(), "{fails:#?}");
+        assert_eq!(
+            warns,
+            vec!["template.soft-stamp-co-change: template/a.txt changed without STAMP".to_string()]
+        );
+    }
+
+    /// The mechanism's own opt-in boundary: a `co-change` entry that never
+    /// declares `per_commit: true` (`process.evals-rerun`'s own real
+    /// shape) is not evaluated here at all, even split exactly the way the
+    /// stamp pair would fail -- pinning the fix for the generalization
+    /// that once made this entry's own booked range-level economy
+    /// unsatisfiable per commit.
+    #[test]
+    fn an_opted_out_co_change_check_is_never_evaluated_per_commit() {
+        let dir = make_repo(&[range_only_co_change_entry()]);
+        let root = dir.path();
+        let base_sha = commit(root, "chore: base", None);
+        write_file(root, "evals/record.json", "{}\n");
+        commit(root, "chore: seed the record", None);
+        write_file(root, "agents/implementer.md", "x\n");
+        commit(
+            root,
+            "docs(agents): change implementer without a rerun",
+            None,
+        );
+        let base = load_base(root).expect("load base");
+        let (fails, warns) =
+            check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
+        assert_eq!(fails, Vec::<String>::new(), "{fails:#?}");
+        assert_eq!(warns, Vec::<String>::new(), "{warns:#?}");
+    }
+
+    /// The message-file arm has no committed diff to read, so a
+    /// `co-change` check never triggers there, whatever the subject says.
+    #[test]
+    fn a_co_change_check_never_triggers_on_the_message_file_arm() {
+        let dir = make_repo(&[co_change_entry()]);
+        let base = load_base(dir.path()).expect("load base");
+        let msg = write_message(dir.path(), "feat(template): x\n");
+        let (fails, warns) = check_commit(&base, &message_opts(msg)).expect("check_commit");
+        assert_eq!(fails, Vec::<String>::new());
+        assert_eq!(warns, Vec::<String>::new());
     }
 }

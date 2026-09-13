@@ -507,10 +507,11 @@
       "kind": "rule",
       "area": "rust",
       "standing": false,
-      "summary": "A task-end gate run includes every check CI runs on push; a local gate list that omits a CI check is stale.",
+      "summary": "A task-end gate run includes every check CI runs on push or pull request; a local gate list that omits a CI check is stale.",
       "body": [
-        "The list today: cargo fmt --check, the full suite, clippy, the cross-target check, and the lint chain (shellcheck, cargo deny, both knowledge gates, render --check, the residue gate).",
+        "The list today: cargo fmt --check, the full suite, clippy, the cross-target check, the lint chain (shellcheck, cargo deny, both knowledge gates, render --check, the residue gate, the payload-stamp gate), and -- pull-request only -- a check-commit range pass (`houserules check-commit --from $(git merge-base main HEAD) --to HEAD`, ci.yml's own check-commit job) and a knowledge-base audit of the diff (`mise run audit -- --base <PR base> --head <PR head>`).",
         "Derive the list from .github/workflows and mise.toml, not from memory; when CI gains a check, the task-end list gains it in the same change.",
+        "The check-commit range pass matters most for a per-commit knowledge check: it judges every commit back to the real merge base with main, never only a fix round's own diff, so an omission here is exactly how a per-commit check ships unrun against the range CI actually judges (batch 24 T1 fix round 6: a per-commit co-change check went unrun at CI's own --from until this entry named the job).",
         "Origin: batch 22 T1 - three review rounds closed with cargo fmt --check red at HEAD because no round's gate list named it; CI would have failed the first push."
       ],
       "source": {
@@ -550,6 +551,44 @@
       "see": [
         "houserules.platform-gated-tests"
       ]
+    },
+    {
+      "id": "houserules.payload-stamp-gate",
+      "kind": "procedure",
+      "area": "template",
+      "summary": "Touching template/ also needs crates/houserules/payload.stamp regenerated: `cargo run --bin payload-stamp-gate -- --write`, or mise run lint fails.",
+      "body": [
+        "HR-081: release-please's commit-to-package attribution (CommitSplit, keyed on a commit's changed file paths) only ever counts a commit that touches crates/houserules/**, and include-component-in-tag stays false (design.md 5.20, reaffirmed at 5.72 after a since-rejected reversal at 5.71), which rules out linking a second package's commits in via any component-matching plugin (getComponent always returns '' when that setting is false). A template/**-only commit would otherwise cut no release, even though template/ is embedded into the shipped binary at compile time (houserules.payload-embeds-checkout-bytes) and is therefore a real product change.",
+        "crates/houserules/payload.stamp records a sha256 digest of template/'s current tracked file set (paths and content). payload-stamp-gate (crates/houserules/src/bin/payload-stamp-gate.rs, wired into `mise run lint` alongside residue-gate) recomputes that digest from the WORKING TREE and fails when it disagrees with the recorded one, naming both values and the fix. `--write` regenerates the stamp. This is a tree-level guarantee only: it never reads individual commits, so a branch that splits the template/ edit from the stamp regeneration into two commits still passes at the tip.",
+        "Per-commit enforcement -- every commit touching template/ also touches crates/houserules/payload.stamp, not only the branch tip -- is `houserules check-commit`'s job: this entry's own `check` (type co-change, if template/**, then crates/houserules/payload.stamp) declares `per_commit: true`, the opt-in that runs a co-change check per commit there, over the PR's full range in CI (the opt-in exists because a range-level co-change entry -- process.evals-rerun's, say -- books a different, range-only economy on purpose; check-commit never applies per-commit semantics to one without the flag). check-commit also exempts a commit whose PARENT tree predates payload.stamp's own introduction, so this retroactively-applied check never flags history from before the mechanism existed. After changing anything under template/: run `cargo run --quiet --bin payload-stamp-gate -- --write` and commit the regenerated payload.stamp in the SAME commit as the template/ change -- check-commit rejects a split, the payload-stamp gate alone would not. Once paired, that commit touches crates/houserules/payload.stamp, a path CommitSplit's own, unmodified prefix match already attributes to crates/houserules -- no release-please plugin surface needed."
+      ],
+      "tags": [
+        "release",
+        "hr-081",
+        "template"
+      ],
+      "source": {
+        "date": "2026-09-12",
+        "by": "review",
+        "ref": "batch 24 task-1 fix round 4, the owner's 5.71 rejection (design.md 5.72); fix round 5 added the per-commit check-commit enforcement; fix round 6 scoped it to per_commit: true and added the retroactivity guard"
+      },
+      "verify": [
+        "crates/houserules/src/bin/payload-stamp-gate.rs",
+        "crates/houserules/payload.stamp",
+        "mise.toml",
+        "crates/houserules/src/rules/check_commit.rs",
+        "crates/houserules/src/rules/audit.rs"
+      ],
+      "see": [
+        "houserules.payload-embeds-checkout-bytes"
+      ],
+      "check": {
+        "type": "co-change",
+        "level": "fail",
+        "if": "template/**",
+        "then": "crates/houserules/payload.stamp",
+        "per_commit": true
+      }
     }
   ]
 }

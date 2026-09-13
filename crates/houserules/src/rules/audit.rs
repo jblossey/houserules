@@ -171,8 +171,11 @@ fn changed_files(root: &Path, base: &str, head: &str) -> Result<Vec<String>, Str
     Ok(lines(&output))
 }
 
-/// Every file in `head`'s tree.
-fn tree_files(root: &Path, head: &str) -> Result<Vec<String>, String> {
+/// Every file in `head`'s tree. `pub(super)`: `check_commit`'s own
+/// per-commit `co-change` retroactivity guard reads a commit's PARENT
+/// tree through this same function, not a second `git ls-tree`
+/// invocation of its own.
+pub(super) fn tree_files(root: &Path, head: &str) -> Result<Vec<String>, String> {
     let output =
         run_git(root, &["ls-tree", "-r", "--name-only", head]).map_err(|e| stderr_headline(&e))?;
     Ok(lines(&output))
@@ -185,19 +188,27 @@ fn show_file(root: &Path, head: &str, path: &str) -> Result<String, String> {
 
 /// One commit as the `commits` checks read it: its subject, its body, and
 /// its author name (`%an`), the last so a check can tell a generated
-/// message from a human one (see [`CommitsCheck::violation`]).
+/// message from a human one (see [`CommitsCheck::violation`]). `sha` is
+/// empty for a commit that has no real one yet (`unattributed`); a
+/// non-empty `sha` is what `check_commit`'s own per-commit `co-change`
+/// evaluation uses to fetch that one commit's changed files
+/// (`changed_files_for`) -- `Commit` itself carries no file list, since a
+/// range-level `CheckType::Commits` check never needs one.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Commit {
+    pub(super) sha: String,
     pub(super) subject: String,
     pub(super) body: String,
     pub(super) author: String,
 }
 
 impl Commit {
-    /// A message with no author on record: the `check-commit` hook arm,
-    /// which reads a message file before git has attached an author.
+    /// A message with no author or sha on record: the `check-commit` hook
+    /// arm, which reads a message file before git has committed it --
+    /// there is no commit object yet for a `co-change` check to diff.
     pub(super) fn unattributed(subject: String, body: String) -> Self {
         Self {
+            sha: String::new(),
             subject,
             body,
             author: String::new(),
@@ -222,7 +233,7 @@ pub(super) fn commits_in(root: &Path, base: &str, head: &str) -> Result<Vec<Comm
         root,
         &[
             "log",
-            "--format=%an%x00%s%x00%b%x1e",
+            "--format=%H%x00%an%x00%s%x00%b%x1e",
             &format!("{base}..{head}"),
         ],
     )
@@ -232,17 +243,45 @@ pub(super) fn commits_in(root: &Path, base: &str, head: &str) -> Result<Vec<Comm
         .map(|record| record.strip_prefix('\n').unwrap_or(record))
         .filter(|record| !record.is_empty())
         .map(|record| {
-            let mut parts = record.splitn(3, '\u{0}');
+            let mut parts = record.splitn(4, '\u{0}');
+            let sha = parts.next().unwrap_or_default().to_string();
             let author = parts.next().unwrap_or_default().to_string();
             let subject = parts.next().unwrap_or_default().to_string();
             let body = parts.next().unwrap_or_default().to_string();
             Commit {
+                sha,
                 subject,
                 body,
                 author,
             }
         })
         .collect())
+}
+
+/// Every path one commit (`sha`) itself changed, against its single first
+/// parent -- `git diff-tree`'s own plumbing for "what did this commit
+/// touch", one process per commit (`check_commit`'s range arm runs over
+/// CI's own PR-sized commit range, never a full-history walk). A MERGE
+/// commit (more than one parent) is read as touching NOTHING: plain `git
+/// diff-tree` needs `-m`, `-c`, or `--first-parent` to diff a merge
+/// against any parent at all, and this call passes none of them (verified
+/// live against a scratch `--no-ff` merge: empty output, exit 0, no
+/// error). That is the accepted contract here, not an oversight: this
+/// repository merges fast-forward only (`process.ff-only-merges`), so no
+/// merge commit ever reaches `check-commit`'s own range in practice, and a
+/// silently-empty file list is exactly what a per-commit `co-change` check
+/// needs on one -- `filter_matching` over an empty slice never matches
+/// `if_changed`, so the check simply does not trigger, never a false
+/// violation. `pub(super)`: `check_commit`'s own per-commit `co-change`
+/// evaluation is the only caller. An unresolvable `sha` or a failing
+/// `git` is a named `Err`, never a panic (`houserules.crash-paths-are-named`).
+pub(super) fn changed_files_for(root: &Path, sha: &str) -> Result<Vec<String>, String> {
+    let output = run_git(
+        root,
+        &["diff-tree", "--no-commit-id", "--name-only", "-r", sha],
+    )
+    .map_err(|e| stderr_headline(&e))?;
+    Ok(lines(&output))
 }
 
 /// Every removed (`-`-prefixed, excluding the `---` file header) line in
@@ -397,6 +436,68 @@ impl<'a> CommitsCheck<'a> {
     /// block on either surface.
     pub(super) fn level(&self) -> super::check_shape::CheckLevel {
         self.check.level
+    }
+}
+
+/// One `co-change` check, evaluated against one commit's own changed
+/// files. `run_check`'s own `CheckType::CoChange` arm answers a different
+/// question at a different granularity -- whether the whole audited RANGE
+/// ever paired `if_changed` with `then` somewhere across its commits, not
+/// whether any single commit split them -- so `check_commit`'s per-commit
+/// range arm evaluates this struct instead of that arm. `pub(super)`: a
+/// sibling of `CommitsCheck`, read by `check_commit` alone.
+pub(super) struct CoChangeCheck<'a> {
+    check: &'a CheckDef,
+}
+
+impl<'a> CoChangeCheck<'a> {
+    /// Wraps `check` for per-commit evaluation. Unlike `CommitsCheck::
+    /// compile`, there is no regex to precompile: `if_changed`/`then` are
+    /// globs, matched fresh per path by `glob_match` itself.
+    pub(super) fn compile(check: &'a CheckDef) -> Self {
+        Self { check }
+    }
+
+    /// `Ok(Some(evidence))` when `files` (one commit's own changed paths)
+    /// matches `if_changed` but none of them also matches `then`;
+    /// `Ok(None)` when the check did not trigger on this commit, or the
+    /// commit already pairs both sides itself. A malformed glob is a named
+    /// `Err`, never a silently-false match -- the same care `run_check`'s
+    /// own `CoChange` arm takes (see its inline comment).
+    pub(super) fn violation(&self, files: &[String]) -> Result<Option<String>, String> {
+        let trigger = filter_matching(files, &self.check.if_changed)?;
+        if trigger.is_empty() {
+            return Ok(None);
+        }
+        for path in files {
+            if match_any(path, &self.check.then)? {
+                return Ok(None);
+            }
+        }
+        Ok(Some(format!(
+            "{} changed without {}",
+            trigger[0],
+            glob_list(&self.check.then).join(" or ")
+        )))
+    }
+
+    /// This check's declared `level`, the same way `CommitsCheck::level`
+    /// reads it.
+    pub(super) fn level(&self) -> super::check_shape::CheckLevel {
+        self.check.level
+    }
+
+    /// `true` when this check's own `then` target already exists somewhere
+    /// in `parent_tree` -- a commit's own PARENT tree, from one commit
+    /// before the diff (`tree_files`). A per-commit `co-change` check
+    /// exists to enforce that a mechanism the repository ALREADY HAS was
+    /// paired with its trigger in the same commit; a commit written before
+    /// that mechanism existed could not have paired it, so `check_commit`'s
+    /// own per-commit loop treats a `false` return as "not yet applicable
+    /// to this commit," never a violation. A malformed `then` glob is a
+    /// named `Err`, the same care `violation` takes.
+    pub(super) fn mechanism_exists(&self, parent_tree: &[String]) -> Result<bool, String> {
+        Ok(!filter_matching(parent_tree, &self.check.then)?.is_empty())
     }
 }
 

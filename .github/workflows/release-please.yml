@@ -15,4 +15,16 @@ jobs:
       issues: write
       pull-requests: write
     steps:
+      # RELEASE_PLEASE_TOKEN is a fine-grained PAT scoped to Contents (Read
+      # and write), Pull requests (Read and write), and Issues (Read and
+      # write), this repository only -- the three permissions
+      # googleapis/release-please-action's own README asks for, matching
+      # what this job already grants GITHUB_TOKEN above. Absent, the `||`
+      # falls back to the default GITHUB_TOKEN and this step behaves
+      # exactly as it does today. Present, the PAT becomes the PR/tag
+      # author, which starts release.yml on the tag push (a
+      # GITHUB_TOKEN-authored tag never does,
+      # houserules.default-token-tags-start-no-workflows).
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}

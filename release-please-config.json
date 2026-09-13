@@ -1,18 +1,18 @@
 {
-  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/v17.11.2/schemas/config.json",
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/v17.6.0/schemas/config.json",
   "bootstrap-sha": "8931962b7b8ec67096cbc614973a9f773a76f096",
   "include-component-in-tag": false,
   "extra-files": [
     "/README.md",
     "/template/.github/workflows/knowledge.yml"
   ],
+  "plugins": [
+    { "type": "cargo-workspace" }
+  ],
   "packages": {
     "crates/houserules": {
       "release-type": "rust",
-      "changelog-path": "/CHANGELOG.md",
-      "versioning": "prerelease",
-      "prerelease": true,
-      "prerelease-type": "alpha"
+      "changelog-path": "/CHANGELOG.md"
     }
   }
 }

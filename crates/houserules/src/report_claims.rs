@@ -414,10 +414,11 @@ fn collect_listed_commit_shas(report: &Value) -> Vec<String> {
     shas
 }
 
-/// `true` when `sha` resolves to a real commit reachable in `root`'s
-/// object database.
-fn resolves_to_commit(root: &Path, sha: &str) -> bool {
-    Command::new("git")
+/// Resolves `sha` to the full 40-character commit id it names in `root`,
+/// or `None` when it does not resolve to a commit at all (unknown,
+/// ambiguous, or not a commit).
+fn resolve_commit(root: &Path, sha: &str) -> Option<String> {
+    let output = Command::new("git")
         .args([
             "rev-parse",
             "--verify",
@@ -426,10 +427,21 @@ fn resolves_to_commit(root: &Path, sha: &str) -> bool {
         ])
         .current_dir(root)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8(output.stdout)
+        .ok()
+        .map(|full| full.trim().to_string())
+}
+
+/// `true` when `sha` resolves to a real commit reachable in `root`'s
+/// object database.
+fn resolves_to_commit(root: &Path, sha: &str) -> bool {
+    resolve_commit(root, sha).is_some()
 }
 
 /// `true` when `ancestor` is an ancestor of (or equal to) `descendant` in
@@ -521,7 +533,22 @@ fn check_self_audit_head_is_current(root: &Path, report: &Value, errors: &mut Ve
     let Some(newest) = newest_listed_commit(root, &unique) else {
         return; // every listed sha is real; they just form no single line
     };
-    if head != newest {
+    // `head` and `newest` can each be short or full: `houserules audit`'s own
+    // printed `summary.head` is always the short, git-log-style abbreviation, even
+    // when `--head` was given in full, while `commits[].sha` names whatever length
+    // the report happened to record. Both are already known to resolve (`head` is
+    // checked here; every `unique` sha, `newest` included, was checked above), so
+    // comparing resolved identity rather than the raw strings treats two different
+    // lengths of the same commit as equal, as they are.
+    let Some(head_resolved) = resolve_commit(root, head) else {
+        errors.push(format!(
+            "self_audit.summary.head \"{head}\" does not resolve to a commit"
+        ));
+        return;
+    };
+    let newest_resolved = resolve_commit(root, &newest)
+        .expect("newest_listed_commit only returns a sha this function already verified resolves");
+    if head_resolved != newest_resolved {
         errors.push(format!(
             "self_audit.summary.head is \"{head}\", but the report's own newest listed commit is \"{newest}\" -- self_audit is stale"
         ));
@@ -1310,6 +1337,25 @@ mod tests {
         // A later, unrelated commit -- simulating the next task landing on the same branch.
         // self_audit must still describe this report's own final commit, not the branch tip.
         commit(dir.path(), "later");
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// Passes when self_audit.summary.head is an abbreviated form of the report's own
+    /// newest listed commit, not a byte-identical string. `houserules audit`'s own
+    /// printed `summary.head`/`summary.base` are always the short, git-log-style
+    /// abbreviation regardless of whether `--head` was given short or full, so a
+    /// verbatim-pasted self_audit routinely names the same commit in a shorter form
+    /// than `commits[].sha`'s full sha.
+    #[test]
+    fn passes_when_self_audit_head_is_an_abbreviated_form_of_the_reports_own_newest_listed_commit()
+    {
+        let (dir, short_head) = init_scratch_repo("check-report-claims-abbreviated-head-");
+        let full_head = git(dir.path(), &["rev-parse", "HEAD"]).trim().to_string();
+        let mut report = base_report(&short_head);
+        report["commits"] = json!([{"sha": full_head, "subject": "seed"}]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
         let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
         assert_eq!(errors, Vec::<String>::new());
     }

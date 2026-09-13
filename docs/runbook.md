@@ -209,6 +209,19 @@ release runs:
    sha256 checksum per archive plus a unified `sha256.sum`, the shell
    and powershell installers, all uploaded to the GitHub Release the tag
    names.
+
+   **Do not delete `refs/tags/v0.2.0-alpha` before `v0.3.0` exists.**
+   `backfillReleasesFromTags` (release-please's own tag-based release
+   lookup, run when no matching GitHub Release object is found) resolves
+   the plain `v0.2.0-alpha` tag as this repository's current release
+   anchor under `include-component-in-tag: false`; deleting it removes
+   that anchor. `release-please-config.json`'s own `bootstrap-sha` gives
+   release-please a stopping point if the anchor is gone, so a deletion
+   would not stall the pipeline or walk the whole repository history —
+   but the resulting commit window would not match today's
+   tag-anchored one exactly (verified live: the configured `bootstrap-
+   sha` sits several commits earlier than the tag). Keep the tag until
+   `v0.3.0` ships and becomes the new anchor in its place.
 4. **The pins are already current.** Step 1's merge carried the new
    README and knowledge.yml pins in the same commit; nothing further to
    do for them here. The seeded workflow ships each future release
