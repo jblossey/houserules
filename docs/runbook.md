@@ -5,8 +5,9 @@ one recurring task.
 
 ## release-please configuration (crates/houserules)
 
-`.github/workflows/release-please.yml` runs `googleapis/
-release-please-action@v5.0.0` on every push to `main`, not only when a
+`.github/workflows/release-please.yml` runs
+`googleapis/release-please-action@v5.0.0` on every push to `main`, not
+only when a
 release is being cut, and authenticates with the `RELEASE_PLEASE_TOKEN`
 repository secret (a fine-grained PAT scoped to Contents, Pull requests,
 and Issues, each Read and write, this repository only), falling back to
@@ -36,8 +37,9 @@ passes `--locked` (`.github/workflows/ci.yml:45-46`,
 check --locked` outright on `main`, before anything gets a chance to
 self-heal it. `cargo-dist`'s own release build passes no such flag, so
 the release itself still succeeds either way; HR-082 tracks closing the
-CI-facing gap. `crates/houserules/tests/
-release_please_config.rs` pins every one of these settings against the
+CI-facing gap.
+`crates/houserules/tests/release_please_config.rs` pins
+every one of these settings against the
 pinned release-please source and fails loudly if any of them regresses.
 
 A commit touching only `template/` touches no path under
@@ -108,9 +110,10 @@ One release runs:
    release-please a stopping point if the anchor is gone, so a deletion
    would not stall the pipeline or walk the whole repository history —
    but the resulting commit window would not match today's
-   tag-anchored one exactly (verified live: the configured `bootstrap-
-   sha` sits several commits earlier than the tag). Keep the tag until
-   `v0.3.0` ships and becomes the new anchor in its place.
+   tag-anchored one exactly (verified live: the configured
+   `bootstrap-sha` sits several commits earlier than the tag). `v0.3.0`
+   shipped 2026-09-13 and is the anchor now; the `v0.2.0-alpha` remains
+   stay as history per the owner's ruling (design.md 5.67).
 4. **The tag builds and uploads into the release step 3 already made.**
    `release.yml` builds five targets (linux x64/arm64 musl, macOS
    x64/arm64, Windows x64), a sha256 checksum per archive plus a unified

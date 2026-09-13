@@ -133,7 +133,8 @@
         "STAYS OPEN: jblossey/houserules carries one release so far (houserules-v0.2.0-alpha, 2026-09-03), and it ships zero assets; the v0.2.0-alpha tag the install step's URL actually needs has no release of its own (the releases API confirms both facts, fix round 1 t2-evidence/releases-api-listing.json). Either way the pinned URL 404s. Fix round 1 also gave the step `shell: bash`, so that 404 aborts the step itself (GitHub's documented -o pipefail) instead of surfacing two steps later as a confusing 'houserules: command not found' -- but a real CI run of the seeded step still cannot succeed until HR-048's pipeline cuts a release with assets. Closes only then, once a live run of a freshly seeded repository's PR gate proves the install step end to end (docs/specs/2026-09-06-batch-19-phase4.md §7's step two) -- the wiring is done, the verification is not.",
         "houserules.payload-runs-on-builtins (the invariant that the SessionStart hook and the CI gates run where nothing is installed) is amended at T6 to the ruled binary+POSIX contract, and again at T2 to name this step; both amendments land against the fact each carried at the time, not silently past it.",
         "Source: batch 18 T5 fix round 1 review, filed by the implementer per process.no-tech-debt.",
-        "Corrected at the batch-24 branch-fix review (2026-09-13): the installer URL is the latest alias (releases/latest/download/houserules-installer.sh) since the 2a design; this item's closure condition verifies THAT shape at T3b, not the retired versioned form."
+        "Corrected at the batch-24 branch-fix review (2026-09-13): the installer URL is the latest alias (releases/latest/download/houserules-installer.sh) since the 2a design; this item's closure condition verifies THAT shape at T3b, not the retired versioned form.",
+        "CLOSED live, batch 24 T3b close (2026-09-13, owner-ruled run-now): a freshly seeded repository (private throwaway houserules-hr063-seed-proof, init from the released 0.3.0 kit via the x86_64-musl archive) opened PR 1 and the seeded knowledge workflow ran GREEN first attempt on the pull_request event: the install step curled releases/latest/download/houserules-installer.sh inside the runner ('downloading houserules 0.3.0 x86_64-unknown-linux-musl-static ... everything's installed!'), then check-knowledge, check-backlog, and audit all passed. Captures: .superpowers/sdd/2026-09-12-batch-24/t3b-evidence/hr063-seeded-gate-run.json and hr063-seeded-gate-full.log. The throwaway repo awaits owner deletion (the CLI token lacks the delete_repo scope)."
       ],
       "tags": [
         "cli",
@@ -536,6 +537,23 @@
       "see": [
         "HR-068",
         "HR-048"
+      ]
+    },
+    {
+      "id": "HR-119",
+      "type": "chore",
+      "title": "Wire dist generate --check into a real CI gate for the create-release pairing",
+      "body": [
+        "Batch 24 T3b fix round 1 (task-3b-review.json, important issue 2): crates/houserules/tests/dist_workspace_config.rs pins dist-workspace.toml's create-release = false and release.yml's upload-not-create shape by two independent substrings, with no gate that re-derives one from the other. The file's own doc comment used to claim `dist generate --check` runs in CI and catches drift; it does not. No job in .github/workflows/ci.yml and no task in mise.toml installs or runs `dist` at all, and re-derived live: a scratch clone of the tree at batch 24 T3b fix round 1 with a one-line hand-edit appended to release.yml exits 0 from `dist generate --check` under this repository's own allow-dirty = [\"ci\"], and exits 255 with an 'out of date contents' diff only once allow-dirty is cleared to []. The comment is corrected to state this plainly; this item tracks making it a real gate instead.",
+        "Feasibility, re-derived live at the same fix round: mise's own registry carries cargo-dist (`mise registry | grep dist` -> `aqua:axodotdev/cargo-dist github:axodotdev/cargo-dist cargo:cargo-dist`); `mise install` against a one-line scratch mise.toml (`[tools]\\n\"cargo-dist\" = \"0.32.0\"`) installed a working `dist` binary via the aqua backend in one step on this Linux development environment, GitHub artifact attestation verified. Linux install is proven; macOS and Windows are not (no such host here), and ci.yml's `rust` job runs a 3-OS matrix (ubuntu/macos/windows) that would also pick up any tool this repository's global mise.toml [tools] table names -- adding cargo-dist there unscoped risks an untested install path on two OSes no existing tool in that table exercises.",
+        "Proposed fix: add cargo-dist to mise.toml's [tools], pinned to the same version as dist-workspace.toml's cargo-dist-version (security-hygiene.exact-pins), scoped to the one OS the check actually needs -- mise's own docs name an `os` tool-option for exactly this (mise.jdx.dev/configuration.html, checked 2026-09-13); verify its literal TOML syntax against current docs before use, since the fetched page named the option without a worked example. Add `dist generate --check` as a step in mise.toml's `lint` task (which runs only in ci.yml's ubuntu-only `checks` job, so the rust job's macOS/Windows legs need no new tool at all). Re-run the two exit-code probes above against the real gate (0 clean, 255 on a hand-edit) before shipping, and update dist_workspace_config.rs's doc comment once the gate is real.",
+        "Deferred out of batch 24 T3b's fix round per that review's own escape hatch (a full regen gate is shipped only when proven safe wherever it runs; otherwise the honest-comment version plus this deferral note): the CI-wide, 3-OS blast radius of a mise.toml [tools] change is not something to land untested in a fix round with no CI run available here to verify it against first."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 24,
+      "see": [
+        "HR-118"
       ]
     }
   ]
