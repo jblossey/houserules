@@ -608,6 +608,72 @@
         "by": "review",
         "ref": "batch 24 branch review, issue 4"
       }
+    },
+    {
+      "id": "houserules.release-please-owns-the-release-object",
+      "kind": "invariant",
+      "area": "tools",
+      "standing": false,
+      "summary": "release-please is the only tool that creates a GitHub Release here; dist uploads into it (create-release = false) and never calls gh release create.",
+      "body": [
+        "T2 live (2026-09-13): both tools created v0.3.0 -- release-please on the tag push, then dist's host job failed at gh release create ('a release with the same tag name already exists'; design.md 5.77, HR-118). crates/houserules/tests/dist_workspace_config.rs pins both halves.",
+        "When wiring any new release-adjacent automation, enumerate the external resources each tool WRITES (releases, tags, PRs, comments), not only the commits it authors, and name exactly one creator per resource."
+      ],
+      "tags": [
+        "release",
+        "dist",
+        "release-please",
+        "automation"
+      ],
+      "source": {
+        "date": "2026-09-13",
+        "by": "review",
+        "ref": "batch 24 close branch review; T2 create-collision (design.md 5.77)"
+      }
+    },
+    {
+      "id": "houserules.seeded-repo-live-proof",
+      "kind": "procedure",
+      "area": "tools",
+      "standing": false,
+      "summary": "Prove adopter-facing changes with a throwaway seeded repo: init from the released kit, open a PR, and require the seeded knowledge workflow green end to end.",
+      "body": [
+        "One green PR run proves the installer alias, the binary, and the gates together. Steps (batch 24 close, HR-063): create a private throwaway repository; run houserules init from the RELEASED kit (a downloaded archive, not the dev build); push and open a PR; the seeded knowledge workflow must curl the latest-alias installer inside the runner and pass check-knowledge, check-backlog, and audit. Capture the run JSON and full log into the batch workspace.",
+        "The CLI token usually lacks delete_repo: book the owner's deletion of the throwaway repo in the same turn the proof lands. Never use the tag-pilot checkout for this (houserules.tag-pilot-is-read-only)."
+      ],
+      "tags": [
+        "release",
+        "ci",
+        "live-proof",
+        "install"
+      ],
+      "source": {
+        "date": "2026-09-13",
+        "by": "review",
+        "ref": "batch 24 close; HR-063 closure captures (t3b-evidence/hr063-seeded-gate-run.json)"
+      }
+    },
+    {
+      "id": "houserules.mise-cooldown-on-release-day",
+      "kind": "gotcha",
+      "area": "tools",
+      "standing": false,
+      "summary": "mise's minimum_release_age (default 24h) keeps a repository's first-ever release from resolving via @latest for a day; later releases fall back unaffected.",
+      "body": [
+        "Verified live at v0.3.0 (batch 24 T3b): the plain documented command failed with 'no versions found ... matching date filter' until the release aged 24h; MISE_MINIMUM_RELEASE_AGE=0s proved the channel itself correct. filter_by_date filters the release list before @latest takes the newest survivor (mise src/toolset/tool_version.rs, read live 2026-09-13).",
+        "On release day, verify the mise channel with the override and record both runs; the documented command needs no change."
+      ],
+      "tags": [
+        "mise",
+        "release",
+        "install",
+        "verification"
+      ],
+      "source": {
+        "date": "2026-09-13",
+        "by": "review",
+        "ref": "batch 24 T3b report, part B capture set"
+      }
     }
   ]
 }

@@ -144,23 +144,21 @@ One release runs:
    stamps for every `KIT_OWNED` file and kit-shipped knowledge entry.
    Follow the restamp procedure below to check and, if needed, refresh
    them — referenced here, not repeated.
-6. **One act remains due, now that this run has succeeded for real.**
-   Every mechanism above was proven, before `v0.3.0`, only from the
-   pinned release-please source and `release_please_config.rs`'s own
-   config-shape pins (its module doc: "this file pins only the config
-   shape ... with no release-please run"), plus T1's own commit-split
-   and package-shape simulations in the batch workspace
-   (`.superpowers/sdd/2026-09-12-batch-24/t1-evidence/`) — not from an
-   actual release-please run against this exact config. This
-   repository's own `v0.3.0` cut supplied that run: the host/create/
-   announce jobs succeeded, and the README install-block re-walk (the
-   shell installer, mise, and direct-download channels) ran live against
-   the real, now-`latest` release (HR-064, HR-070, batch 24 T3b). One act
-   from that same run stays open:
-   - **A seeded-repository CI run**: seed a fresh repository with
-     `houserules init`, open a PR against it, and confirm the install
-     step actually installs the binary and the gate passes end to end
-     (HR-063).
+6. **Every mechanism above is live-proven; nothing remains due.**
+   Before `v0.3.0`, the proofs were the pinned release-please source,
+   `release_please_config.rs`'s config-shape pins (its module doc:
+   "this file pins only the config shape ... with no release-please
+   run"), and T1's commit-split and package-shape simulations in the
+   batch workspace
+   (`.superpowers/sdd/2026-09-12-batch-24/t1-evidence/`). The `v0.3.0`
+   cut supplied the real runs (batch 24, 2026-09-13): the
+   host/create/announce jobs succeeded; the README install-block
+   re-walk (the shell installer, mise, and direct-download channels)
+   ran live against the real, now-`latest` release (HR-064, HR-070);
+   and a seeded-repository CI run closed the loop — a fresh
+   `houserules init` repository's PR gate installed the binary through
+   the latest-alias installer inside the runner and passed end to end
+   (HR-063, captures in the batch workspace's `t3b-evidence/`).
 
 ### Owner-attended external acts
 
