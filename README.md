@@ -70,64 +70,73 @@ toolchain, no Node. Install it through any of these channels, then run
 
 ### The shell installer
 
-<!-- x-release-please-start-version -->
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jblossey/houserules/releases/latest/download/houserules-installer.sh | sh
 ```
-<!-- x-release-please-end -->
 
 cargo-dist's own installer (the same [release pipeline](docs/runbook.md#cutting-a-release)
 publishes it): it picks your platform's archive, checks its sha256, and
 installs to `$CARGO_HOME/bin` (falling back to `~/.cargo/bin`), adding
 that directory to `PATH` itself (`.profile`, `.zshrc`/`.zshenv`, fish's
 `conf.d`, or `$GITHUB_PATH` under CI — no shell restart needed there).
+`releases/latest/download/<asset>` is GitHub's own alias for "the newest
+non-prerelease release's asset", so this URL never needs a version edit
+(HR-049; docs/specs/2026-09-12-batch-24-repo-and-setup.md §2a).
 
-PENDING the first release with assets (HR-048): `jblossey/houserules`
-carries one release so far (`houserules-v0.2.0-alpha`, 2026-09-03), and
-it ships zero assets; the tag this URL names has no release of
-its own. Either way, the URL 404s today. Verified live
-2026-09-07 (the releases API listing,
-`.superpowers/sdd/2026-09-06-batch-19/t2-evidence/releases-api-listing.json`;
+PENDING the first non-prerelease release (HR-048): today the alias has
+nothing to resolve, since `jblossey/houserules`'s only release
+(`houserules-v0.2.0-alpha`) is a prerelease with zero assets, and
+GitHub's `releases/latest` excludes prereleases (verified live
+2026-09-13, the releases listing,
+`.superpowers/sdd/2026-09-12-batch-24/t3a-evidence/releases-listing.json`;
 the 404,
-`.superpowers/sdd/2026-09-06-batch-19/t2-evidence/curl-installer-404.log`).
-Re-run this block once the pipeline cuts a release with assets, and
-again once HR-049 re-verifies live (the two-step reality,
-docs/specs/2026-09-06-batch-19-phase4.md §7).
+`.superpowers/sdd/2026-09-12-batch-24/t3a-evidence/latest-alias-installer-404.log`).
+T3b re-runs this block live once `v0.3.0` ships.
 
 ### mise
 
 ```sh
-mise use ubi:jblossey/houserules
+mise use github:jblossey/houserules
 ```
 
-Resolves the latest GitHub release's archive for your platform through
-mise's `ubi` backend, with no registry entry needed; `mise use` with no
+Resolves the newest non-prerelease GitHub release's archive for your
+platform through mise's `github` backend, autodetecting OS,
+architecture, and libc from the asset name; `mise use` with no
 `@version` defaults to `@latest` and records that spec in `mise.toml`.
-mise's own current docs mark the `ubi` backend deprecated in favor of
-`github:owner/repo`, removed in mise 2027.1.0 — `ubi` still resolves and
-installs today (HR-070 tracks the migration).
+houserules tags plain `v<version>` releases (docs/design.md §5.20,
+reaffirmed §5.72), matching this backend's own default `version_prefix`
+(mise's current docs, checked 2026-09-13:
+https://mise.jdx.dev/dev-tools/backends/github.html — "By default, mise
+handles the common `v` prefix"), so no override is needed. mise's
+current docs mark the `ubi` backend this replaces deprecated in this
+backend's favor (checked 2026-09-13,
+https://mise.jdx.dev/dev-tools/backends/ubi.html: "The ubi backend is
+deprecated. Use the GitHub backend instead."); the `matching`/
+`matching_regex` options carry over (HR-070) — houserules's own
+documented command above uses neither.
 
-PENDING the first release with assets: the one release that exists
-ships no asset for mise's `ubi` backend to resolve. mise's own
-diagnostic names a different symptom, `no versions found ... matching
-date filter`, not an absent release. Verified live 2026-09-07,
-`.superpowers/sdd/2026-09-06-batch-19/t2-evidence/mise-ubi-control-run.log`.
+PENDING the first non-prerelease release: today no version resolves,
+since mise's own release listing filters out a release that is either a
+prerelease or carries no assets, and `houserules-v0.2.0-alpha` is both
+(verified live 2026-09-13,
+`.superpowers/sdd/2026-09-12-batch-24/t3a-evidence/releases-listing.json`).
+T3b re-runs this block live once `v0.3.0` ships.
 
 ### Direct download
 
-<!-- x-release-please-start-version -->
 | Target | Archive |
 |---|---|
-| Apple Silicon macOS | [houserules-aarch64-apple-darwin.tar.xz](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-aarch64-apple-darwin.tar.xz) |
-| Intel macOS | [houserules-x86_64-apple-darwin.tar.xz](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-x86_64-apple-darwin.tar.xz) |
-| x64 Windows | [houserules-x86_64-pc-windows-msvc.zip](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-x86_64-pc-windows-msvc.zip) |
-| ARM64 Linux (musl) | [houserules-aarch64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-aarch64-unknown-linux-musl.tar.xz) |
-| x64 Linux (musl) | [houserules-x86_64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/download/v0.2.0-alpha/houserules-x86_64-unknown-linux-musl.tar.xz) |
-<!-- x-release-please-end -->
+| Apple Silicon macOS | [houserules-aarch64-apple-darwin.tar.xz](https://github.com/jblossey/houserules/releases/latest/download/houserules-aarch64-apple-darwin.tar.xz) |
+| Intel macOS | [houserules-x86_64-apple-darwin.tar.xz](https://github.com/jblossey/houserules/releases/latest/download/houserules-x86_64-apple-darwin.tar.xz) |
+| x64 Windows | [houserules-x86_64-pc-windows-msvc.zip](https://github.com/jblossey/houserules/releases/latest/download/houserules-x86_64-pc-windows-msvc.zip) |
+| ARM64 Linux (musl) | [houserules-aarch64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/latest/download/houserules-aarch64-unknown-linux-musl.tar.xz) |
+| x64 Linux (musl) | [houserules-x86_64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/latest/download/houserules-x86_64-unknown-linux-musl.tar.xz) |
 
 Each archive carries a `.sha256` checksum beside it (append `.sha256` to
-the archive's own URL); extract the archive and put the `houserules`
-binary on `PATH` yourself.
+the archive's own URL, through the same `releases/latest/download`
+alias); extract the archive and put the `houserules` binary on `PATH`
+yourself. The documented channels all pin to the alias; an exact older
+version stays downloadable from its own release page instead.
 
 macOS ships unsigned (docs/specs/2026-09-06-batch-19-phase4.md §3's
 ruling: zero cost, revisit at 1.0). A browser download sets the
@@ -143,9 +152,14 @@ Verified against the documented `xattr -d <attribute> <file>` form
 live in this Linux development environment — no macOS host is available
 here, a permanent constraint, not a pending-release one.
 
-PENDING the first release with assets: all five listed archives 404
-today. Verified live 2026-09-07,
-`.superpowers/sdd/2026-09-06-batch-19/t2-evidence/direct-download-404.log`.
+PENDING the first non-prerelease release: today all five archive links
+404, for the same reason the shell installer's does (verified live
+2026-09-13, one capture per row above under
+`.superpowers/sdd/2026-09-12-batch-24/t3a-evidence/`:
+`live-direct-download-aarch64-apple-darwin.log`,
+`-x86_64-apple-darwin.log`, `-x86_64-pc-windows-msvc.log`,
+`-aarch64-unknown-linux-musl.log`, `-x86_64-unknown-linux-musl.log`).
+T3b re-runs this table live once `v0.3.0` ships.
 
 ## Quick start
 
@@ -309,6 +323,6 @@ and work items.
 MIT — see [LICENSE](LICENSE). The files that `init` and `update` write into
 your project are yours under the same terms; the kit-owned scripts carry an
 SPDX header, so vendored copies keep the notice. Distribution is
-binary-only (GitHub Releases, mise via ubi, a curl-to-sh installer);
-houserules will not publish to npm or any plugin marketplace (ruled
-2026-09-04, docs/design.md §5.22).
+binary-only (GitHub Releases, mise via the `github:` backend, a
+curl-to-sh installer); houserules will not publish to npm or any plugin
+marketplace (ruled 2026-09-04, docs/design.md §5.22).

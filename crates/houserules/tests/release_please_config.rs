@@ -1,9 +1,10 @@
 //! Pins `release-please-config.json`'s package shape: the one package
-//! sits at `"crates/houserules"` (`release-type: "rust"`, reading that
-//! crate's own `Cargo.toml`). `docs/runbook.md`'s "release-please's
-//! release-type" section carries the full source derivation
-//! (`googleapis/release-please@v17.6.0`'s `Rust.getDefaultPackageName`);
-//! this file pins only the config shape that derivation depends on,
+//! sits at `"crates/houserules"` (`release-type: "rust"`).
+//! `Rust.getDefaultPackageName` (`src/strategies/rust.ts:137-141`) reads
+//! that crate's own `Cargo.toml` through `getPackageManifest()`
+//! (`:148-153`), which resolves `addPath('Cargo.toml')` against the
+//! package's own path -- no `package.json` anywhere in the call path.
+//! This file pins only the config shape that derivation depends on,
 //! cheaply, with no release-please run.
 //!
 //! Every source line this file cites is v17.6.0, the release-please

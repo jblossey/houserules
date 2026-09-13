@@ -80,7 +80,6 @@
 //! skip, then every unexplained hit, then a summary line; exits 0 only
 //! when no path was unreadable and no hit remains unexplained.
 
-use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -230,35 +229,6 @@ fn find_matches(rel_path: &str, text: &str) -> Vec<Hit> {
     hits
 }
 
-/// The 1-based line numbers of `docs/runbook.md`'s own "release-please's
-/// release-type" section (its heading through the line before the next
-/// `## ` heading, or end of file): explains `release-please`'s own
-/// third-party internals -- a Node-based tool this repository's CI still
-/// legitimately depends on (`.github/workflows/release-please.yml`) -- to
-/// derive a fix from the pinned source
-/// (`process.wiring-checks-run-the-resolution`), never an instruction
-/// this repository's own toolchain follows. Heading-bounded rather than a
-/// whole-file exception so the rest of the runbook -- the release and
-/// restamp procedures -- stays gated.
-fn runbook_release_please_section_lines(text: &str) -> HashSet<usize> {
-    let lines: Vec<&str> = text.split('\n').collect();
-    let mut exempt = HashSet::new();
-    let Some(start) = lines
-        .iter()
-        .position(|line| line.starts_with("## release-please's release-type"))
-    else {
-        return exempt;
-    };
-    exempt.insert(start + 1);
-    for (offset, line) in lines.iter().enumerate().skip(start + 1) {
-        if line.starts_with("## ") {
-            break;
-        }
-        exempt.insert(offset + 1);
-    }
-    exempt
-}
-
 /// One exception category's name, the reason it stays, and the predicate
 /// deciding whether a given hit (with its file's full text alongside)
 /// falls inside it.
@@ -286,16 +256,6 @@ fn exceptions() -> Vec<Exception> {
             matches: |hit, _file_text| {
                 hit.file == "README.md"
                     && hit.text.to_lowercase().contains("will not publish to npm")
-            },
-        },
-        Exception {
-            label: "docs/runbook.md: the release-please release-type section (HR-073)",
-            reason: "`runbook_release_please_section_lines`'s own doc has the full account: \
-                release-please's own third-party Node internals, derived from its pinned source \
-                to explain and close HR-073's fix, never this repository's own toolchain.",
-            matches: |hit, file_text| {
-                hit.file == "docs/runbook.md"
-                    && runbook_release_please_section_lines(file_text).contains(&hit.line)
             },
         },
         Exception {
@@ -715,53 +675,6 @@ mod tests {
         assert!(
             matched,
             "the \"will not publish to npm\" line must be excepted"
-        );
-    }
-
-    /// `runbook_release_please_section_lines` bounds exactly the
-    /// "release-please's release-type" section: its own heading through
-    /// the line before the next `## ` heading, nothing from the sections
-    /// before or after.
-    #[test]
-    fn runbook_release_please_section_lines_stops_at_the_next_heading() {
-        let text = "# Title\n\n## release-please's release-type: X\n\nnode line one\nnode line two\n\n## Next section\n\nnode line three (must NOT be exempt)\n";
-        let exempt = runbook_release_please_section_lines(text);
-        assert!(exempt.contains(&3)); // the heading itself
-        assert!(exempt.contains(&5));
-        assert!(exempt.contains(&6));
-        assert!(!exempt.contains(&8)); // "## Next section"
-        assert!(!exempt.contains(&10)); // past the next heading
-    }
-
-    /// A `node`/`package.json` line inside `docs/runbook.md`'s
-    /// "release-please's release-type" section is excepted; the
-    /// identical text elsewhere in the same file is not -- the exception
-    /// is heading-bounded, not whole-file.
-    #[test]
-    fn runbook_release_please_section_exception_is_heading_bounded() {
-        let file_text = "# houserules runbook\n\n## release-please's release-type: rust (HR-073)\n\nnames \"node\" here\n\n## Cutting a release\n\nnames \"node\" here too\n";
-        let inside = Hit {
-            file: "docs/runbook.md".to_string(),
-            line: 5,
-            text: "names \"node\" here".to_string(),
-        };
-        let outside = Hit {
-            file: "docs/runbook.md".to_string(),
-            line: 9,
-            text: "names \"node\" here too".to_string(),
-        };
-        let exceptions = exceptions();
-        assert!(
-            exceptions
-                .iter()
-                .any(|exception| (exception.matches)(&inside, file_text)),
-            "the release-please section's own line must be excepted"
-        );
-        assert!(
-            !exceptions
-                .iter()
-                .any(|exception| (exception.matches)(&outside, file_text)),
-            "a line outside the release-please section must NOT be excepted"
         );
     }
 
