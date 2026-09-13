@@ -83,15 +83,11 @@ that directory to `PATH` itself (`.profile`, `.zshrc`/`.zshenv`, fish's
 non-prerelease release's asset", so this URL never needs a version edit
 (HR-049; docs/specs/2026-09-12-batch-24-repo-and-setup.md §2a).
 
-PENDING the first non-prerelease release (HR-048): today the alias has
-nothing to resolve, since `jblossey/houserules`'s only release
-(`houserules-v0.2.0-alpha`) is a prerelease with zero assets, and
-GitHub's `releases/latest` excludes prereleases (verified live
-2026-09-13, the releases listing,
-`.superpowers/sdd/2026-09-12-batch-24/t3a-evidence/releases-listing.json`;
-the 404,
-`.superpowers/sdd/2026-09-12-batch-24/t3a-evidence/latest-alias-installer-404.log`).
-T3b re-runs this block live once `v0.3.0` ships.
+Live-verified (HR-048, HR-063): `v0.3.0` is the alias's target now (16
+assets, not a prerelease). A scrubbed-environment run of the exact
+command above — a fresh `$HOME`, no dev `PATH` — downloaded, verified,
+and installed the binary for real. The installed binary printed
+`houserules 0.3.0`.
 
 ### mise
 
@@ -115,12 +111,26 @@ deprecated. Use the GitHub backend instead."); the `matching`/
 `matching_regex` options carry over (HR-070) — houserules's own
 documented command above uses neither.
 
-PENDING the first non-prerelease release: today no version resolves,
-since mise's own release listing filters out a release that is either a
-prerelease or carries no assets, and `houserules-v0.2.0-alpha` is both
-(verified live 2026-09-13,
-`.superpowers/sdd/2026-09-12-batch-24/t3a-evidence/releases-listing.json`).
-T3b re-runs this block live once `v0.3.0` ships.
+Live-verified (HR-070): the `github` backend resolves `v0.3.0` and
+installs it correctly, with GitHub artifact attestation verified. The
+installed binary printed `houserules 0.3.0`.
+
+The live run also hit a one-time gap that needs no change to the
+command above. mise's own `minimum_release_age` setting (default `24h`,
+a supply-chain safety cutoff — mise's current docs, checked 2026-09-13,
+https://mise.jdx.dev/configuration/settings.html) rejects a candidate
+release younger than that, falling back to an older release when one
+exists. `v0.3.0` is `jblossey/houserules`'s first non-prerelease
+release, so on the day it ships there is no older release to fall back
+to. The plain command above fails with "no versions found ... matching
+date filter" until the release turns 24 hours old (published
+2026-09-13T09:53:27Z) — captured live, a scrubbed-environment run.
+
+`filter_by_date` (mise's own `src/toolset/tool_version.rs`, read live)
+filters the release list; `@latest` resolution then takes the newest
+release that survives the filter. A release with an older,
+already-aged release behind it falls back to that one instead of
+failing — only the very first release has none.
 
 ### Direct download
 
@@ -152,14 +162,14 @@ Verified against the documented `xattr -d <attribute> <file>` form
 live in this Linux development environment — no macOS host is available
 here, a permanent constraint, not a pending-release one.
 
-PENDING the first non-prerelease release: today all five archive links
-404, for the same reason the shell installer's does (verified live
-2026-09-13, one capture per row above under
-`.superpowers/sdd/2026-09-12-batch-24/t3a-evidence/`:
-`live-direct-download-aarch64-apple-darwin.log`,
-`-x86_64-apple-darwin.log`, `-x86_64-pc-windows-msvc.log`,
-`-aarch64-unknown-linux-musl.log`, `-x86_64-unknown-linux-musl.log`).
-T3b re-runs this table live once `v0.3.0` ships.
+Live-verified (HR-049, HR-064): all five archive links resolve; each
+returned HTTP 200 through the alias, a scrubbed-environment capture.
+The x64 Linux (musl) row — this development environment's own
+platform — ran end to end: fetched the archive and its `.sha256`
+through the alias, `sha256sum -c` passed, and the extracted binary
+printed `houserules 0.3.0`. No macOS or Windows host is available here
+to run the other four archives, the same permanent constraint the
+quarantine block above already names.
 
 ## Quick start
 

@@ -111,12 +111,25 @@ One release runs:
    tag-anchored one exactly (verified live: the configured `bootstrap-
    sha` sits several commits earlier than the tag). Keep the tag until
    `v0.3.0` ships and becomes the new anchor in its place.
-4. **The tag builds and publishes the release.** `release.yml` builds
-   five targets (linux x64/arm64 musl, macOS x64/arm64, Windows x64), a
-   sha256 checksum per archive plus a unified `sha256.sum`, and the
-   shell and PowerShell installers, then uploads all of it to the tag's
-   GitHub Release. `0.3.0` carries no prerelease suffix, so the release
-   is not marked a prerelease — the condition every documented install
+4. **The tag builds and uploads into the release step 3 already made.**
+   `release.yml` builds five targets (linux x64/arm64 musl, macOS
+   x64/arm64, Windows x64), a sha256 checksum per archive plus a unified
+   `sha256.sum`, and the shell and PowerShell installers. It then uploads
+   all of it into the tag's GitHub Release with `gh release upload`, then
+   undrafts the release with `gh release edit --draft=false` (a no-op:
+   step 3's release already publishes, never drafts).
+   `dist-workspace.toml`'s `create-release = false` is what makes this an
+   upload instead of a second creation.
+
+   WARNING: v0.3.0's own first live cut ran before this setting existed.
+   Its host job called `gh release create` against the tag
+   release-please had already released, and collided ("a release with
+   the same tag name already exists", HR-118, design.md 5.77).
+
+   Every release from the one that carries `create-release = false`
+   onward uploads into release-please's release instead of fighting it
+   for creation. `0.3.0` carries no prerelease suffix, so the release is
+   not marked a prerelease — the condition every documented install
    path's `releases/latest/download` alias needs, to resolve to it
    (docs/specs/2026-09-12-batch-24-repo-and-setup.md §2a).
 5. **Check for baseline drift, not a version restamp.** The release PR
@@ -128,20 +141,19 @@ One release runs:
    stamps for every `KIT_OWNED` file and kit-shipped knowledge entry.
    Follow the restamp procedure below to check and, if needed, refresh
    them — referenced here, not repeated.
-6. **Two acts fall due once this run succeeds for real (HR-063):** every
-   mechanism above is proven from the pinned release-please source and
-   `release_please_config.rs`'s own config-shape pins (its module doc:
-   "this file pins only the config shape ... with no release-please
-   run"), plus T1's own commit-split and package-shape simulations in
-   the batch workspace
+6. **One act remains due, now that this run has succeeded for real.**
+   Every mechanism above was proven, before `v0.3.0`, only from the
+   pinned release-please source and `release_please_config.rs`'s own
+   config-shape pins (its module doc: "this file pins only the config
+   shape ... with no release-please run"), plus T1's own commit-split
+   and package-shape simulations in the batch workspace
    (`.superpowers/sdd/2026-09-12-batch-24/t1-evidence/`) — not from an
    actual release-please run against this exact config. This
-   repository's own `0.3.0` cut is that missing run. Once the
-   host/create/announce jobs succeed against the resulting release:
-   - **The README install-block re-walk**: re-run the shell installer,
-     mise, and direct-download blocks against the real, now-`latest`
-     release and replace each PENDING note with the result (HR-064,
-     HR-070).
+   repository's own `v0.3.0` cut supplied that run: the host/create/
+   announce jobs succeeded, and the README install-block re-walk (the
+   shell installer, mise, and direct-download channels) ran live against
+   the real, now-`latest` release (HR-064, HR-070, batch 24 T3b). One act
+   from that same run stays open:
    - **A seeded-repository CI run**: seed a fresh repository with
      `houserules init`, open a PR against it, and confirm the install
      step actually installs the binary and the gate passes end to end
