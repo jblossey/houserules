@@ -683,7 +683,8 @@
       "body": [
         "The batch-19 shape: release.yml's tag glob matched v0.2.0-alpha, and dist plan --tag=v0.2.0-alpha still exited 255 because CARGO_PKG_VERSION could not resolve the tag - the pattern check passed while the pipeline was broken on every tag the flow would produce (batch 19 task-1-review.json issue 2).",
         "The proof is the consumer's own run, captured: dist plan for a tag wiring, the updater's replacement count for a pin wiring, the as-CI shell for a workflow step. The match check stays as the cheap first gate, never the verdict.",
-        "A third-party breakage claim states WHEN it fires, derived from the pinned source's call path - never hedged as 'may fail' - because the hedge is what mis-schedules the fix (batch 20: HR-073's original wording queued a push-time failure behind a release-time track until the source derivation re-scoped it pre-merge)."
+        "A third-party breakage claim states WHEN it fires, derived from the pinned source's call path - never hedged as 'may fail' - because the hedge is what mis-schedules the fix (batch 20: HR-073's original wording queued a push-time failure behind a release-time track until the source derivation re-scoped it pre-merge).",
+        "Run the resolution at the version the pinned consumer BUNDLES (read its dist/build metadata), never at the newest schema or docs version, and pin the two together with a cross-check test."
       ],
       "tags": [
         "verification",

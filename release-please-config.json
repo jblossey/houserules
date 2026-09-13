@@ -3,7 +3,7 @@
   "bootstrap-sha": "8931962b7b8ec67096cbc614973a9f773a76f096",
   "include-component-in-tag": false,
   "extra-files": [
-    "/template/.github/workflows/knowledge.yml"
+    { "type": "json", "path": "/.houserules.json", "jsonpath": "$.version" }
   ],
   "plugins": [
     { "type": "cargo-workspace" }

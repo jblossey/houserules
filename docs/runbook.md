@@ -19,9 +19,14 @@ a tag pushed by the default `GITHUB_TOKEN` starts no workflow
 (`release-type: "rust"`, reading that crate's own `Cargo.toml` as the
 version source). `include-component-in-tag: false` keeps every release
 tag plain (`v<version>`, docs/design.md §5.20, reaffirmed §5.72 after a
-since-rejected reversal at §5.71). Every `extra-files` entry anchors to
-the repository root with a leading `/`, since the package sits off root.
-`changelog-path: "/CHANGELOG.md"` keeps release notes in the existing
+since-rejected reversal at §5.71). The one `extra-files` entry,
+`/.houserules.json`'s `json`/`$.version` update, anchors to the
+repository root with a leading `/`, since the package sits off root; it
+folds this repository's own kit-version restamp into the release PR
+itself, so the PR's own `crates/houserules/Cargo.toml` bump and
+`.houserules.json`'s `version` field land in the same commit (see
+`houserules.post-release-restamp` below). `changelog-path:
+"/CHANGELOG.md"` keeps release notes in the existing
 root changelog instead of starting a second one under
 `crates/houserules/`. The `cargo-workspace` plugin keeps the
 workspace-root `Cargo.lock` in sync; a residue in the package's own
@@ -48,6 +53,12 @@ check-commit` enforces the same pairing commit by commit in CI. After
 changing anything under `template/`, run `cargo run --quiet --bin
 payload-stamp-gate -- --write` and commit the regenerated
 `payload.stamp` in the same commit as the `template/` change.
+release-please's own release commit touches no path under `template/`:
+the seeded `template/.github/workflows/knowledge.yml` installer pins
+`releases/latest/download`, needing no per-release rewrite, so
+`extra-files` carries no entry there (branch review batch 24, issue 1) —
+this gate and `check-commit`'s co-change enforcement need no bot-commit
+carve-out.
 
 ## Cutting a release
 
@@ -61,7 +72,11 @@ One release runs:
 
 1. **release-please keeps a PR open against `main`**, bumping
    `crates/houserules/Cargo.toml`'s version (the `rust` release-type's
-   own native update) and appending to the root `CHANGELOG.md`. The
+   own native update), appending to the root `CHANGELOG.md`, and
+   rewriting `.houserules.json`'s `version` field to match (the
+   `extra-files` entry, above) — this repository's own kit-version
+   restamp rides the same PR as the adopter-facing bump, so the PR
+   itself carries a matching `Cargo.toml`/`.houserules.json` pair. The
    `RELEASE_PLEASE_TOKEN` PAT (release-please configuration, above)
    authenticates the workflow that keeps this PR current.
 2. **This release's version is pinned by a `Release-As: 0.3.0` commit
@@ -79,7 +94,10 @@ One release runs:
    PAT — that PAT authorship, not the merge itself, is what lets the
    tag start `release.yml`; a tag the default `GITHUB_TOKEN` created
    would start no workflow
-   (`houserules.default-token-tags-start-no-workflows`).
+   (`houserules.default-token-tags-start-no-workflows`). If the release
+   PR's own checks sit at `action_required` instead of running, approve
+   the runs once from the PR's checks tab; this first cut is
+   owner-attended either way.
 
    **Do not delete `refs/tags/v0.2.0-alpha` before `v0.3.0` exists.**
    `backfillReleasesFromTags` (release-please's own tag-based release
@@ -101,11 +119,15 @@ One release runs:
    is not marked a prerelease — the condition every documented install
    path's `releases/latest/download` alias needs, to resolve to it
    (docs/specs/2026-09-12-batch-24-repo-and-setup.md §2a).
-5. **Restamp this repository's own kit version.** Separate from the
-   adopter-facing release above: this repository runs its own kit
-   (`houserules.template-is-the-source`), so its own `.houserules.json`
-   stamp also needs the new version. Follow the restamp procedure below
-   — referenced here, not repeated.
+5. **Check for baseline drift, not a version restamp.** The release PR
+   (step 1) already carried `.houserules.json`'s `version` field to
+   `0.3.0`, so `crates/houserules/tests/dogfood.rs`'s
+   `houserules_json_stamps_the_installed_version_and_the_hr_id_prefix`
+   test passes on the release PR itself, before merge. What can still
+   drift is `baselines`: the per-file hashes `houserules update --dir .`
+   stamps for every `KIT_OWNED` file and kit-shipped knowledge entry.
+   Follow the restamp procedure below to check and, if needed, refresh
+   them — referenced here, not repeated.
 6. **Two acts fall due once this run succeeds for real (HR-063):** every
    mechanism above is proven from the pinned release-please source and
    `release_please_config.rs`'s own config-shape pins (its module doc:
@@ -140,22 +162,32 @@ above), then again only when the registration itself needs an update
 | asdf plugin | An `asdf-houserules` plugin repository implementing asdf's plugin API against the same release archives | A new repository under the `jblossey` account |
 | Scoop / winget | A Scoop manifest in a bucket repository, and/or a winget manifest PR against `microsoft/winget-pkgs`, both pointing at the Windows archive | A Scoop bucket repository; a PR to `microsoft/winget-pkgs` |
 
-## After a release-please merge, restamp the kit version
+## After a release-please merge, check for baseline drift
 
-release-please opens a PR that bumps `crates/houserules/Cargo.toml`'s
-version (the `rust` release-type's own native update, HR-073).
-The merge does not update `.houserules.json`. The stale stamp fails
-`crates/houserules/tests/dogfood.rs`'s `houserules_json_stamps_the_
-installed_version_and_the_hr_id_prefix` test on main, because that test
-pins the stamp to the running version (`CARGO_PKG_VERSION`).
+release-please's PR bumps `crates/houserules/Cargo.toml`'s version (the
+`rust` release-type's own native update, HR-073) and, in the same PR,
+rewrites `.houserules.json`'s `version` field to match (the
+`/.houserules.json` `extra-files` entry). The version half of the restamp
+therefore already rides the PR and needs no post-merge step;
+`crates/houserules/tests/dogfood.rs`'s
+`houserules_json_stamps_the_installed_version_and_the_hr_id_prefix` test
+passes on the release PR itself, before merge, by construction.
 
-After you merge a release-please PR, restamp the kit:
+What the PR does NOT update is `baselines`: the per-file hashes
+`houserules update --dir .` stamps for every `KIT_OWNED` file and
+kit-shipped knowledge entry. Those drift only if the kit's own payload
+changed since the last stamp, independent of the version bump.
+
+After you merge a release-please PR, check for that drift:
 
 1. Run `houserules update --dir .`. The command prints a drift line, for
-   example `kit 0.1.0 -> 0.2.0-alpha`.
-2. Commit the restamped `.houserules.json`:
-   `chore(release): restamp the kit version`.
+   example `kit 0.3.0 -> 0.3.0`; a version drift here would mean the
+   extra-files entry above did not fire and needs investigating.
+2. If `.houserules.json` changed (a `baselines` hash, ordinarily),
+   commit it: `chore(release): restamp the kit baselines`.
 3. Push the commit to main.
 
-Run this step every time, right after the merge. A skipped restamp
-breaks main until the next one.
+An unstamped baseline drift does not fail `dogfood.rs`'s version test
+(that test pins only `version` and `idPrefix`), but it does leave
+`.houserules.json` stale against the tree's real kit-owned content until
+the next `update` run notices it.

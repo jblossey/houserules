@@ -49,7 +49,7 @@
         "Fix: wire the pins into the release flow — release-please extra-files annotations if they support the shape, else one line in the restamp step of docs/runbook.md and the finishing-a-feature skill (update the README pins with the restamp commit). Decide the mechanism in the batch spec. Interlock: HR-048's tag-format ruling may rename the tag grammar these pins use — schedule together or after it.",
         "Batch 19 T2: measured and wired. release-please v17.11.2's Generic updater treats a bare string in `extra-files` as annotation-scanned text, verified against its own source (src/updaters/generic.ts at the pinned tag) and the pinned config schema. Wired six pin lines in README.md (the shell-installer URL, the five direct-download archive links) via x-release-please-start-version/-end blocks placed outside the runnable code fences, plus the seeded template/.github/workflows/knowledge.yml's own install-step pin via one inline x-release-please-version marker -- seven lines total across the two files, each proven with a RED (pre-fix content, no markers, replacement count assert-fails) and GREEN (shipped content, exact count) reproduction of the updater's own regex logic. STAYS OPEN: the mechanism is wired, not yet verified live -- closes only once a real release-please release actually replaces these pins and a fresh capture confirms the new pin resolves (docs/specs/2026-09-06-batch-19-phase4.md §7's step two).",
         "Source: batch 13 branch review, issue 2 (2026-09-03).",
-        "CLOSED by design change, batch 24 T3a (docs/specs/2026-09-12-batch-24-repo-and-setup.md §2a): every install path in README.md now pins to GitHub's `releases/latest/download/<asset>` alias instead of a version-bearing URL, so a release never again needs a README edit there. The x-release-please-start-version/-end blocks this item wired around those URLs retire with them; `release-please-config.json`'s `extra-files` drops the now-annotation-free `/README.md` entry. This item's own scope closes: nothing version-bearing remains in README.md's install paths for a pin to follow. `template/.github/workflows/knowledge.yml`'s own inline `x-release-please-version` pin is a separate, still-live mechanism this item also wired (batch 19 T2); it does NOT close here -- it is out of this task's scope (touching `template/` pulls in the payload-stamp co-change rule for no reason this task needs) -- and HR-063's own seeded-repository CI run already owns that pin's first live re-verification (docs/runbook.md step 6)."
+        "CLOSED by design change, batch 24 T3a (docs/specs/2026-09-12-batch-24-repo-and-setup.md §2a): every install path in README.md now pins to GitHub's `releases/latest/download/<asset>` alias instead of a version-bearing URL, so a release never again needs a README edit there. The x-release-please-start-version/-end blocks this item wired around those URLs retire with them; `release-please-config.json`'s `extra-files` drops the now-annotation-free `/README.md` entry. This item's own scope closes: nothing version-bearing remains in README.md's install paths for a pin to follow. `template/.github/workflows/knowledge.yml`'s own inline `x-release-please-version` pin is the mechanism retired with the last extra-files annotation at the batch-24 branch fix (extra-files now carries only /.houserules.json's version path) this item also wired (batch 19 T2); it does NOT close here -- it is out of this task's scope (touching `template/` pulls in the payload-stamp co-change rule for no reason this task needs) -- and HR-063's own seeded-repository CI run already owns that pin's first live re-verification (docs/runbook.md step 6)."
       ],
       "tags": [
         "docs",
@@ -132,7 +132,8 @@
         "Batch 19 T2: the install step now exists. A pinned cargo-dist shell-installer step (`releases/download/v<version>/houserules-installer.sh`) runs before check-knowledge/check-backlog/audit, defended against jdx/mise-action (a new marketplace-action dependency plus an inline mise.toml an adopter repo does not otherwise carry) at batch 19 T2's commit \"feat(template): install houserules before the seeded CI gate runs\" and that task's report `implemented` field. No new dependency enters this repository's own manifests; dependency_vetting there is null.",
         "STAYS OPEN: jblossey/houserules carries one release so far (houserules-v0.2.0-alpha, 2026-09-03), and it ships zero assets; the v0.2.0-alpha tag the install step's URL actually needs has no release of its own (the releases API confirms both facts, fix round 1 t2-evidence/releases-api-listing.json). Either way the pinned URL 404s. Fix round 1 also gave the step `shell: bash`, so that 404 aborts the step itself (GitHub's documented -o pipefail) instead of surfacing two steps later as a confusing 'houserules: command not found' -- but a real CI run of the seeded step still cannot succeed until HR-048's pipeline cuts a release with assets. Closes only then, once a live run of a freshly seeded repository's PR gate proves the install step end to end (docs/specs/2026-09-06-batch-19-phase4.md §7's step two) -- the wiring is done, the verification is not.",
         "houserules.payload-runs-on-builtins (the invariant that the SessionStart hook and the CI gates run where nothing is installed) is amended at T6 to the ruled binary+POSIX contract, and again at T2 to name this step; both amendments land against the fact each carried at the time, not silently past it.",
-        "Source: batch 18 T5 fix round 1 review, filed by the implementer per process.no-tech-debt."
+        "Source: batch 18 T5 fix round 1 review, filed by the implementer per process.no-tech-debt.",
+        "Corrected at the batch-24 branch-fix review (2026-09-13): the installer URL is the latest alias (releases/latest/download/houserules-installer.sh) since the 2a design; this item's closure condition verifies THAT shape at T3b, not the retired versioned form."
       ],
       "tags": [
         "cli",
@@ -252,7 +253,8 @@
         "Verified live (batch 20 T5, and re-verified in fix round 1 with a bounded, rerunnable sweep, t5-evidence/ci-lock-flag-sweep.sh): no --locked/--frozen/--offline flag exists anywhere in this repository's own CI surface (.github/, mise.toml, dist-workspace.toml) or in cargo-dist v0.32.0's own build path (cargo-dist/src/build/{cargo,mod,fake,generic}.rs), so any subsequent cargo build/check/test invocation -- including the one dist build runs when cutting a release -- silently rewrites the stale line to match Cargo.toml, with no failure anywhere today.",
         "The risk: a --locked consumer would fail outright. Reproduced live (bumping the crate's version in this checkout, running the command, then reverting): `cargo check --locked` fails with 'cannot update the lock file ... because --locked was passed' (t5-evidence/cargo-check-locked-fails.log). Nothing in this repository's pipeline runs with --locked today, so this is a latent risk, not an active break -- but it has no tracked owner now that HR-073 is ticked done, and process.no-tech-debt wants an accepted gap carried by a backlog item, not by a closed one's body.",
         "Candidate remedies (open): extend the post-release-please-merge restamp procedure (docs/runbook.md) to also run a Cargo.lock refresh (e.g. `cargo update -p houserules --precise <version>` or a plain `cargo check`) and commit it alongside the kit-version restamp; or accept the residue indefinitely with this item standing as its documented risk record. Filed separately from HR-081 (same review round, same closed item, different mechanism -- a stale lockfile line versus a missed release PR -- so a remedy for one does not gate the other).",
-        "Source: batch 20 T5 fix round 1 review (task-5-review.json), minor finding 3."
+        "Source: batch 20 T5 fix round 1 review (task-5-review.json), minor finding 3.",
+        "Correction (batch 24 T3a re-review, 2026-09-13): the 'nothing runs with --locked today' measurement above was overturned at batch 21 - ci.yml:45-46 and mise.toml:15,26 all pass --locked on main (d49a84a, 19b75c4). The risk is ACTIVE, not latent: a version-bump commit with a stale lock breaks the locked CI runs; docs/runbook.md's release section states the current polarity."
       ],
       "milestone": null,
       "status": "open",
@@ -490,6 +492,34 @@
       "batch": null,
       "see": [
         "HR-111"
+      ]
+    },
+    {
+      "id": "HR-116",
+      "type": "chore",
+      "title": "Template-cluster riders from the batch-24 branch review",
+      "body": [
+        "Three defects for the next template-touching batch (each triggers or adjoins the evals rerun): (1) orchestrating skill - while a task is open, the controller commits only to files disjoint from the task's, records each such commit in the ledger BEFORE the next reviewer dispatch, and the dispatch names them; (2) implementer template / retrieval protocol step 3 - a second, range-wide invocation (check-commit --from $(git merge-base main HEAD) --to HEAD) whenever the diff or id list touches a commits/co-change check, mirroring CI; (3) deliverables schema - an optional rulings array pairing each in-task ruling with its home-file path so homing becomes deterministically checkable."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-103"
+      ]
+    },
+    {
+      "id": "HR-117",
+      "type": "feat",
+      "title": "Deterministic CI-mirror test for the task-gates list",
+      "body": [
+        "From the batch-24 branch review: a rust test parses .github/workflows/ci.yml's run lines and asserts each named check appears in houserules.task-gates-mirror-ci's own gate list, so the list can no longer silently omit a CI job. Origin: the check-commit job went unnamed and a per-commit check shipped unrun at CI's real --from."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-110"
       ]
     }
   ]

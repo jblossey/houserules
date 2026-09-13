@@ -113,7 +113,7 @@
         "The SessionStart hook and the CI gates run where nothing but the `houserules` binary and a POSIX shell are guaranteed; a runtime dependency would break both (docs/design.md §2–3).",
         "`tools/kb.sh` and `tools/backlog.sh` left the payload (batch 18 T5, docs/specs/2026-09-05-batch-18-phase3.md §§1,3): every shipped reference to them rewrote to the flat `houserules` command, and `update` deletes either file an install still carries.",
         "A template script may exec an optional tool only behind a probe of that tool itself, with a working fallback; probing mise is not probing the tool (batch 6 task 4). The shipped `.githooks/commit-msg` execs `houserules check-commit` only behind a probe of that subcommand and degrades to the trailer gate alone (batch 18 T2) — the same degrade shape commitlint's own now-retired probe had; this repository's own devDependencies (vitest) serve its own tests only and never enter `template/`.",
-        "The seeded CI gate (`template/.github/workflows/knowledge.yml`) now carries an install step (batch 19 T2, HR-063): a pinned cargo-dist shell installer fetches the `houserules` binary from `jblossey/houserules`'s own GitHub Releases before `check-knowledge`/`check-backlog`/`audit` run, under `shell: bash` (fix round 1) so a failed download aborts the step instead of the pipe's `sh` masking curl's exit code (GitHub's own documented default, `bash -e {0}` with no `-o pipefail`, only applies `-o pipefail` when `shell: bash` is named). The wiring exists; a release with real assets does not yet (HR-048's pipeline has cut one release, zero assets), so a fresh `houserules init` today seeds a PR gate whose install step genuinely fails red, on curl's own 404, until the pipeline cuts a release with assets (docs/specs/2026-09-06-batch-19-phase4.md §7's step two) — this invariant is amended against that known gap, not silently past it.",
+        "The seeded CI gate (`template/.github/workflows/knowledge.yml`) now carries an install step (batch 19 T2, HR-063): the cargo-dist shell installer on the releases/latest alias fetches the `houserules` binary from `jblossey/houserules`'s own GitHub Releases before `check-knowledge`/`check-backlog`/`audit` run, under `shell: bash` (fix round 1) so a failed download aborts the step instead of the pipe's `sh` masking curl's exit code (GitHub's own documented default, `bash -e {0}` with no `-o pipefail`, only applies `-o pipefail` when `shell: bash` is named). The wiring exists; a release with real assets does not yet (HR-048's pipeline has cut one release, zero assets), so a fresh `houserules init` today seeds a PR gate whose install step genuinely fails red, on curl's own 404, until the pipeline cuts a release with assets (docs/specs/2026-09-06-batch-19-phase4.md §7's step two) — this invariant is amended against that known gap, not silently past it.",
         "The second known gap (batch 18 branch review) closed at batch 20 T2 (HR-066, docs/specs/2026-09-07-batch-20-phase5.md §3): `check-report-claims` now ships as the `houserules check-report-claims` subcommand (`crates/houserules/src/report_claims.rs`, moved from a dev-only `src/bin/` target), so the seeded implementer template's closing act invokes the binary the payload itself carries, in every adopter repo."
       ],
       "tags": [
@@ -232,10 +232,10 @@
       "id": "houserules.post-release-restamp",
       "kind": "procedure",
       "area": "docs",
-      "summary": "After a release-please PR merge, run update --dir ., commit the restamp, and push; see docs/runbook.md.",
+      "summary": "After a release-please PR merge, check for baseline drift with update --dir .; the version already rides the PR. See docs/runbook.md.",
       "body": [
-        "release-please bumps crates/houserules/Cargo.toml's version in its PR (the release-type: rust config's own native update, HR-073, batch 20 T5, closing the gap package.json's batch 20 T3 (HR-047) retirement had opened). Merging the PR does not update .houserules.json. The stale stamp fails crates/houserules/tests/dogfood.rs's houserules_json_stamps_the_installed_version_and_the_hr_id_prefix test on main (HR-044), which pins the stamp to CARGO_PKG_VERSION.",
-        "After you merge a release-please PR: run `houserules update --dir .` (it prints the drift line, for example `kit 0.1.0 -> 0.2.0-alpha`); commit the restamped `.houserules.json` as `chore(release): restamp the kit version`; push to main.",
+        "release-please bumps crates/houserules/Cargo.toml's version in its PR (the release-type: rust config's own native update, HR-073, batch 20 T5, closing the gap package.json's batch 20 T3 (HR-047) retirement had opened) and, in the SAME PR, rewrites .houserules.json's version field to match, via an extra-files json/jsonpath entry (/.houserules.json, $.version -- branch review batch 24, issue 2: folding the restamp into the release PR is what makes the mechanism testable before merge, not only on main after it). Merging the PR therefore leaves the version stamp already correct: crates/houserules/tests/dogfood.rs's houserules_json_stamps_the_installed_version_and_the_hr_id_prefix test (HR-044, which pins the stamp to CARGO_PKG_VERSION) passes on the release PR itself, before merge, by construction.",
+        "What the PR does not update is baselines: the per-file hashes houserules update --dir . stamps for every KIT_OWNED file and kit-shipped knowledge entry, which can still drift if the kit's own payload changed since the last stamp -- independent of the version bump. After you merge a release-please PR: run `houserules update --dir .` (it prints the drift line, for example `kit 0.3.0 -> 0.3.0` when the version already matches); commit `.houserules.json` only if a baseline hash changed, as `chore(release): restamp the kit baselines`; push to main.",
         "Full steps and rationale: docs/runbook.md.",
         "In a project that installs the kit: install the newer `houserules` binary first (whichever channel the project used -- the shell installer, mise, or a direct download; otherwise the command below still runs the old binary and reads no drift), then run `houserules update --dir .` the same way the kit repository itself does, and commit `.houserules.json` only when the drift line's sides differ. The finishing-a-feature skill ships this unified form (batch 19 T2 fix round 1: npm retirement removed the earlier pnpm-exec-only path this bullet used to describe)."
       ],
@@ -588,6 +588,25 @@
         "if": "template/**",
         "then": "crates/houserules/payload.stamp",
         "per_commit": true
+      }
+    },
+    {
+      "id": "houserules.release-footer-survives-aggregation",
+      "kind": "gotcha",
+      "area": "tools",
+      "standing": false,
+      "summary": "A Release-As footer must survive aggregation: keep its empty commit or restate it on a crates-touching commit; no other body line starts 'Release-As:'.",
+      "body": [
+        "Verify after any history rewrite with git log --grep '^Release-As:' - exactly one hit, the intended one. Release-please reads the footer from any commit in the release window; a competing line at a body line start creates a second footer."
+      ],
+      "tags": [
+        "release",
+        "aggregation"
+      ],
+      "source": {
+        "date": "2026-09-13",
+        "by": "review",
+        "ref": "batch 24 branch review, issue 4"
       }
     }
   ]

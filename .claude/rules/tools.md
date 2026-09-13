@@ -19,5 +19,6 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 - [houserules.actions-default-shell-lacks-pipefail] An Actions run step with no shell key runs bash -e without pipefail: a failing left side of a pipe passes silently; name shell: bash for -eo pipefail.
 - [houserules.default-token-tags-start-no-workflows] A tag or commit pushed with the default GITHUB_TOKEN triggers no workflow; a release hand-off needs a PAT/App token or an explicit workflow_dispatch hop.
+- [houserules.release-footer-survives-aggregation] A Release-As footer must survive aggregation: keep its empty commit or restate it on a crates-touching commit; no other body line starts 'Release-As:'.
 
 Detail: houserules get <id>

@@ -930,3 +930,26 @@ Each item records the ruling with its date, or stays marked open.
     known inert under that constraint, so a different mechanism
     is required. Source: owner, 2026-09-12, the batch-24
     checkpoint.
+73. **The kit-version restamp folds into the release PR, not a
+    post-merge step — ruled 2026-09-13.** The branch review
+    (batch 24) walked the release PR release-please's own config
+    would open through this branch's own gates and found it red
+    by construction, two ways: the seeded `template/.github/
+    workflows/knowledge.yml`'s `x-release-please-version`
+    extra-files entry collides with `houserules.payload-stamp-
+    gate` and `check-commit`'s per-commit co-change on every
+    release commit, and `.houserules.json`'s version stamp lags
+    `crates/houserules/Cargo.toml`'s bump on the release PR
+    itself, failing `dogfood.rs`'s version test before anyone can
+    merge. Fix: the knowledge.yml entry retires (its installer
+    URL moves to `releases/latest/download`, needing no
+    per-release rewrite), and `extra-files` gains one replacement
+    entry, `/.houserules.json` (`json`/`$.version`), so the
+    version restamp rides the release PR instead of a separate
+    post-merge commit. Final state: `extra-files` carries exactly
+    that one entry. `houserules.post-release-restamp` and
+    docs/runbook.md's step 5 now cover baseline drift only.
+    Source: controller under the branch-fix task's own ruled
+    latitude (spec-compliant per docs/specs/2026-09-12-batch-24-
+    repo-and-setup.md §2's "merges green unattended" goal),
+    2026-09-13, branch review issues 1-2.

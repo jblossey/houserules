@@ -40,11 +40,16 @@
 //! whenever `template/` and the stamp disagree, and `--write`
 //! regenerates it. A contributor who changes `template/` without
 //! regenerating the stamp fails that gate before the change can land, so
-//! `template/**` and `crates/houserules/payload.stamp` always change
-//! together by the time a commit reaches `main` -- the one path
-//! `CommitSplit`'s own, unmodified prefix match
+//! every human- or agent-authored commit that touches `template/**` also
+//! touches `crates/houserules/payload.stamp` by the time it reaches
+//! `main` -- the one path `CommitSplit`'s own, unmodified prefix match
 //! (`src/util/commit-split.ts`) already attributes to `crates/
-//! houserules`.
+//! houserules`. `release-please`'s own generated commits touch no path
+//! under `template/**` at all: the seeded `template/.github/workflows/
+//! knowledge.yml` installer now pins `releases/latest/download`, with no
+//! `extra-files` entry left under `template/` for a release commit to
+//! rewrite (branch review, batch 24, issue 1) -- this invariant needs no
+//! bot-commit carve-out.
 //!
 //! `cargo-workspace` (`src/plugins/cargo-workspace.ts:345-350`) writes
 //! the workspace-root `Cargo.lock` directly (`path: 'Cargo.lock'`,
@@ -222,20 +227,20 @@ fn include_component_in_tag_stays_false_at_the_config_root() {
     assert_eq!(config["include-component-in-tag"], false);
 }
 
-/// Every `extra-files` entry is repository-root-relative (a leading `/`,
-/// or an object whose own `path` carries one): the package's `addPath`
-/// is not `ROOT_PROJECT_PATH`, so an entry without one would resolve
-/// under `crates/houserules/` instead of the repository root.
+/// Every `extra-files` entry, when present, is repository-root-relative
+/// (a leading `/`, or an object whose own `path` carries one): the
+/// package's `addPath` is not `ROOT_PROJECT_PATH`, so an entry without
+/// one would resolve under `crates/houserules/` instead of the
+/// repository root. `extra-files` itself may legitimately be empty --
+/// nothing here requires a standing entry -- so an empty array trivially
+/// satisfies this loop; `extra_files_contains_only_the_version_entry`
+/// below pins this repository's own current, non-empty shape.
 #[test]
 fn extra_files_are_anchored_to_the_repository_root() {
     let config = config();
     let extra_files = config["extra-files"]
         .as_array()
         .expect("config.extra-files is a JSON array");
-    assert!(
-        !extra_files.is_empty(),
-        "extra-files must not be emptied out"
-    );
     for entry in extra_files {
         let path = match entry {
             serde_json::Value::String(path) => path.as_str(),
@@ -249,6 +254,24 @@ fn extra_files_are_anchored_to_the_repository_root() {
             "extra-files entry {path:?} is not anchored to the repository root"
         );
     }
+}
+
+/// `extra-files` carries exactly one entry: the `/.houserules.json`
+/// `json`/`jsonpath` update that folds this repository's own kit-version
+/// restamp into the release PR itself (`houserules.post-release-restamp`,
+/// branch review batch 24 issue 2). `template/.github/workflows/
+/// knowledge.yml`'s former entry is retired (issue 1: the seeded
+/// installer now pins `releases/latest/download` and needs no per-release
+/// rewrite), so this is the array's only member, not one of several.
+#[test]
+fn extra_files_contains_only_the_version_entry() {
+    let config = config();
+    assert_eq!(
+        config["extra-files"],
+        serde_json::json!([
+            { "type": "json", "path": "/.houserules.json", "jsonpath": "$.version" }
+        ])
+    );
 }
 
 /// The config never names `package.json` -- as a `package-name`
@@ -313,4 +336,54 @@ fn schema_names_the_bundled_release_please_version() {
          dist/index.js exports.VERSION and update PINNED_ACTION_SHA, \
          RELEASE_PLEASE_VERSION and every source-line citation in this file together"
     );
+}
+
+/// Ports `GenericJson.updateContent` (`src/updaters/generic-json.ts`,
+/// fetched live at v17.6.0) against this repository's REAL
+/// `.houserules.json`, proving `extra_files_contains_only_the_version_
+/// entry`'s `json`/`$.version` entry end to end
+/// (`process.wiring-checks-run-the-resolution`): `$.version` is a single
+/// top-level field, so JSONPath's own traversal needs no general engine
+/// here -- direct field access is that jsonpath's exact resolution.
+/// `VERSION_REGEX` (`(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(-(?<
+/// preRelease>[\w.]+))?(\+(?<build>[-\w.]+))?`) is ported with `regress`,
+/// this crate's own ECMAScript-regex engine (`rules::check`,
+/// `report_claims`, `rules::audit` already depend on it directly, so
+/// this proof adds no dependency); only the whole match's span matters
+/// here, since `updateContent` replaces group 0, not a named group.
+/// `payload.value.replace(VERSION_REGEX, ...)` is JS's non-global
+/// `.replace()`, which rewrites the FIRST match only -- `regress::find`
+/// (not `find_iter`) is the same restriction.
+#[test]
+fn houserules_json_version_field_updates_via_the_ported_generic_json_updater() {
+    let root = repo_root();
+    let raw = fs::read_to_string(root.join(".houserules.json")).expect("read .houserules.json");
+    let original: serde_json::Value = serde_json::from_str(&raw).expect("parse .houserules.json");
+
+    let version_regex = regress::Regex::new(r"\d+\.\d+\.\d+(-[\w.]+)?(\+[-\w.]+)?")
+        .expect("valid VERSION_REGEX port");
+    let current_version = original["version"]
+        .as_str()
+        .expect(".houserules.json's version field is a string");
+    let found = version_regex
+        .find(current_version)
+        .unwrap_or_else(|| panic!("{current_version:?} does not match VERSION_REGEX"));
+
+    let mut updated_version = String::new();
+    updated_version.push_str(&current_version[..found.start()]);
+    updated_version.push_str("0.3.0");
+    updated_version.push_str(&current_version[found.end()..]);
+
+    let mut updated = original.clone();
+    updated["version"] = serde_json::json!(updated_version);
+
+    let mut expected = original.clone();
+    expected["version"] = serde_json::json!("0.3.0");
+    assert_eq!(
+        updated, expected,
+        "the ported update must rewrite $.version to 0.3.0 and touch nothing else"
+    );
+    assert_eq!(updated["idPrefix"], original["idPrefix"]);
+    assert_eq!(updated["overrides"], original["overrides"]);
+    assert_eq!(updated["baselines"], original["baselines"]);
 }

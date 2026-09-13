@@ -62,6 +62,12 @@ and lint first.
    result (`git restore --staged .` and re-stage per logical group as
    needed). Never include a co-author line, in this or any commit.
 
+4b. **Sweep interim SHAs.** Grep the aggregated diff for commit-SHA
+   citations (`git diff main...HEAD | grep -oE '\b[0-9a-f]{7,40}\b'`,
+   judged in context): a SHA that will not survive the aggregation
+   restates to a durable locator or to the aggregated commit
+   (`knowledge-base.cite-durable-refs`).
+
 5. **Push and open a PR.**
    ```sh
    git push -f -u origin <branch>
