@@ -279,12 +279,58 @@
       "type": "chore",
       "title": "README rework: research-derived structure, adopter-first, evidence narration stripped",
       "body": [
-        "Owner direction (2026-09-15): research what a good open-source README is, derive the ideal structure for this repo before consulting the current file, compare, then rework completely. Owner-triaged rulings: strip ALL maintainer-evidence narration (Live-verified blocks, HR-refs, design.md cites, checked-dates, the moot mise minimum_release_age forensic - provenance stays in specs/knowledge); the convergence thesis becomes a short plain-claims Why section; ADD a ToC, a CLI reference table (the 20 frozen subcommands, replacing the misleading pipe-notation Daily commands block), a Stability/1.0-contract section, and a Contributing & support section; Updating folds under Install. Process deviation ruled for this batch only: no spec, no implementer/reviewer - the controller researches, presents, triages with the owner, and does the rework itself (design.md 5.84)."
+        "Owner direction (2026-09-15): research what a good open-source README is, derive the ideal structure for this repo before consulting the current file, compare, then rework completely. Owner-triaged rulings: strip ALL maintainer-evidence narration (Live-verified blocks, HR-refs, design.md cites, checked-dates, the moot mise minimum_release_age forensic - provenance stays in specs/knowledge); the convergence thesis becomes a short plain-claims Why section; ADD a ToC, a CLI reference table (the 20 frozen subcommands, replacing the misleading pipe-notation Daily commands block), a Stability/1.0-contract section, and a Contributing & support section; Updating folds under Install. Process deviation ruled for this batch only: no spec, no implementer/reviewer - the controller researches, presents, triages with the owner, and does the rework itself (design.md 5.84).",
+        "Scope addition (owner, 2026-09-15): the README also states how houserules can be uninstalled, as convenience information for users."
       ],
       "milestone": null,
       "status": "open",
       "batch": 26,
       "see": []
+    },
+    {
+      "id": "HR-133",
+      "type": "feat",
+      "title": "houserules update self-updates the installed binary",
+      "body": [
+        "Owner (2026-09-15): 'houserules update does update a repo but it doesn't update the installed houserules binary. It should.' Design at spec time: the mechanism must respect the install channel (shell installer, mise, direct download) - a mise-managed binary is mise's to update, a self-replaced one needs the dist install receipt. Cluster with HR-134 and HR-135."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-134",
+        "HR-135"
+      ]
+    },
+    {
+      "id": "HR-134",
+      "type": "feat",
+      "title": "Update-available notice on every command when a newer release exists",
+      "body": [
+        "Owner (2026-09-15): when a new houserules version is published, the binary states that an update is available on every command, as a small header, like other CLI tools do. Design at spec time: version check against the GitHub latest release with a local cache and a short TTL; never a network call per invocation; silent on network failure; an opt-out env var. Cluster with HR-133 and HR-135."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-133",
+        "HR-135"
+      ]
+    },
+    {
+      "id": "HR-135",
+      "type": "question",
+      "title": "Install path: does ~/.cargo/bin make sense for a toolchain-neutral binary?",
+      "body": [
+        "Owner (2026-09-15): houserules currently installs into .cargo; 'I am asking myself if that makes sense for a pure binary that has nothing to do with rust anymore on the user systems.' The shell installer's target comes from dist-workspace.toml (cargo-dist install-path; CARGO_HOME is the default). Candidate: ~/.local/bin (XDG) with a PATH fallback. Needs an owner ruling; a move also needs a migration story for existing installs and feeds HR-133's self-update mechanism. Cluster with HR-133 and HR-134."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-133",
+        "HR-134"
+      ]
     }
   ]
 }

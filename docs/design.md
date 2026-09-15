@@ -1191,4 +1191,15 @@ Each item records the ruling with its date, or stays marked open.
     of the 20 frozen subcommands, a Stability section stating
     the 5.82 contract, and a Contributing & support section;
     the Updating section folds under Install. Source: owner,
-    2026-09-15, the README triage.
+    2026-09-15, the README triage.85. **The install-and-update UX cluster is booked; the README
+    gains an Uninstall section - ruled 2026-09-15.** Mid-batch
+    26 the owner directed four additions. Three are booked as
+    open backlog items for a future spec: `houserules update`
+    also updates the installed binary (HR-133); the binary
+    prints a small update-available header on every command
+    once a newer release exists (HR-134); and the install path
+    question - whether `~/.cargo/bin` fits a toolchain-neutral
+    binary - awaits an owner ruling before any move (HR-135).
+    The fourth lands in this batch: README states how to
+    uninstall houserules, per install channel (HR-132 scope
+    addition). Source: owner, 2026-09-15, mid-batch messages.
