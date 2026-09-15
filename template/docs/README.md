@@ -27,7 +27,7 @@ entry, and each governs its own case:
 - A **file path** governs the whole file, whichever kind it is: a
   kit-owned file, an entire knowledge-topic file under `knowledge/`,
   or any other file houserules seeds (a backlog file, a schema, an
-  eval scenario, a workflow, `CLAUDE.md`, and the rest). Listing one
+  eval scenario, a workflow, `AGENTS.md`, and the rest). Listing one
   silences every report for that file -- modified, deleted, or a
   missing file's backfill -- and `update` never writes, replaces, or
   recreates it again, whatever the kit ships for it next.

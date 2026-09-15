@@ -14,9 +14,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// A `Command` for the compiled `houserules` binary under test.
+/// A `Command` for the compiled `houserules` binary under test. Sets
+/// `HOUSERULES_SKIP_SELF_UPDATE` so `update`'s self-update phase
+/// (`selfupdate.rs`) never runs here -- `update.rs`'s own copy of this
+/// helper has the full account.
 fn houserules() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_houserules"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_houserules"));
+    command.env("HOUSERULES_SKIP_SELF_UPDATE", "1");
+    command
 }
 
 /// This checkout's repository root, resolved at compile time so it is
@@ -85,6 +90,7 @@ const SEED_ONCE: &[&str] = &[
     ".claude/evals/record.json",
     ".claude/evals/seeded-violations.json",
     "docs/README.md",
+    "AGENTS.md",
     "CLAUDE.md",
 ];
 
@@ -239,6 +245,30 @@ fn init_into_a_fresh_repo_writes_every_kit_owned_and_seed_once_file_then_renders
         .map(|entry| entry["matcher"].as_str().expect("matcher is a string"))
         .collect();
     assert_eq!(matchers, TEMPLATE_MATCHERS);
+}
+
+/// `AGENTS.md` is the cross-harness instruction file `SEED_ONCE` carries
+/// (`houserules.template-is-the-source`'s own copy is embedded byte for
+/// byte, `payload_content` rewrites no prefix into it): a fresh `init`
+/// writes it, and its content is the template's own, unchanged.
+#[test]
+fn init_into_a_fresh_repo_seeds_agents_md_byte_identical_to_the_template() {
+    let dir = scratch_git_repo();
+    let output = houserules()
+        .args(["init", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run init");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let seeded = fs::read(dir.path().join("AGENTS.md")).expect("read seeded AGENTS.md");
+    let template =
+        fs::read(repo_root().join("template/AGENTS.md")).expect("read template/AGENTS.md");
+    assert_eq!(seeded, template);
 }
 
 /// With `--dir` omitted entirely, `cmd_init` resolves

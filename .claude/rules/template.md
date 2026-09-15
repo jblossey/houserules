@@ -12,6 +12,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 ## Invariants
 
+- [houserules.agents-md-is-canonical] AGENTS.md is the cross-harness instruction surface; CLAUDE.md is a one-line pointer to it; every seeded text stays harness-neutral.
 - [houserules.payload-runs-on-builtins] The vendored payload runs on the `houserules` binary and POSIX shell only: every shipped reference invokes it directly; no file needs Node, npm, or an install.
 
 Detail: houserules get <id>

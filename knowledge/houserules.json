@@ -60,7 +60,8 @@
         "Batch 18 T6 flips the binary this recipe runs (docs/specs/2026-09-05-batch-18-phase3.md §4): until HR-048 ships a distribution channel, exercise the compiled binary directly — `cargo build --release` once, then `target/release/houserules <command>` (or `cargo run --quiet --release --bin houserules -- <command>`) against the scratch repository. The npm-era HR-001 pair (`pnpm dlx`'s published path, the symlinked `node_modules` path) no longer applies, and neither does the frozen file itself: `bin/houserules.mjs` retired outright at batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2) along with the rest of the JS toolchain — it only ever implemented `init`/`update`/`files`, and this recipe's compiled-binary form already covered the same surface.",
         "For a change to `update`, run `init` and then `update` in the same scratch repository and confirm that only kit-owned files changed.",
         "The report names the scratch path (a `cd` entry or the path in the command) and records the init and both check gates as their own `live_run` entries; a live run without them fails the recipe.",
-        "A fix round that changes no CLI behavior (test-only, report-only, evidence wording) may stand on the task's original live run when the report discloses the scoping for the re-reviewer to judge (batch 6)."
+        "A fix round that changes no CLI behavior (test-only, report-only, evidence wording) may stand on the task's original live run when the report discloses the scoping for the re-reviewer to judge (batch 6).",
+        "Sandboxing a real cargo-dist shell installer (batch 27 T2, HR-133) inside a scratch `HOME` needs `CARGO_HOME` and `XDG_CONFIG_HOME` unset too, not only `HOME` overridden: the installer's own install-path fallback and axoupdater's receipt-home lookup both prefer `CARGO_HOME`/`XDG_CONFIG_HOME` first when either is inherited from the real environment, silently installing into the real machine's `~/.cargo/bin` even with a scratch `HOME` set (`env -u CARGO_HOME -u XDG_CONFIG_HOME HOME=<scratch> sh`). Caught live when this exact mistake overwrote this repository's own dev-installed `houserules` binary; fixed by reinstalling from the tree (`cargo install --path crates/houserules --bin houserules --force`)."
       ],
       "tags": [
         "live-run",
@@ -397,7 +398,8 @@
       "summary": "release.yml is generated from dist-workspace.toml; never hand-edit it — edit the config and run `dist generate` (`dist generate --check` is the gate).",
       "body": [
         "cargo-dist's `dist generate` rewrites the whole file from `dist-workspace.toml` on every run; a hand-edit is silently discarded the next time anyone runs `dist init`, `dist generate`, or `dist update`, and `dist generate --check` fails once a hand-edit diverges from what the config would produce.",
-        "Landed at batch 19 T1 with the config's own header comment stating the same discipline; this entry gives the generated file's own path a loading path so an agent about to edit release.yml directly sees the rule, per knowledge-base.rules-need-a-loading-path (batch 19 T1 fix round 1, review issue 4)."
+        "Landed at batch 19 T1 with the config's own header comment stating the same discipline; this entry gives the generated file's own path a loading path so an agent about to edit release.yml directly sees the rule, per knowledge-base.rules-need-a-loading-path (batch 19 T1 fix round 1, review issue 4).",
+        "An installer-only setting such as `install-path` leaves `release.yml` byte-identical after `dist generate`: the value bakes into the generated installer script at release-build time, not into the CI workflow file. `dist generate --check` exiting 0 with an empty diff is exactly this outcome, not a sign the edit went unread (batch 27 T1, HR-135's install-path move, live-verified with `dist build --artifacts=global`)."
       ],
       "tags": [
         "cargo-dist",
@@ -509,7 +511,7 @@
       "standing": false,
       "summary": "A task-end gate run includes every check CI runs on push or pull request; a local gate list that omits a CI check is stale.",
       "body": [
-        "The list today: cargo fmt --check, the full suite, clippy, the cross-target check, the lint chain (shellcheck, cargo deny, both knowledge gates, render --check, the residue gate, the vacuous-exception gate, the payload-stamp gate, the dist-generate-check gate), and -- pull-request only -- a check-commit range pass (`houserules check-commit --from $(git merge-base main HEAD) --to HEAD`, ci.yml's own check-commit job) and a knowledge-base audit of the diff (`mise run audit -- --base <PR base> --head <PR head>`).",
+        "The list today: a mingw-w64 C compiler installed first (`gcc-mingw-w64-x86-64`, needed once a `-sys` crate landed, houserules.c-toolchain-crates-need-ci-mingw), cargo fmt --check, the full suite, clippy, the cross-target check, the lint chain (shellcheck, cargo deny, both knowledge gates, render --check, the residue gate, the vacuous-exception gate, the payload-stamp gate, the dist-generate-check gate), and -- pull-request only -- a check-commit range pass (`houserules check-commit --from $(git merge-base main HEAD) --to HEAD`, ci.yml's own check-commit job) and a knowledge-base audit of the diff (`mise run audit -- --base <PR base> --head <PR head>`).",
         "Derive the list from .github/workflows and mise.toml, not from memory; when CI gains a check, the task-end list gains it in the same change.",
         "The check-commit range pass matters most for a per-commit knowledge check: it judges every commit back to the real merge base with main, never only a fix round's own diff, so an omission here is exactly how a per-commit check ships unrun against the range CI actually judges (batch 24 T1 fix round 6: a per-commit co-change check went unrun at CI's own --from until this entry named the job).",
         "Origin: batch 22 T1 - three review rounds closed with cargo fmt --check red at HEAD because no round's gate list named it; CI would have failed the first push."
@@ -522,6 +524,9 @@
       "tags": [
         "gates",
         "ci"
+      ],
+      "see": [
+        "houserules.c-toolchain-crates-need-ci-mingw"
       ]
     },
     {
@@ -560,7 +565,8 @@
       "body": [
         "HR-081: release-please's commit-to-package attribution (CommitSplit, keyed on a commit's changed file paths) only ever counts a commit that touches crates/houserules/**, and include-component-in-tag stays false (design.md 5.20, reaffirmed at 5.72 after a since-rejected reversal at 5.71), which rules out linking a second package's commits in via any component-matching plugin (getComponent always returns '' when that setting is false). A template/**-only commit would otherwise cut no release, even though template/ is embedded into the shipped binary at compile time (houserules.payload-embeds-checkout-bytes) and is therefore a real product change.",
         "crates/houserules/payload.stamp records a sha256 digest of template/'s current tracked file set (paths and content). payload-stamp-gate (crates/houserules/src/bin/payload-stamp-gate.rs, wired into `mise run lint` alongside residue-gate) recomputes that digest from the WORKING TREE and fails when it disagrees with the recorded one, naming both values and the fix. `--write` regenerates the stamp. This is a tree-level guarantee only: it never reads individual commits, so a branch that splits the template/ edit from the stamp regeneration into two commits still passes at the tip.",
-        "Per-commit enforcement -- every commit touching template/ also touches crates/houserules/payload.stamp, not only the branch tip -- is `houserules check-commit`'s job: this entry's own `check` (type co-change, if template/**, then crates/houserules/payload.stamp) declares `per_commit: true`, the opt-in that runs a co-change check per commit there, over the PR's full range in CI (the opt-in exists because a range-level co-change entry -- process.evals-rerun's, say -- books a different, range-only economy on purpose; check-commit never applies per-commit semantics to one without the flag). check-commit also exempts a commit whose PARENT tree predates payload.stamp's own introduction, so this retroactively-applied check never flags history from before the mechanism existed. After changing anything under template/: run `cargo run --quiet --bin payload-stamp-gate -- --write` and commit the regenerated payload.stamp in the SAME commit as the template/ change -- check-commit rejects a split, the payload-stamp gate alone would not. Once paired, that commit touches crates/houserules/payload.stamp, a path CommitSplit's own, unmodified prefix match already attributes to crates/houserules -- no release-please plugin surface needed."
+        "Per-commit enforcement -- every commit touching template/ also touches crates/houserules/payload.stamp, not only the branch tip -- is `houserules check-commit`'s job: this entry's own `check` (type co-change, if template/**, then crates/houserules/payload.stamp) declares `per_commit: true`, the opt-in that runs a co-change check per commit there, over the PR's full range in CI (the opt-in exists because a range-level co-change entry -- process.evals-rerun's, say -- books a different, range-only economy on purpose; check-commit never applies per-commit semantics to one without the flag). check-commit also exempts a commit whose PARENT tree predates payload.stamp's own introduction, so this retroactively-applied check never flags history from before the mechanism existed. After changing anything under template/: run `cargo run --quiet --bin payload-stamp-gate -- --write` and commit the regenerated payload.stamp in the SAME commit as the template/ change -- check-commit rejects a split, the payload-stamp gate alone would not. Once paired, that commit touches crates/houserules/payload.stamp, a path CommitSplit's own, unmodified prefix match already attributes to crates/houserules -- no release-please plugin surface needed.",
+        "The per-commit co-change check proves PRESENCE only: that the commit touches both paths, never that the digest it wrote is the tree's true one. Only the tree-level gate above -- payload-stamp-gate run with no arguments, which mise run lint runs in CI on every PR -- recomputes the digest and proves CORRECTNESS, so an intermediate commit can carry a stale digest and still pass check-commit; the tree-level gate at the branch tip is what actually blocks a wrong stamp from reaching main. Observed live at batch 27 T4 (HR-136): the commit that first added AGENTS.md to SEED_ONCE shipped a payload.stamp digest that did not match the tracked template/ tree, check-commit still reported `ok` for it, and only the next `mise run lint` run (payload-stamp-gate over the working tree) caught the mismatch; fixed forward in the very next commit, never by amending the wrong one."
       ],
       "tags": [
         "release",
@@ -570,7 +576,7 @@
       "source": {
         "date": "2026-09-12",
         "by": "review",
-        "ref": "batch 24 task-1 fix round 4, the owner's 5.71 rejection (design.md 5.72); fix round 5 added the per-commit check-commit enforcement; fix round 6 scoped it to per_commit: true and added the retroactivity guard"
+        "ref": "batch 24 task-1 fix round 4, the owner's 5.71 rejection (design.md 5.72); fix round 5 added the per-commit check-commit enforcement; fix round 6 scoped it to per_commit: true and added the retroactivity guard; batch 27 T4 fix round 1 added the presence-vs-correctness distinction after that task's own SEED_ONCE commit shipped a wrong digest that check-commit passed"
       },
       "verify": [
         "crates/houserules/src/bin/payload-stamp-gate.rs",
@@ -749,6 +755,69 @@
         "git",
         "ci",
         "main"
+      ]
+    },
+    {
+      "id": "houserules.c-toolchain-crates-need-ci-mingw",
+      "kind": "gotcha",
+      "area": "tools",
+      "summary": "A dependency with a C build script (a `-sys` crate) breaks the windows-gnu cross check unless ci.yml installs a mingw-w64 C compiler first.",
+      "body": [
+        "Every dependency before axoupdater (HR-133, batch 27 T2) was pure Rust, so `cargo check --target x86_64-pc-windows-gnu --all-targets --locked` (houserules.platform-gated-tests' cheap proxy) never invoked a C compiler and passed on a bare ubuntu-latest runner.",
+        "axoupdater's github_releases/blocking features pull in aws-lc-sys (rustls' crypto provider via reqwest): its `cc`-crate build script compiles plain C sources (jitterentropy, s2n-bignum's wrapper, BoringSSL C files) on every target it builds for, windows-gnu included, and needs a real `x86_64-w64-mingw32-gcc` on PATH to cross-compile those from ubuntu. GitHub's ubuntu-latest runner-images manifest carries no mingw-w64 package by default (checked against actions/runner-images' Ubuntu 24.04 README, 2026-09-15). Without it the build fails `error occurred in cc-rs: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)` (captured against this exact aws-lc-sys 0.45.0 before any mingw toolchain was on PATH).",
+        "A separate, unrelated fact about the same crate: its windows x86_64 assembly ships as pre-generated NASM (`.asm`) objects one directory (`win-x86_64`), shared byte-for-byte by the MSVC and GNU ABIs; building them from source needs a real `nasm` executable unless the opt-in `prebuilt-nasm` feature (or `AWS_LC_SYS_PREBUILT_NASM`) is set, in which case the crate copies its own bundled `.obj` files instead. This tree already carries `prebuilt-nasm` -- not from aws-lc-sys's own default (`all-bindings`), but because rustls's and rustls-webpki's own `aws-lc-rs` feature each forward `aws-lc-rs/prebuilt-nasm` once the aws-lc-rs crypto provider is selected (confirmed with `cargo tree -e features -p aws-lc-sys`, and by rustc receiving `--cfg 'feature=\"prebuilt-nasm\"'` in a verbose `x86_64-pc-windows-gnu` build) -- so no leg anywhere in this repository ever needs a real `nasm` install; the mingw-w64 package above is for the plain C sources only.",
+        "Every other target already has (or dist itself provisions) a working C compiler without any ci.yml change: macOS runners ship Xcode's command-line tools, GitHub's windows runners ship MSVC, and `dist plan --output-format=json`'s own `artifacts_matrix` runs the two musl release legs un-containerized on ubuntu-22.04(-arm) with `packages_install: apt-get install musl-tools` -- dist's own provisioning, never ci.yml's. Only houserules' own additional windows-gnu cross-check proxy (a job no other target needs, since it exists solely as a cheap Linux-hosted stand-in for a real Windows build) needed the new step.",
+        "Fix landed alongside axoupdater: ci.yml's `checks` job installs `gcc-mingw-w64-x86-64` via apt-get right before `mise run lint`. Verified locally with a portable llvm-mingw toolchain (mstorsjo/llvm-mingw's prebuilt tarball) on PATH, since this sandbox had neither root nor a system package manager to install the Ubuntu package directly; the two toolchains provide the same `x86_64-w64-mingw32-gcc`/`-ar` binary names cc-rs looks for, so the substitution is representative of the C-compiler requirement, though only a real CI run with the actual apt package proves the wiring end to end (HR-137 tracks that confirmation, along with the `rust` job's macos-latest/windows-latest legs and the release build's five targets, none of which has actually run since this dependency landed).",
+        "Any future `-sys` crate addition re-triggers the C-compiler half of this: check whether it needs a live C compiler for windows-gnu specifically (a Rust-only or fully-prebuilt-for-every-target dependency does not), and add the runner's compiler package in the same commit if it does."
+      ],
+      "tags": [
+        "ci",
+        "windows",
+        "dependencies",
+        "cross-compile"
+      ],
+      "source": {
+        "date": "2026-09-15",
+        "by": "controller",
+        "ref": "batch 27 T2, HR-133 dependency vetting"
+      },
+      "see": [
+        "houserules.platform-gated-tests"
+      ]
+    },
+    {
+      "id": "houserules.agents-md-is-canonical",
+      "kind": "invariant",
+      "area": "template",
+      "summary": "AGENTS.md is the cross-harness instruction surface; CLAUDE.md is a one-line pointer to it; every seeded text stays harness-neutral.",
+      "body": [
+        "Batch 27 T4 (HR-136): `template/AGENTS.md` carries the canonical project instructions -- the substance CLAUDE.md alone used to carry, rephrased for 'your agent'/'the agent' rather than 'Claude'. `template/CLAUDE.md` is exactly `@AGENTS.md`, the one-line import Claude Code's own docs endorse (code.claude.com/docs/en/memory.md, verified 2026-09-15). Both join `SEED_ONCE`: `init` writes each once, `update` never overwrites an existing copy of either, and backfills whichever one a later kit release adds to an install an older release already seeded.",
+        "Every seeded text -- the three template skills, template knowledge entries, template docs -- names 'your agent'/'the agent', never 'Claude', as the addressee (writing-style.instructions-cover-the-state-space: an instruction that assumes Claude Code's skills auto-load or its subagents exist stops holding for every other harness). `.claude/rules/*`, `.claude/agents/*`, and the SessionStart hook (`tools/claude-session-start.sh`) stay genuinely Claude-Code-specific mechanisms; AGENTS.md's own 'Working with other harnesses' section names them as optional accelerations a harness with none of the three still fully covers by reading AGENTS.md and running the `houserules` commands it names.",
+        "This repository adopts its own design: root `AGENTS.md` carries this repository's own instructions, not the generic template's (its batch lifecycle names a user gate and this repository's own `process.sequential-agents` ruling), and root `CLAUDE.md` is the same one-line pointer -- both edited directly, since neither is `KIT_OWNED`: `houserules.template-is-the-source`'s byte-identity pin (`crates/houserules/tests/dogfood.rs`) never covers a `SEED_ONCE` path.",
+        "The kit's own gate carries the same design, not only the seeded texts: `check_base` (crates/houserules/src/rules/check.rs) requires AGENTS.md to exist and spends the 200-line/12288-byte instruction budget on it; it tolerates an absent CLAUDE.md entirely (no finding), budgeting it only when present, at the same limits. No `knowledge/areas.json` area glob may name `CLAUDE.md`: an adopter who deletes the now-optional pointer would leave that glob matching nothing, and the dead-glob gate fails the whole base for it -- this is why the docs area's own glob list carries `AGENTS.md` but never `CLAUDE.md`, in this repository's own `knowledge/areas.json` and in `template/knowledge/areas.json` alike. Batch 27 T4 fix round 1 shipped the design in code before this clause existed to say so; fix round 2 added this clause after the gap between code and entry was itself filed as a finding."
+      ],
+      "tags": [
+        "agents-md",
+        "claude-code",
+        "template"
+      ],
+      "source": {
+        "date": "2026-09-15",
+        "by": "user",
+        "ref": "docs/specs/2026-09-15-batch-27-install-ux-and-agent-agnostic.md §3 T4 (owner direction 2026-09-15, design.md 5.86)"
+      },
+      "verify": [
+        "template/AGENTS.md",
+        "template/CLAUDE.md",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "crates/houserules/src/install.rs",
+        "crates/houserules/src/rules/check.rs",
+        "knowledge/areas.json"
+      ],
+      "see": [
+        "houserules.template-is-the-source",
+        "writing-style.instructions-cover-the-state-space"
       ]
     }
   ]

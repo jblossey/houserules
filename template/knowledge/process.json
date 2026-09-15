@@ -10,7 +10,7 @@
       "standing": true,
       "summary": "Ask the project's owner or decider when information is missing. Do not assume.",
       "body": [
-        "Who answers depends on the project and its environment: a human owner in a supervised setup, an orchestrator or manager agent in a fully autonomous one. Name the project's actual decider once known, in CLAUDE.md or a knowledge entry."
+        "Who answers depends on the project and its environment: a human owner in a supervised setup, an orchestrator or manager agent in a fully autonomous one. Name the project's actual decider once known, in AGENTS.md or a knowledge entry."
       ],
       "tags": [
         "users"

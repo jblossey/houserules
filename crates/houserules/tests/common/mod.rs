@@ -40,9 +40,14 @@ pub const FROZEN_SHA: &str = "5f14727b4adeeb347a8d1f0c8f98d929f62bc7f4";
 /// one at a time.
 static WORKTREE_LOCK: Mutex<()> = Mutex::new(());
 
-/// A `Command` for the compiled `houserules` binary under test.
+/// A `Command` for the compiled `houserules` binary under test. Sets
+/// `HOUSERULES_SKIP_SELF_UPDATE` so `update`'s self-update phase
+/// (`selfupdate.rs`) never runs here -- `tests/update.rs`'s own
+/// per-file copy of this helper has the full account.
 pub fn houserules() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_houserules"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_houserules"));
+    command.env("HOUSERULES_SKIP_SELF_UPDATE", "1");
+    command
 }
 
 /// This checkout's repository root, resolved at compile time from the

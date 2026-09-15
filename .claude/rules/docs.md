@@ -2,7 +2,7 @@
 paths:
   - "docs/**"
   - "README.md"
-  - "CLAUDE.md"
+  - "AGENTS.md"
   - "knowledge/**"
   - "backlog/**"
   - ".claude/**"

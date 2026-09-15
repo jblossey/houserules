@@ -1,6 +1,6 @@
 ---
 name: migrating-knowledge
-description: Use to migrate existing knowledge — CLAUDE.md prose, docs, wikis, code comments, PR templates, lint and CI configs — into `knowledge/*.json`, after `init` in a codebase that already has it, or when adopting houserules in an existing project.
+description: Use to migrate existing knowledge — AGENTS.md or CLAUDE.md prose, docs, wikis, code comments, PR templates, lint and CI configs — into `knowledge/*.json`, after `init` in a codebase that already has it, or when adopting houserules in an existing project.
 ---
 
 # Migrating existing knowledge
@@ -11,8 +11,8 @@ the seed is `standing` and loads every session; some of it is
 case-dependent instead, scoped to an area and loading only when a matching
 file is read — both kinds are already there, not just the standing ones.
 Every project-specific rule you already live by is still scattered across
-CLAUDE.md, docs, code, past conversations, and whatever only lives in an
-assistant's own memory. This skill moves it in. Knowledge that exists only
+AGENTS.md, docs, code, past conversations, and whatever only lives in an
+agent's own memory. This skill moves it in. Knowledge that exists only
 in memory is the most fragile source: write it down explicitly, the same
 turn you notice it (`process.keep-knowledge-current`), before it is lost
 to the next compaction.
@@ -28,18 +28,45 @@ needs its own ruled discipline and its own CI gate. Work the rest topic by
 topic and gate after each one (see Gates below); do not migrate everything
 before the first check.
 
+## If `init` or `update` kept your own AGENTS.md
+
+`AGENTS.md` is seed-once: neither `init` nor `update` overwrites a file
+that is already there. `init` reports `kept AGENTS.md`; `update` leaves
+it untouched and prints no line for it at all -- absence of any AGENTS.md
+line in `update`'s output means it was already there, not that it was
+skipped some other way. Merge the two starter sections by hand: run
+`houserules init --dir <an empty scratch git repo>` somewhere else, open
+the `AGENTS.md` it writes there, and copy its `## Knowledge base` and
+`## Workflow` sections into your own `AGENTS.md` wherever they fit your
+file's own structure. Keep the rest of your file as it is.
+
+If you use Claude Code and have no `CLAUDE.md` yet, add one containing
+only `@AGENTS.md` so Claude Code loads the same instructions; skip this
+on any other harness, or if your `CLAUDE.md` already points at your
+`AGENTS.md` some other way.
+
+If instead you have your own `CLAUDE.md` with real content and no
+`AGENTS.md`, `init` (a first-time install) or `update` (an install seeded
+before this release) seeds a fresh, generic `AGENTS.md` that knows
+nothing about your existing rules and leaves your `CLAUDE.md` exactly as
+it is (also seed-once) -- see README's `Updating` section for the exact
+`wrote AGENTS.md` line that names this state. Move your `CLAUDE.md`
+content into `AGENTS.md` yourself, the same way the rest of this skill
+migrates any other source, then replace `CLAUDE.md` with a single
+`@AGENTS.md` line.
+
 ## Inventory
 
 Knowledge hides in:
 
-- **CLAUDE.md** and any project-instructions file — prose rules, workflow
-  steps, warnings.
+- **AGENTS.md** (or a project's own `CLAUDE.md` or other
+  project-instructions file) — prose rules, workflow steps, warnings.
 - **`docs/`, wikis, READMEs** — design records, decisions, how-tos.
 - **Code comments** that state a constraint, not just what the code does.
 - **PR and review templates** — the checklist a reviewer runs by hand.
 - **Lint and CI configs** — a rule enforced in YAML or a linter plugin is
   still a rule; the entry documents it, the config still enforces it.
-- **Past conversations and an assistant's own memory** — a fact or
+- **Past conversations and an agent's own memory** — a fact or
   preference the project has been operating on that was never written to a
   tracked file. Nothing outlives the session until it is.
 
@@ -108,7 +135,7 @@ leave everything else area-scoped so it loads with its files.
 
 Work one `knowledge/<topic>.json` at a time:
 
-1. Pick a source: one CLAUDE.md section, one doc, one comment cluster.
+1. Pick a source: one AGENTS.md section, one doc, one comment cluster.
 2. For each paragraph, write an entry, or park it when it is not worth one
    yet. Parks are hand-edited into a group in `backlog/parked.json` — no
    CLI creates one:
@@ -118,16 +145,18 @@ Work one `knowledge/<topic>.json` at a time:
    ] }
    ```
    The text ends with the trigger, so the park is re-openable later.
-3. Delete the migrated prose — a CLAUDE.md paragraph, a doc section that
+3. Delete the migrated prose — an AGENTS.md paragraph, a doc section that
    only restated the rule. Keep anything that enforces or executes: a
    lint or CI config, a code comment that still explains its code. The
    entry documents it; the config or the comment still does the work.
 4. Gate (below), then move to the next topic.
 
-When the pass is done, CLAUDE.md keeps only project identity and the two
+When the pass is done, AGENTS.md keeps only project identity and the two
 sections `init` seeded (`## Knowledge base`, `## Workflow`) — everything
 else has become an entry, a park, or a deletion, except a lint or CI
 config or a comment that still does the work its entry now documents.
+`CLAUDE.md` stays a plain `@AGENTS.md` pointer if you use Claude Code;
+nothing else belongs there.
 
 ## Gates
 
@@ -190,7 +219,7 @@ prove it with a real run before trusting it, not a syntax check alone.
 
 ## A worked example
 
-Before, in CLAUDE.md:
+Before, in AGENTS.md:
 
 > Every change to `src/payments/` needs a review from someone on the
 > payments team before merge — that code moves money, and the linter can't
@@ -211,7 +240,7 @@ After, in `knowledge/process.json`:
     "Ping #payments-oncall if no review lands within a day."
   ],
   "tags": ["payments", "review"],
-  "source": { "date": "2026-09-02", "by": "docs", "ref": "CLAUDE.md, migrated" },
+  "source": { "date": "2026-09-02", "by": "docs", "ref": "AGENTS.md, migrated" },
   "verify": ["src/payments/"]
 }
 ```
@@ -221,4 +250,4 @@ carries both reasons the source gave plus the fallback, and `verify`
 points at the code the rule protects. The entry is `standing: true`: a
 review-before-merge rule is a non-negotiable, and area `process` carries
 no file globs, so only `standing` gives the entry a loading path. Delete
-the CLAUDE.md paragraph once `houserules render` and both checks pass.
+the AGENTS.md paragraph once `houserules render` and both checks pass.

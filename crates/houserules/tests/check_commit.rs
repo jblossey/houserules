@@ -20,8 +20,13 @@ use std::process::Command;
 /// specifically, since each file under `tests/` compiles as its own crate
 /// (`argv_closure.rs`'s own doc names this exact tension for the same
 /// reason).
+/// Sets `HOUSERULES_SKIP_SELF_UPDATE` so `update`'s self-update phase
+/// (`selfupdate.rs`) never runs here -- `tests/update.rs`'s own copy of
+/// this helper has the full account.
 fn houserules() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_houserules"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_houserules"));
+    command.env("HOUSERULES_SKIP_SELF_UPDATE", "1");
+    command
 }
 
 /// The vendored knowledge schema's path, resolved at compile time from the

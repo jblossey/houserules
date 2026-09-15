@@ -18,9 +18,16 @@ use std::process::Command;
 use sha2::{Digest, Sha256};
 
 /// A `Command` for the compiled `houserules` binary under test --
-/// `install.rs`'s own copy of this helper.
+/// `install.rs`'s own copy of this helper. Sets
+/// `HOUSERULES_SKIP_SELF_UPDATE` so `update`'s new self-update phase
+/// (`selfupdate.rs`) never runs here: its own network call belongs
+/// nowhere in `cargo test` (security-hygiene), and every `assert_eq!`
+/// against this file's exact stderr predates that phase and would break
+/// under its extra line the moment a real install receipt is present.
 fn houserules() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_houserules"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_houserules"));
+    command.env("HOUSERULES_SKIP_SELF_UPDATE", "1");
+    command
 }
 
 /// This checkout's repository root -- `install.rs`'s own copy.
@@ -160,6 +167,7 @@ const SEED_ONCE: &[&str] = &[
     ".claude/evals/record.json",
     ".claude/evals/seeded-violations.json",
     "docs/README.md",
+    "AGENTS.md",
     "CLAUDE.md",
 ];
 
@@ -897,6 +905,64 @@ fn update_backfills_a_missing_seed_once_file() {
     let backfilled = fs::read(dir.path().join("docs/README.md")).unwrap();
     let template = fs::read(repo_root().join("template/docs/README.md")).unwrap();
     assert_eq!(backfilled, template);
+}
+
+/// `AGENTS.md` gets the identical backfill treatment as any other missing
+/// `SEED_ONCE` path: absent with no override means "never arrived", not
+/// "deleted on purpose".
+#[test]
+fn update_backfills_a_missing_agents_md_file() {
+    let dir = seeded_repo();
+    fs::remove_file(dir.path().join("AGENTS.md")).expect("remove AGENTS.md");
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("wrote AGENTS.md\n"), "got:\n{stdout}");
+
+    let backfilled = fs::read(dir.path().join("AGENTS.md")).unwrap();
+    let template = fs::read(repo_root().join("template/AGENTS.md")).unwrap();
+    assert_eq!(backfilled, template);
+}
+
+/// A present `AGENTS.md` is `SEED_ONCE`: `init` seeds it, and `update`
+/// never rewrites it once it exists, exactly like `CLAUDE.md`.
+#[test]
+fn update_keeps_an_existing_agents_md_file_untouched() {
+    let dir = seeded_repo();
+    assert!(
+        dir.path().join("AGENTS.md").is_file(),
+        "init did not seed AGENTS.md"
+    );
+    fs::write(dir.path().join("AGENTS.md"), b"project notes").expect("edit AGENTS.md");
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        !stdout.contains("AGENTS.md"),
+        "update reported AGENTS.md in:\n{stdout}"
+    );
+    assert_eq!(
+        fs::read(dir.path().join("AGENTS.md")).unwrap(),
+        b"project notes"
+    );
 }
 
 /// `seeded_repo`'s own `init` already skipped every `GITHUB_HOSTED_SEED_ONCE`
@@ -1832,5 +1898,35 @@ fn update_duplicated_dir_flag_exits_2_with_claps_cannot_be_used_multiple_times_m
     assert!(
         stderr.starts_with("error: the argument '--dir <DIR>' cannot be used multiple times"),
         "got {stderr:?}"
+    );
+}
+
+/// `HOUSERULES_SKIP_SELF_UPDATE` silences the self-update phase end to
+/// end through the real binary, independently of `houserules()`'s own
+/// default above -- this test builds its bare `Command` so it proves the
+/// running binary reads this exact environment variable name itself,
+/// never only the pure `selfupdate::phase_disabled` unit already covers.
+/// No install receipt exists on a test-running machine by construction
+/// (no test in this suite, or any other, ever runs the real shell
+/// installer), so an unguarded phase would print its one no-receipt
+/// guidance line first; this asserts that line's absence.
+#[test]
+fn update_skips_the_self_update_phase_silently_when_the_skip_env_var_is_set() {
+    let dir = seeded_repo();
+    let output = Command::new(env!("CARGO_BIN_EXE_houserules"))
+        .env("HOUSERULES_SKIP_SELF_UPDATE", "1")
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(
+        !stderr.contains("houserules: no shell-installer receipt found"),
+        "self-update phase ran despite the skip env var: {stderr:?}"
     );
 }

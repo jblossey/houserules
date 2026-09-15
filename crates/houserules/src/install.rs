@@ -199,8 +199,9 @@ const KIT_OWNED: &[&str] = &[
 ];
 
 /// Project-data files `init` seeds once, and `update` never overwrites once
-/// they exist: an adopter's own edits to backlog items, evals, or `CLAUDE.md`
-/// are never kit-owned content. `update` still BACKFILLS a `SEED_ONCE` path
+/// they exist: an adopter's own edits to backlog items, evals, or
+/// `AGENTS.md`/`CLAUDE.md` are never kit-owned content. `update` still
+/// BACKFILLS a `SEED_ONCE` path
 /// that is entirely absent (this module's own "update" doc section has the
 /// full account) -- a later kit release can add a new path to this list, and
 /// an install seeded by an older release never had a chance to receive it.
@@ -226,6 +227,7 @@ const SEED_ONCE: &[&str] = &[
     ".claude/evals/record.json",
     ".claude/evals/seeded-violations.json",
     "docs/README.md",
+    "AGENTS.md",
     "CLAUDE.md",
 ];
 
@@ -1107,11 +1109,15 @@ fn update(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
     Ok(())
 }
 
-/// Runs the `update` subcommand: resolves `dir` the same way `init` does
-/// (`cmd_init`'s own doc explains the choice), then syncs it from the
-/// embedded payload. Every error is one named stderr line and exit 2
-/// (`houserules.crash-paths-are-named`).
+/// Runs the `update` subcommand: first runs the self-update phase
+/// (`selfupdate::run_before_repo_phase`'s own doc has the full account --
+/// keeps the installed binary itself current, on the channels that
+/// support it, never a hard error), then resolves `dir` the same way
+/// `init` does (`cmd_init`'s own doc explains the choice) and syncs it
+/// from the embedded payload. Every error from the repo phase is one
+/// named stderr line and exit 2 (`houserules.crash-paths-are-named`).
 pub(crate) fn cmd_update(dir: Option<PathBuf>, id_prefix: Option<String>) -> ExitCode {
+    crate::selfupdate::run_before_repo_phase();
     let target = match resolve_like_node(dir.as_deref().unwrap_or_else(|| Path::new("."))) {
         Ok(target) => target,
         Err(error) => {

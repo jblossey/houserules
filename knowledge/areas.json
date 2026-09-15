@@ -1,7 +1,7 @@
 {
   "global": { "paths": [] },
   "process": { "paths": [] },
-  "docs": { "paths": ["docs/**", "README.md", "CLAUDE.md", "knowledge/**", "backlog/**", ".claude/**"] },
+  "docs": { "paths": ["docs/**", "README.md", "AGENTS.md", "knowledge/**", "backlog/**", ".claude/**"] },
   "tools": { "paths": ["tools/**", ".github/**", "mise.toml"] },
   "cli": { "paths": ["crates/houserules/src/**"] },
   "template": { "paths": ["template/**"] },

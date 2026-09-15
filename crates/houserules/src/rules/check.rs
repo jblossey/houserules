@@ -22,18 +22,19 @@ use super::model::{Base, load_base};
 use super::render::{RULE_KINDS, SKILL_PATH, render_all};
 
 /// Size limits `check_base` enforces on the generated markdown files and
-/// `CLAUDE.md`.
+/// on `AGENTS.md`, the canonical instruction file
+/// (`houserules.agents-md-is-canonical`).
 struct Budgets {
-    claude_md_lines: usize,
-    claude_md_bytes: usize,
+    agents_md_lines: usize,
+    agents_md_bytes: usize,
     standing_lines: usize,
     area_lines: usize,
     skill_lines: usize,
 }
 
 const BUDGETS: Budgets = Budgets {
-    claude_md_lines: 200,
-    claude_md_bytes: 12288,
+    agents_md_lines: 200,
+    agents_md_bytes: 12288,
     standing_lines: 60,
     area_lines: 160,
     skill_lines: 120,
@@ -227,19 +228,28 @@ fn check_shape(check: &Value, at: &str, errors: &mut Vec<String>) {
 }
 
 /// Checks `path` (relative to `root`) against a line budget and, when
-/// `max_bytes` is given, a byte budget. A missing file is its own
-/// finding, distinct from either budget.
+/// `max_bytes` is given, a byte budget. `required` decides what a missing
+/// file means: a finding of its own (the canonical `AGENTS.md`, every
+/// generated file) when `true`, or nothing at all (the optional
+/// `CLAUDE.md` pointer, which an adopter on another harness may delete)
+/// when `false` -- a file this check tolerates absent is never budgeted
+/// either, since there is nothing to measure.
 fn check_budget(
     root: &Path,
     path: &str,
     max_lines: usize,
     max_bytes: Option<usize>,
+    required: bool,
     errors: &mut Vec<String>,
 ) {
     let abs = root.join(path);
-    let Ok(text) = fs::read_to_string(&abs) else {
-        errors.push(format!("{path}: missing"));
-        return;
+    let text = match fs::read_to_string(&abs) {
+        Ok(text) => text,
+        Err(_) if required => {
+            errors.push(format!("{path}: missing"));
+            return;
+        }
+        Err(_) => return,
     };
     let lines = text.split('\n').count() - usize::from(text.ends_with('\n'));
     if lines > max_lines {
@@ -943,18 +953,54 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
     }
     check_budget(
         &base.root,
+        "AGENTS.md",
+        BUDGETS.agents_md_lines,
+        Some(BUDGETS.agents_md_bytes),
+        true,
+        &mut errors,
+    );
+    // CLAUDE.md is the optional Claude Code pointer to AGENTS.md
+    // (houserules.agents-md-is-canonical): a harness that never reads it
+    // may delete it, so its absence is never a finding. Present, it still
+    // shares AGENTS.md's own budget -- an adopter migrating off a
+    // pre-AGENTS.md install may still carry real content there until they
+    // move it, and that content should not grow unbounded either.
+    check_budget(
+        &base.root,
         "CLAUDE.md",
-        BUDGETS.claude_md_lines,
-        Some(BUDGETS.claude_md_bytes),
+        BUDGETS.agents_md_lines,
+        Some(BUDGETS.agents_md_bytes),
+        false,
         &mut errors,
     );
     for (path, _) in &rendered {
         if path == ".claude/rules/standing-rules.md" {
-            check_budget(&base.root, path, BUDGETS.standing_lines, None, &mut errors);
+            check_budget(
+                &base.root,
+                path,
+                BUDGETS.standing_lines,
+                None,
+                true,
+                &mut errors,
+            );
         } else if path == SKILL_PATH {
-            check_budget(&base.root, path, BUDGETS.skill_lines, None, &mut errors);
+            check_budget(
+                &base.root,
+                path,
+                BUDGETS.skill_lines,
+                None,
+                true,
+                &mut errors,
+            );
         } else {
-            check_budget(&base.root, path, BUDGETS.area_lines, None, &mut errors);
+            check_budget(
+                &base.root,
+                path,
+                BUDGETS.area_lines,
+                None,
+                true,
+                &mut errors,
+            );
         }
     }
     errors.extend(archive_errors);
@@ -1135,7 +1181,7 @@ mod tests {
             "api": {"paths": ["apps/api/**"]},
             "schemas": {"paths": ["packages/schemas/**"]},
             "infra": {"paths": ["tools/**", ".github/**"]},
-            "docs": {"paths": ["docs/**", "CLAUDE.md"]},
+            "docs": {"paths": ["docs/**"]},
         })
     }
 
@@ -1144,8 +1190,12 @@ mod tests {
     /// every glob it names match at least one file in the tree, so every
     /// fixture whose `areas.json` declares a glob needs a file that glob
     /// actually matches -- these are that file, one per glob, content
-    /// unused. `docs`'s `CLAUDE.md` glob is covered separately
-    /// (`make_repo` always writes that file itself).
+    /// unused. `areas_json()`'s own `docs` area names no file-specific
+    /// glob (only `docs/**`, which `docs/marker.md` below covers): unlike
+    /// the real seed, this fixture's `docs` area never names `CLAUDE.md`,
+    /// since `check_base` no longer requires that file to exist
+    /// (`houserules.agents-md-is-canonical`) and a glob naming an
+    /// optional file would be dead the moment a caller removes it.
     fn write_area_marker_files(root: &Path) {
         for relative in [
             "crates/marker.rs",
@@ -1192,9 +1242,9 @@ mod tests {
     }
 
     /// A knowledge base under `root`: the project-extended seed schema,
-    /// `AREAS`, `entries` split into topic files, and a starter
-    /// `CLAUDE.md`. A caller writes any extra file directly to `root`
-    /// afterward.
+    /// `AREAS`, `entries` split into topic files, and starter `AGENTS.md`
+    /// and `CLAUDE.md` files. A caller writes any extra file directly to
+    /// `root` afterward.
     fn make_repo(root: &Path, entries: &[Value]) {
         fs::create_dir_all(root.join("knowledge")).unwrap();
         fs::write(
@@ -1208,6 +1258,7 @@ mod tests {
         )
         .unwrap();
         write_topics(root, entries);
+        fs::write(root.join("AGENTS.md"), "# Test\n").unwrap();
         fs::write(root.join("CLAUDE.md"), "# Test\n").unwrap();
         write_area_marker_files(root);
     }
@@ -1220,10 +1271,10 @@ mod tests {
     }
 
     /// A knowledge base under `root` seeded with the real
-    /// `template/knowledge` content, starter `CLAUDE.md`, and the other
-    /// files its entries' `verify` paths name. No git init or commit:
-    /// `--dir` bypasses git resolution entirely, and `check_base` itself
-    /// never calls git.
+    /// `template/knowledge` content, starter `AGENTS.md` and `CLAUDE.md`,
+    /// and the other files its entries' `verify` paths name. No git init
+    /// or commit: `--dir` bypasses git resolution entirely, and
+    /// `check_base` itself never calls git.
     fn make_seed_repo(root: &Path) {
         let template = template_root();
         fs::create_dir_all(root.join("knowledge")).unwrap();
@@ -1241,11 +1292,20 @@ mod tests {
             )
             .unwrap();
         }
-        fs::write(
-            root.join("CLAUDE.md"),
-            fs::read_to_string(template.join("CLAUDE.md")).unwrap(),
-        )
-        .unwrap();
+        // `AGENTS.md` is the one instruction file the `docs` area's glob
+        // list names (`houserules.agents-md-is-canonical`): the dead-glob
+        // scan below needs a real match, or that glob reports dead in
+        // this git-less fixture. `CLAUDE.md` names no glob at all -- it is
+        // an optional pointer a non-Claude adopter may delete -- but a
+        // real `init` still writes it, so this fixture still carries it
+        // for output fidelity.
+        for file in ["AGENTS.md", "CLAUDE.md"] {
+            fs::write(
+                root.join(file),
+                fs::read_to_string(template.join(file)).unwrap(),
+            )
+            .unwrap();
+        }
         // Every path here is a real file `houserules init` itself writes --
         // nothing stands in for one. The seed's `docs`/`tools` areas
         // (`template/knowledge/areas.json`) declare `docs/**`, `tools/**`,
@@ -1687,18 +1747,23 @@ mod tests {
         );
     }
 
-    /// Flags a missing CLAUDE.md.
+    /// A missing CLAUDE.md is never a finding: it is the optional Claude
+    /// Code pointer to the canonical AGENTS.md (`houserules.agents-md-is-
+    /// canonical`), and a harness that never reads it may delete it.
     #[test]
-    fn flags_a_missing_claude_md() {
+    fn passes_check_base_when_claude_md_is_absent() {
         let dir = tempfile::tempdir().expect("tempdir");
         let root = dir.path();
         make_repo(root, &[entry(json!({}))]);
         fs::remove_file(root.join("CLAUDE.md")).unwrap();
         let base = load_base(root).expect("loads");
-        assert!(check_base(&base).contains(&"CLAUDE.md: missing".to_string()));
+        crate::rules::render::render(&base, false).expect("render");
+        let base = load_base(root).expect("loads");
+        assert_eq!(check_base(&base), Vec::<String>::new());
     }
 
-    /// Accepts a CLAUDE.md with no trailing newline.
+    /// Accepts a CLAUDE.md with no trailing newline, present but never
+    /// required.
     #[test]
     fn accepts_a_claude_md_with_no_trailing_newline() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -1711,7 +1776,9 @@ mod tests {
         assert_eq!(check_base(&base), Vec::<String>::new());
     }
 
-    /// Flags CLAUDE.md over the line budget.
+    /// A present CLAUDE.md still shares AGENTS.md's own budget: an
+    /// adopter migrating off a pre-AGENTS.md install may still carry real
+    /// content there, and it should not grow unbounded either.
     #[test]
     fn flags_claude_md_over_the_line_budget() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -1727,7 +1794,7 @@ mod tests {
         );
     }
 
-    /// Flags CLAUDE.md over the byte budget.
+    /// A present CLAUDE.md over the byte budget is flagged too.
     #[test]
     fn flags_claude_md_over_the_byte_budget() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -1740,6 +1807,50 @@ mod tests {
             errors
                 .iter()
                 .any(|e| e.starts_with("CLAUDE.md: ") && e.ends_with(" bytes, budget 12288"))
+        );
+    }
+
+    /// AGENTS.md is the canonical instruction file: unlike CLAUDE.md, its
+    /// absence is always a finding.
+    #[test]
+    fn flags_a_missing_agents_md() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(root, &[entry(json!({}))]);
+        fs::remove_file(root.join("AGENTS.md")).unwrap();
+        let base = load_base(root).expect("loads");
+        assert!(check_base(&base).contains(&"AGENTS.md: missing".to_string()));
+    }
+
+    /// Flags AGENTS.md over the line budget.
+    #[test]
+    fn flags_agents_md_over_the_line_budget() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(root, &[entry(json!({}))]);
+        fs::write(root.join("AGENTS.md"), "x\n".repeat(201)).unwrap();
+        let base = load_base(root).expect("loads");
+        let errors = check_base(&base);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.starts_with("AGENTS.md: ") && e.ends_with(" lines, budget 200"))
+        );
+    }
+
+    /// Flags AGENTS.md over the byte budget.
+    #[test]
+    fn flags_agents_md_over_the_byte_budget() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(root, &[entry(json!({}))]);
+        fs::write(root.join("AGENTS.md"), "x".repeat(12289)).unwrap();
+        let base = load_base(root).expect("loads");
+        let errors = check_base(&base);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.starts_with("AGENTS.md: ") && e.ends_with(" bytes, budget 12288"))
         );
     }
 

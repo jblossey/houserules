@@ -66,6 +66,17 @@ use serde_json::{Value, json};
 /// copy.
 const FROZEN_SHA: &str = "5f14727b4adeeb347a8d1f0c8f98d929f62bc7f4";
 
+/// The stub `AGENTS.md` content written into the frozen worktree the
+/// `root` corpus checks out: that sha predates AGENTS.md joining
+/// `SEED_ONCE` (`houserules.agents-md-is-canonical`), which `check_base`
+/// now requires unconditionally. `crates/houserules/tests/check_parity.rs`
+/// keeps its own copy of this constant for the same reason -- a `src/
+/// bin/*.rs` target cannot depend on `tests/*.rs` code, this file's own
+/// doc above already explains why. Content is never asserted, only its
+/// existence and its budget, so any short text under the 200-line/
+/// 12288-byte instruction budget is equally valid here.
+const ROOT_WORKTREE_AGENTS_MD_STUB: &str = "# AGENTS.md stub\n\nWritten by the check-parity harness: the frozen sha this worktree checks out predates AGENTS.md joining SEED_ONCE. A real adopter's own checkout already has one.\n";
+
 /// A fresh, empty directory under the OS temp root, removed by its own
 /// `Drop`. `tempfile` (this crate's `[dev-dependencies]`) is unavailable to
 /// a `src/bin/*.rs` target -- Cargo does not link dev-dependencies into a
@@ -517,6 +528,17 @@ fn main() {
                 .join(".claude/skills/project-knowledge/SKILL.md"),
         )
         .expect("remove the knowledge skill");
+        // The frozen sha predates AGENTS.md joining SEED_ONCE
+        // (houserules.agents-md-is-canonical), which check_base now
+        // requires unconditionally; write a stub here, the same way this
+        // block already patches the checkout's stale generated files, so
+        // the root slice keeps proving what it exists to prove -- a
+        // real, larger knowledge base passing check-knowledge end to end.
+        fs::write(
+            worktree.path.join("AGENTS.md"),
+            ROOT_WORKTREE_AGENTS_MD_STUB,
+        )
+        .expect("write AGENTS.md stub into the frozen worktree");
         written.extend(render_and_freeze(
             &bin,
             &worktree.path,

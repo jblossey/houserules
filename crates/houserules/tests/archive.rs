@@ -14,9 +14,14 @@ use std::process::Command;
 
 use serde_json::{Value, json};
 
-/// A `Command` for the compiled `houserules` binary under test.
+/// A `Command` for the compiled `houserules` binary under test. Sets
+/// `HOUSERULES_SKIP_SELF_UPDATE` so `update`'s self-update phase
+/// (`selfupdate.rs`) never runs here -- `tests/update.rs`'s own copy of
+/// this helper has the full account.
 fn houserules() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_houserules"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_houserules"));
+    command.env("HOUSERULES_SKIP_SELF_UPDATE", "1");
+    command
 }
 
 /// A fresh scratch directory with `git init` already run -- the minimal

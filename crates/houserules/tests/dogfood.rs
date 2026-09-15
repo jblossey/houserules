@@ -27,8 +27,13 @@ use std::process::Command;
 /// independently (their own docs explain why: a file needing none of
 /// `mod common;`'s other helpers still warns the rest of that module dead
 /// if pulled in just for this one function).
+/// Sets `HOUSERULES_SKIP_SELF_UPDATE` so `update`'s self-update phase
+/// (`selfupdate.rs`) never runs here -- `tests/update.rs`'s own copy of
+/// this helper has the full account.
 fn houserules() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_houserules"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_houserules"));
+    command.env("HOUSERULES_SKIP_SELF_UPDATE", "1");
+    command
 }
 
 /// This checkout's repository root, resolved at compile time so it is
@@ -149,6 +154,7 @@ fn kit_owned_manifest_separates_from_seed_once_and_has_no_overlap() {
         "backlog/schema.json",
         ".claude/schemas/deliverables.json",
         ".claude/evals/record.json",
+        "AGENTS.md",
         "CLAUDE.md",
     ] {
         assert!(

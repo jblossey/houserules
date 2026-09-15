@@ -19,8 +19,13 @@ use std::process::Command;
 /// this file needs none of that module's other helpers (`FrozenWorktree`,
 /// `copy_dir_recursive`, `repo_root`), for the same reason `check_commit.
 /// rs`'s own copy gives.
+/// Sets `HOUSERULES_SKIP_SELF_UPDATE` so `update`'s self-update phase
+/// (`selfupdate.rs`) never runs here -- `tests/update.rs`'s own copy of
+/// this helper has the full account.
 fn houserules() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_houserules"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_houserules"));
+    command.env("HOUSERULES_SKIP_SELF_UPDATE", "1");
+    command
 }
 
 /// Runs `git` in `root`, panicking with its stderr on failure.
