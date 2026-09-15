@@ -112,10 +112,11 @@
         "Candidate remedies (this item carries the question, not the answer): (a) an extra-files or component-mapping addition to release-please-config.json that attributes template/** changes to the crate's own path for commit-attribution purposes; (b) a documented pre-release rule that a payload-changing commit always rides alongside a crate-side commit before a release is cut, checked by hand or by a gate. Owner picks.",
         "MECHANISM (task-1 fix round 4, provisional pending owner ratification at the batch report): remedy (b), concretized. crates/houserules/payload.stamp records a sha256 digest of template/'s tracked file set, recomputed and compared by payload-stamp-gate (crates/houserules/src/bin/payload-stamp-gate.rs), wired into mise run lint (houserules.payload-stamp-gate). That gate is a TREE-LEVEL check only: a branch splitting the template/ edit from the stamp regeneration across two commits still passes it at the tip. Fix round 5 closed that gap: houserules check-commit now also runs this entry's own co-change check (if template/**, then crates/houserules/payload.stamp) per commit, over the PR's full range in CI, so a split commit pair fails before merge, not only a stale tree.",
         "Still gating this item's own close: the mechanism above is proven by source-level review and a full-pipeline simulation against real git history (batch-24 task-1's own t1-evidence/), never by a genuine release-please run. The first real template-only change that lands on main after T2 -- one commit touching template/ and crates/houserules/payload.stamp together, nothing else -- is that live proof.",
-        "Source: batch 20 T5 fix round 1 review (task-5-review.json), important finding 1."
+        "Source: batch 20 T5 fix round 1 review (task-5-review.json), important finding 1.",
+        "CLOSED by live proof, 2026-09-15: batch 26's merge put ea17fc6 feat(template) on main - a commit whose only crates/houserules/** path is payload.stamp. release-please run 34951127224 opened release PR #28 (chore(main): release 1.1.0) whose changelog carries exactly that commit as its one feature: the stamp pairing attributed the template-payload change to the crate and drove the minor bump. The release PR itself is owner-attended."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 25,
       "see": [
         "HR-073"
