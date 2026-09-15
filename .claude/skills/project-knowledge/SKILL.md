@@ -62,4 +62,4 @@ knowledge-base  5  Authoring knowledge entries
 process  37  How work runs: batches, dispatch, reviews, rulings
 quality  8  Quality principles
 security-hygiene  5  Dependency, commit, and test hygiene
-writing-style  4  Writing style for docs, comments, commits, reports
+writing-style  5  Writing style for docs, comments, commits, reports

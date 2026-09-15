@@ -73,6 +73,7 @@
     "process.fix-round-verification-record": "8549dfa36ad070316690e9ad4dd84affd81ca03d36cb4c39392ab5501e8707ed",
     "process.pointer-sweep-unfiltered": "8ed8dbaced05500674dabb89c157c203b23793997ac0da226291170ef4b243c0",
     "process.report-evidence-verbatim": "571af72730f8600d88390f1ddd3ae98f4c4f362fb2158be8e83e2ed1de88c0fc",
-    "quality.tests-clean-temp-dirs": "6cb7ad176e0a91d8740c656c930b203d2c879a632316c1674d4fbf967113ef40"
+    "quality.tests-clean-temp-dirs": "6cb7ad176e0a91d8740c656c930b203d2c879a632316c1674d4fbf967113ef40",
+    "writing-style.readme-is-an-adopter-funnel": "3a2d727100496f2ea55ce4b112b7a390027b5367628b90beba05380dfcca75c7"
   }
 }

@@ -107,6 +107,27 @@
         "by": "docs",
         "ref": "houserules seed"
       }
+    },
+    {
+      "id": "writing-style.readme-is-an-adopter-funnel",
+      "kind": "rule",
+      "area": "docs",
+      "standing": false,
+      "summary": "A README is an adopter funnel: value, install, runnable usage, then depth; keep out process history, provenance narration, and claims that rot with releases.",
+      "body": [
+        "Order the file as a funnel (an evaluator can stop early, a user finds install and usage fast, a contributor reads to the end): title; a few meaningful badges; a one-liner under 120 characters matching the repository description; a short what/who/why description; a table of contents once the file passes 100 lines; install, with updating as a subsection; usage whose commands run exactly as written, with real output shown; deeper concepts; a reference section or a link to one; contributing (where to ask questions, whether pull requests are accepted); license last.",
+        "Keep out: maintainer evidence and verification narration, internal ids and ruling citations, changelog prose, marketing claims, and version-bound statements that go stale at the next release. State current facts plainly and keep provenance in the project's own records; link out for depth instead of inlining it.",
+        "Derived from standard-readme's specification, The Art of README's cognitive funneling, and makeareadme.com; re-check current guidance before a large rewrite."
+      ],
+      "tags": [
+        "docs",
+        "readme"
+      ],
+      "source": {
+        "date": "2026-09-15",
+        "by": "user",
+        "ref": "owner direction at the batch-26 README rework"
+      }
     }
   ]
 }

@@ -20,6 +20,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [knowledge-base.state-only-the-source] State only what the source states; verify polarity, counts, and mechanisms against the code before filing an entry or shipping teaching prose.
 - [knowledge-base.summary-is-the-rule] The `summary` states the rule in one sentence; `body` carries why, how, exceptions; examples in docs and skills model this split. No time-sensitive phrasing.
 - [process.evals-rerun] Re-run every `.claude/evals/` scenario when the implementer or task-reviewer template or a scenario changes; append the run to `.claude/evals/record.json`.
+- [writing-style.readme-is-an-adopter-funnel] A README is an adopter funnel: value, install, runnable usage, then depth; keep out process history, provenance narration, and claims that rot with releases.
 
 ## Gotchas
 
