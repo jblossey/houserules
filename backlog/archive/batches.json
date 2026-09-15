@@ -348,6 +348,36 @@
         "state": "done",
         "text": "Done 2026-09-13: the full release chain proven live - PR #22 merged first-push-green; release PR #23 engineered green unattended, 0.3.0 via the Release-As footer, the version restamp riding the PR (5.73); the owner's merge drove release-please on the PAT to tag v0.3.0 and dist shipped 16 assets marked latest after the owner-ruled create-collision recovery (5.77, HR-118 create-release=false landed on the close branch); all install channels verified live from clean environments plus a seeded-repo PR gate green first attempt (HR-063). Accepted 2026-09-13 (5.76); rulings 5.67-5.77 homed; three standing rules adopted (5.75). HR-081 alone stays open on its close gate: the first template-only change on main after v0.3.0 must bump a release PR. HR-119 filed-in-24, due later."
       }
+    },
+    {
+      "number": 25,
+      "items": [
+        "HR-113",
+        "HR-116",
+        "HR-107",
+        "HR-109",
+        "HR-110",
+        "HR-111",
+        "HR-112",
+        "HR-115",
+        "HR-117",
+        "HR-120",
+        "HR-100",
+        "HR-104",
+        "HR-119",
+        "HR-098",
+        "HR-081",
+        "HR-101",
+        "HR-102",
+        "HR-122",
+        "HR-125"
+      ],
+      "summary": "The v1-readiness batch, per the owner's HR-113 direction: the complete template-defaults review (one row per shipped default plus the gap rows from this repository and the read-only tag-pilot checkout, the owner ruling every row), the ruled template edits with the HR-116 riders and the evals rerun, the deterministic v1 gate family (HR-107/109/110/111/112/115/117/120), the adopter-facing matcher and restamp fixes (HR-100/104), the create-release CI gate (HR-119), the governance pass (HR-098, owner-attended), HR-081's close-gate observation, the surface freeze, and the 1.0.0 cut as ruled at the gate.",
+      "kickoff": "docs/specs/2026-09-14-batch-25-v1-readiness.md",
+      "status": {
+        "state": "done",
+        "text": "Done 2026-09-15: the v1-readiness batch - the owner's 258-row template-defaults review applied end to end (6 cross-cutting directives, 86 drops, 15 changes, 11 adoptions incl. the three 5.81-reconciled tag-pilot keeps; the review artifact purged per the owner's sensitivity directive); the deterministic v1 gate family live on its own corpus (report-claims citation/count/sweep checks, HR-109 keyword rejection, vacuous-exception, CI-mirror, durable-sha, dist-generate-check); adopter fixes (idPrefix, restamp no-op, --help); the 1.0 surface frozen at 5.82 (20 names test-pinned, schema blobs content-hashed); evals 14/14 at the shipping templates. Accepted 2026-09-15 (5.83); the 1.0.0 cut rides the close. HR-081 and HR-098 stay open on post-merge observation gates; HR-121 open unscheduled; HR-127..131 filed from the retrospective."
+      }
     }
   ]
 }

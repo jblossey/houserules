@@ -116,7 +116,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": 24,
+      "batch": 25,
       "see": [
         "HR-073"
       ]
@@ -147,7 +147,7 @@
       ],
       "milestone": null,
       "status": "partial",
-      "batch": null,
+      "batch": 25,
       "see": [
         "HR-092",
         "HR-068",
@@ -155,160 +155,42 @@
       ]
     },
     {
-      "id": "HR-100",
-      "type": "bug",
-      "milestone": null,
-      "status": "open",
-      "title": "`get` only resolves HR-/A-/PP- ids; a project's own --id-prefix is not respected",
-      "body": [
-        "`is_backlog_id` (crates/houserules/src/get.rs) hardcodes the HR-/A-/PP- id shapes rather than reading the project's own stamped id prefix (`.houserules.json`'s `idPrefix`, default `WI`). Reproduced live at batch 22 T1: `houserules init --dir <scratch>` with no `--id-prefix` seeds `WI-nnn` items, and `houserules get WI-001` then fails with `unknown id \"WI-001\"` even though the item exists and `list`/`batch` both resolve it fine.",
-        "Found incidentally while live-running HR-105's archive sweep (docs/plans/2026-09-11-batch-22-stewardship.md, T1); out of that task's own scope, so filed here rather than fixed in place.",
-        "Consequence recorded at batch 22 T1 fix round 1 (task-1-review.json, issue 3): this gap is not only latent. houserules archive makes it active -- a WI-prefixed item's archived record becomes unreachable by get in ANY project once swept, not merely unreached before the sweep the way it was before HR-105. get's own archive fallback works around the consequence by trying both archive lookups regardless of routing (fix round 1); this item still tracks the underlying matcher fix."
-      ]
-    },
-    {
-      "id": "HR-101",
-      "type": "chore",
-      "milestone": null,
-      "status": "open",
-      "title": "find-shell-tool-refs.rs carries two exception entries that now match nothing",
-      "body": [
-        "`exceptions()` in crates/houserules/src/bin/find-shell-tool-refs.rs names two exceptions -- `template/tools/kb.mjs` and `crates/houserules/src/rules/read.rs` -- that a live run (`cargo run --bin find-shell-tool-refs`) shows currently matching zero hits: kb.mjs no longer exists in the tree, and read.rs's own sole `kb.sh`-naming line was removed by the batch 22 T3a comment sweep. Only the `install.rs` exception still fires (4 hits).",
-        "Found while sweeping this file's comments at batch 22 T3b: correcting a stale doc claim about read.rs's hit count surfaced that the underlying exception entry is now dead weight, not only the sentence describing it.",
-        "Removing the two dead `Exception` entries (and `RUST_FILES`'s `rules/read.rs` member, if nothing else in that file still needs the scan) is a code change, out of scope for a comment-only sweep; filed here rather than fixed in place.",
-        "The surviving `install.rs` exception's own `reason` string literal narrates its own history (batch/phase/fix-round references) the same way the two removed entries' reasons did. It is user-facing output, not a comment, so the comment-only sweep correctly left it alone -- but once the two dead entries are deleted, rewrite this one's `reason` to the present-tense rule it states (RETIRED's own doc/test are FILE PATHS the deletion mechanism removes, narrowed to exactly that window so a whole-file exception cannot swallow an unrelated hit) in the same commit."
-      ]
-    },
-    {
-      "id": "HR-102",
-      "type": "chore",
-      "milestone": null,
-      "status": "open",
-      "title": ".gitattributes carries the same history narration HR-106's keep/drop line prunes from code",
-      "body": [
-        "HR-106's keep/drop line (docs/specs/2026-09-11-batch-22-stewardship.md §3) drops batch/task/round references, commit SHAs, and CI run/job ids from comments, keeping only the current constraint. The repository root's own .gitattributes carries exactly that class of history narration in its four comment blocks, confirmed present at HEAD: PR #6 and CI run 34056471594 (the tests/goldens/** block), commit e36c4b2 (the tests/fixtures/** block, alongside batch 20 T3 and HR-084), commits 0bb27a0 and 2174a9f (the .claude/rules/**/.claude/skills/project-knowledge/** block, alongside batch 20 T6), and HR-054 (the tests/corpus/** block).",
-        "Found during HR-106's own T3c comment sweep of crates/houserules/tests/**; .gitattributes is not a code file under any of spec §3's three file lists (crates/houserules/src/**, crates/houserules/tests/**, tools/*.sh, .githooks/*, and the template shell copies), so the sweep left it untouched, per scope.",
-        "Prune each block to the current constraint it states (which paths get -text, and why -text specifically, not the discovery history), the same rewrite HR-106's own sweeps already applied across crates/houserules/src/** and crates/houserules/tests/**."
-      ]
-    },
-    {
-      "id": "HR-104",
-      "type": "chore",
-      "title": "update restamps an entry whose content equals the current payload",
-      "body": [
-        "Found at the batch-22 close-out update run: an entry edited to the exact content the current payload ships (both copies edited together, the dogfood norm) classifies Modified against its stale baseline and prints 'kept (locally modified)' on every update forever, because only at-baseline entries restamp.",
-        "Refinement: when current content equals the current payload content, restamp silently - the adopter holds exactly what the kit ships, so there is nothing to keep or report. Applies to KIT_OWNED files and knowledge entries alike.",
-        "Seven such lines print on this repository's own update today; the report noise grows with every ruled wording change."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": null,
-      "see": [
-        "HR-099"
-      ]
-    },
-    {
-      "id": "HR-107",
+      "id": "HR-121",
       "type": "feat",
-      "title": "Deterministic citation-line check in check-report-claims",
+      "title": "macOS signing and notarization in the dist pipeline",
       "body": [
-        "RULED 2026-09-12 (batch 22 report, standing proposal 1): extend the report-claims gate deterministically - every path:NNN (and path:NNN-MMM) citation in a report's narrative fields must name an existing file, and NNN must not exceed that file's line count at HEAD. Catches the stream-index-as-file-line class (batch 22 T3c: 13 of 33 catalogue citations) and dangling pins mechanically, where judged review rounds catch them today.",
-        "Design note: command fields stay exempt (the ephemeral-path precedent); the check reads the tracked tree and the batch workspace the report cites."
+        "Deferred at the batch-25 gate (owner, 2026-09-14; design.md 5.79 discharges 5.37's revisit-at-1.0): 1.0 ships unsigned macOS binaries with the current Gatekeeper bypass documented (run once and let macOS block it, then System Settings > Privacy & Security > Open Anyway; amended 2026-09-15, owner ruling - Apple removed right-click-Open in macOS Sequoia). Trigger: real adopter friction with Gatekeeper, not a date. Scope when triggered: the owner's Apple Developer identity and certificates as repository secrets, dist's macos-sign configuration regenerated into release.yml, proven on a watched release."
       ],
       "milestone": null,
       "status": "open",
       "batch": null,
-      "see": [
-        "HR-075"
-      ]
+      "see": []
     },
     {
-      "id": "HR-109",
-      "type": "bug",
-      "title": "The schema engine silently ignores unsupported keywords - a gate that narrows itself",
-      "body": [
-        "Found at batch 23 T1 review round 2, proven empirically: rules/check.rs's validate handles only $ref, enum, type, pattern, minLength, maxLength, minimum, items, uniqueItems, required, properties, and additionalProperties; any other keyword (oneOf, anyOf, allOf, const, maximum, format) falls through every branch and the field goes UNCHECKED with no finding printed. A scratch schema whose taskNumber carried oneOf stopped raising the 'must be integer or string' error entirely.",
-        "This is the class quality.gates-derive-their-scope exists for: a validation gate that narrows itself in silence. It is also what made a review-suggested oneOf fix unimplementable at T1 (the two-descriptions fallback shipped instead).",
-        "Remedy, pick one at spec time: the engine reports an unsupported keyword as a named finding (the way an uncompilable pattern already is - houserules.crash-paths-are-named's shape), or it grows real combinator support. The named-finding route is the smaller, safer first step and unblocks combinators later."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": null,
-      "see": [
-        "HR-107"
-      ]
-    },
-    {
-      "id": "HR-110",
+      "id": "HR-123",
       "type": "feat",
-      "title": "Cross-check numeric and locative claims against their cited captures",
+      "title": "check-report-claims: HR-110's locative class ('the X live in Y')",
       "body": [
-        "From the batch-23 branch review retrospective: a sentence in a commit body, report narrative, or plan stating 'N passed', 'N files', or 'the X live in Y' while citing a retained capture should fail a deterministic check when the number or location is absent from that capture. All three batch-23 state-only-the-source instances (523-vs-528, a sweep example failing its own pattern, a plan's marker-location sentence) were one such cross-check away."
+        "Batch 25 T3a shipped only HR-110's number class ('N passed', 'N files' next to a cited capture); the locative class the same item names ('a report narrative stating the X live in Y, citing a retained capture, fails when Y is absent from that capture') is not implemented. The two real batch-23 locative instances that motivated HR-110 both sat in a commit body and a plan file, neither a report-narrative field check-report-claims scans, so this task's own corpus run (every retained deliverable in the tracked tree and the batch workspaces) turned up no report-narrative locative instance to derive a mechanical, low-noise trigger from.",
+        "Scoped out per quality.gates-derive-their-scope rather than shipped as a guess: a 'the X live in Y' sentence has no citation-adjacent signal as reliable as HR-110's own digit-token match, and this task's corpus run showed even the number class needs real instances to calibrate against (the 'N files (a, b, c)' enumeration-list false positive, fixed in the same task, only surfaced once real corpus data was run through it). Pick this up once a report-narrative locative instance exists to calibrate against, or once a design session derives a trigger some other way; do not ship an untested heuristic against it.",
+        "Rider (batch 25 branch review): report_claims.rs is 2889 lines - before this item (or HR-124) lands there, split the three checks and the shared resolver into submodules per the batch-25 plan's god-file direction."
       ],
       "milestone": null,
       "status": "open",
       "batch": null,
       "see": [
-        "HR-107"
-      ]
-    },
-    {
-      "id": "HR-111",
-      "type": "feat",
-      "title": "Vacuous-zero check: a cited sweep must cover the file it certifies",
-      "body": [
-        "From the batch-23 branch review retrospective: when a report cites a sweep or enumeration as proof over a file, the audit's report check should verify the sweep's retained file list contains that file and flag the citation otherwise. Batch 23 T1 round 0 cited a sweep whose list omitted deliverable.rs - the file the task changed most - so its zero was vacuous."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": null,
-      "see": [
-        "HR-107",
         "HR-110"
       ]
     },
     {
-      "id": "HR-112",
+      "id": "HR-124",
       "type": "feat",
-      "title": "Promote the no-provenance comment sweep into a deterministic gate",
+      "title": "check-report-claims: HR-111's multi-file sweep-coverage case",
       "body": [
-        "From the batch-23 branch review retrospective: promote the retained no-provenance sweeps (batch-22 t3a set plus batch-23's per-file variant) into a residue-gate-style deterministic check over crates/**, so provenance narration in comments fails a gate instead of costing an opus review round. The marker classes derive from the retained probes; writing-style.code-comments' history clause is the governing rule."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": null,
-      "see": [
-        "HR-102"
-      ]
-    },
-    {
-      "id": "HR-113",
-      "type": "feat",
-      "title": "The v1-readiness batch: v1 gaps plus the owner's full template-defaults review",
-      "body": [
-        "Owner direction (2026-09-12, during batch 24): the batch AFTER batch 24 (batch 25) makes the repository v1-ready. Two halves.",
-        "(1) V1 readiness: the controller proposes everything deemed necessary at shaping. Known candidates to complete then: the macOS-signing revisit-at-1.0 ruling; the CLI/schema surface freeze; the open quality-gate items as v1 gates (HR-107 citation-lines, HR-109 silent-keyword engine, HR-110/111 claim cross-checks, HR-112 no-provenance gate); the matcher and restamp refinements (HR-100, HR-104); docs completeness incl. HR-088/089-class update-path gaps; the 1.0 version cut itself.",
-        "(2) The template-defaults review: a complete sweep over every default the template ships. The controller delivers a complete list/spreadsheet - one row per shipped default - where the owner can, per item: tick template-appropriate or not; request changes and specify which; and ADD items they think are still missing. Every owner decision then homes per process.rulings-to-file and the edits ride the batch.",
-        "The list's row set derives from template/** itself (git ls-files template/), never from memory: the seeded knowledge entries per topic (process, quality, security-hygiene, writing-style, knowledge-base - every rule, gotcha, and procedure), the three agent templates' instructions, the skills, the schema constraints (id shapes, required fields, textList floors, the task-id shape), the seeded workflow (knowledge.yml), CLAUDE.md's seeded text, settings.json's hooks, areas.json's defaults, backlog seed files, docs/README.md, and the eval scenarios.",
-        "Addition (owner, 2026-09-12, same day): the sweep list also carries the GAP rows - items currently in use that are NOT in the template. Two gap sources, each its own row set: (a) this repository's own knowledge/backlog machinery versus template/ (entries, rules, and defaults that exist here but never shipped); (b) the tag-pilot checkout's current state versus template/ - tag-pilot has evolved independently and may hold items that became relevant there without surfacing in houserules. Tag-pilot stays STRICTLY read-only (houserules.tag-pilot-is-read-only): the sweep READS it to enumerate, never modifies, commits, or runs anything against it. Each gap row gets the same three affordances: adopt into the template or not, with which changes, plus free additions.",
-        "Deliverable form settled at shaping: an interactive review page or a spreadsheet file, whichever the owner prefers at the gate; the requirements are the three per-row affordances above plus free additions."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": null,
-      "see": [
-        "HR-108"
-      ]
-    },
-    {
-      "id": "HR-115",
-      "type": "feat",
-      "title": "Vacuous-exception check: a gate exception must match something real",
-      "body": [
-        "Found by batch 24 T3a fix round 1: docs/runbook.md's heading rename from \"release-please's release-type\" to \"release-please configuration\" orphaned residue-gate.rs's own named exception -- `runbook_release_please_section_lines` keyed its heading lookup on the old string, so the exception (\"docs/runbook.md: the release-please release-type section (HR-073)\") could no longer match any real line, while its doc comment kept describing a live, heading-bounded exemption and its two dedicated unit tests (synthetic fixture text carrying the old heading) stayed green throughout, hiding the deadness. The fix round retired the exception, the helper, and both tests outright rather than re-keying: a live `cargo run --bin residue-gate` plus a whole-file grep confirmed docs/runbook.md now carries zero PATTERNS hits anywhere (the retired-Node sweep the same task performed left nothing for any heading-keyed exception to except), so re-keying to the new heading would only have recreated a vacuous exception under a different name.",
-        "The systemic gap this leaves: residue-gate.rs's own `exceptions()` mechanism has no way to notice when a declared exception's `matches` predicate excepts zero real hits across a live run -- only a human re-reading the exception list catches it, and this instance survived one heading rename undetected. Same family as HR-111 (a cited sweep must cover the file it certifies): here, a declared exception must cover something the live walk actually finds.",
-        "Candidate: after building the excepted/unexpected classification, count each exception's own real (non-test) match total across the live run and warn or fail when any named exception matches zero hits -- the residue-gate binary already computes per-exception hit counts for its own report output (\"N hit(s)\" per label), so the count exists; only the zero-check does not. Shape (warn vs fail, and whether a zero count for a whole-file exception with no current violations is a false positive the check must tolerate) is open.",
-        "Source: batch 24 T3a fix round 1, spec-compliance finding 2 (2026-09-13)."
+        "Batch 25 T3a fix round 1: check_narrative_sweep_coverage (HR-111) returns early unless a report's files_changed names exactly one file. Measured over the task's own 350-file corpus (t3a-files-changed-reach.py, retained at .superpowers/sdd/2026-09-14-batch-25/): 3 of 350 deliverables carry exactly one files_changed entry (where the check runs), 93 carry more than one, 3 carry an empty files_changed array, and the remaining 251 are review kinds that carry no files_changed field at all -- so the check is inert on 347 of 350 retained deliverables, the common case by a wide margin.",
+        "Blocker: this task's corpus run found no reliable signal for WHICH of several changed files a given sweep/enumeration citation is offered as proof for. Comparing a sweep's content against the WHOLE files_changed list once produced a flood of false positives (a narrowly-scoped sweep has no reason to mention a plan file or a schema copy the same task also edited); a two-citation-per-sentence heuristic (the sweep, then a second citation naming the certified file) would have missed the task's own real motivating instance (HR-111's own origin, batch 23 T1: the sentence names only the sweep, relying on the reader knowing which file the task is about). Picking this up needs either a design session to derive a real per-file attribution signal, or a corpus of real multi-file sweep citations large enough to calibrate one against -- this task's own corpus supplied none.",
+        "Origin: batch 25 T3a (HR-111); this item schedules the deferred multi-file case rather than leaving it only as a report concern, per process.no-tech-debt.",
+        "Rider (batch 25 branch review): see HR-123's split-first note - the same file hosts both items."
       ],
       "milestone": null,
       "status": "open",
@@ -318,63 +200,79 @@
       ]
     },
     {
-      "id": "HR-116",
-      "type": "chore",
-      "title": "Template-cluster riders from the batch-24 branch review",
-      "body": [
-        "Three defects for the next template-touching batch (each triggers or adjoins the evals rerun): (1) orchestrating skill - while a task is open, the controller commits only to files disjoint from the task's, records each such commit in the ledger BEFORE the next reviewer dispatch, and the dispatch names them; (2) implementer template / retrieval protocol step 3 - a second, range-wide invocation (check-commit --from $(git merge-base main HEAD) --to HEAD) whenever the diff or id list touches a commits/co-change check, mirroring CI; (3) deliverables schema - an optional rulings array pairing each in-task ruling with its home-file path so homing becomes deterministically checkable."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": null,
-      "see": [
-        "HR-103"
-      ]
-    },
-    {
-      "id": "HR-117",
+      "id": "HR-126",
       "type": "feat",
-      "title": "Deterministic CI-mirror test for the task-gates list",
+      "title": "Vacuousness check for dist-workspace.toml's [dist.github-action-commits] seed table",
       "body": [
-        "From the batch-24 branch review: a rust test parses .github/workflows/ci.yml's run lines and asserts each named check appears in houserules.task-gates-mirror-ci's own gate list, so the list can no longer silently omit a CI job. Origin: the check-commit job went unnamed and a per-commit check shipped unrun at CI's real --from."
+        "Batch 25 T4 review (reproduced by the reviewer): the seed table is a third exception-shaped list with no vacuousness check - an entry naming an action dist never emits (probe: appending 'actions/never-emitted-by-dist') passes dist-generate-check silently, and the four seeded actions' sha values are by construction of the reseed never compared against anything by that gate (a zeroed 'actions/attest' sha also exits 0). Same class HR-115's vacuous-exception-gate covers for the tree's other two exception-list shapes. Fix: assert every seed-table action appears in dist's generated release.yml (and consider the sha-column direction), in the gate or beside it."
       ],
       "milestone": null,
       "status": "open",
       "batch": null,
       "see": [
-        "HR-110"
+        "HR-115",
+        "HR-119"
       ]
     },
     {
-      "id": "HR-119",
-      "type": "chore",
-      "title": "Wire dist generate --check into a real CI gate for the create-release pairing",
-      "body": [
-        "Batch 24 T3b fix round 1 (task-3b-review.json, important issue 2): crates/houserules/tests/dist_workspace_config.rs pins dist-workspace.toml's create-release = false and release.yml's upload-not-create shape by two independent substrings, with no gate that re-derives one from the other. The file's own doc comment used to claim `dist generate --check` runs in CI and catches drift; it does not. No job in .github/workflows/ci.yml and no task in mise.toml installs or runs `dist` at all, and re-derived live: a scratch clone of the tree at batch 24 T3b fix round 1 with a one-line hand-edit appended to release.yml exits 0 from `dist generate --check` under this repository's own allow-dirty = [\"ci\"], and exits 255 with an 'out of date contents' diff only once allow-dirty is cleared to []. The comment is corrected to state this plainly; this item tracks making it a real gate instead.",
-        "Feasibility, re-derived live at the same fix round: mise's own registry carries cargo-dist (`mise registry | grep dist` -> `aqua:axodotdev/cargo-dist github:axodotdev/cargo-dist cargo:cargo-dist`); `mise install` against a one-line scratch mise.toml (`[tools]\\n\"cargo-dist\" = \"0.32.0\"`) installed a working `dist` binary via the aqua backend in one step on this Linux development environment, GitHub artifact attestation verified. Linux install is proven; macOS and Windows are not (no such host here), and ci.yml's `rust` job runs a 3-OS matrix (ubuntu/macos/windows) that would also pick up any tool this repository's global mise.toml [tools] table names -- adding cargo-dist there unscoped risks an untested install path on two OSes no existing tool in that table exercises.",
-        "Proposed fix: add cargo-dist to mise.toml's [tools], pinned to the same version as dist-workspace.toml's cargo-dist-version (security-hygiene.exact-pins), scoped to the one OS the check actually needs -- mise's own docs name an `os` tool-option for exactly this (mise.jdx.dev/configuration.html, checked 2026-09-13); verify its literal TOML syntax against current docs before use, since the fetched page named the option without a worked example. Add `dist generate --check` as a step in mise.toml's `lint` task (which runs only in ci.yml's ubuntu-only `checks` job, so the rust job's macOS/Windows legs need no new tool at all). Re-run the two exit-code probes above against the real gate (0 clean, 255 on a hand-edit) before shipping, and update dist_workspace_config.rs's doc comment once the gate is real.",
-        "Deferred out of batch 24 T3b's fix round per that review's own escape hatch (a full regen gate is shipped only when proven safe wherever it runs; otherwise the honest-comment version plus this deferral note): the CI-wide, 3-OS blast radius of a mise.toml [tools] change is not something to land untested in a fix round with no CI run available here to verify it against first."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 24,
-      "see": [
-        "HR-118"
-      ]
-    },
-    {
-      "id": "HR-120",
+      "id": "HR-127",
       "type": "feat",
-      "title": "Deterministic audit check: in-branch SHA cited from a permanent file",
+      "title": "Deterministic verify-drift warn: a changed verify-listed file flags its entry for re-read",
       "body": [
-        "From the batch-24 close branch review (knowledge-base.cite-durable-refs, two occurrences in the batch): flag any 7-40 hex string in a backlog/ or knowledge/ diff hunk that resolves to a commit not reachable from the default branch. Both violations were in-branch SHAs cited from durable files, mechanically detectable at audit time. Companion to HR-117's derive-the-enumeration class (the reviewer also proposed deriving houserules.task-gates-mirror-ci's gate list from ci.yml at audit time; HR-117 already books that class as a rust test)."
+        "Batch 25 branch review: state-only-the-source was the batch's most-violated rule (7 counts + 1 live at the review) - prose describing a mechanism goes stale when a fix round changes the mechanism. Add an audit warn row: when a range changes a file named in an entry's verify list without touching that entry's own topic file, flag the entry ('verify-drift'). Proof case: cite-durable-refs' body described the rejected --base design after 0864f1a changed durable_sha.rs, which its verify names."
       ],
       "milestone": null,
       "status": "open",
       "batch": null,
-      "see": [
-        "HR-117"
-      ]
+      "see": []
+    },
+    {
+      "id": "HR-128",
+      "type": "feat",
+      "title": "check-report-claims covers reviews; closure-word lint",
+      "body": [
+        "Batch 25 branch review, two arms. (a) Reviews quote counts and outputs like reports do (4 claims-match counts this batch, 3 critical): run check-report-claims over review deliverables and add its clean run to the task-reviewer template's closing act like the implementer template mandates. (b) Closure-word lint: a narrative field containing every/all/no remaining/zero without a named artifact or command in the same field is flagged (4 closure-claim counts this batch; HR-124 books the sweep-coverage widening separately)."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": []
+    },
+    {
+      "id": "HR-129",
+      "type": "feat",
+      "title": "Template-cluster riders from the batch-25 branch review",
+      "body": [
+        "Four defects for the next template-touching batch. (1) task-reviewer template: an issue that cites a rule flips that rule's rule_adherence row to fail in the same review - or stats additionally tallies issues[].rule and new_breakage[].rule (this batch: stats reports 13 violated ids where the 14 reviews yield 20). (2) deliverables schema (both copies, parity-pinned): an optional fix_rounds[].gates_run field so the audit can flag a fix round that never re-ran the full mirror set (3 shrunken-gate-list instances this batch). (3) the orchestrating skill's dispatch checklist: a brief that forbids tree changes names the controller as the homing path for deferrals (T1's structural rulings-to-file breach). (4) task-reviewer fix-round section: a fix round records the FULL mirror set; a shrunken tests list is an automatic re-review finding."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": []
+    },
+    {
+      "id": "HR-130",
+      "type": "feat",
+      "title": "check-knowledge lint: a rule-kind entry without a loading path",
+      "body": [
+        "Batch 25 branch review: an adopted rule landed in an area whose globs no longer covered the files it governs, caught only by judged review. Deterministic floor: flag a rule-kind entry whose standing is false and whose area globs match no tracked file class it names (exact predicate to be designed against areas.json's shape)."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": []
+    },
+    {
+      "id": "HR-131",
+      "type": "fix",
+      "title": "durable-sha's default-branch resolution vs exotic adopter defaults - owner ruling needed",
+      "body": [
+        "Batch 25 T3b/branch review: durable-sha hard-fails (named exit 2) for an adopter whose default branch is neither main nor master and who lacks an origin/HEAD symref - the designed, named behavior. Any repair (a flag, a config key) lands under houserules.1-0-surface-is-frozen after the cut, so the fix needs an owner ruling either way. OWNER RULING NEEDED before scheduling."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": []
     }
   ]
 }

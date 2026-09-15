@@ -124,6 +124,12 @@ One release runs:
    `dist-workspace.toml`'s `create-release = false` is what makes this an
    upload instead of a second creation.
 
+   The macOS x64/arm64 archives ship unsigned: `dist-workspace.toml`
+   carries no `macos-sign` configuration. README's Direct download
+   section names the adopter-facing Gatekeeper bypass; HR-121 books
+   signing and notarization, triggered by real adopter friction, not a
+   date (docs/design.md §5.79(4)).
+
    WARNING: v0.3.0's own first live cut ran before this setting existed.
    Its host job called `gh release create` against the tag
    release-please had already released, and collided ("a release with

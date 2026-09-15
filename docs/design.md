@@ -1014,3 +1014,167 @@ Each item records the ruling with its date, or stays marked open.
     release edit`, cooperating with release-please's published
     release), riding the batch-24 close branch. Source: owner,
     2026-09-13, T2.
+78. **process.gates-cover-generated-commits extended to
+    generated resources — ruled 2026-09-13.** The owner
+    extended the standing rule adopted at 5.75 the same day:
+    the pre-ship walk covers every generated RESOURCE the
+    automations write (releases, tags, PRs) with one named
+    owner per resource, not only the commit author classes.
+    Proof of the gap: the T2 create-collision (5.77) — two
+    automations both created the v0.3.0 release object — hit
+    live hours after the commit-scoped rule shipped. The entry
+    in `knowledge/process.json` carries the trimmed summary and
+    the extension bullet. Source: owner, 2026-09-13, the
+    batch-24 close report.
+79. **Batch-25 gate rulings — ruled 2026-09-14.** Four rulings
+    settle the v1-readiness spec (docs/specs/2026-09-14-batch-
+    25-v1-readiness.md): (1) the template-defaults review is an
+    interactive claude.ai artifact page that is NOT published
+    publicly — private by default on the owner's account, the
+    link never shared, the repository holding the durable
+    record of every decision; (2) riders HR-101 and HR-102 ride
+    the batch, HR-072 and HR-088 stay deferred — seventeen
+    items; (3) the 1.0.0 cut rides the batch close on a
+    Release-As footer, watched end to end; (4) macOS signing
+    stays deferred-documented (HR-121 books it on adopter
+    friction), discharging 5.37's revisit-at-1.0 obligation;
+    the documented bypass wording amended 2026-09-15 (owner
+    ruling at the batch-25 report): the current path is run
+    once and let macOS block it, then System Settings >
+    Privacy & Security > Open Anyway - Apple removed the older
+    right-click-Open in macOS Sequoia.
+    Source: owner, 2026-09-14, the batch-25 spec gate.
+80. **The template-defaults review ruled - 2026-09-14.** The
+    owner reviewed all 258 rows on the private page (150 keep,
+    86 drop, 15 change; the row-level record is
+    docs/specs/2026-09-14-batch-25-review-decisions.md, which
+    carries every cross-cutting directive verbatim). The big
+    strokes: the ask-the-user pattern becomes ask-the-
+    owner/decider across every template file; no concrete
+    houserules-repo reference may appear in any template file;
+    template wording de-Rusts (cargo examples become generic);
+    the seeded CI workflow leaves the payload - init/migrate
+    elicits the project's host and generates the gate;
+    ff-only-merges, no-coauthor, sequential-agents, and the
+    effortLevel pin leave the template's fixed rules (the
+    init/migrate flow asks each project's own discipline);
+    model-policy becomes a recommendation; standing flips for
+    contract-refresh-sweep, gate-shell-chains,
+    skills-for-procedures, and keep-knowledge-current (the last
+    standing in this repository too); Keep on a GAP row means
+    ADOPT (owner-confirmed) - eight repo rules enter the
+    template de-referenced; 46 of the 49 tag-pilot rows are dropped
+    (three keep-ticks stand, ruled at 5.81 after a controller
+    mis-aggregation recorded them as drops). The page's
+    decisions database and its rows file are purged after T2
+    consumes them (owner directive: tag-pilot sensitivity);
+    tracked files quote no tag-pilot content, not even entry
+    names. Rider (controller, 2026-09-15, under the granted
+    design latitude, accepted with the built state at 5.83):
+    the CI-workflow directive was implemented as a CONDITIONAL
+    SEED, not a payload removal - the workflow file stays in
+    template/, init seeds it only for a GitHub-hosted origin
+    and prints a skip note elsewhere, update backfills a later
+    GitHub origin, and the migrating-knowledge skill instructs
+    generating the host's own gate. Source: owner, 2026-09-14,
+    the review read-back and the three confirmation rulings.
+81. **Two T2-review reconciliations - ruled 2026-09-15.** (1) The
+    three tag-pilot rows the owner ticked Keep (tests-clean-temp-
+    dirs, pointer-sweep-unfiltered, report-evidence-verbatim) ARE
+    adopted into the template, de-referenced - the drop-all
+    statement in 5.80 and the addendum was the controller's
+    mis-aggregation of the read-back, not the owner's tick; their
+    generic content is published by this ruling, while the other
+    46 rows' identifiers stay workspace-only. (2) The seeded
+    commit-msg hook DROPS its attribution-trailer gate: the
+    template hook keeps only the Conventional-Commits checks and
+    attribution enforcement is fully project-ruled. THIS
+    repository keeps its own trailer-gating hook through the
+    overrides model (security-hygiene.no-coauthor is standing
+    here), the same pattern as its other retained rules. Rider
+    (controller, same checkpoint): .houserules.json's overrides
+    also pin 16 knowledge-entry ids - this repository keeps its
+    own referenced, batch-cited versions of the entries the
+    template de-referenced under directive 2, and the overrides
+    list is what holds them against future template updates; the
+    count is the audit's cross-check against the file. Source:
+    owner, 2026-09-15, the T2 review checkpoint.
+82. **The v1 surface freeze pinned — derived 2026-09-15.** The
+    CLI command set and both schema copies' constraint surface
+    are the 1.0 contract (spec §3, HR-113). The 20 frozen
+    `Command` variants `crates/houserules/src/main.rs`
+    defines, captured verbatim by `houserules --help`:
+    `render`: Writes every stale generated knowledge file, or
+    lists them with `--check`; `check-knowledge`: Validates
+    the knowledge base: schema, cross-entry invariants, and
+    every generated file's freshness and budget; `get`: Prints
+    one or more items by id, each resolved by its own shape: a
+    backlog item (`<idPrefix>-\d{3}`, the project's own
+    stamped prefix), an amendment or parked item (`A-\d{2}`,
+    `PP-\d+-\d{2}`, both kit-fixed regardless of idPrefix), or
+    otherwise a knowledge entry; `list`: Lists backlog items,
+    optionally filtered; `batch`: Prints one development
+    batch's summary and item rows; `set`: Applies
+    `field=value` assignments to a backlog item and rewrites
+    its file; `check-backlog`: Validates the backlog: schema,
+    cross-file invariants; `audit`: Builds the rule package
+    for a git range and runs every member's deterministic
+    check; `validate`: Validates one or more deliverable JSON
+    files against `.claude/schemas/deliverables.json`;
+    `stats`: Aggregates rule violations and unused injected
+    ids across a workspace directory's JSON deliverables;
+    `index`: Lists knowledge-entry index rows, optionally
+    filtered; `for`: Prints the rule package one or more
+    changed paths pull in: their areas' rule-shaped entries,
+    plus every entry whose `verify` names one of the paths;
+    `topics`: Lists every loaded knowledge topic's name, entry
+    count, and title; `standing`: Lists the standing rules,
+    rules before invariants; `check-commit`: Runs every
+    `commits`-type knowledge check against a not-yet-committed
+    message or a git range; `init`: Seeds the kit into a
+    target git repository from the embedded payload; `files`:
+    Prints the kit-owned and seed-once file lists the embedded
+    payload defines; `update`: Syncs an already-`init`ed
+    target's `KIT_OWNED` files from the embedded payload,
+    deletes any retired kit file still present, and reports
+    the stamped-to-running version drift;
+    `check-report-claims`: Cross-checks one deliverable
+    report's claims against the artifacts and git history it
+    cites: redirected captures, truncation markers, listed
+    commit shas, self-audit narrative, and the bounded
+    no-execution paste-run lint over every captured command
+    field; `archive`: Moves done/dropped backlog items, done
+    batch entries, and superseded/retired knowledge entries
+    into their `archive/` mirrors. The
+    `no_subcommand_carries_a_long_about_beyond_its_short_one`
+    test pins the count; a sibling test,
+    `the_1_0_cli_surface_names_exactly_these_20_subcommands`,
+    pins the names themselves (batch 25 T5 review: a renamed
+    variant keeps the count-only test green,
+    disclosed-mutation-proven by temporarily renaming
+    `Files`). Schemas: `knowledge/schema.json`,
+    `template/knowledge/schema.json`, `backlog/schema.json`,
+    `template/backlog/schema.json`,
+    `.claude/schemas/deliverables.json`, and
+    `template/.claude/schemas/deliverables.json`, pinned as of
+    this freeze (batch-25 T5) to the blob ids `git rev-parse
+    HEAD:<path>` returns: 8a9987062e5b, 2a433a5f7b29,
+    d4c195bc437c, c8dfca6cd118, d78e5a0fa50c, 0bb189143e34, in
+    that order -- content hashes, so they carry their own
+    identity with no commit sha needed. Post-1.0, a change to
+    either surface is a breaking change: an owner ruling and a
+    major-version bump, not a patch or minor release
+    (`houserules.1-0-surface-is-frozen`). Source: spec
+    docs/specs/2026-09-14-batch-25-v1-readiness.md §3,
+    approved by the owner 2026-09-14; derived from the tree at
+    T5, 2026-09-15.
+
+83. **Batch 25 accepted; the close and the 1.0.0 cut proceed -
+    ruled 2026-09-15.** The owner accepted the batch's built
+    state (all six tasks closed on batch-25) and directed the
+    full close: ticks and sweep, the empty Release-As: 1.0.0
+    footer commit riding the final branch (exactly one
+    ^Release-As: hit verified at aggregation), the fable branch
+    review, the ff-only merge, and the watched v1.0.0 cut on
+    the proven chain - the owner merges the release PR when it
+    opens. Source: owner, 2026-09-15, the batch-25 report.
