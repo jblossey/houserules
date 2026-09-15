@@ -248,15 +248,6 @@ fn exceptions() -> Vec<Exception> {
             matches: |hit, _file_text| hit.file == "README.md" && hit.text.contains("no Node"),
         },
         Exception {
-            label: "README.md: \"will not publish to npm\" ruling",
-            reason: "a negation citing a dated owner ruling (npm retires, decisions.json): \
-                stating houserules will never publish to npm is not an npm invocation.",
-            matches: |hit, _file_text| {
-                hit.file == "README.md"
-                    && hit.text.to_lowercase().contains("will not publish to npm")
-            },
-        },
-        Exception {
             label: "template/knowledge/security-hygiene.json (whole file)",
             reason: "security-hygiene.exact-pins ships generic, ecosystem-agnostic manifest \
                 globs and CLI examples (package.json alongside Cargo.toml/pyproject.toml/go.mod, \
@@ -725,23 +716,6 @@ mod tests {
             .iter()
             .any(|exception| (exception.matches)(&hit, ""));
         assert!(matched, "the \"no Node\" line must be excepted");
-    }
-
-    /// README's npm-publish ruling negation is excepted, not flagged.
-    #[test]
-    fn readme_will_not_publish_to_npm_is_excepted() {
-        let hit = Hit {
-            file: "README.md".to_string(),
-            line: 313,
-            text: "houserules will not publish to npm or any plugin marketplace".to_string(),
-        };
-        let matched = exceptions()
-            .iter()
-            .any(|exception| (exception.matches)(&hit, ""));
-        assert!(
-            matched,
-            "the \"will not publish to npm\" line must be excepted"
-        );
     }
 
     /// `template/knowledge/security-hygiene.json` and `process.json` are

@@ -1,7 +1,10 @@
 # houserules
 
 [![CI](https://github.com/jblossey/houserules/actions/workflows/ci.yml/badge.svg)](https://github.com/jblossey/houserules/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/jblossey/houserules?include_prereleases&label=release)](https://github.com/jblossey/houserules/releases)
+[![Release](https://img.shields.io/github/v/release/jblossey/houserules?label=release)](https://github.com/jblossey/houserules/releases)
+
+Knowledge base, backlog, and agent workflow for repositories built with
+AI coding agents.
 
 houserules gives a repository developed with AI coding agents a knowledge
 base, a backlog, and an agent workflow that keeps both current. Point
@@ -14,60 +17,30 @@ backlog item. Three agent templates carry the rules into every change and
 audit the result against them, so the rules stay enforced instead of
 drifting into a wiki nobody reads.
 
-houserules is set up in a way that makes your codebase incrementally
-collect the rules and knowledge agents need in order to achieve a high
-level of quality while at the same time minimizing token usage required
-in each step.
+## Table of contents
 
-The repo harness is based on the assumption that each repository has a
-distinct and finite set of inherent knowledge required to achieve zero-
-shot or close to zero-shot precision in iterations. With each targeted
-and audited rule added, work throughout your code will inferentially
-converge toward an almost optimally performing ai-native implementation
-ground.
+- [Why](#why)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Adding to an existing project](#adding-to-an-existing-project)
+- [What it installs](#what-it-installs)
+- [Ownership model](#ownership-model)
+- [The agent workflow](#the-agent-workflow)
+- [CLI reference](#cli-reference)
+- [Stability](#stability)
+- [Contributing and support](#contributing-and-support)
+- [License](#license)
 
-After a few iterations, claude will have accumulated enough rules
-to not run into the same old pitfalls over and over again which will save
-time and tokens throughout reviews and planning phases. After the
-convergence phase (or already during the convergence), you'll be able
-to add your own rules which claude will then iteratively enforce, shaping
-the codebase in the exact style which you deem perfect.
+## Why
 
-## What it installs
-
-- **A knowledge base** (`knowledge/*.json`): addressable entries (`id`,
-  `kind`, `area`, `summary`, `body`, `tags`, `source`, `see`, `verify`,
-  optional deterministic `check`), one JSON file per topic, validated by a
-  schema your project owns.
-- **A backlog** (`backlog/`): typed work items, one JSON file per section,
-  driving every change.
-- **One dependency-free `houserules` binary**: read commands print JSON;
-  `check-knowledge`/`check-backlog` gate lint; `render` generates the
-  markdown the harness loads; `audit` checks a git range against its rule
-  package; `validate` checks agent deliverables; `stats` aggregates a
-  batch's audits.
-- **Generated harness files** (`houserules render`): standing rules
-  (`.claude/rules/standing-rules.md`), path-scoped area rules
-  (`.claude/rules/<area>.md`), and a preloaded `project-knowledge` skill.
-- **An agent layer**: three agent templates (`implementer`, `task-reviewer`,
-  `branch-reviewer`) with rule-adherence audits and a JSON deliverables
-  contract (`.claude/schemas/deliverables.json`), an `orchestrating` skill,
-  a `finishing-a-feature` skill, a `migrating-knowledge` skill, a
-  SessionStart hook, a commit-msg hook that gates Conventional Commits, and
-  eval scenarios.
-- **Seed rules**: a generic standing-rule set (TDD, conventional commits,
-  no tech debt, dependency vetting, exact pins, doc comments, ASD-STE100
-  writing style, and more). Merge discipline, commit attribution, and agent
-  parallelism are left to your own project's ruling instead of shipped
-  fixed — the `migrating-knowledge` skill's "Elicit your own operating
-  discipline" step elicits and records them. Your project adds its own
-  topics, areas, and rules on top.
-- **A CI gate** (`.github/workflows/knowledge.yml`), for a GitHub-hosted
-  project: `check-knowledge`, `check-backlog`, and a PR audit, through the
-  `houserules` binary alone. `init` detects your origin remote and seeds
-  this only when it resolves to GitHub; elsewhere it prints a skip note and
-  the `migrating-knowledge` skill's own instruction covers generating the
-  equivalent gate for your host.
+Agent sessions forget; repositories don't. houserules turns what agents
+learn in your codebase — the pitfalls, conventions, and decisions — into
+addressable rules that load into every future session. Each rule is
+targeted and audited, so the set stays small and cheap in tokens: agents
+stop repeating known mistakes without re-reading history, and review
+rounds shrink. Once the recurring pitfalls are captured, you add your own
+rules and the same machinery enforces them — the codebase converges on
+the style you rule, not the style that happens.
 
 ## Install
 
@@ -81,20 +54,10 @@ toolchain, no Node. Install it through any of these channels, then run
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jblossey/houserules/releases/latest/download/houserules-installer.sh | sh
 ```
 
-cargo-dist's own installer (the same [release pipeline](docs/runbook.md#cutting-a-release)
-publishes it): it picks your platform's archive, checks its sha256, and
+The installer picks your platform's archive, verifies its sha256, and
 installs to `$CARGO_HOME/bin` (falling back to `~/.cargo/bin`), adding
-that directory to `PATH` itself (`.profile`, `.zshrc`/`.zshenv`, fish's
-`conf.d`, or `$GITHUB_PATH` under CI — no shell restart needed there).
-`releases/latest/download/<asset>` is GitHub's own alias for "the newest
-non-prerelease release's asset", so this URL never needs a version edit
-(HR-049; docs/specs/2026-09-12-batch-24-repo-and-setup.md §2a).
-
-Live-verified (HR-048, HR-063): `v0.3.0` is the alias's target now (16
-assets, not a prerelease). A scrubbed-environment run of the exact
-command above — a fresh `$HOME`, no dev `PATH` — downloaded, verified,
-and installed the binary for real. The installed binary printed
-`houserules 0.3.0`.
+that directory to `PATH` itself. The URL always resolves to the newest
+release — it never needs a version edit.
 
 ### mise
 
@@ -102,42 +65,9 @@ and installed the binary for real. The installed binary printed
 mise use github:jblossey/houserules
 ```
 
-Resolves the newest non-prerelease GitHub release's archive for your
-platform through mise's `github` backend, autodetecting OS,
-architecture, and libc from the asset name; `mise use` with no
-`@version` defaults to `@latest` and records that spec in `mise.toml`.
-houserules tags plain `v<version>` releases (docs/design.md §5.20,
-reaffirmed §5.72), matching this backend's own default `version_prefix`
-(mise's current docs, checked 2026-09-13:
-https://mise.jdx.dev/dev-tools/backends/github.html — "By default, mise
-handles the common `v` prefix"), so no override is needed. mise's
-current docs mark the `ubi` backend this replaces deprecated in this
-backend's favor (checked 2026-09-13,
-https://mise.jdx.dev/dev-tools/backends/ubi.html: "The ubi backend is
-deprecated. Use the GitHub backend instead."); the `matching`/
-`matching_regex` options carry over (HR-070) — houserules's own
-documented command above uses neither.
-
-Live-verified (HR-070): the `github` backend resolves `v0.3.0` and
-installs it correctly, with GitHub artifact attestation verified. The
-installed binary printed `houserules 0.3.0`.
-
-The live run also hit a one-time gap that needs no change to the
-command above. mise's own `minimum_release_age` setting (default `24h`,
-a supply-chain safety cutoff — mise's current docs, checked 2026-09-13,
-https://mise.jdx.dev/configuration/settings.html) rejects a candidate
-release younger than that, falling back to an older release when one
-exists. `v0.3.0` is `jblossey/houserules`'s first non-prerelease
-release, so on the day it ships there is no older release to fall back
-to. The plain command above fails with "no versions found ... matching
-date filter" until the release turns 24 hours old (published
-2026-09-13T09:53:27Z) — captured live, a scrubbed-environment run.
-
-`filter_by_date` (mise's own `src/toolset/tool_version.rs`, read live)
-filters the release list; `@latest` resolution then takes the newest
-release that survives the filter. A release with an older,
-already-aged release behind it falls back to that one instead of
-failing — only the very first release has none.
+Resolves the newest release's archive for your platform through
+[mise](https://mise.jdx.dev)'s `github` backend and records the tool in
+your `mise.toml`.
 
 ### Direct download
 
@@ -149,47 +79,52 @@ failing — only the very first release has none.
 | ARM64 Linux (musl) | [houserules-aarch64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/latest/download/houserules-aarch64-unknown-linux-musl.tar.xz) |
 | x64 Linux (musl) | [houserules-x86_64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/latest/download/houserules-x86_64-unknown-linux-musl.tar.xz) |
 
-Each archive carries a `.sha256` checksum beside it (append `.sha256` to
-the archive's own URL, through the same `releases/latest/download`
-alias); extract the archive and put the `houserules` binary on `PATH`
-yourself. The documented channels all pin to the alias; an exact older
-version stays downloadable from its own release page instead.
+Each archive has a `.sha256` checksum beside it (append `.sha256` to the
+archive URL). Extract the archive and put the `houserules` binary on
+`PATH`. An exact older version stays downloadable from its own release
+page.
 
-macOS ships unsigned (docs/specs/2026-09-06-batch-19-phase4.md §3's
-ruling: zero cost, revisit at 1.0). A browser download sets the
-quarantine flag, and Gatekeeper then refuses to run an unsigned binary;
-clear it once:
+macOS binaries are unsigned. Clear the quarantine flag once:
 
 ```sh
 xattr -d com.apple.quarantine /path/to/houserules
 ```
 
-Verified against the documented `xattr -d <attribute> <file>` form
-(ss64.com/mac/xattr.html, checked 2026-09-07); this block cannot run
-live in this Linux development environment — no macOS host is available
-here, a permanent constraint, not a pending-release one.
+Or use the GUI path: run the binary once and let macOS block it, then
+open System Settings, click Privacy & Security, scroll to the
+blocked-software notice, and click Open Anyway.
 
-A GUI alternative to `xattr`: run the binary once and let macOS block
-it, then open System Settings, click Privacy & Security, scroll to the
-blocked-software notice, and click Open Anyway; click Open again to
-confirm. Apple's own article introduces these steps with "After you've
-tried to open the app" (support.apple.com/en-us/102445, checked
-2026-09-15) — the Open Anyway button appears only after that blocked
-launch. Apple removed the older Control-click/right-click bypass
-starting macOS Sequoia, so it is not documented here.
+### Updating
 
-The 1.0 revisit (docs/design.md §5.79(4)) keeps the binary unsigned:
-HR-121 books signing and notarization, triggered by real adopter
-friction with Gatekeeper, not a date.
+```sh
+houserules update
+```
 
-Live-verified (HR-049, HR-064): all five archive links resolve; each
-returned HTTP 200 through the alias, a scrubbed-environment capture.
-The x64 Linux (musl) row — this development environment's own
-platform — ran end to end: fetched the archive and its `.sha256`
-through the alias, `sha256sum -c` passed, and the extracted binary
-printed `houserules 0.3.0`. No macOS or Windows host is available here
-to run the other four archives, the same permanent constraint the
-quarantine block above already names.
+`update` overwrites only kit-owned machinery and re-renders; it never
+touches project data. It also prints the version drift it just synced,
+`kit <old> -> <new>`. When a new houserules release ships:
+
+1. Install the new release through whichever channel you used originally.
+2. Run `houserules update --dir .`.
+3. Review the diff (`git diff`). The drift line confirms the version you
+   moved from and the version you landed on.
+
+### Uninstalling
+
+Remove the binary through the channel you installed with:
+
+- **Shell installer or direct download**: delete the `houserules` binary
+  from where it was installed — `$CARGO_HOME/bin` (default
+  `~/.cargo/bin`) for the shell installer, wherever you placed it for a
+  direct download.
+- **mise**: run `mise uninstall houserules` and remove the tool's entry
+  from your `mise.toml`.
+
+Everything houserules put into a project is plain files tracked by your
+repository — there is no hidden state. To remove the kit from a project,
+delete the files it manages (`houserules files` lists them) plus the
+seeded `knowledge/` and `backlog/` data, or keep the knowledge files:
+they are readable JSON and useful without the binary.
 
 ## Quick start
 
@@ -201,23 +136,32 @@ git add -A && git commit -m 'chore: install houserules knowledge setup'
 ```
 
 `init` writes the kit-owned machinery, seeds your starting knowledge
-topics, backlog, and schemas (plus the CI workflow, on a GitHub-hosted
-origin), then runs `render` and stamps
-`.houserules.json` with the binary's own version — no drift to correct
-right after. `houserules update --dir .` stays safe and idempotent to
-run any time later; it brings the generated files to whatever binary you
-currently have on `PATH` and drops any kit file that binary has since
-retired. Look at what you got:
+topics, backlog, and schemas (plus a CI workflow, on a GitHub-hosted
+origin), then renders the harness files and stamps `.houserules.json`
+with the binary's version. Look at what you got:
 
 ```sh
-houserules topics            # the seeded topics: process, quality, ...
+houserules topics
+```
+
+```json
+[
+  { "topic": "knowledge-base",   "entries": 4,  "title": "Authoring knowledge entries" },
+  { "topic": "process",          "entries": 33, "title": "How work runs: batches, dispatch, reviews, rulings" },
+  { "topic": "quality",          "entries": 6,  "title": "Quality principles" },
+  { "topic": "security-hygiene", "entries": 4,  "title": "Dependency, commit, and test hygiene" },
+  { "topic": "writing-style",    "entries": 5,  "title": "Writing style for docs, comments, commits, reports" }
+]
+```
+
+```sh
 houserules get process.tdd   # one entry, in full
 ```
 
 Restart Claude Code once after the first install (the first
-`.claude/agents/` file and the new hook need a fresh session). Set `git
-config core.hooksPath .githooks` to activate the commit-msg Conventional
-Commits gate.
+`.claude/agents/` file and the new hook need a fresh session). Set
+`git config core.hooksPath .githooks` to activate the commit-msg
+Conventional Commits gate.
 
 ## Adding to an existing project
 
@@ -227,43 +171,74 @@ houserules init --id-prefix ABC
 ```
 
 - `--id-prefix ABC` sets your backlog id prefix (`ABC-001`); default `WI`.
-- An existing `CLAUDE.md` is never touched: `init` reports `kept CLAUDE.md`.
-  Copy the `## Knowledge base` and `## Workflow` sections from
-  `template/CLAUDE.md` into yours by hand.
-- An existing `.claude/settings.json` is merged: the two SessionStart hook
-  entries (`startup|resume|clear|fork` for the session ritual, `compact` for
-  the standing rules) are appended only if their matchers are absent.
-  Nothing else in your settings is touched.
-- `.githooks/commit-msg` is kit-owned: `init` replaces any hook of that name
-  your project already has. Set `git config core.hooksPath .githooks` to
-  activate its commit-msg Conventional Commits gate.
-- Existing files under `knowledge/`, `backlog/`, evals, or the workflow are
-  kept as they are.
+- An existing `CLAUDE.md` is never touched: `init` reports `kept
+  CLAUDE.md`. Copy the `## Knowledge base` and `## Workflow` sections
+  from the seeded template into yours by hand.
+- An existing `.claude/settings.json` is merged: the two SessionStart
+  hook entries are appended only if their matchers are absent. Nothing
+  else in your settings is touched.
+- `.githooks/commit-msg` is kit-owned: `init` replaces any hook of that
+  name your project already has.
+- Existing files under `knowledge/`, `backlog/`, evals, or the workflow
+  are kept as they are.
 
-Then move your real rules in: add topics as `knowledge/<topic>.json`, extend
-the `area` enum in `knowledge/schema.json` together with the globs in
-`knowledge/areas.json`, replace the example backlog item, and run
-`houserules render`. The `migrating-knowledge` skill walks that move step
-by step, from inventory to entries to gates.
+Then move your real rules in: add topics as `knowledge/<topic>.json`,
+extend the `area` enum in `knowledge/schema.json` together with the
+globs in `knowledge/areas.json`, replace the example backlog item, and
+run `houserules render`. The `migrating-knowledge` skill walks that move
+step by step, from inventory to entries to gates — including eliciting
+your project's own merge, attribution, and parallelism discipline, which
+houserules leaves to your ruling instead of shipping fixed.
+
+## What it installs
+
+- **A knowledge base** (`knowledge/*.json`): addressable entries (`id`,
+  `kind`, `area`, `summary`, `body`, `tags`, `source`, `see`, `verify`,
+  optional deterministic `check`), one JSON file per topic, validated by
+  a schema your project owns.
+- **A backlog** (`backlog/`): typed work items, one JSON file per
+  section, driving every change.
+- **The `houserules` binary**: read commands print JSON;
+  `check-knowledge`/`check-backlog` gate lint; `render` generates the
+  markdown the harness loads; `audit` checks a git range against its
+  rule package; `validate` checks agent deliverables.
+- **Generated harness files** (`houserules render`): standing rules
+  (`.claude/rules/standing-rules.md`), path-scoped area rules
+  (`.claude/rules/<area>.md`), and a preloaded `project-knowledge`
+  skill.
+- **An agent layer**: three agent templates (`implementer`,
+  `task-reviewer`, `branch-reviewer`) with rule-adherence audits and a
+  JSON deliverables contract, an `orchestrating` skill, a
+  `finishing-a-feature` skill, a `migrating-knowledge` skill, a
+  SessionStart hook, a commit-msg hook that gates Conventional Commits,
+  and eval scenarios.
+- **Seed rules**: a generic standing-rule set (TDD, conventional
+  commits, no tech debt, dependency vetting, exact pins, doc comments,
+  ASD-STE100 writing style, and more). Your project adds its own topics,
+  areas, and rules on top.
+- **A CI gate** (`.github/workflows/knowledge.yml`), on a GitHub-hosted
+  origin: `check-knowledge`, `check-backlog`, and a PR audit, through
+  the `houserules` binary alone. On other hosts `init` prints a skip
+  note and the `migrating-knowledge` skill covers generating the
+  equivalent gate.
 
 ## Ownership model
 
 Every path houserules writes falls into one of three buckets:
 
-- **Kit-owned** — `update` overwrites it on every run. Never hand-edit it;
-  edits are lost on the next `update` or `render`. `.claude/rules/*.md` and
-  `.claude/skills/project-knowledge/SKILL.md` are generated by `houserules
-  render` from `knowledge/`, so they behave the same way.
+- **Kit-owned** — `update` overwrites it on every run. Never hand-edit
+  it. `.claude/rules/*.md` and
+  `.claude/skills/project-knowledge/SKILL.md` are generated by
+  `houserules render` from `knowledge/`, so they behave the same way.
 - **Seed-once** — `init` writes it only if it is absent, then leaves it
-  alone. It is yours from the first write on. `.claude/settings.json` is
-  the one exception: `init` merges its two SessionStart hook entries into
-  an existing file instead of skipping it; `update` never touches the
-  file either way. `.github/workflows/knowledge.yml` is seed-once with one
-  extra gate: written only when your `origin` remote resolves to
-  GitHub, skipped with a printed note otherwise; `update` backfills it
-  later if your origin becomes GitHub-hosted after the fact.
-- **Yours** — everything else: your knowledge entries, your backlog items,
-  your project code. houserules never touches it.
+  alone. It is yours from the first write on. `.claude/settings.json`
+  is the one exception: `init` merges its two SessionStart hook entries
+  into an existing file instead of skipping it. The CI workflow is
+  seed-once with one extra gate: written only when your `origin`
+  resolves to GitHub; `update` backfills it if your origin becomes
+  GitHub-hosted later.
+- **Yours** — everything else: your knowledge entries, your backlog
+  items, your project code. houserules never touches it.
 
 `houserules files` prints the exact manifest:
 
@@ -274,16 +249,13 @@ Every path houserules writes falls into one of three buckets:
 | `.claude/skills/orchestrating`, `finishing-a-feature`, `migrating-knowledge` | `.claude/schemas/deliverables.json`, evals |
 | `.githooks/commit-msg` | `CLAUDE.md`, settings |
 
-`.github/workflows/knowledge.yml` seeds separately, only for a
-GitHub-hosted `origin` (above).
-
 ## The agent workflow
 
 Three agent templates, each on a different model tier, carry the rules
 into every change:
 
-- **implementer** (the cheapest model that fits the task): implements one
-  task from a brief, test-driven, and writes a JSON report.
+- **implementer** (the cheapest model that fits the task): implements
+  one task from a brief, test-driven, and writes a JSON report.
 - **task-reviewer** (a stronger model than the implementer it reviews):
   reviews one task's diff for spec compliance, code quality, and rule
   adherence.
@@ -291,80 +263,88 @@ into every change:
   before merge and proposes knowledge-base improvements drawn from the
   batch's reviews.
 
-An `orchestrating` skill drives the batch lifecycle — brainstorm or spec,
-a decision gate from the project's owner or decider, plan, dispatch, live
-run, finish, rollout; a `finishing-a-feature` skill handles the merge
-(ff-only from the CLI by default, or the project's own ruled discipline);
-a `migrating-knowledge` skill moves an existing project's rules into the
-kit.
+An `orchestrating` skill drives the batch lifecycle — brainstorm or
+spec, a decision gate from the project's owner or decider, plan,
+dispatch, live run, finish, rollout. Every dispatched agent runs
+`houserules audit` against its own diff and records the result in its
+JSON report, so rule adherence is checked, not just asserted.
 
-`houserules audit --base <ref>` checks a change against the rule package
-its files touch. Every dispatched agent runs it against its own diff and
-records the result in its JSON report
-(`.claude/schemas/deliverables.json`), so rule adherence is checked, not
-just asserted.
+## CLI reference
 
-## Updating an installation
+Working with knowledge:
+
+| Command | What it does |
+|---|---|
+| `topics` | Lists every knowledge topic with its entry count and title |
+| `index` | Lists knowledge-entry index rows, optionally filtered |
+| `get <id>` | Prints items by id: a backlog item, amendment, parked item, or knowledge entry |
+| `for <path>` | Prints the rule package a set of changed paths pulls in |
+| `standing` | Lists the standing rules |
+| `render` | Rewrites stale generated harness files (`--check` lists them instead) |
+
+Working with the backlog:
+
+| Command | What it does |
+|---|---|
+| `list` | Lists backlog items, optionally filtered |
+| `batch <n>` | Prints one development batch's summary and item rows |
+| `set <id> k=v` | Applies field assignments to a backlog item |
+| `archive` | Sweeps done/dropped items, batches, and retired entries into `archive/` mirrors |
+
+Gates:
+
+| Command | What it does |
+|---|---|
+| `check-knowledge` | Validates the knowledge base and generated-file freshness |
+| `check-backlog` | Validates the backlog |
+| `check-commit` | Runs commit-message checks against a message file or git range |
+| `audit` | Builds a git range's rule package and runs every deterministic check |
+| `validate` | Validates deliverable JSON files against the schema |
+| `check-report-claims` | Cross-checks a report's claims against the artifacts it cites |
+| `stats` | Aggregates rule violations across a workspace's deliverables |
+
+Installing:
+
+| Command | What it does |
+|---|---|
+| `init` | Seeds the kit into a git repository from the embedded payload |
+| `update` | Syncs kit-owned files, removes retired ones, reports version drift |
+| `files` | Prints the kit-owned and seed-once manifests |
+
+Run any command with `--help` for its flags.
+
+## Stability
+
+houserules is at 1.0. The CLI surface (the twenty subcommands above and
+their flags) and the schema constraint surface are frozen: a change to
+either is a breaking change and ships only with a major version bump.
+Within a major version, `update` never rewrites your project's own data
+files. The full contract lives in [docs/design.md](docs/design.md).
+
+## Contributing and support
+
+Questions and bug reports go to
+[GitHub issues](https://github.com/jblossey/houserules/issues). Pull
+requests are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) covers the
+development workflow, the batch process, and the gates a change must
+pass.
+
+This repository runs its own kit (id prefix `HR`): `template/` is the
+source of everything the binary installs, and the root `.claude/`,
+`tools/`, and `.githooks/` are the installed copy. Edit `template/`,
+then run `houserules update --dir .`; tests pin the copies to their
+sources.
 
 ```sh
-houserules update
-```
-
-`update` overwrites only kit-owned machinery and re-renders; it never
-touches project data.
-
-Do not hand-edit kit-owned files or the generated `.claude/rules/*.md` and
-`.claude/skills/project-knowledge/SKILL.md` — edits are lost on the next
-`update` or `render`.
-
-`update` also reports version drift: it prints one line naming the version
-your stamp had and the version the run just synced to, `kit <old> -> <new>`
-(an unchanged version prints the same shape with both sides equal). A stamp
-from before the version field prints `kit none -> <new>`. When houserules
-ships a new release, adopt it this way:
-
-1. Install the new release through whichever [Install](#install) channel
-   you used originally (the shell installer, `mise`, or a fresh direct
-   download over the old binary).
-2. Run `houserules update --dir .`.
-3. Review the diff (`git diff`). The drift line is your check: it confirms
-   the version you moved from and the version you landed on.
-
-## Daily commands
-
-```sh
-houserules topics | index --topic process | get <id> | for <path> | standing
-houserules render | check-knowledge | audit --base origin/main | validate <report.json>
-houserules list --open | get WI-001 | batch 1 | set WI-001 status=done batch=1 | check-backlog
-```
-
-## Development (this repository)
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor workflow.
-
-```sh
-mise run setup    # activates the commit-msg hook (trailer gate + check-commit)
-mise run lint     # shellcheck, cargo deny, a cross-target compile check,
-                  # check-knowledge, check-backlog, render --check, the
-                  # residue/vacuous-exception/payload-stamp gates, and
-                  # dist generate --check
+mise run setup    # hooks + the binary on PATH
+mise run lint     # the full lint chain
 cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 ```
 
-Package operations go through cargo only (`cargo add <crate>@=<version>`);
-tool versions are pinned in `mise.toml`. This repository runs its own kit (id
-prefix `HR`): `template/` is the source, the root `tools/`, `.claude/agents/`,
-and `.claude/skills/` are the installed copy. Edit `template/`, then run
-`houserules update --dir .` (`mise run houserules -- update --dir .`);
-`crates/houserules/tests/dogfood.rs` pins the copies to their sources.
-`knowledge/` and `backlog/` at the root are this repository's own rules
-and work items.
-
 ## License
 
-MIT — see [LICENSE](LICENSE). The files that `init` and `update` write into
-your project are yours under the same terms; the kit-owned scripts carry an
-SPDX header, so vendored copies keep the notice. Distribution is
-binary-only (GitHub Releases, mise via the `github:` backend, a
-curl-to-sh installer); houserules will not publish to npm or any plugin
-marketplace (ruled 2026-09-04, docs/design.md §5.22).
+MIT — see [LICENSE](LICENSE). The files that `init` and `update` write
+into your project are yours under the same terms; the kit-owned scripts
+carry an SPDX header, so vendored copies keep the notice. Distribution
+is binary-only: GitHub Releases, mise's `github:` backend, and the shell
+installer.
