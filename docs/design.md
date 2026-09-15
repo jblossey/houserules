@@ -1178,3 +1178,17 @@ Each item records the ruling with its date, or stays marked open.
     review, the ff-only merge, and the watched v1.0.0 cut on
     the proven chain - the owner merges the release PR when it
     opens. Source: owner, 2026-09-15, the batch-25 report.
+84. **Batch 26 (the README rework) runs owner-mode - ruled
+    2026-09-15.** For this batch only, the owner suspended the
+    spec gate and the subagent pipeline: the controller
+    researches README practice, derives the ideal structure
+    before consulting the current file, presents the comparison,
+    triages the changes with the owner, and performs the rework
+    itself. Triage rulings: strip all maintainer-evidence
+    narration from README (provenance lives in specs and
+    knowledge); the convergence thesis becomes a short
+    plain-claims Why section; add a ToC, a CLI reference table
+    of the 20 frozen subcommands, a Stability section stating
+    the 5.82 contract, and a Contributing & support section;
+    the Updating section folds under Install. Source: owner,
+    2026-09-15, the README triage.
