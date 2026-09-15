@@ -25,18 +25,6 @@
         "state": "planned",
         "text": "Done 2026-09-07: phase 4 wired whole under the two-step reality (spec section 7) - the cargo-dist pipeline pinned with the tag both matching and resolving, the crate version converged and lockstepped, every consumer flipped to the real channels with dated PENDING control runs, the pins wired via release-please, the seeded install step fallible, the release runbook with the owner-attended checklist. ALL FOUR ITEMS STAY OPEN by design: HR-049/063/064/070 close at the first release with assets (runbook step 6), behind HR-068 (the owner token decision) and HR-069 (the pr-run-mode revert). Step one proven; step two owner-attended."
       }
-    },
-    {
-      "number": 26,
-      "items": [
-        "HR-132"
-      ],
-      "summary": "The README rework, owner-directed: research-derived ideal structure, ideal-vs-current comparison triaged with the owner, then the complete rework - adopter-first, evidence narration stripped, ToC + CLI reference + stability contract + contributing/support added.",
-      "kickoff": "the owner's direction of 2026-09-15 (design.md 5.84; no spec by owner ruling)",
-      "status": {
-        "state": "in-progress",
-        "text": "Owner-mode batch (5.84): no spec, no subagents; research done, triage ruled, rework in flight."
-      }
     }
   ]
 }

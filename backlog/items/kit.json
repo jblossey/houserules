@@ -275,19 +275,6 @@
       "see": []
     },
     {
-      "id": "HR-132",
-      "type": "chore",
-      "title": "README rework: research-derived structure, adopter-first, evidence narration stripped",
-      "body": [
-        "Owner direction (2026-09-15): research what a good open-source README is, derive the ideal structure for this repo before consulting the current file, compare, then rework completely. Owner-triaged rulings: strip ALL maintainer-evidence narration (Live-verified blocks, HR-refs, design.md cites, checked-dates, the moot mise minimum_release_age forensic - provenance stays in specs/knowledge); the convergence thesis becomes a short plain-claims Why section; ADD a ToC, a CLI reference table (the 20 frozen subcommands, replacing the misleading pipe-notation Daily commands block), a Stability/1.0-contract section, and a Contributing & support section; Updating folds under Install. Process deviation ruled for this batch only: no spec, no implementer/reviewer - the controller researches, presents, triages with the owner, and does the rework itself (design.md 5.84).",
-        "Scope addition (owner, 2026-09-15): the README also states how houserules can be uninstalled, as convenience information for users."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 26,
-      "see": []
-    },
-    {
       "id": "HR-133",
       "type": "feat",
       "title": "houserules update self-updates the installed binary",

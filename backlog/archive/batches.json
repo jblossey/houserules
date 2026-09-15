@@ -378,6 +378,18 @@
         "state": "done",
         "text": "Done 2026-09-15: the v1-readiness batch - the owner's 258-row template-defaults review applied end to end (6 cross-cutting directives, 86 drops, 15 changes, 11 adoptions incl. the three 5.81-reconciled tag-pilot keeps; the review artifact purged per the owner's sensitivity directive); the deterministic v1 gate family live on its own corpus (report-claims citation/count/sweep checks, HR-109 keyword rejection, vacuous-exception, CI-mirror, durable-sha, dist-generate-check); adopter fixes (idPrefix, restamp no-op, --help); the 1.0 surface frozen at 5.82 (20 names test-pinned, schema blobs content-hashed); evals 14/14 at the shipping templates. Accepted 2026-09-15 (5.83); the 1.0.0 cut rides the close. HR-081 and HR-098 stay open on post-merge observation gates; HR-121 open unscheduled; HR-127..131 filed from the retrospective."
       }
+    },
+    {
+      "number": 26,
+      "items": [
+        "HR-132"
+      ],
+      "summary": "The README rework, owner-directed: research-derived ideal structure, ideal-vs-current comparison triaged with the owner, then the complete rework - adopter-first, evidence narration stripped, ToC + CLI reference + stability contract + contributing/support added.",
+      "kickoff": "the owner's direction of 2026-09-15 (design.md 5.84; no spec by owner ruling)",
+      "status": {
+        "state": "done",
+        "text": "Done 2026-09-15: the README reworked to the research-derived funnel per the 5.84 triage (evidence narration stripped, Why/ToC/CLI-reference/Stability/Contributing/Uninstalling added), the readme-is-an-adopter-funnel rule seeded in the template, HR-133..135 booked from the owner mid-batch directions (5.85)."
+      }
     }
   ]
 }
