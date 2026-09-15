@@ -55,9 +55,9 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jblossey/houserules/rel
 ```
 
 The installer picks your platform's archive, verifies its sha256, and
-installs to `$CARGO_HOME/bin` (falling back to `~/.cargo/bin`), adding
-that directory to `PATH` itself. The URL always resolves to the newest
-release — it never needs a version edit.
+installs to `~/.local/bin`, adding that directory to `PATH` itself. The
+URL always resolves to the newest release — it never needs a version
+edit.
 
 ### mise
 
@@ -100,23 +100,42 @@ blocked-software notice, and click Open Anyway.
 houserules update
 ```
 
-`update` overwrites only kit-owned machinery and re-renders; it never
-touches project data. It also prints the version drift it just synced,
-`kit <old> -> <new>`. When a new houserules release ships:
+Installed through the shell installer and run from where it installed,
+`update` checks GitHub for a newer release, replaces the binary itself,
+and re-runs before touching your repository — nothing else to install
+by hand. Run from anywhere else — mise, a direct download, or a
+shell-installer copy invoked from a different location — it prints one
+line naming what to do instead, and updates your repository on the
+binary you already have.
 
-1. Install the new release through whichever channel you used originally.
-2. Run `houserules update --dir .`.
-3. Review the diff (`git diff`). The drift line confirms the version you
-   moved from and the version you landed on.
+Either way, the repository sync overwrites only kit-owned machinery and
+re-renders — never project data — and prints the version drift it just
+synced, `kit <old> -> <new>`. It also backfills any seed-once file a
+later kit release adds that your install never received: an install
+seeded before this release gets a fresh `AGENTS.md` this way (`wrote
+AGENTS.md`) — generic, and yours to fill in with the rules your own
+`CLAUDE.md` already carries; the `migrating-knowledge` skill walks that
+merge. Review the diff (`git diff`) afterward; the drift line confirms
+the version you moved from and the version you landed on. Whenever the
+binary check completes, it also warns if another `houserules` sits
+elsewhere on your `PATH` — not the copy it just checked, updated or not.
+
+Set `HOUSERULES_SKIP_SELF_UPDATE` (to any value) to update only the
+repository and skip the binary check for one run; `update` skips it
+automatically in CI.
+
+On an interactive terminal, every other command also checks, at most
+once a day, whether a newer release exists, and names it in one line.
+Set `CI` or `HOUSERULES_NO_UPDATE_CHECK` (to any value) to turn that off.
 
 ### Uninstalling
 
 Remove the binary through the channel you installed with:
 
 - **Shell installer or direct download**: delete the `houserules` binary
-  from where it was installed — `$CARGO_HOME/bin` (default
-  `~/.cargo/bin`) for the shell installer, wherever you placed it for a
-  direct download.
+  from where it was installed — `~/.local/bin` for the shell installer,
+  wherever you placed it for a direct download. An older shell-installer
+  install sits in `~/.cargo/bin`.
 - **mise**: run `mise uninstall houserules` and remove the tool's entry
   from your `mise.toml`.
 
@@ -171,9 +190,12 @@ houserules init --id-prefix ABC
 ```
 
 - `--id-prefix ABC` sets your backlog id prefix (`ABC-001`); default `WI`.
-- An existing `CLAUDE.md` is never touched: `init` reports `kept
-  CLAUDE.md`. Copy the `## Knowledge base` and `## Workflow` sections
-  from the seeded template into yours by hand.
+- An existing `AGENTS.md` is never touched: `init` reports `kept
+  AGENTS.md`. Copy the `## Knowledge base` and `## Workflow` sections
+  from the seeded template into yours by hand; the `migrating-knowledge`
+  skill walks the merge. An existing `CLAUDE.md` is kept the same way —
+  point it at your `AGENTS.md` with a single `@AGENTS.md` line if you use
+  Claude Code.
 - An existing `.claude/settings.json` is merged: the two SessionStart
   hook entries are appended only if their matchers are absent. Nothing
   else in your settings is touched.
@@ -198,6 +220,9 @@ houserules leaves to your ruling instead of shipping fixed.
   a schema your project owns.
 - **A backlog** (`backlog/`): typed work items, one JSON file per
   section, driving every change.
+- **Project instructions** (`AGENTS.md`): the cross-harness instruction
+  file every agent reads, plus a one-line `CLAUDE.md` (`@AGENTS.md`) that
+  bridges Claude Code to the same text.
 - **The `houserules` binary**: read commands print JSON;
   `check-knowledge`/`check-backlog` gate lint; `render` generates the
   markdown the harness loads; `audit` checks a git range against its
@@ -247,7 +272,7 @@ Every path houserules writes falls into one of three buckets:
 | `tools/claude-session-start.sh` | `knowledge/` schema, areas, topics |
 | `.claude/agents/*.md` | `backlog/` schema and data |
 | `.claude/skills/orchestrating`, `finishing-a-feature`, `migrating-knowledge` | `.claude/schemas/deliverables.json`, evals |
-| `.githooks/commit-msg` | `CLAUDE.md`, settings |
+| `.githooks/commit-msg` | `AGENTS.md`, `CLAUDE.md` pointer, settings |
 
 ## The agent workflow
 

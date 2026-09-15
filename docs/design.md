@@ -79,9 +79,9 @@ The two strongest reasons:
 2. **The manifest split solves update-vs-ownership.** Kit-owned files
    (`tools/`, agent templates, orchestrating/finishing skills, hook) stay
    upgradable byte-for-byte; seed-once files (schemas, topics, backlog,
-   evals, CI workflow, CLAUDE.md, settings) belong to the project from the
-   first write. `houserules files` prints the split; `.houserules.json` records
-   the installed version.
+   evals, CI workflow, AGENTS.md, CLAUDE.md, settings) belong to the project
+   from the first write. `houserules files` prints the split; `.houserules.json`
+   records the installed version.
 
 Harness portability comes free: the payload is plain JSON, markdown, and
 POSIX shell; the `houserules` binary reads and writes it (amended at
@@ -211,9 +211,11 @@ Each item records the ruling with its date, or stays marked open.
    houserules improvement tag-pilot lacks. The tag-pilot-only scenario
    rust-test-near-coverage stays unported by design.
 5. **Dogfooding — ruled 2026-08-31: yes, full.** After the rename, this
-   repository installs its own kit: `init --dir . --id-prefix HR`, then a
-   repository-specific `CLAUDE.md`, areas (`template`, `cli`, `tests`,
-   `docs`), topics, and a backlog that holds the open work items. The CLIs
+   repository installs its own kit: `init --dir . --id-prefix HR`, then
+   a repository-specific `AGENTS.md` (with `CLAUDE.md` as its one-line
+   `@AGENTS.md` Claude Code pointer, batch 27 T4, HR-136), areas
+   (`template`, `cli`, `tests`, `docs`), topics, and a backlog that
+   holds the open work items. The CLIs
    resolve their data from the git root of the cwd, so the root
    `knowledge/` and `backlog/` do not collide with `template/` (the seed
    payload, read only by `init` and the tests). The 12 kit-owned files
@@ -1203,3 +1205,12 @@ Each item records the ruling with its date, or stays marked open.
     The fourth lands in this batch: README states how to
     uninstall houserules, per install channel (HR-132 scope
     addition). Source: owner, 2026-09-15, mid-batch messages.
+86. **Batch 27 directed: the install-and-update cluster plus the
+    agent-agnostic kit - ruled 2026-09-15.** The owner scheduled
+    HR-133 (update self-updates the binary), HR-134 (the
+    update-available header), HR-135, and the new HR-136 (the kit
+    works flawlessly with Codex and other harnesses that do not
+    know Claude structures). HR-135 is ruled: `~/.local/bin` is
+    the correct install path for a toolchain-neutral binary; the
+    move carries a migration story for existing `~/.cargo/bin`
+    installs. Source: owner, 2026-09-15, the batch-27 direction.
