@@ -20,19 +20,18 @@ You are the controller. Subagents get knowledge through their templates; you get
 | Phase | Skill | Repo gate |
 |---|---|---|
 | Select items | — | `houserules list --open`; record the batch in `backlog/batches.json` and schedule its items (`set <id> batch=<n>`) |
-| Design | superpowers:brainstorming when installed, else write it by hand | spec in `docs/specs/`; user approval |
-| Plan | superpowers:writing-plans when installed, else write it by hand | plan in `docs/plans/`; code-health scan of the touched files (`process.code-health-scan`); user approval when asked |
-| Build | superpowers:subagent-driven-development when installed, else dispatch tasks yourself | the dispatch protocol below; strictly sequential |
+| Design | superpowers:brainstorming when installed, else write it by hand | spec in `docs/specs/`; approval from the project's owner or decider |
+| Plan | superpowers:writing-plans when installed, else write it by hand | plan in `docs/plans/`; code-health scan of the touched files (`process.code-health-scan`); approval when asked |
+| Build | superpowers:subagent-driven-development when installed, else dispatch tasks yourself | the dispatch protocol below |
 | Verify | — | live run before any PR or deploy spend (`process.live-run-before-ci`) |
-| Finish | project skill `finishing-a-feature` | backlog ticked, one to five clean commits, PR, checks, ff-only merge |
-| Rollout, acceptance | — | user acceptance; the acceptance record and new rulings ride the next branch |
+| Finish | project skill `finishing-a-feature` | backlog ticked, one to five clean commits, PR, checks, merged per the project's own discipline |
+| Rollout, acceptance | — | acceptance from the project's owner or decider; the acceptance record and new rulings ride the next branch |
 
-In a repository that builds `houserules` from source (the houserules kit repository and its forks), when the current branch changes generated output, run every controller gate through the tree binary (`cargo run --release --quiet --bin houserules --`) instead of the installed one; reinstall after merge with `cargo install --path crates/houserules --bin houserules`. Elsewhere, an adopter's installed `houserules` has no such tree to build from and is already the released build.
+Dispatch agent work sequentially by default. A project may rule its own parallelism discipline (elicited by the `migrating-knowledge` skill's "Elicit your own operating discipline" step, recorded as its own knowledge entry); absent such a ruling, never dispatch two subagents at once.
 
 ## Dispatch protocol
 
-- Templates: `implementer` (sonnet), `task-reviewer` (opus), `branch-reviewer` (fable). Name the model on every dispatch; the template value is the default, not a substitute for naming it. Reviews always run on a mightier model than the implementer they review (`process.model-policy`).
-- Never dispatch two subagents at once.
+- Templates: `implementer` (sonnet), `task-reviewer` (opus), `branch-reviewer` (fable). Name the model on every dispatch; the template value is the default, not a substitute for naming it. Reviews run on a mightier model than the implementer they review by default (`process.model-policy` is a recommendation the project may override).
 - Derive a dispatch's commit span with `git rev-list --count BASE..HEAD`; never hand-type a count into a dispatch or its ledger row.
 - An implementer dispatch is the task brief plus these lines:
   - `BASE: <sha>` — the commit before the task.
@@ -43,12 +42,13 @@ In a repository that builds `houserules` from source (the houserules kit reposit
 - The audit `--ids` value is the dispatch's `Knowledge:` list, generated from it, never typed separately — true for round 0 and every re-review alike.
 - A re-review dispatch carries the identical `Knowledge:`/`Backlog:`/`--ids` block as the round-0 dispatch. A narrowed block narrows the audit package silently.
 - A fix-round dispatch names `FIX_BASE`; the fix-diff audit goes into the report's `fix_rounds` entry, and `self_audit` stays the `BASE..HEAD` audit (`process.deliverables-json`).
-- A fix-round dispatch quotes a finding's premise only with the review's own named verification run beside it; a premise with no such run gets no free pass — the dispatch tells the implementer to measure it first, before acting on it (HR-067: a batch 18 T6 fix round relayed an unverified hook-history premise as fact, and the correction it produced was itself false).
+- A fix-round dispatch quotes a finding's premise only with the review's own named verification run beside it; a premise with no such run gets no free pass — the dispatch tells the implementer to measure it first, before acting on it. Relaying an unverified premise as fact produces a correction that can itself be false.
 - The branch review dispatch names `WORKSPACE`, `BASE` (the merge base), `HEAD`, the plan and spec paths, and `REVIEW_FILE: <workspace>/branch-review.json`, through `branch-reviewer`; its audit runs `--workspace <WORKSPACE>` in place of `--report`.
 - A brief names no version number for a tool, action, or package (`security-hygiene.exact-pins`); it names the verification the implementer runs and records in `docs_verified`, and shows placeholders such as `jdx/mise-action@<current major>`.
 - A brief names every test, gate, and file its spec task lists, verbatim or by pointer (`process.brief-carries-the-spec`); an implementer who cannot satisfy one flags it instead of dropping it.
-- A brief's claim about a file's current contents is measured at brief-writing time — grepped or read, never restated from memory or an earlier document (HR-067: a batch 19 T2 brief asserted a second knowledge copy that did not exist, and the implementer paid the disproof).
+- A brief's claim about a file's current contents is measured at brief-writing time — grepped or read, never restated from memory or an earlier document; an unmeasured claim about a knowledge copy or a file's shape is exactly the kind of thing that can be flatly wrong, and the implementer pays the disproof.
 - When a batch edits an agent template or skill, the dispatch message carries the changed instruction verbatim: templates load at session start, so the running session's copy is stale until a restart.
+- A controller commit made while a task is open (a concurrent backlog filing, a rulings-to-file write) touches only files disjoint from the open task's own files; record it in the ledger before the next reviewer dispatch, and name it in that dispatch.
 
 ## Handling reviews
 
@@ -62,7 +62,7 @@ In a repository that builds `houserules` from source (the houserules kit reposit
 - Batch close: before the branch review dispatches, confirm every `task-*-report.json` in the workspace has a ledger row stating its close commit and round count.
 - Log every controller slip that forces a re-run, an amend, or a correction — gate-caught or not — to the batch workspace ledger when it happens (`process.gate-shell-chains`).
 - On a mid-batch branch rebuild, write the old-to-new sha map to its own workspace file, cite it in the batch report, and never edit closed-task deliverables (`process.main-wins-backlog-collisions`).
-- Retrospective proposals from the branch review: apply every proposal that does not change a `standing` entry in one `docs(knowledge): ...` commit before finishing; list standing-rule proposals in the batch report for the user's ruling.
+- Retrospective proposals from the branch review: apply every proposal that does not change a `standing` entry in one `docs(knowledge): ...` commit before finishing; list standing-rule proposals in the batch report for the project's owner or decider to rule on.
 
 ## Template evaluation
 

@@ -55,7 +55,6 @@
 //!   the whole `tests/` prefix is still correct on the right ground: none
 //!   of it is a live instruction this repository's own contributors
 //!   follow.
-//! - `.superpowers/` -- batch workspaces: dated session history.
 //! - `.claude/evals/` -- eval scenarios model adopter repositories across
 //!   ecosystems and are governed by `process.evals-rerun`, never touched
 //!   by an unrelated gate. (`template/.claude/evals/` is NOT under this
@@ -103,7 +102,7 @@ const PATTERNS: [&str; 8] = [
 
 /// Tracked-path prefixes never walked -- this module's own doc has the
 /// reason for each.
-const EXCLUDED_PREFIXES: [&str; 11] = [
+const EXCLUDED_PREFIXES: [&str; 10] = [
     "crates/",
     "knowledge/",
     "backlog/",
@@ -113,7 +112,6 @@ const EXCLUDED_PREFIXES: [&str; 11] = [
     "docs/plans/",
     "docs/design.md",
     "tests/",
-    ".superpowers/",
     ".claude/evals/",
 ];
 
@@ -285,12 +283,63 @@ fn exceptions() -> Vec<Exception> {
     ]
 }
 
+/// Every declared exception's own real hit count against `excepted`, in
+/// `exceptions`' declared order, `0` included for one that matched
+/// nothing this run -- `excepted` alone cannot show that: an exception
+/// with zero hits never appears in it at all, the exact invisibility
+/// `bin/vacuous-exception-gate.rs`'s own module doc names as HR-115's
+/// starting defect. Printed unconditionally by `main` so that gate's live
+/// run always has a real count to read per label, never only the ones
+/// that happened to fire.
+fn declared_exception_counts(
+    exceptions: &[Exception],
+    excepted: &[(Hit, &'static str, &'static str)],
+) -> Vec<(&'static str, usize)> {
+    let mut counts: Vec<(&'static str, usize)> = exceptions
+        .iter()
+        .map(|exception| (exception.label, 0))
+        .collect();
+    for (_, label, _) in excepted {
+        if let Some(entry) = counts.iter_mut().find(|(existing, _)| existing == label) {
+            entry.1 += 1;
+        }
+    }
+    counts
+}
+
+/// Every `EXCLUDED_PREFIXES` entry's own real hit count against
+/// `tracked` (the full `git ls-files` list, before any prefix filters
+/// it out): how many tracked paths actually start with it. Printed
+/// unconditionally, `0` included, for the identical reason
+/// `declared_exception_counts` prints every label's count: a prefix
+/// matching zero tracked files excludes nothing at all, and that was
+/// invisible until this count existed -- `EXCLUDED_PREFIXES` used to
+/// carry a `.superpowers/` entry in exactly that state (`.gitignore`
+/// already keeps that whole tree untracked, so the entry never excluded
+/// a single file), retired once this count exposed it (HR-115's own
+/// `vacuous-exception-gate` review finding).
+fn excluded_prefix_counts(tracked: &[String]) -> Vec<(&'static str, usize)> {
+    EXCLUDED_PREFIXES
+        .iter()
+        .map(|prefix| {
+            let count = tracked
+                .iter()
+                .filter(|path| path.starts_with(prefix))
+                .count();
+            (*prefix, count)
+        })
+        .collect()
+}
+
 /// Walks the tracked-file list minus `EXCLUDED_PREFIXES`, classifies
 /// every `PATTERNS` hit as excepted or unexpected, reports every
 /// unreadable and binary path, prints all of it plus the summary line,
 /// and exits 1 if any path was unreadable or any hit remains unexpected
 /// (0 otherwise) -- this module's own doc has the full scope and
-/// exception account.
+/// exception account. This gate's own exit code never depends on whether
+/// a declared exception matched zero hits: `bin/vacuous-exception-gate.rs`
+/// reads the printed counts below and is the one gate that fails on that
+/// condition, across every gate that declares one (HR-115).
 fn main() {
     let root = repo_root();
     let (tracked, undecodable) = tracked_files(&root);
@@ -373,6 +422,24 @@ fn main() {
                 println!("  {}:{}: {}", hit.file, hit.line, hit.text);
             }
         }
+    }
+
+    let declared_counts = declared_exception_counts(&exceptions, &excepted);
+    println!(
+        "\n-- {} declared exception(s), by label --",
+        declared_counts.len()
+    );
+    for (label, count) in &declared_counts {
+        println!("{label}: {count} hit(s)");
+    }
+
+    let prefix_counts = excluded_prefix_counts(&tracked);
+    println!(
+        "\n-- {} excluded prefix(es), by tracked-file hit count --",
+        prefix_counts.len()
+    );
+    for (prefix, count) in &prefix_counts {
+        println!("{prefix}: {count} hit(s)");
     }
 
     println!(
@@ -518,7 +585,6 @@ mod tests {
             "docs/design.md",
             "tests/fixtures/mini/CLAUDE.md",
             "tests/goldens/render/root/CLAUDE.md",
-            ".superpowers/sdd/2026-09-07-batch-20/progress.md",
             ".claude/evals/record.json",
         ];
         for path in excluded {
@@ -706,5 +772,72 @@ mod tests {
             text: "commit a package.json".to_string(),
         };
         assert!(exceptions().iter().any(|e| (e.matches)(&hit, "")));
+    }
+
+    /// `declared_exception_counts` names every declared label, in
+    /// declared order, with its real count -- `0` for one `excepted`
+    /// never carries (HR-115's own starting defect: an exception with no
+    /// hits is invisible in `excepted` alone).
+    #[test]
+    fn declared_exception_counts_includes_zero_for_a_label_excepted_names_nothing_for() {
+        let declared = vec![
+            Exception {
+                label: "alpha",
+                reason: "r",
+                matches: |_, _| false,
+            },
+            Exception {
+                label: "beta",
+                reason: "r",
+                matches: |_, _| false,
+            },
+        ];
+        let hit = Hit {
+            file: "f".to_string(),
+            line: 1,
+            text: "t".to_string(),
+        };
+        let excepted = vec![(hit, "alpha", "r")];
+        assert_eq!(
+            declared_exception_counts(&declared, &excepted),
+            vec![("alpha", 1), ("beta", 0)]
+        );
+    }
+
+    /// `excluded_prefix_counts` names every `EXCLUDED_PREFIXES` entry,
+    /// in declared order, with its real tracked-file hit count -- `0`
+    /// for a prefix matching nothing, the exact state the retired
+    /// `.superpowers/` entry was in permanently (this test's own doc has
+    /// the incident).
+    #[test]
+    fn excluded_prefix_counts_includes_zero_for_a_prefix_matching_no_tracked_file() {
+        let tracked = vec!["crates/main.rs".to_string(), "README.md".to_string()];
+        let counts = excluded_prefix_counts(&tracked);
+        let crates_count = counts
+            .iter()
+            .find(|(prefix, _)| *prefix == "crates/")
+            .expect("crates/ is a declared prefix");
+        assert_eq!(crates_count.1, 1);
+        // Every declared prefix appears, in order, none of them dropped
+        // just because their count happens to be zero.
+        assert_eq!(counts.len(), EXCLUDED_PREFIXES.len());
+        assert!(counts.iter().all(|(prefix, count)| {
+            tracked.iter().filter(|p| p.starts_with(prefix)).count() == *count
+        }));
+    }
+
+    /// Live regression: every declared `EXCLUDED_PREFIXES` entry matches
+    /// at least one file this checkout actually tracks -- the invariant
+    /// whose violation (the retired `.superpowers/` entry, excluded by
+    /// `.gitignore` from ever being tracked at all) `vacuous-exception-
+    /// gate` now reads this section to enforce permanently.
+    #[test]
+    fn every_declared_excluded_prefix_matches_a_real_tracked_file() {
+        let root = repo_root();
+        let (tracked, _undecodable) = tracked_files(&root);
+        let counts = excluded_prefix_counts(&tracked);
+        for (prefix, count) in &counts {
+            assert!(*count > 0, "{prefix} matches zero tracked files");
+        }
     }
 }

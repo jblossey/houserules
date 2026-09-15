@@ -415,6 +415,7 @@
       "id": "process.keep-knowledge-current",
       "kind": "rule",
       "area": "process",
+      "standing": true,
       "summary": "Add knowledge future sessions need to `knowledge/`; session memory is not portable, repo files are.",
       "body": [
         "Write the entry in the same turn you learn the fact. Then run `houserules render` and commit the generated files with it."
@@ -769,10 +770,11 @@
       "kind": "rule",
       "area": "process",
       "standing": true,
-      "summary": "Walk every commit author class a new gate will hit -- bots and generated commits included -- through the gate on paper before it ships; state each accepted red.",
+      "summary": "Before a new gate or pipeline step ships, walk every commit author class and every generated resource it touches through it on paper; state each accepted red.",
       "body": [
         "Batch 24 shipped a payload-stamp mechanism (tree gate + per-commit co-change + range co-change) proven against 40 human-authored commits, while release-please-config.json's own extra-files entry scheduled a bot commit to template/** that trips all three, plus the dogfood version-stamp test -- discovered only at the branch review.",
-        "The walk is cheap: enumerate the automation that writes commits to this repository (release-please, Dependabot, the restamp step), list the exact files each writes, and run the new check's predicate against those file sets."
+        "The walk is cheap: enumerate the automation that writes commits to this repository (release-please, Dependabot, the restamp step), list the exact files each writes, and run the new check's predicate against those file sets.",
+        "Extended 2026-09-13 (owner, design.md 5.78): the walk covers generated RESOURCES too -- releases, tags, PRs -- with one named owner per resource. The T2 create-collision (design.md 5.77) was two automations both creating the v0.3.0 release object; the commit-class walk alone missed it the same day this rule shipped."
       ],
       "tags": [
         "gates",
@@ -826,6 +828,48 @@
         "date": "2026-09-13",
         "by": "user",
         "ref": "batch 24 branch review retrospective; design.md 5.71/5.72; adopted standing at the batch-24 report (design.md 5.75)"
+      }
+    },
+    {
+      "id": "process.pointer-sweep-unfiltered",
+      "kind": "gotcha",
+      "area": "docs",
+      "standing": false,
+      "summary": "When a file moves or is deleted, sweep for its old path with an unfiltered grep over the whole tree; an extension-limited grep is not a pointer audit.",
+      "body": [
+        "An include-pattern or file-extension filter on the sweep misses a stale pointer sitting in an unusual place: a .gitignore entry, a comment in an uncommon file extension, an assertion message string.",
+        "Exclude only the directories that never carry source content (a dependency directory, a version-control directory, a build output directory, a scratch workspace) - never a file extension."
+      ],
+      "tags": [
+        "sweeps",
+        "grep",
+        "migration"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
+    },
+    {
+      "id": "process.report-evidence-verbatim",
+      "kind": "rule",
+      "area": "global",
+      "standing": false,
+      "summary": "A deliverable pastes only real command output; a re-review reproduces at least one RED or audit before accepting a fix round.",
+      "body": [
+        "A fabricated capture and an overclaimed TDD RED are both caught only by a reviewer actually re-running the thing, never by a gate - the failure is invisible until someone reproduces it.",
+        "An implementer that cannot reproduce a piece of evidence says so and labels what it reconstructs instead; asserting an unrecorded chronology as observed is a violation even when the underlying work was done correctly."
+      ],
+      "tags": [
+        "reports",
+        "evidence",
+        "reproduction"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
       }
     }
   ]

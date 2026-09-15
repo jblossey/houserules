@@ -135,7 +135,8 @@
         "Derive the walk set (git ls-files minus an EXCLUDED_PREFIXES-style constant whose doc names the reason for each entry) so a newly tracked file is gated the moment it lands; pin the boundary with a test that classifies every real tracked path.",
         "An input the gate cannot read is a named, fatal error, never a continue: the silent-skip version under-counted and passed a seeded violation hiding behind a rename. A readable-but-binary input may be a counted, printed skip.",
         "A gate's file list comes from the authoritative set (git-tracked files, never the working directory); every finding names which derivation decided it; every skip is counted and printed on every branch, including the one where the primary derivation returns nothing; and an enumeration feeding a closure claim fails loudly on input it cannot read (batch 21 T1/T2 arcs).",
-        "A gate that needs a toolchain component derives that need from declared configuration (mise.toml tools, lockfiles), never from what the authoring machine happens to have installed; prove a new gate on a runner shaped like CI's fresh declared install (batch 21 branch-fix: a lint step green only on a hand-added rustup target no tracked file declared)."
+        "A gate that needs a toolchain component derives that need from declared configuration (mise.toml tools, lockfiles), never from what the authoring machine happens to have installed; prove a new gate on a runner shaped like CI's fresh declared install (batch 21 branch-fix: a lint step green only on a hand-added rustup target no tracked file declared).",
+        "Every hand-kept enumeration inside a gate ships with a derivation test that recomputes it from the subject (batch 25: the keyword set derived from the engine's own source, the lint-array pin from mise.toml, the exclusion lists reached by the vacuousness gate)."
       ],
       "tags": [
         "gates",
@@ -146,6 +147,48 @@
         "date": "2026-09-08",
         "by": "review",
         "ref": "batch 20 branch review; task-4-review.json important findings 1-2; residue-gate.rs module doc"
+      }
+    },
+    {
+      "id": "quality.tests-clean-temp-dirs",
+      "kind": "rule",
+      "area": "global",
+      "standing": false,
+      "summary": "A test that creates a temp directory removes it in its own teardown; never leak fixture directories into the OS temp directory.",
+      "body": [
+        "Track the directory at the same site that creates it, and remove it in the test framework's own teardown hook (an afterEach, a Drop guard, a finally block) rather than relying on a separate cleanup pass.",
+        "A suite that leaks its own scratch directories can silently fill a shared temp filesystem, breaking unrelated work on the same host until someone notices and clears it by hand."
+      ],
+      "tags": [
+        "testing",
+        "scratch-dirs"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
+    },
+    {
+      "id": "quality.user-facing-text-is-contract",
+      "kind": "rule",
+      "area": "global",
+      "standing": false,
+      "summary": "When behavior changes, update every user-facing surface that states it (help, errors, documented procedures) and verify a procedure by following it as printed.",
+      "body": [
+        "Help output, error messages, and documented step sequences are contract surfaces the way exported symbols are; a behavior fix that leaves them stating the old behavior ships the old defect to the user in prose form.",
+        "Enumerate the surfaces mechanically: grep the user-visible strings for the changed concept (the old flag, shape, or step) rather than recalling where it is mentioned.",
+        "A documented procedure is verified by executing its printed steps in order, on the environment it targets or the closest disclosed proxy; a paraphrase check misses preconditions the source text carries."
+      ],
+      "tags": [
+        "cli",
+        "docs",
+        "contract"
+      ],
+      "source": {
+        "date": "2026-09-15",
+        "by": "review",
+        "ref": "batch 25 branch review retrospective"
       }
     }
   ]

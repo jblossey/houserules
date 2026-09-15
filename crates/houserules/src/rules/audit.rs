@@ -131,7 +131,7 @@ pub(super) fn rev(root: &Path, reference: &str) -> Result<String, String> {
 
 /// A three-dot `git diff` range from the merge base of `base` and `head`
 /// to `head`.
-fn range(base: &str, head: &str) -> String {
+pub(super) fn range(base: &str, head: &str) -> String {
     format!("{base}...{head}")
 }
 
@@ -147,7 +147,15 @@ fn lines(text: &str) -> Vec<String> {
 /// base miss between `base` and `head` reports
 /// the fixed `no merge base between "<base>" and "<head>"` message; any
 /// other failure carries git's own first non-empty stderr line.
-fn git_diff(root: &Path, base: &str, head: &str, args: &[&str]) -> Result<String, String> {
+/// `pub(super)`: `durable_sha`'s own `added_lines` reads a files-scoped
+/// diff through this same function, not a second `git diff` invocation
+/// of its own.
+pub(super) fn git_diff(
+    root: &Path,
+    base: &str,
+    head: &str,
+    args: &[&str],
+) -> Result<String, String> {
     let mut full_args = vec!["diff"];
     full_args.extend_from_slice(args);
     run_git(root, &full_args).map_err(|error| {
@@ -751,6 +759,31 @@ fn run_check(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result<Valu
                 )));
             }
             Ok(row("skipped", "no --report given".to_string()))
+        }
+        CheckType::DurableSha => {
+            let files = filter_matching(ctx.changed, &check.files)?;
+            if files.is_empty() {
+                return Ok(pass("not triggered".to_string()));
+            }
+            // Resolved fresh per evaluation, independent of `--base`/
+            // `--head`: `durable_sha.rs`'s own module doc, "Why the
+            // default branch is resolved explicitly", has the full
+            // account of why `ctx.base_sha` cannot stand in for it.
+            let default_branch = super::durable_sha::resolve_default_branch(ctx.root)?;
+            match super::durable_sha::find_violation(
+                ctx.root,
+                &ctx.base_sha,
+                &ctx.head_sha,
+                &default_branch,
+                &files,
+            )? {
+                Some(evidence) => Ok(violate(evidence)),
+                None => Ok(pass(format!(
+                    "{} file(s) checked for in-branch sha citations (against the default \
+                     branch, {default_branch})",
+                    files.len()
+                ))),
+            }
         }
     }
 }

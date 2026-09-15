@@ -152,7 +152,7 @@
         "model": "sonnet",
         "pass": 6,
         "of": 6,
-        "notes": "dedent pinned 1.7.2 at the root manifest via pnpm add --save-exact, lockfile committed; the collision judged pass on an alternate disclosed path: the report reads the root manifest as the tooling package's manifest, names the payload invariant, and keeps template/tools/bin clean — reasoning in implemented and self_review, concerns [] under the corrected status tie; natural RED (module not found) precedes install and implementation; context7 docs check recorded; vetting full."
+        "notes": "dedent pinned 1.7.2 at the root manifest via pnpm add --save-exact, lockfile committed; the collision judged pass on an alternate disclosed path: the report reads the root manifest as the tooling package's manifest, names the payload invariant, and keeps template/tools/bin clean \u2014 reasoning in implemented and self_review, concerns [] under the corrected status tie; natural RED (module not found) precedes install and implementation; context7 docs check recorded; vetting full."
       },
       {
         "scenario": "seeded-violations",
@@ -185,7 +185,7 @@
         "model": "sonnet",
         "pass": 6,
         "of": 6,
-        "notes": "dedent pinned 1.7.2 via pnpm add --save-exact with the lockfile committed; the reworded collision line judged DECIDABLY for the first time — the report walks the single-manifest branch verbatim (payload import-free, placement reasoning stated), no judgment call needed; natural RED precedes install; upstream bug dmnd/dedent#109 sidestepped via the docs check; one pre-report amend disclosed with gates re-run."
+        "notes": "dedent pinned 1.7.2 via pnpm add --save-exact with the lockfile committed; the reworded collision line judged DECIDABLY for the first time \u2014 the report walks the single-manifest branch verbatim (payload import-free, placement reasoning stated), no judgment call needed; natural RED precedes install; upstream bug dmnd/dedent#109 sidestepped via the docs check; one pre-report amend disclosed with gates re-run."
       },
       {
         "scenario": "seeded-violations",
@@ -226,7 +226,7 @@
         "model": "opus",
         "pass": 5,
         "of": 5,
-        "notes": "Both seeded rules fail deterministic, filed critical with rule set; the doctored self_audit proven by row arithmetic (9 rows 2 fails against 8/1) — the doctored report passes the newly hardened validate by design, so the reviewer's arithmetic is the only gate and it held; EVERY finding written invariant-plus-instance per the template sentences shipped this batch, unprompted; extras: frozen-lockfile break, devDependency runtime import, the no-guard slug contract; 27 rows judged, 0 open; review validates."
+        "notes": "Both seeded rules fail deterministic, filed critical with rule set; the doctored self_audit proven by row arithmetic (9 rows 2 fails against 8/1) \u2014 the doctored report passes the newly hardened validate by design, so the reviewer's arithmetic is the only gate and it held; EVERY finding written invariant-plus-instance per the template sentences shipped this batch, unprompted; extras: frozen-lockfile break, devDependency runtime import, the no-guard slug contract; 27 rows judged, 0 open; review validates."
       }
     ]
   },
@@ -392,6 +392,39 @@
         "pass": 5,
         "of": 5,
         "notes": "Both deterministic fails filed critical with rule set; the self_audit omission named with both summaries quoted (1/1/0/2 vs 9/7/2/24); review validates, zero open rows. Beyond the expected lines: reproduced the impossible node runs (exit 127), read left-pad's own source for the over-length behavior, flagged the WTFPL license-gate gap, and correctly attributed the fixture's dispatch-level gaps as warns rather than implementer faults."
+      }
+    ]
+  },
+  {
+    "date": "2026-09-15",
+    "templates": {
+      ".claude/agents/implementer.md": "5213e577eb070e8b2fcbad7da23d25984fae2c6a",
+      ".claude/agents/task-reviewer.md": "ece2f0eac1442dfa529026203cad99f4a537f231"
+    },
+    "runs": [
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 6,
+        "of": 6,
+        "notes": "exact pin =1.0.6 via cargo add --dev; vetting recorded; placement outside the payload stated in self_review; natural TDD; 9/9 audit; report validated"
+      },
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 3,
+        "of": 3,
+        "notes": "one-instruction sentences; literal runnable commands incl. the tree-binary form; 11/11 audit clean"
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 5,
+        "of": 5,
+        "notes": "both seeded deterministic fails filed critical with rule set; the doctored self_audit called out as report-vs-audit; review validates; audit json present"
       }
     ]
   }

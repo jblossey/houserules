@@ -5,17 +5,28 @@ description: Use to migrate existing knowledge — CLAUDE.md prose, docs, wikis,
 
 # Migrating existing knowledge
 
-`init` seeds a generic standing-rule set (process, quality,
-security-hygiene, writing-style, knowledge-base) and an empty set of
-project topics. Every project-specific rule you already live by is still
-scattered across CLAUDE.md, docs, and code. This skill moves it in.
+`init` seeds a generic rule set (process, quality, security-hygiene,
+writing-style, knowledge-base) and an empty set of project topics. Most of
+the seed is `standing` and loads every session; some of it is
+case-dependent instead, scoped to an area and loading only when a matching
+file is read — both kinds are already there, not just the standing ones.
+Every project-specific rule you already live by is still scattered across
+CLAUDE.md, docs, code, past conversations, and whatever only lives in an
+assistant's own memory. This skill moves it in. Knowledge that exists only
+in memory is the most fragile source: write it down explicitly, the same
+turn you notice it (`process.keep-knowledge-current`), before it is lost
+to the next compaction.
 
 ## When
 
-Run this after `init` in a codebase that already carries knowledge — not on
-a fresh project, which starts with nothing to migrate. Work topic by topic
-and gate after each one (see Gates below); do not migrate everything before
-the first check.
+Run the full migration pass after `init` in a codebase that already carries
+knowledge — not on a fresh project, which starts with nothing to migrate.
+Two sections below run regardless, fresh project or migration alike, right
+after `init`: "Elicit your own operating discipline" and "Generate your own
+CI gate" — a fresh project has no existing knowledge to move, but it still
+needs its own ruled discipline and its own CI gate. Work the rest topic by
+topic and gate after each one (see Gates below); do not migrate everything
+before the first check.
 
 ## Inventory
 
@@ -28,6 +39,9 @@ Knowledge hides in:
 - **PR and review templates** — the checklist a reviewer runs by hand.
 - **Lint and CI configs** — a rule enforced in YAML or a linter plugin is
   still a rule; the entry documents it, the config still enforces it.
+- **Past conversations and an assistant's own memory** — a fact or
+  preference the project has been operating on that was never written to a
+  tracked file. Nothing outlives the session until it is.
 
 List the sources before you write the first entry. An inventory that admits
 what is left beats a partial migration that looks finished.
@@ -52,8 +66,8 @@ its own `history` entry when it is long enough to want one.
 
 - Before you write an entry, check `houserules index --topic <t>` or
   `houserules standing` for a seeded rule that already says it. Drop the
-  duplicate instead of filing it — the seed already carries 23 standing
-  rules (conventional commits, TDD, exact pins, ff-only merges, and more).
+  duplicate instead of filing it — the seed already carries 33 standing
+  rules (conventional commits, TDD, exact pins, and more).
 - `summary` states the rule in one sentence, ≤ 160 characters, with no
   time-sensitive phrasing (`knowledge-base.summary-is-the-rule`). Dates
   belong in `source.date`.
@@ -127,6 +141,52 @@ houserules check-backlog
 
 Fix every failure before the next topic. The next branch audit checks the
 migrated entries the same way it checks any other change.
+
+## Elicit your own operating discipline
+
+The template drops three rules as houserules-repo opinion, not universal:
+merge discipline, commit attribution, and agent parallelism. Nothing
+enforces a default for any of the three until your project rules one -
+every template sentence that says a discipline is "elicited" or "ruled"
+means this step. Ask three questions, record each answer as its own
+knowledge entry, and cite that entry wherever a skill or template file
+names the project's own ruling:
+
+- **Merge discipline** - how does a finished branch reach main: fast-forward
+  only from the CLI, a merge commit, a squash merge, or your host's own
+  merge queue? Record it as a `process.*` rule (`standing: true`);
+  `finishing-a-feature`'s merge step follows the shipped fast-forward-only
+  default until this entry says otherwise.
+- **Commit attribution** - may a commit or PR description carry a
+  co-author, session, or tool-attribution trailer? Record it as a
+  `security-hygiene.*` rule; the seeded commit-msg hook enforces only
+  Conventional Commits until a `commits`-type check on this entry adds an
+  attribution gate of your own.
+- **Agent parallelism** - may more than one agent dispatch run at once, or
+  does every dispatch wait for the last one to close? Record it as a
+  `process.*` rule; the `orchestrating` skill defaults to sequential
+  dispatch until this entry rules otherwise.
+
+Answer all three before the first real batch. A project that never rules
+them is choosing the shipped defaults (ff-only CLI merges, no attribution
+trailers, sequential dispatch) by omission, not by decision - ruling them
+explicitly, even to keep the default, is what lets a later reader tell the
+two apart.
+
+## Generate your own CI gate
+
+`init` seeds `.github/workflows/knowledge.yml` only for a GitHub-hosted
+`origin`; every other host gets a printed skip note and nothing written,
+since a GitHub Actions workflow runs nowhere else. Generate the equivalent
+gate for your own host, right after `init`, fresh project or migration
+alike: install `houserules` in
+the CI image, then run the same three steps the seeded workflow runs —
+`houserules check-knowledge`, `houserules check-backlog`, and, on a
+pull/merge request, `houserules audit --base <the request's base sha>
+--head <the request's head sha>` — on every push and pull/merge request.
+Name the job and its trigger once written, so the wiring is a claim
+someone can grep against (`process.wiring-checks-run-the-resolution`), and
+prove it with a real run before trusting it, not a syntax check alone.
 
 ## A worked example
 

@@ -107,7 +107,8 @@
       "body": [
         "Batch 21's mid-batch rebase replayed 29 commits; knowledge and backlog prose written before it kept the old SHAs, which no branch reached afterward. git branch --contains is the reachability check a reviewer runs before accepting a SHA citation.",
         "Aggregation collapses the branch into new commits, so even post-rebase in-branch SHAs die at the finish; only aggregated commits land on main. A durable locator is the event's batch/task/round plus its subject, or the final aggregated SHA added at aggregation time.",
-        "Workspace deliverables are exempt in practice (untracked, machine-local, the reflog's lifetime), but tracked knowledge, backlog bodies, specs, and design records are permanent and clone-facing. Nine pre-batch-21 bare historical markers were dispositioned as accepted history at the batch-21 report; this rule governs prospectively."
+        "Workspace deliverables are exempt in practice (untracked, machine-local, the reflog's lifetime), but tracked knowledge, backlog bodies, specs, and design records are permanent and clone-facing. Nine pre-batch-21 bare historical markers were dispositioned as accepted history at the batch-21 report; this rule governs prospectively.",
+        "HR-120 (batch 25 T3b) gave this rule a deterministic gate: `houserules audit` flags a 7-40 hex string a diff hunk ADDS in a covered permanent file (backlog/, knowledge/, docs/specs/, docs/design.md) that resolves, in this repository's object database, to a commit not reachable from the repository's real default branch (resolved from origin/HEAD, then origin/main|master, then local main|master; never the audit's --base, which per-task callers point at an in-branch commit). A content hash, digest, or made-up example sha is excluded by construction (length bound, and it must actually resolve to a real commit) rather than by a denylist."
       ],
       "tags": [
         "knowledge",
@@ -119,6 +120,19 @@
         "date": "2026-09-11",
         "by": "review",
         "ref": "batch 21 branch review, important issue 2"
+      },
+      "verify": [
+        "crates/houserules/src/rules/durable_sha.rs"
+      ],
+      "check": {
+        "type": "durable-sha",
+        "level": "fail",
+        "files": [
+          "backlog/**",
+          "knowledge/**",
+          "docs/specs/**",
+          "docs/design.md"
+        ]
       }
     }
   ]

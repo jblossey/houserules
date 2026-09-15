@@ -112,7 +112,7 @@
         "Amended at batch 18 T6 (docs/specs/2026-09-05-batch-18-phase3.md §1, parent spec docs/specs/2026-09-04-batch-15-tier2-spec.md §2, RULED at the Tier-2 spec's approval, 2026-09-04): the prior invariant (\"Node built-ins and POSIX shell only\") held while the payload's own engines were `.mjs` files; it stops being true the moment a shipped reference stops being runnable by `node` alone. The id is unchanged (`knowledge-base.ids-are-permanent`); only the body restates the now-true contract.",
         "The SessionStart hook and the CI gates run where nothing but the `houserules` binary and a POSIX shell are guaranteed; a runtime dependency would break both (docs/design.md §2–3).",
         "`tools/kb.sh` and `tools/backlog.sh` left the payload (batch 18 T5, docs/specs/2026-09-05-batch-18-phase3.md §§1,3): every shipped reference to them rewrote to the flat `houserules` command, and `update` deletes either file an install still carries.",
-        "A template script may exec an optional tool only behind a probe of that tool itself, with a working fallback; probing mise is not probing the tool (batch 6 task 4). The shipped `.githooks/commit-msg` execs `houserules check-commit` only behind a probe of that subcommand and degrades to the trailer gate alone (batch 18 T2) — the same degrade shape commitlint's own now-retired probe had; this repository's own devDependencies (vitest) serve its own tests only and never enter `template/`.",
+        "A template script may exec an optional tool only behind a probe of that tool itself, with a working fallback; probing mise is not probing the tool (batch 6 task 4). The shipped `.githooks/commit-msg` execs `houserules check-commit` only behind a probe of that subcommand; when the probe fails, nothing runs and the commit is not blocked (design.md 5.81(2) dropped the shipped hook's own trailer gate — attribution enforcement is fully project-ruled now: a project's own attribution gate comes from its own `commits`-type entry, which `check-commit` picks up the same way it picks up `process.conventional-commits`). This repository's own devDependencies (vitest) serve its own tests only and never enter `template/`.",
         "The seeded CI gate (`template/.github/workflows/knowledge.yml`) now carries an install step (batch 19 T2, HR-063): the cargo-dist shell installer on the releases/latest alias fetches the `houserules` binary from `jblossey/houserules`'s own GitHub Releases before `check-knowledge`/`check-backlog`/`audit` run, under `shell: bash` (fix round 1) so a failed download aborts the step instead of the pipe's `sh` masking curl's exit code (GitHub's own documented default, `bash -e {0}` with no `-o pipefail`, only applies `-o pipefail` when `shell: bash` is named). The wiring exists; a release with real assets does not yet (HR-048's pipeline has cut one release, zero assets), so a fresh `houserules init` today seeds a PR gate whose install step genuinely fails red, on curl's own 404, until the pipeline cuts a release with assets (docs/specs/2026-09-06-batch-19-phase4.md §7's step two) — this invariant is amended against that known gap, not silently past it.",
         "The second known gap (batch 18 branch review) closed at batch 20 T2 (HR-066, docs/specs/2026-09-07-batch-20-phase5.md §3): `check-report-claims` now ships as the `houserules check-report-claims` subcommand (`crates/houserules/src/report_claims.rs`, moved from a dev-only `src/bin/` target), so the seeded implementer template's closing act invokes the binary the payload itself carries, in every adopter repo."
       ],
@@ -509,7 +509,7 @@
       "standing": false,
       "summary": "A task-end gate run includes every check CI runs on push or pull request; a local gate list that omits a CI check is stale.",
       "body": [
-        "The list today: cargo fmt --check, the full suite, clippy, the cross-target check, the lint chain (shellcheck, cargo deny, both knowledge gates, render --check, the residue gate, the payload-stamp gate), and -- pull-request only -- a check-commit range pass (`houserules check-commit --from $(git merge-base main HEAD) --to HEAD`, ci.yml's own check-commit job) and a knowledge-base audit of the diff (`mise run audit -- --base <PR base> --head <PR head>`).",
+        "The list today: cargo fmt --check, the full suite, clippy, the cross-target check, the lint chain (shellcheck, cargo deny, both knowledge gates, render --check, the residue gate, the vacuous-exception gate, the payload-stamp gate, the dist-generate-check gate), and -- pull-request only -- a check-commit range pass (`houserules check-commit --from $(git merge-base main HEAD) --to HEAD`, ci.yml's own check-commit job) and a knowledge-base audit of the diff (`mise run audit -- --base <PR base> --head <PR head>`).",
         "Derive the list from .github/workflows and mise.toml, not from memory; when CI gains a check, the task-end list gains it in the same change.",
         "The check-commit range pass matters most for a per-commit knowledge check: it judges every commit back to the real merge base with main, never only a fix round's own diff, so an omission here is exactly how a per-commit check ships unrun against the range CI actually judges (batch 24 T1 fix round 6: a per-commit co-change check went unrun at CI's own --from until this entry named the job).",
         "Origin: batch 22 T1 - three review rounds closed with cargo fmt --check red at HEAD because no round's gate list named it; CI would have failed the first push."
@@ -673,6 +673,62 @@
         "date": "2026-09-13",
         "by": "review",
         "ref": "batch 24 T3b report, part B capture set"
+      }
+    },
+    {
+      "id": "houserules.controller-gates-use-the-tree-binary",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "While the branch changes generated output, run controller gates and update/render through the tree binary, never the installed houserules.",
+      "body": [
+        "The tree binary: `cargo run --release --quiet --bin houserules --`.",
+        "The installed `houserules` on PATH is last release's build: it cannot see a change this branch has not shipped yet, and can reject a valid command outright on a schema or engine change the tree already carries.",
+        "Reinstall the released build after merge: `cargo install --path crates/houserules --bin houserules`.",
+        "This instruction is repository-specific: only a repository that builds `houserules` from source (this one, and any fork) has a tree to build from at all; an adopter's installed binary is already the released build, with no such tree beside it."
+      ],
+      "tags": [
+        "dev-tools",
+        "controller",
+        "gates"
+      ],
+      "source": {
+        "date": "2026-09-15",
+        "by": "review",
+        "ref": "batch 25 T2 review, finding 4"
+      }
+    },
+    {
+      "id": "houserules.1-0-surface-is-frozen",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Past 1.0, a CLI command/flag change or a schema constraint change is a breaking change: get an owner ruling and bump the major version.",
+      "body": [
+        "The frozen CLI surface: the 20 `Command` variants `crates/houserules/src/main.rs` defines, enumerated by the `no_subcommand_carries_a_long_about_beyond_its_short_one` test (`cargo test --bin houserules no_subcommand_carries_a_long_about_beyond_its_short_one`, asserts the count) and captured verbatim by `cargo run --release --quiet --bin houserules -- --help`.",
+        "The frozen schema surface: `knowledge/schema.json`, `template/knowledge/schema.json`, `backlog/schema.json`, `template/backlog/schema.json`, `.claude/schemas/deliverables.json`, and `template/.claude/schemas/deliverables.json` -- their constraints, not a prose restatement of them. `git rev-parse HEAD:<path>` pins each copy to its blob id at the freeze; design.md 5.82 carries the six ids.",
+        "Adding, removing, or renaming a subcommand or flag, or tightening or loosening a required field, an enum, a textList floor, or an id-shape pattern in any of the six schema files needs an owner ruling and a major-version bump, never a patch or minor release.",
+        "Neither surface is gated mechanically by this entry; design.md 5.82 is the durable record an owner supersession amends (process.owner-rulings-need-owner-supersession)."
+      ],
+      "tags": [
+        "cli",
+        "schema",
+        "breaking-change",
+        "freeze"
+      ],
+      "verify": [
+        "crates/houserules/src/main.rs",
+        "knowledge/schema.json",
+        "template/knowledge/schema.json",
+        "backlog/schema.json",
+        "template/backlog/schema.json",
+        ".claude/schemas/deliverables.json",
+        "template/.claude/schemas/deliverables.json"
+      ],
+      "source": {
+        "date": "2026-09-15",
+        "by": "user",
+        "ref": "docs/specs/2026-09-14-batch-25-v1-readiness.md §3; design.md 5.82"
       }
     }
   ]

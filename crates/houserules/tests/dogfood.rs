@@ -57,9 +57,10 @@ const RETIRED: &[&str] = &[
     "tools/lib/json-store.mjs",
 ];
 
-/// Runs `houserules files` and returns its `kitOwned`/`seedOnce` arrays as
-/// owned strings -- the one CLI-exposed form of the binary's own manifest.
-fn kit_files() -> (Vec<String>, Vec<String>) {
+/// Runs `houserules files` and returns its `kitOwned`/`seedOnce`/
+/// `githubHostedSeedOnce` arrays as owned strings -- the one CLI-exposed
+/// form of the binary's own manifest.
+fn kit_files() -> (Vec<String>, Vec<String>, Vec<String>) {
     let output = houserules().arg("files").output().expect("run files");
     assert!(output.status.success());
     let value: serde_json::Value =
@@ -72,7 +73,11 @@ fn kit_files() -> (Vec<String>, Vec<String>) {
             .map(|entry| entry.as_str().expect("array entry is a string").to_string())
             .collect()
     };
-    (strings("kitOwned"), strings("seedOnce"))
+    (
+        strings("kitOwned"),
+        strings("seedOnce"),
+        strings("githubHostedSeedOnce"),
+    )
 }
 
 /// Every file under `root`, as `/`-joined paths relative to `root`, sorted --
@@ -126,7 +131,7 @@ fn eval_scenarios(seed_once: &[String]) -> Vec<String> {
 /// name their known members and never overlap.
 #[test]
 fn kit_owned_manifest_separates_from_seed_once_and_has_no_overlap() {
-    let (kit_owned, seed_once) = kit_files();
+    let (kit_owned, seed_once, github_hosted_seed_once) = kit_files();
     for expected in [
         "tools/claude-session-start.sh",
         ".claude/agents/implementer.md",
@@ -159,21 +164,38 @@ fn kit_owned_manifest_separates_from_seed_once_and_has_no_overlap() {
         overlap.is_empty(),
         "kitOwned and seedOnce overlap: {overlap:?}"
     );
+
+    assert!(
+        github_hosted_seed_once
+            .iter()
+            .any(|file| file == ".github/workflows/knowledge.yml"),
+        "githubHostedSeedOnce is missing .github/workflows/knowledge.yml"
+    );
+    let github_hosted_overlap: Vec<&String> = github_hosted_seed_once
+        .iter()
+        .filter(|file| kit_owned.contains(file) || seed_once.contains(file))
+        .collect();
+    assert!(
+        github_hosted_overlap.is_empty(),
+        "githubHostedSeedOnce overlaps kitOwned/seedOnce: {github_hosted_overlap:?}"
+    );
 }
 
 /// Every file under `template/` is exactly `kitOwned` (minus `RETIRED`,
 /// which this binary's own `KIT_OWNED` never carries, so the filter is a
-/// structural no-op today) plus `seedOnce` plus `.claude/settings.json`
-/// (seeded or merged specially, never plain-copied).
+/// structural no-op today) plus `seedOnce` plus `githubHostedSeedOnce`
+/// plus `.claude/settings.json` (seeded or merged specially, never
+/// plain-copied).
 #[test]
 fn kit_owned_and_seed_once_account_for_every_template_file() {
-    let (kit_owned, seed_once) = kit_files();
+    let (kit_owned, seed_once, github_hosted_seed_once) = kit_files();
     let mut expected: Vec<String> = kit_owned
         .iter()
         .filter(|file| !RETIRED.contains(&file.as_str()))
         .cloned()
         .collect();
     expected.extend(seed_once.iter().cloned());
+    expected.extend(github_hosted_seed_once.iter().cloned());
     expected.push(".claude/settings.json".to_string());
     expected.sort();
 
@@ -182,15 +204,30 @@ fn kit_owned_and_seed_once_account_for_every_template_file() {
 }
 
 /// Every live `KIT_OWNED` root copy in this checkout is byte-identical to
-/// its `template/` source. A hand edit to either side fails here and is
-/// lost on the next `houserules update`.
+/// its `template/` source, except a path this repo's own `.houserules.json`
+/// `overrides` list declares its own (`.githooks/commit-msg`: this
+/// repository keeps its stricter, trailer-gating hook via the overrides
+/// model while the template's own copy drops that gate -- T2 review ruling
+/// 5.81). A hand edit to a non-overridden path fails here and is lost on
+/// the next `houserules update`.
 #[test]
 fn root_kit_owned_files_equal_their_template_source_byte_for_byte() {
-    let (kit_owned, _seed_once) = kit_files();
+    let (kit_owned, _seed_once, _github_hosted_seed_once) = kit_files();
     let root = repo_root();
+    let stamp: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(root.join(".houserules.json")).expect("read .houserules.json"),
+    )
+    .expect("parse .houserules.json");
+    let overrides: Vec<&str> = stamp["overrides"]
+        .as_array()
+        .expect("overrides is an array")
+        .iter()
+        .map(|v| v.as_str().expect("override entry is a string"))
+        .collect();
     for file in kit_owned
         .iter()
         .filter(|file| !RETIRED.contains(&file.as_str()))
+        .filter(|file| !overrides.contains(&file.as_str()))
     {
         let root_path = root.join(file);
         assert!(
@@ -265,6 +302,23 @@ fn houserules_json_stamps_the_installed_version_and_the_hr_id_prefix() {
             "backlog/items/general.json",
             ".github/workflows/knowledge.yml",
             "docs/README.md",
+            "process.ask-when-missing",
+            "process.brief-carries-the-spec",
+            "process.contract-refresh-sweep",
+            "process.eval-fixture-procedure",
+            "process.evals-rerun",
+            "process.evidence-outlives-the-session",
+            "process.fix-round-verification-record",
+            "process.gate-shell-chains",
+            "process.main-wins-backlog-collisions",
+            "process.owner-content-mid-batch",
+            "process.review-findings-are-claims-too",
+            "process.rulings-to-file",
+            "process.skills-for-procedures",
+            "process.tdd",
+            "quality.no-compat-softening",
+            "quality.principles",
+            ".githooks/commit-msg",
         ]),
         "got {stamp}"
     );
@@ -299,7 +353,7 @@ fn deliverables_schema_equals_template_source_with_the_id_prefix_rewrite() {
 /// vacuously empty.
 #[test]
 fn seed_once_derives_at_least_one_eval_scenario() {
-    let (_kit_owned, seed_once) = kit_files();
+    let (_kit_owned, seed_once, _github_hosted_seed_once) = kit_files();
     assert!(!eval_scenarios(&seed_once).is_empty());
 }
 
@@ -308,7 +362,7 @@ fn seed_once_derives_at_least_one_eval_scenario() {
 /// plain byte equality, no transform.
 #[test]
 fn seed_once_eval_scenario_copies_equal_template_source_byte_for_byte() {
-    let (_kit_owned, seed_once) = kit_files();
+    let (_kit_owned, seed_once, _github_hosted_seed_once) = kit_files();
     let root = repo_root();
     for file in eval_scenarios(&seed_once) {
         let root_bytes =

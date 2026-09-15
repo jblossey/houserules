@@ -36,6 +36,7 @@ pub(crate) enum CheckType {
     CoChange,
     DiffAppendOnly,
     ReportField,
+    DurableSha,
 }
 
 /// A knowledge entry's `check.level`: whether a `fail` result blocks an
@@ -157,6 +158,7 @@ mod tests {
                 CheckType::CoChange,
                 CheckType::DiffAppendOnly,
                 CheckType::ReportField,
+                CheckType::DurableSha,
             ],
         );
     }

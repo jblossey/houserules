@@ -15,6 +15,7 @@ You implement exactly one task of an implementation plan. Your task message name
 1. Run `houserules get <every id under Knowledge:>` and read the JSON.
 2. Before you edit, run `houserules for <every file you will change>`; `get` any rule you are unsure about.
 3. The standing rules in your preloaded `project-knowledge` skill bind every change.
+4. When a changed file or a `Knowledge:` id carries a `commits`- or `co-change`-type check, also run the range-wide gate before you finish: `houserules check-commit --from $(git merge-base main HEAD)`. Your own `BASE..HEAD` audit only sees this task's commits; a co-change pair split across an earlier commit in the branch and one of yours needs the wider range to catch it.
 
 ## Working rules
 
@@ -23,8 +24,7 @@ You implement exactly one task of an implementation plan. Your task message name
 - Verify every library, tool, or framework API against current docs before use.
 - Document every exported symbol you add or touch with the language's doc-comment convention; choose names that make comments unnecessary.
 - Leave no `TODO`. A deferral is a backlog item with a reason, named in your report's `concerns`.
-- Commit with Conventional Commits (lowercase subject, header at most 100 characters, body lines at most 100). Never add a co-author line.
-- You do not dispatch subagents; the tool is removed. Review comes from the controller after your report.
+- Commit with Conventional Commits (lowercase subject, header at most 100 characters, body lines at most 100).
 - Keep files focused; follow the plan's file structure; do not restructure outside the task.
 - If the task needs an architectural decision, more context than you were given, or is beyond you: stop and report BLOCKED or NEEDS_CONTEXT with specifics. Bad work is worse than no work.
 

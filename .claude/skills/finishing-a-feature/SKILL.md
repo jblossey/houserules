@@ -1,15 +1,19 @@
 ---
 name: finishing-a-feature
-description: Use when a feature branch is complete, tests and lint are green, and the branch is ready to merge to main. This repository forbids GitHub merge buttons, merge commits, squash merges, and co-author lines; merges are fast-forward-only via CLI.
+description: Use when a feature branch is complete, tests and lint are green, and the branch is ready to merge to main. Merges are fast-forward-only via CLI and commits carry no co-author lines by default, unless the project has ruled its own merge and attribution discipline.
 ---
 
 # Finishing a Feature
 
 ## Overview
 
-This repository requires clean aggregated commits, fast-forward-only (ff-only)
-merges done from the CLI, and no co-author lines. When interactive rebase is
-not available, commit aggregation uses `git reset --soft` instead.
+This procedure produces clean aggregated commits and merges them from the
+CLI. It ships with two defaults a project may override by ruling its own
+discipline instead (elicited by the `migrating-knowledge` skill's "Elicit
+your own operating discipline" step, recorded as its own knowledge entry):
+fast-forward-only (ff-only) merges, and no co-author lines. When
+interactive rebase is not available, commit aggregation uses `git reset
+--soft` instead.
 
 ## When to Use
 
@@ -60,7 +64,8 @@ and lint first.
    ```
    Then build 1-5 clean, logical Conventional Commits from the staged
    result (`git restore --staged .` and re-stage per logical group as
-   needed). Never include a co-author line, in this or any commit.
+   needed). Never include a co-author line, in this or any commit, unless
+   the project has ruled its own attribution convention.
 
 4b. **Sweep interim SHAs.** Grep the aggregated diff for commit-SHA
    citations (`git diff main...HEAD | grep -oE '\b[0-9a-f]{7,40}\b'`,
@@ -80,13 +85,16 @@ and lint first.
    ```
    All checks must pass before continuing.
 
-7. **Merge fast-forward from the CLI.** Never use the GitHub merge button.
+7. **Merge from the CLI, per the project's own discipline.** The default
+   here is fast-forward-only, never a UI merge button:
    ```sh
    git switch main && git pull --ff-only
    git merge --ff-only <branch>
    git push origin main
    ```
-   GitHub marks the PR merged once the commits reach main.
+   A project that has ruled a different merge discipline (a merge commit,
+   a squash) follows that ruling instead. GitHub marks the PR merged once
+   the commits reach main.
 
 8. **After merging a release-please PR, or any merge that changes the
    houserules version, restamp the kit version.** Skip this step for
@@ -122,7 +130,10 @@ and lint first.
   step 4.
 - **Force-pushing main.** Force-push (`-f`) is only ever for feature
   branches. Never force-push main.
-- **Adding a co-author line.** This repository never uses co-author trailers,
-  in aggregated commits or anywhere else in this procedure.
-- **Merging via the GitHub UI.** The merge button, merge commits, and
-  squash merges are all forbidden here — always merge ff-only from the CLI.
+- **Adding a co-author line without a ruling that allows it.** The default
+  here is no co-author trailers, in aggregated commits or anywhere else in
+  this procedure; change it only by ruling the project's own attribution
+  convention first.
+- **Merging via a UI button without a ruling that allows it.** The default
+  here is always ff-only from the CLI; change it only by ruling the
+  project's own merge discipline first.

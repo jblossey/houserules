@@ -40,21 +40,27 @@
 //!
 //! `update` resolves the target the same way `init` does, runs the same
 //! `.git` check and marker read-and-validate (`read_marker`), then
-//! reconciles four kinds of kit-shipped content against `.houserules.json`'s
+//! reconciles five kinds of kit-shipped content against `.houserules.json`'s
 //! `baselines` map (`baseline::classify`'s own doc has the decision rule
 //! every one of them shares) and its `overrides` list (a hand-edited JSON
 //! array of paths and knowledge-entry ids the adopter has declared their
 //! own, documented for adopters at `docs/README.md`):
 //!
-//! - Every `KIT_OWNED` file not in `overrides`: at its recorded baseline
-//!   (or, with none recorded yet, identical to the running payload) gets
-//!   overwritten and restamped, same as an unconditional sync would;
-//!   content that diverges is kept and reported once (`kept <path> (locally
-//!   modified)`); a path the adopter deleted outright is RESTORED, the same
-//!   as the at-baseline case, since kit machinery an adopter has not
-//!   claimed with an override is always present after `update` -- it is
-//!   never merely reported absent. A path in `overrides` is left exactly as
-//!   found, present or absent, with no report line at all.
+//! - Every `KIT_OWNED` file not in `overrides` gets overwritten and
+//!   restamped, same as an unconditional sync would, when its content is:
+//!     - at its recorded baseline; or
+//!     - with none recorded yet, identical to the running payload; or
+//!     - already identical to the running payload despite a stale
+//!       recorded baseline (both copies edited to the same ruled wording
+//!       without an intervening restamp).
+//!
+//!   Content matching none of the three is kept and reported once
+//!   (`kept <path> (locally modified)`). A path the adopter deleted
+//!   outright is RESTORED, the same as the at-baseline case, since kit
+//!   machinery an adopter has not claimed with an override is always
+//!   present after `update` -- it is never merely reported absent. A path
+//!   in `overrides` is left exactly as found, present or absent, with no
+//!   report line at all.
 //! - Every knowledge-topic path (a `SEED_ONCE` path under `knowledge/` other
 //!   than `schema.json` and `areas.json`): listed in `overrides`, the whole
 //!   file is left exactly as found, with no report line; absent and not
@@ -70,6 +76,11 @@
 //!   overridden; left untouched when already present, since these files are
 //!   adopter data once seeded, not kit content this baseline mechanism
 //!   tracks.
+//! - Every `GITHUB_HOSTED_SEED_ONCE` path: backfilled the same way as any
+//!   other missing `SEED_ONCE` path, but only once `origin_is_github_hosted`
+//!   is true for the target; a non-GitHub origin (or none at all) leaves it
+//!   silently absent, matching `RETIRED`'s own absence convention below
+//!   rather than the `wrote`/`kept` pair every other `SEED_ONCE` path gets.
 //! - Any `RETIRED` path still present, deleted and reported
 //!   (`delete_retired`, below).
 //!
@@ -158,7 +169,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 
 use rust_embed::RustEmbed;
 use serde_json::{Map, Value, json};
@@ -214,10 +225,26 @@ const SEED_ONCE: &[&str] = &[
     ".claude/evals/docs-edit.json",
     ".claude/evals/record.json",
     ".claude/evals/seeded-violations.json",
-    ".github/workflows/knowledge.yml",
     "docs/README.md",
     "CLAUDE.md",
 ];
+
+/// `SEED_ONCE` paths this kit seeds only for a GitHub-hosted target: the
+/// gate itself assumes a GitHub Actions runner and a GitHub PR event, so
+/// writing it into a project hosted elsewhere would ship a workflow file
+/// nothing ever runs. `seed` (`init`) writes each path here exactly like a
+/// `SEED_ONCE` path -- absent and github-hosted, written and reported;
+/// already present, kept and reported -- except that an origin this
+/// crate's own `origin_is_github_hosted` does not recognize as GitHub
+/// skips the write and reports why instead of writing. `update` backfills
+/// a still-absent path here the same way it backfills any other missing
+/// `SEED_ONCE` path, but only once the target's origin has become
+/// GitHub-hosted; skipping it for a non-GitHub origin stays silent there,
+/// matching `update`'s own convention of reporting only what it changes
+/// (`RETIRED`'s "Deletion" doc section is the same convention on the
+/// removal side). A project not on GitHub gets its own CI gate from the
+/// `migrating-knowledge` skill's own instruction instead.
+const GITHUB_HOSTED_SEED_ONCE: &[&str] = &[".github/workflows/knowledge.yml"];
 
 /// The `SEED_ONCE` paths that hold knowledge entries: `knowledge/*.json`
 /// other than `schema.json` and `areas.json`, the same split
@@ -429,6 +456,21 @@ fn read_marker(marker_path: &Path, prefix: &str) -> Result<Map<String, Value>, S
         ));
     }
     Ok(marker)
+}
+
+/// `root`'s own stamped `idPrefix` (`.houserules.json`), for a reader that
+/// needs it outside `init`/`update`'s own flow -- `get`'s id-shape routing
+/// (`crate::get::is_backlog_id`) is the one caller today. Reuses
+/// `read_marker` and `effective_id_prefix` unmodified, with `"WI"` standing
+/// in for the CLI's own `--id-prefix` flag (`get` takes no such flag): a
+/// marker file absent entirely, or present without an `idPrefix` key,
+/// resolves to `"WI"`, `init`'s and `update`'s own default; a present,
+/// invalid `idPrefix` is `read_marker`'s own named error
+/// (`houserules.crash-paths-are-named`), the same one `init`/`update` raise
+/// for it.
+pub(crate) fn stamped_id_prefix(root: &Path) -> Result<String, String> {
+    let marker = read_marker(&root.join(MARKER_PATH), "WI")?;
+    Ok(effective_id_prefix(&marker, "WI"))
 }
 
 /// Reads `marker`'s `overrides` field: a JSON array of strings, each one a
@@ -679,6 +721,34 @@ fn upsert_topic_entries(
     Ok(reports)
 }
 
+/// `true` when `target`'s configured `origin` remote resolves to a
+/// GitHub-hosted URL: `git config --get remote.origin.url`, read locally
+/// with no network call, matched for a `github.com` host segment against
+/// every real remote form (`https://github.com/<org>/<repo>.git`,
+/// `git@github.com:<org>/<repo>.git`, `ssh://git@github.com/<org>/<repo>`)
+/// -- the host segment is the same literal substring in all three. `false`
+/// covers every non-matching case alike: no `origin` configured at all (a
+/// bare `git init`, most of this crate's own test fixtures), a `git`
+/// invocation that fails outright, and an `origin` hosted anywhere else
+/// (GitLab, Bitbucket, a self-hosted forge) -- `seed`/`update` read this as
+/// one boolean gate, never distinguishing why it came back `false`.
+fn origin_is_github_hosted(target: &Path) -> bool {
+    let output = Command::new("git")
+        .args(["config", "--get", "remote.origin.url"])
+        .current_dir(target)
+        .output();
+    let Ok(output) = output else {
+        return false;
+    };
+    if !output.status.success() {
+        return false;
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .to_lowercase()
+        .contains("github.com")
+}
+
 /// Deletes each `retired` path found under `target`, returning the ones
 /// actually removed, in call order -- `update`'s own report prints one
 /// `removed <path>` line per entry this returns (this module's own doc,
@@ -774,9 +844,12 @@ fn merge_settings(path: &Path, prefix: &str) -> Result<bool, String> {
 
 /// Seeds `target` from the embedded payload: writes every `KIT_OWNED` file,
 /// then every `SEED_ONCE` file absent from `target` (an existing one is
-/// left untouched, reported `kept`), seeds or merges `.claude/settings.json`,
-/// stamps `.houserules.json` -- `overrides` and `baselines` included -- and
-/// renders the generated markdown. Every payload file this writes is
+/// left untouched, reported `kept`), then every `GITHUB_HOSTED_SEED_ONCE`
+/// file the same way but only when `origin_is_github_hosted(target)` is
+/// true (a non-GitHub origin skips the write and reports why), seeds or
+/// merges `.claude/settings.json`, stamps `.houserules.json` -- `overrides`
+/// and `baselines` included -- and renders the generated markdown. Every
+/// payload file this writes is
 /// rewritten with `effective_id_prefix`'s resolution: the marker's own
 /// stamped `idPrefix` when one is already on record, falling back to the
 /// `--id-prefix` flag and then `WI` -- never the flag alone, so a re-`init`
@@ -807,6 +880,21 @@ fn seed(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
     for file in SEED_ONCE {
         if target.join(file).exists() {
             println!("kept {file}");
+            continue;
+        }
+        write_into(target, file, &payload_content(file, &effective_prefix)?)?;
+        println!("wrote {file}");
+    }
+    let github_hosted = origin_is_github_hosted(target);
+    for file in GITHUB_HOSTED_SEED_ONCE {
+        if target.join(file).exists() {
+            println!("kept {file}");
+            continue;
+        }
+        if !github_hosted {
+            println!(
+                "skipped {file} (origin is not GitHub-hosted; see the migrating-knowledge skill to add your own CI gate)"
+            );
             continue;
         }
         write_into(target, file, &payload_content(file, &effective_prefix)?)?;
@@ -984,6 +1072,16 @@ fn update(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
             write_into(target, file, &payload_content(file, &effective_prefix)?)?;
             println!("wrote {file}");
         }
+        for file in GITHUB_HOSTED_SEED_ONCE {
+            if target.join(file).exists() || is_overridden(&overrides, file) {
+                continue;
+            }
+            if !origin_is_github_hosted(target) {
+                continue;
+            }
+            write_into(target, file, &payload_content(file, &effective_prefix)?)?;
+            println!("wrote {file}");
+        }
     }
 
     let stamped_version = marker
@@ -1030,12 +1128,16 @@ pub(crate) fn cmd_update(dir: Option<PathBuf>, id_prefix: Option<String>) -> Exi
     }
 }
 
-/// Runs the `files` subcommand: prints the kit-owned and seed-once path
-/// lists as JSON.
+/// Runs the `files` subcommand: prints the kit-owned, seed-once, and
+/// GitHub-hosted-only seed-once path lists as JSON.
 pub(crate) fn cmd_files() -> ExitCode {
     print!(
         "{}",
-        emit(&json!({"kitOwned": KIT_OWNED, "seedOnce": SEED_ONCE}))
+        emit(&json!({
+            "kitOwned": KIT_OWNED,
+            "seedOnce": SEED_ONCE,
+            "githubHostedSeedOnce": GITHUB_HOSTED_SEED_ONCE,
+        }))
     );
     ExitCode::SUCCESS
 }
@@ -1050,7 +1152,12 @@ mod tests {
     /// present in the compiled-in payload.
     #[test]
     fn the_embedded_payload_carries_every_kit_owned_and_seed_once_path() {
-        for file in KIT_OWNED.iter().chain(SEED_ONCE).chain([&SETTINGS_PATH]) {
+        for file in KIT_OWNED
+            .iter()
+            .chain(SEED_ONCE)
+            .chain(GITHUB_HOSTED_SEED_ONCE)
+            .chain([&SETTINGS_PATH])
+        {
             assert!(
                 Payload::get(file).is_some(),
                 "{file} is missing from the embedded payload"
@@ -1168,5 +1275,54 @@ mod tests {
                 "tools/lib/json-store.mjs",
             ]
         );
+    }
+
+    /// A scratch git repository, `origin` unset -- `origin_is_github_hosted`'s
+    /// own no-remote-configured case.
+    fn git_repo_with_no_origin() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let status = std::process::Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(dir.path())
+            .status()
+            .expect("run git init");
+        assert!(status.success(), "git init failed");
+        dir
+    }
+
+    /// `git_repo_with_no_origin` plus a configured `origin` remote at `url`.
+    fn git_repo_with_origin(url: &str) -> tempfile::TempDir {
+        let dir = git_repo_with_no_origin();
+        let status = std::process::Command::new("git")
+            .args(["remote", "add", "origin", url])
+            .current_dir(dir.path())
+            .status()
+            .expect("run git remote add");
+        assert!(status.success(), "git remote add failed");
+        dir
+    }
+
+    #[test]
+    fn origin_is_github_hosted_true_for_an_https_github_origin() {
+        let dir = git_repo_with_origin("https://github.com/jblossey/houserules.git");
+        assert!(origin_is_github_hosted(dir.path()));
+    }
+
+    #[test]
+    fn origin_is_github_hosted_true_for_an_ssh_style_github_origin() {
+        let dir = git_repo_with_origin("git@github.com:jblossey/houserules.git");
+        assert!(origin_is_github_hosted(dir.path()));
+    }
+
+    #[test]
+    fn origin_is_github_hosted_false_with_no_origin_configured() {
+        let dir = git_repo_with_no_origin();
+        assert!(!origin_is_github_hosted(dir.path()));
+    }
+
+    #[test]
+    fn origin_is_github_hosted_false_for_a_non_github_origin() {
+        let dir = git_repo_with_origin("https://gitlab.com/jblossey/houserules.git");
+        assert!(!origin_is_github_hosted(dir.path()));
     }
 }

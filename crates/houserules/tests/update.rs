@@ -159,10 +159,12 @@ const SEED_ONCE: &[&str] = &[
     ".claude/evals/docs-edit.json",
     ".claude/evals/record.json",
     ".claude/evals/seeded-violations.json",
-    ".github/workflows/knowledge.yml",
     "docs/README.md",
     "CLAUDE.md",
 ];
+
+/// Every `GITHUB_HOSTED_SEED_ONCE` path -- `install.rs`'s own array.
+const GITHUB_HOSTED_SEED_ONCE: &[&str] = &[".github/workflows/knowledge.yml"];
 
 /// The lowercase hex SHA-256 digest of `content` -- this test file's own
 /// copy of `install::baseline::hash`, computed independently with the same
@@ -305,6 +307,60 @@ fn update_replaces_an_at_baseline_kit_owned_file_with_the_running_kits_content()
     assert_eq!(
         restamped["baselines"][file],
         serde_json::json!(sha256_hex(&running_content))
+    );
+}
+
+/// A `KIT_OWNED` file already holding the running kit's exact content, but
+/// with a recorded baseline stamped to something else entirely, is neither
+/// kept-and-reported nor left stale: `update` restamps its baseline to the
+/// running content's hash and reports it the same way an ordinary
+/// at-baseline sync would, never as `kept ... (locally modified)`. This is
+/// the dogfood shape a ruled wording change produces when a project's own
+/// copy is hand-synced to a new kit release without an intervening
+/// `update` restamping first.
+#[test]
+fn update_restamps_a_kit_owned_file_already_at_the_running_content_despite_a_stale_baseline() {
+    let dir = seeded_repo();
+    let file = ".claude/agents/implementer.md";
+    let running_content = fs::read(repo_root().join("template").join(file)).unwrap();
+    set_marker_baseline(
+        dir.path(),
+        file,
+        &sha256_hex(b"content from an older kit release\n"),
+    );
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        !stdout.contains(&format!("kept {file} (locally modified)\n")),
+        "got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains(&format!("wrote {file}\n")),
+        "got:\n{stdout}"
+    );
+
+    assert_eq!(
+        fs::read(dir.path().join(file)).unwrap(),
+        running_content,
+        "update changed content that already matched the running kit"
+    );
+    let marker_path = dir.path().join(".houserules.json");
+    let restamped: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    assert_eq!(
+        restamped["baselines"][file],
+        serde_json::json!(sha256_hex(&running_content)),
+        "the stale baseline was never restamped to the running content's hash"
     );
 }
 
@@ -591,6 +647,68 @@ fn update_replaces_an_at_baseline_knowledge_entry_with_the_running_kits_content(
     );
 }
 
+/// A knowledge entry already holding the running kit's exact content, but
+/// with a recorded baseline stamped to something else entirely, restamps
+/// silently: no `kept ... (locally modified)` line, no `updated ... entry
+/// changed` line either, since the entry's own content never actually
+/// changes -- only its stale baseline moves to match what is already on
+/// disk. The dogfood shape: a ruled wording change lands in both the kit's
+/// own template and this project's own root copy in the same turn, and
+/// only the restamp is still pending.
+#[test]
+fn update_restamps_a_knowledge_entry_already_at_the_running_content_despite_a_stale_baseline() {
+    let dir = seeded_repo();
+    let entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
+    let running_entry = entries
+        .iter()
+        .find(|entry| entry["id"] == TEST_ENTRY_ID)
+        .expect("test entry present in a fresh seed")
+        .clone();
+    let mut stale_release_entry = running_entry.clone();
+    stale_release_entry["summary"] = serde_json::json!("an older release's summary text");
+    set_marker_baseline(
+        dir.path(),
+        TEST_ENTRY_ID,
+        &sha256_hex(&canonical_entry_bytes(&stale_release_entry)),
+    );
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(!stdout.contains(TEST_ENTRY_ID), "got:\n{stdout}");
+    assert!(
+        !stdout.contains(&format!("updated {TEST_ENTRY_TOPIC_FILE}")),
+        "got:\n{stdout}"
+    );
+
+    let entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
+    let entry = entries
+        .iter()
+        .find(|entry| entry["id"] == TEST_ENTRY_ID)
+        .expect("entry still present");
+    assert_eq!(
+        entry, &running_entry,
+        "update changed already-current content"
+    );
+
+    let marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(dir.path().join(".houserules.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        marker["baselines"][TEST_ENTRY_ID],
+        serde_json::json!(sha256_hex(&canonical_entry_bytes(&running_entry))),
+        "the stale baseline was never restamped to the running content's hash"
+    );
+}
+
 /// An entry the adopter edited diverges from its recorded baseline:
 /// `update` keeps the adopter's own content and reports it once, the same
 /// contract a `KIT_OWNED` file gets.
@@ -779,6 +897,130 @@ fn update_backfills_a_missing_seed_once_file() {
     let backfilled = fs::read(dir.path().join("docs/README.md")).unwrap();
     let template = fs::read(repo_root().join("template/docs/README.md")).unwrap();
     assert_eq!(backfilled, template);
+}
+
+/// `seeded_repo`'s own `init` already skipped every `GITHUB_HOSTED_SEED_ONCE`
+/// path (no `origin` remote on a plain `scratch_git_repo`); a plain `update`
+/// leaves it missing and silent, the same convention `RETIRED`'s absence
+/// gets, since nothing has changed about the target's origin.
+#[test]
+fn update_silently_leaves_the_github_hosted_only_file_absent_without_a_github_origin() {
+    let dir = seeded_repo();
+    for file in GITHUB_HOSTED_SEED_ONCE {
+        assert!(!dir.path().join(file).exists(), "{file} was seeded");
+    }
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    for file in GITHUB_HOSTED_SEED_ONCE {
+        assert!(
+            !stdout.contains(file),
+            "update reported {file} in:\n{stdout}"
+        );
+        assert!(!dir.path().join(file).exists(), "{file} was backfilled");
+    }
+}
+
+/// A target that becomes GitHub-hosted after its original `init` (an
+/// `origin` remote added later) has its `GITHUB_HOSTED_SEED_ONCE` file
+/// backfilled on the next `update`, the same way any other newly
+/// qualifying `SEED_ONCE` path is.
+#[test]
+fn update_backfills_the_github_hosted_only_file_once_origin_becomes_github_hosted() {
+    let dir = seeded_repo();
+    for file in GITHUB_HOSTED_SEED_ONCE {
+        assert!(!dir.path().join(file).exists(), "{file} was seeded");
+    }
+    let status = Command::new("git")
+        .args([
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/jblossey/houserules.git",
+        ])
+        .current_dir(dir.path())
+        .status()
+        .expect("run git remote add");
+    assert!(status.success(), "git remote add failed");
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    for file in GITHUB_HOSTED_SEED_ONCE {
+        assert!(
+            stdout.contains(&format!("wrote {file}\n")),
+            "got:\n{stdout}"
+        );
+        let backfilled = fs::read(dir.path().join(file)).unwrap();
+        let template = fs::read(repo_root().join("template").join(file)).unwrap();
+        assert_eq!(backfilled, template);
+    }
+}
+
+/// An override on the still-absent `GITHUB_HOSTED_SEED_ONCE` path means
+/// "deleted on purpose" even once the origin becomes GitHub-hosted: `update`
+/// leaves it absent and prints nothing about it, the same as any other
+/// overridden `SEED_ONCE` path.
+#[test]
+fn update_does_not_backfill_an_overridden_github_hosted_only_file() {
+    let dir = seeded_repo();
+    let status = Command::new("git")
+        .args([
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/jblossey/houserules.git",
+        ])
+        .current_dir(dir.path())
+        .status()
+        .expect("run git remote add");
+    assert!(status.success(), "git remote add failed");
+
+    let marker_path = dir.path().join(".houserules.json");
+    let mut marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    marker["overrides"] = serde_json::json!(GITHUB_HOSTED_SEED_ONCE);
+    fs::write(
+        &marker_path,
+        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
+    )
+    .unwrap();
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    for file in GITHUB_HOSTED_SEED_ONCE {
+        assert!(
+            !stdout.contains(file),
+            "update reported {file} in:\n{stdout}"
+        );
+        assert!(!dir.path().join(file).exists());
+    }
 }
 
 /// An override on a missing `SEED_ONCE` path means "deleted on purpose":

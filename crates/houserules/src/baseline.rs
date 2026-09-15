@@ -28,10 +28,14 @@ pub(crate) fn hash(content: &[u8]) -> String {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Status {
     /// No adopter drift: the caller writes the payload's current content
-    /// and restamps the baseline to its hash. Covers three shapes alike --
-    /// content already at the recorded baseline, content that happens to
-    /// already equal the payload with no baseline recorded yet (a
-    /// pre-baseline install's first stamp), and an item the adopter has
+    /// and restamps the baseline to its hash. Covers four shapes alike --
+    /// content already at the recorded baseline; content that already
+    /// equals the CURRENT payload even though the recorded baseline is
+    /// stale (both copies edited to the same ruled wording, the dogfood
+    /// norm, without an intervening restamp -- nothing to keep against a
+    /// baseline the kit itself has already moved past); content that
+    /// happens to already equal the payload with no baseline recorded yet
+    /// (a pre-baseline install's first stamp); and an item the adopter has
     /// never had at all (nothing recorded, nothing on disk).
     AtBaseline,
     /// The current content diverges from its recorded baseline (or, with
@@ -52,6 +56,11 @@ pub(crate) enum Status {
 /// content for it. `overridden` short-circuits every other input: an
 /// adopter-declared override is always [`Status::Overridden`], regardless
 /// of what the content or baseline says.
+///
+/// `current` matching `payload` is [`Status::AtBaseline`] regardless of
+/// what `baseline` records: a stale recorded baseline never reports drift
+/// against content that already matches what the kit currently ships,
+/// since there is nothing left for the adopter to have diverged from.
 pub(crate) fn classify(
     baseline: Option<&str>,
     current: Option<&[u8]>,
@@ -61,23 +70,20 @@ pub(crate) fn classify(
     if overridden {
         return Status::Overridden;
     }
-    match (baseline, current) {
-        (Some(baseline), Some(current)) => {
-            if hash(current) == baseline {
-                Status::AtBaseline
-            } else {
-                Status::Modified
-            }
-        }
-        (Some(_), None) => Status::Deleted,
-        (None, Some(current)) => {
-            if hash(current) == hash(payload) {
-                Status::AtBaseline
-            } else {
-                Status::Modified
-            }
-        }
-        (None, None) => Status::AtBaseline,
+    let Some(current) = current else {
+        return if baseline.is_some() {
+            Status::Deleted
+        } else {
+            Status::AtBaseline
+        };
+    };
+    let current_hash = hash(current);
+    let at_recorded_baseline = baseline.is_some_and(|baseline| current_hash == baseline);
+    let at_current_payload = current_hash == hash(payload);
+    if at_recorded_baseline || at_current_payload {
+        Status::AtBaseline
+    } else {
+        Status::Modified
     }
 }
 
@@ -106,6 +112,28 @@ mod tests {
             classify(
                 Some(&baseline),
                 Some(b"kit content"),
+                b"new kit content",
+                false
+            ),
+            Status::AtBaseline
+        );
+    }
+
+    /// A stale recorded baseline (content the kit shipped BEFORE a ruled
+    /// wording change) must not shadow `current` already matching what the
+    /// kit ships NOW -- both copies edited together, the dogfood norm,
+    /// land exactly here. There is nothing to keep: the adopter holds
+    /// precisely the running payload, so this restamps silently rather
+    /// than reporting drift against a baseline the kit itself has already
+    /// moved past.
+    #[test]
+    fn classify_at_baseline_when_current_already_matches_the_payload_despite_a_stale_recorded_baseline()
+     {
+        let stale_baseline = hash(b"old kit content");
+        assert_eq!(
+            classify(
+                Some(&stale_baseline),
+                Some(b"new kit content"),
                 b"new kit content",
                 false
             ),

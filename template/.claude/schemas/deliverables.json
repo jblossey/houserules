@@ -348,6 +348,22 @@
         }
       }
     },
+    "ruling": {
+      "type": "object",
+      "required": [
+        "ruling",
+        "home"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ruling": {
+          "$ref": "#/$defs/text"
+        },
+        "home": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
     "fixRound": {
       "type": "object",
       "required": [
@@ -513,6 +529,12 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/fixRound"
+          }
+        },
+        "rulings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ruling"
           }
         },
         "dependency_vetting": {

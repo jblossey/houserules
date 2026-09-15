@@ -78,14 +78,14 @@ fn dist_workspace_sets_create_release_false() {
 /// The generated host job uploads into release-please's already-created
 /// release (`gh release upload`) and never calls `gh release create` --
 /// the exact call that collided in T2. `dist-workspace.toml` is this
-/// file's source (`houserules.release-workflow-is-generated`), but no CI
-/// job or mise task runs `dist generate --check` today: a control probe
-/// (a scratch clone, `dist generate --check` after a one-line hand-edit
-/// to `release.yml`) exits 0 under this repository's own
-/// `allow-dirty = ["ci"]`, and only exits 255 once allow-dirty is
-/// cleared. This test substring-pins both halves of the pairing so a
-/// drift between them fails `cargo test` even without that gate; HR-119
-/// tracks wiring `dist generate --check` into a real, permanent CI step.
+/// file's source (`houserules.release-workflow-is-generated`), and
+/// `dist-generate-check.rs` (wired into `mise run lint`'s ubuntu-only
+/// leg) is the real, permanent gate: it runs `dist generate --check`
+/// against a scratch copy with `allow-dirty` cleared to `[]`, since this
+/// repository's own tracked `allow-dirty = ["ci"]` would otherwise make
+/// the check tolerate any drift in `release.yml`, hand-edits included.
+/// This test substring-pins both halves of the pairing too, so a drift
+/// between them fails `cargo test` even independent of that gate.
 #[test]
 fn release_workflow_host_step_uploads_not_creates() {
     let workflow = fs::read_to_string(repo_root().join(".github/workflows/release.yml"))

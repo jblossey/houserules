@@ -8,8 +8,10 @@
       "kind": "rule",
       "area": "process",
       "standing": true,
-      "summary": "Ask the user when information is missing. Do not assume.",
-      "body": [],
+      "summary": "Ask the project's owner or decider when information is missing. Do not assume.",
+      "body": [
+        "Who answers depends on the project and its environment: a human owner in a supervised setup, an orchestrator or manager agent in a fully autonomous one. Name the project's actual decider once known, in CLAUDE.md or a knowledge entry."
+      ],
       "tags": [
         "users"
       ],
@@ -47,7 +49,7 @@
       "standing": false,
       "summary": "A task brief carries every test, gate, and file its spec task names; an implementer who cannot satisfy one flags it instead of dropping it.",
       "body": [
-        "The controller writes briefs from the spec and plan; a silent omission surfaces only in review, one round late (batch 3, task 3).",
+        "The controller writes briefs from the spec and plan; a silent omission surfaces only in review, one round late.",
         "When a brief and the spec disagree, the spec wins and the disagreement is a ruling to record."
       ],
       "tags": [
@@ -57,7 +59,7 @@
       "source": {
         "date": "2026-09-01",
         "by": "review",
-        "ref": "batch 3 branch review, uncovered_findings; task 3 review, finding 2"
+        "ref": "review retrospective, uncovered_findings"
       }
     },
     {
@@ -65,7 +67,7 @@
       "kind": "rule",
       "area": "process",
       "standing": true,
-      "summary": "Start each batch with a brainstorming session or a written spec; get the user's approval before implementing.",
+      "summary": "Start each batch with a brainstorming session or a written spec; get approval from the project's owner or decider before implementing.",
       "body": [
         "Use the superpowers brainstorming and spec skills when the plugin is installed; otherwise write the spec by hand. Specs live in `docs/specs/`.",
         "The order is strict: spec, then plan. A plan written before its approved spec is nil - deleted and the planning phase redone from the spec, never re-anchored."
@@ -106,28 +108,6 @@
       }
     },
     {
-      "id": "process.ff-only-merges",
-      "kind": "rule",
-      "area": "process",
-      "standing": true,
-      "summary": "Merge fast-forward only, from the CLI, after aggregating the branch into clean logical commits. No merge commits, no GitHub squash merges.",
-      "body": [
-        "Aggregate with `git reset --soft $(git merge-base main HEAD)` and recommit in one to five Conventional Commits when interactive rebase is not available.",
-        "The project skill `finishing-a-feature` is the procedure."
-      ],
-      "tags": [
-        "git"
-      ],
-      "source": {
-        "date": "2026-08-30",
-        "by": "docs",
-        "ref": "houserules seed"
-      },
-      "verify": [
-        ".claude/skills/finishing-a-feature/SKILL.md"
-      ]
-    },
-    {
       "id": "process.knowledge-first",
       "kind": "rule",
       "area": "process",
@@ -160,29 +140,11 @@
         "A ledger note may accompany a ruling; it never substitutes for the tracked write.",
         "A dispatch deviation from the spec's process line (model, order, gate) is a ruling: amend that spec line in the same turn. The batch report at the tick repeats it; it does not replace it.",
         "An accepted implementer deviation is a ruling. Home it (a spec amendment or a backlog item) in the turn it is accepted, before the next dispatch.",
-        "A code comment is not a home file: a sanctioned deviation homes in the spec's deviations section or the design record the turn it is accepted; the comment may cite that home, never substitute for it (batch 16 task 4)."
+        "A code comment is not a home file: a sanctioned deviation homes in the spec's deviations section or the design record the turn it is accepted; the comment may cite that home, never substitute for it."
       ],
       "tags": [
         "rulings",
         "compaction"
-      ],
-      "source": {
-        "date": "2026-08-30",
-        "by": "docs",
-        "ref": "houserules seed"
-      }
-    },
-    {
-      "id": "process.sequential-agents",
-      "kind": "rule",
-      "area": "process",
-      "standing": true,
-      "summary": "Run all agent work strictly sequentially. Never dispatch two implementers or two reviewers at the same time.",
-      "body": [
-        "Parallel dispatches conflict in the working tree and hide which run produced a change."
-      ],
-      "tags": [
-        "dispatch"
       ],
       "source": {
         "date": "2026-08-30",
@@ -204,7 +166,7 @@
         "A fix round that narrows or widens matching behavior carries its own RED or counter-example test. A cycle captured after the commit says so in the report's tdd entry and presents the runs in the order they really happened.",
         "When no assertion can change (an output-noise or report-only fix), disclosed before/after captures of the observable difference are the honest evidence, presented in the order they ran.",
         "The `mode` label follows when the shown run happened, not the failure's flavor: `natural` only when the shown RED ran pre-commit; a post-hoc recapture is `reconstructed` and the tdd entry says so; a disclosed-mutation proof is `mutation`.",
-        "Two label failures are ruled (batch 18): a mutation proof's RED shows the test FAILING under the mutation — a capture showing the tests passing proves nothing; and a post-commit recapture is `reconstructed` regardless of what also ran earlier — the label follows the shown run, and one report uses one label for one procedure."
+        "Two label failures are common: a mutation proof's RED must show the test FAILING under the mutation — a capture showing the tests passing proves nothing; and a post-commit recapture is `reconstructed` regardless of what also ran earlier — the label follows the shown run, and one report uses one label for one procedure."
       ],
       "tags": [
         "testing"
@@ -220,12 +182,12 @@
       "kind": "rule",
       "area": "process",
       "standing": true,
-      "summary": "Every review runs on a mightier model than the implementer it reviews. Implementers use the cheapest model that fits the task.",
+      "summary": "Recommended: run reviews on a mightier model than the implementer they review, and implementers on the cheapest model that fits the task.",
       "body": [
-        "Model order: haiku < sonnet < opus < fable. Mightier is strict: an Opus implementer needs a Fable review, so choosing an Opus implementer is a deliberate, costed decision.",
+        "A project may adopt a stricter or looser policy; record the project's own choice as its own entry once ruled. Absent a ruling, mightier-than-the-implementer is the default: an Opus implementer gets a Fable review, so choosing an Opus implementer is a deliberate, costed decision.",
         "Scoped re-reviews follow the same bar as first reviews: the fix diff's size never lowers the reviewer's tier.",
         "Name the model on every dispatch; an omitted model inherits the session's most expensive one.",
-        "Effort pins (owner-ruled 2026-09-12): the controller session runs at effort high (settings.json effortLevel), task and branch reviews at high, implementers at xhigh - set in the agent templates' frontmatter; a dispatch that deviates names the deviation."
+        "The agent templates set their own effort level in frontmatter by default (implementers at xhigh, reviews at high); a dispatch that deviates names the deviation."
       ],
       "tags": [
         "dispatch",
@@ -360,7 +322,7 @@
         "Run every scenario in a detached scratch worktree at the branch head before the branch review; the orchestrating skill holds the procedure. Keep nothing from a worktree; workspace artifacts carry the `eval-` prefix.",
         "A run set in the record names `date`, `templates` (the git blob id of each template under test from `git rev-parse HEAD:<path>`; blob ids survive commit aggregation, commit SHAs do not), and one row per scenario: `scenario`, `agent`, `model`, `pass`, `of`, `notes`. The branch reviewer compares the latest blob ids with `HEAD`.",
         "No scenario covers `branch-reviewer` or the orchestrating skill; a change there needs no run. The `houserules render` command's own retrieval-protocol text shapes the generated skill the implementer loads; run the scenarios after a change there too — the check cannot see it.",
-        "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns; the branch does not merge before the record commit lands, and the branch-range audit is the row that must pass (batches 7-11, 14).",
+        "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns; the branch does not merge before the record commit lands, and the branch-range audit is the row that must pass.",
         "A template-touching batch may book ONE shared rerun at the final template state instead of a rerun per task (the ledgered economy); each interim task audit's deterministic fail is then recorded plan-mandated, citing the spec section that books the rerun, and the branch-range audit after the record commit is the row that must pass."
       ],
       "tags": [
@@ -371,7 +333,7 @@
       "source": {
         "date": "2026-08-31",
         "by": "user",
-        "ref": "tag-pilot fc3241b"
+        "ref": "owner ruling"
       },
       "see": [
         "process.deliverables-json",
@@ -415,6 +377,7 @@
       "id": "process.keep-knowledge-current",
       "kind": "rule",
       "area": "process",
+      "standing": true,
       "summary": "Add knowledge future sessions need to `knowledge/`; session memory is not portable, repo files are.",
       "body": [
         "Write the entry in the same turn you learn the fact. Then run `houserules render` and commit the generated files with it."
@@ -438,6 +401,7 @@
       "id": "process.skills-for-procedures",
       "kind": "rule",
       "area": "process",
+      "standing": true,
       "summary": "Create a project skill (`.claude/skills/`) for a repeatable procedure. Author it with the writing-skills skill when available.",
       "body": [],
       "tags": [
@@ -451,12 +415,13 @@
     },
     {
       "id": "process.contract-refresh-sweep",
-      "kind": "procedure",
+      "kind": "rule",
       "area": "process",
+      "standing": true,
       "summary": "A contract change migrates every earlier report in-batch: a report-only refresh round per task, a scoped re-review, and scripted checks for mechanical fixes.",
       "body": [
-        "Plan the sweep at pre-flight: refresh rounds run right after the contract task closes and before the next task dispatch, so every later review reads a valid workspace (batch 7 ran them after T4, before T5).",
-        "Semantic decisions in a refresh (which tdd mode, which narrative) belong to the task's reviewer, not the refresh dispatch: batch 7's controller over-steered one mode and the re-reviewer had to correct it.",
+        "Plan the sweep at pre-flight: refresh rounds run right after the contract task closes and before the next task dispatch, so every later review reads a valid workspace.",
+        "Semantic decisions in a refresh (which tdd mode, which narrative) belong to the task's reviewer, not the refresh dispatch: a controller who over-steers a mode needs the re-reviewer to correct it.",
         "Controller verification replaces a further review round only for reviewer-prescribed mechanical edits whose expected outcome the reviewer pre-verified; it is scripted (byte-equal audit rows, field presence), gated with && chains, and logged in the ledger. Judged findings always get a real review round.",
         "The branch review reads the full workspace regardless, so the sweep is auditable end to end."
       ],
@@ -468,7 +433,7 @@
       "source": {
         "date": "2026-09-02",
         "by": "review",
-        "ref": "batch 7 branch review, retrospective"
+        "ref": "review retrospective"
       }
     },
     {
@@ -477,9 +442,9 @@
       "area": "docs",
       "summary": "Seeded-violations fixtures follow fixed steps: seed violations in the eval worktree, doctor the report to hide only those fail rows, keep the true audit aside.",
       "body": [
-        "Seed at least two rule violations of different check types (batch 7: a range devDependency for exact-pins plus a null dependency_vetting) in one small commit inside the detached eval worktree.",
+        "Seed at least two rule violations of different check types (for example a version-range dependency for exact-pins plus a null dependency_vetting) in one small commit inside the detached eval worktree.",
         "Doctor the report minimally: remove only the seeded fail rows from self_audit, adjust the summary counts to match, and let the prose claim compliance — the reviewer must prove the edit by row arithmetic against a fresh run.",
-        "Keep the undoctored audit output outside the workspace the reviewer reads (batch 7: the session scratchpad), so the judge can score expected_behavior against ground truth.",
+        "Keep the undoctored audit output outside the workspace the reviewer reads (the session scratchpad, for example), so the judge can score expected_behavior against ground truth.",
         "The reviewer dispatch carries the identical Knowledge:/Backlog:/--ids block as a real task review; artifacts carry the eval- prefix in the batch workspace and the record append names both template blob ids."
       ],
       "tags": [
@@ -489,21 +454,22 @@
       "source": {
         "date": "2026-09-02",
         "by": "review",
-        "ref": "batch 7 branch review, retrospective"
+        "ref": "review retrospective"
       }
     },
     {
       "id": "process.gate-shell-chains",
-      "kind": "gotcha",
+      "kind": "rule",
       "area": "process",
+      "standing": true,
       "summary": "Chain every evidence-producing shell sequence with && or explicit exit checks; an unchained tail after a heredoc reports success for a command that never ran.",
       "body": [
-        "Batch 7 hit the class twice: a heredoc-tail slip forced an amend, and a follow-up verification printed a success message while the evidence append was silently skipped; both were caught only because the output was re-read.",
+        "This class is easy to hit twice in the same session: a heredoc-tail slip forces an amend, and a follow-up verification prints a success message while the evidence append is silently skipped; both are caught only when the output is re-read.",
         "Write verification scripts so the success message is unreachable when any prior command fails: && chains, or a trailing explicit exit-code check per command. set -e does not protect tool-run shells.",
         "Re-run, do not hand-repair, any evidence produced by a sequence that later proves unchained.",
-        "Output redirection placed after an && chain binds only the last command; wrap the chain in a subshell, or redirect per command, when the whole sequence is the evidence (batch 9).",
-        "A zero-count probe (grep -c) exits nonzero on zero matches and breaks the chain even when zero is the expected answer; gate count probes on their output, not their exit (batch 9).",
-        "A before/after evidence bracket (snapshot, action, snapshot, diff) is one && chain in one call; snapshots captured across separate calls prove nothing about order. Re-run the whole bracket, never splice it, and check the artifact mtimes increase in chain order (batch 10)."
+        "Output redirection placed after an && chain binds only the last command; wrap the chain in a subshell, or redirect per command, when the whole sequence is the evidence.",
+        "A zero-count probe (grep -c) exits nonzero on zero matches and breaks the chain even when zero is the expected answer; gate count probes on their output, not their exit.",
+        "A before/after evidence bracket (snapshot, action, snapshot, diff) is one && chain in one call; snapshots captured across separate calls prove nothing about order. Re-run the whole bracket, never splice it, and check the artifact mtimes increase in chain order."
       ],
       "tags": [
         "shell",
@@ -512,7 +478,7 @@
       "source": {
         "date": "2026-09-02",
         "by": "review",
-        "ref": "batch 7 branch review, retrospective"
+        "ref": "review retrospective"
       }
     },
     {
@@ -521,7 +487,7 @@
       "area": "process",
       "summary": "On a backlog collision with main, main wins: rebuild the branch on it by cherry-pick, drop the never-merged branch filings, and park superseded analysis.",
       "body": [
-        "Batch 13: an owner-side agent merged HR-047/048 to main while the branch carried candidate filings under the same ids. Never-merged branch-local filings can be dropped without breaching knowledge-base.ids-are-permanent.",
+        "An owner-side agent can merge conflicting backlog ids to main while a branch carries candidate filings under the same ids. Never-merged branch-local filings can be dropped without breaching knowledge-base.ids-are-permanent.",
         "Verify overlap yourself with git diff --name-only on both sides; another agent's no-overlap claim is a claim, not evidence.",
         "Record the old-to-new sha map in a workspace file and the batch report: closed tasks' deliverables keep pre-rebuild shas, and gc can prune those objects."
       ],
@@ -533,7 +499,7 @@
       "source": {
         "date": "2026-09-03",
         "by": "review",
-        "ref": "batch 13 branch review; the HR-047/048 collision"
+        "ref": "branch review retrospective"
       }
     },
     {
@@ -542,8 +508,8 @@
       "area": "process",
       "summary": "Owner content found uncommitted on the shared tree mid-batch: commit it verbatim as its own commit, surface concerns instead of editing, record its position.",
       "body": [
-        "Batch 14: the README convergence paragraphs surfaced while T1 ran; secured as their own docs(readme) commit, two notes surfaced to the owner (a dropped link, lowercase product names), nothing silently changed.",
-        "Verify the interleave position with git log before writing the ledger line: state which task commits sit below and above it. A wrong containment claim forces a ledger correction and changes which range the task review must read (batch 14 T1).",
+        "Owner content can surface uncommitted on the shared tree while a task is running: secure it as its own commit immediately, surface any notes to the owner instead of silently editing it, and change nothing else.",
+        "Verify the interleave position with git log before writing the ledger line: state which task commits sit below and above it. A wrong containment claim forces a ledger correction and changes which range the task review must read.",
         "At aggregation the commit stays its own commit; no task diff absorbs it, and the task-review dispatch names it as owner content to be judged as such."
       ],
       "tags": [
@@ -554,7 +520,7 @@
       "source": {
         "date": "2026-09-04",
         "by": "review",
-        "ref": "batch 14 branch review"
+        "ref": "branch review retrospective"
       }
     },
     {
@@ -565,9 +531,9 @@
       "summary": "Cite evidence only at paths that outlive the session: the batch workspace or the tracked tree, never a session scratchpad.",
       "body": [
         "A report or workspace doc that cites a capture must name a file under the batch workspace (or the repository) that a later reader can open. A session scratchpad path is dead the moment the session ends; a citation into it is a claim nobody can collect on.",
-        "Copy small captures into the workspace beside the doc that cites them (batch 16 task 5: 59 files under t5-evidence/). An artifact too large to retain is disclosed as not retained, with its decisive excerpt quoted inline - never cited at a path that no longer exists.",
+        "Copy small captures into the workspace beside the doc that cites them. An artifact too large to retain is disclosed as not retained, with its decisive excerpt quoted inline - never cited at a path that no longer exists.",
         "Truncation markers count as citations: a marker naming a full log must point at a durable file whose content is a byte-prefix match of the retained excerpt.",
-        "A long-lived SOURCE comment states the rerunnable command and its measured counts inline, self-contained; a batch-workspace path may ride along as provenance but never as the only evidence, because a clone carries no workspace (ruled at the batch 20 report, docs/design.md 5.52)."
+        "A long-lived SOURCE comment states the rerunnable command and its measured counts inline, self-contained; a batch-workspace path may ride along as provenance but never as the only evidence, because a clone carries no workspace."
       ],
       "tags": [
         "evidence",
@@ -577,7 +543,7 @@
       "source": {
         "date": "2026-09-04",
         "by": "review",
-        "ref": "batch 16 task 5 review finding 5; owner ruling at the batch 16 report"
+        "ref": "review finding; owner ruling"
       }
     },
     {
@@ -587,16 +553,16 @@
       "standing": true,
       "summary": "Before submitting a report, re-open every artifact a claim cites and confirm the artifact shows what the sentence says.",
       "body": [
-        "The recurring failure is not fabrication but drift: the work is right while the sentence describing it cites a capture that is not there, quotes a line the capture lost, or keeps a rationale a later verification overturned (batch 16 tasks 2 and 5).",
+        "The recurring failure is not fabrication but drift: the work is right while the sentence describing it cites a capture that is not there, quotes a line the capture lost, or keeps a rationale a later verification overturned.",
         "The check is mechanical: for each named file, open it; for each quoted line, grep it; for each number, recompute it from the artifact. A reviewer does exactly this, so a report that skips it converts Minor findings into review rounds.",
-        "A reversed trend is worth recording too: name the pattern in the review when it appears, and name its reversal when a later round demonstrates it (batch 16 task 2 round 2).",
-        "A SHIPPED doc or comment sentence stating a measurement is a claim like a report sentence (ruled batch 18): it cites a retained capture at a durable path, and a fix round's sweep re-opens every doc sentence the round touched. The report-claims checker cannot see shipped files — the manual sweep is the only net there.",
-        "A command field is the literal command copied from the terminal — never retyped, never annotated inline; labels and notes go beside the field (ruled batch 19: the class failed four review rounds). A reviewer paste-runs command fields; a field that cannot paste-run is a finding by itself.",
-        "Close every report by running the report-claims checker (`houserules check-report-claims <REPORT_FILE>`) over the report file after the last edit, and paste its clean run as the final tests entry. The checker is a floor, not a substitute for the manual sweep: its Limits section (crates/houserules/src/report_claims.rs, reachable only where this kit's own source lives) names what only the sweep catches; an adopter repo carries no such source, so there a false positive is disclosed per report and reported upstream instead. It ships as a `houserules` subcommand (HR-066, batch 20 T2), so the closing act runs in every adopter repo, not only the one that built it. The checker gates gitignored workspace reports, never a tracked artifact a CI job could see, so it carries no CI job of its own -- the implementer template's closing-act mandate (HR-060) is the whole mechanism.",
-        "A commit message body is a claim like a report sentence: recompute its counts from the artifact before committing; a wrong count found post-commit is recorded in the report for aggregation to carry, never amended and never left silent (batch 20 carried five such corrections; commit prose was the largest surviving drift surface once the checker gated reports).",
-        "After any world-changing event - a fix round, an interruption, a rebase - re-derive every count and summary-scope field (implemented, self_review, doc comments citing measurements) from the tree at HEAD before re-submitting; a carried-forward sentence is a new claim, never trusted (batch 21: all four tasks failed this at least once; the interruption seam cost a full review round).",
-        "A claim about a failure names whether it was OBSERVED or INFERRED - a commit body keeps the same observed-vs-reconstructed split its report keeps (batch 21 branch-fix 2: the report drew the split correctly while a local-history commit body collapsed it into one 'panicked').",
-        "Five drift classes, each caught only by re-derivation across batch 22's five tasks: a rewritten command string that was never run as written; a count not re-measured after the change; a citation carrying a stream index where a file line belongs; a false universal ('every', 'all') no enumeration was run for; and a transcription of another agent's wording whose particulars were never checked against the tree.",
+        "A reversed trend is worth recording too: name the pattern in the review when it appears, and name its reversal when a later round demonstrates it.",
+        "A SHIPPED doc or comment sentence stating a measurement is a claim like a report sentence: it cites a retained capture at a durable path, and a fix round's sweep re-opens every doc sentence the round touched. The report-claims checker cannot see shipped files — the manual sweep is the only net there.",
+        "A command field is the literal command copied from the terminal — never retyped, never annotated inline; labels and notes go beside the field. A reviewer paste-runs command fields; a field that cannot paste-run is a finding by itself.",
+        "Close every report by running the report-claims checker (`houserules check-report-claims <REPORT_FILE>`) over the report file after the last edit, and paste its clean run as the final tests entry. The checker is a floor, not a substitute for the manual sweep: its Limits section (crates/houserules/src/report_claims.rs, reachable only where this kit's own source lives) names what only the sweep catches; an adopter repo carries no such source, so there a false positive is disclosed per report and reported upstream instead. It ships as a `houserules` subcommand, so the closing act runs in every adopter repo, not only the one that built it. The checker gates gitignored workspace reports, never a tracked artifact a CI job could see, so it carries no CI job of its own -- the implementer template's closing-act mandate is the whole mechanism.",
+        "A commit message body is a claim like a report sentence: recompute its counts from the artifact before committing; a wrong count found post-commit is recorded in the report for aggregation to carry, never amended and never left silent.",
+        "After any world-changing event - a fix round, an interruption, a rebase - re-derive every count and summary-scope field (implemented, self_review, doc comments citing measurements) from the tree at HEAD before re-submitting; a carried-forward sentence is a new claim, never trusted.",
+        "A claim about a failure names whether it was OBSERVED or INFERRED - a commit body keeps the same observed-vs-reconstructed split its report keeps.",
+        "Drift recurs in a handful of shapes, each caught only by re-derivation: a rewritten command string that was never run as written; a count not re-measured after the change; a citation carrying a stream index where a file line belongs; a false universal ('every', 'all') no enumeration was run for; and a transcription of another agent's wording whose particulars were never checked against the tree.",
         "Re-derive every sentence from the tree at the final HEAD immediately before the report ships; a sentence carried from a draft, a review, or a dispatch is re-derived before it lands."
       ],
       "tags": [
@@ -607,7 +573,7 @@
       "source": {
         "date": "2026-09-04",
         "by": "review",
-        "ref": "batch 16 task 2 re-review r1 trend note; owner ruling at the batch 16 report"
+        "ref": "review trend note; owner ruling"
       }
     },
     {
@@ -617,12 +583,12 @@
       "standing": true,
       "summary": "A claim that a set is closed ('every', 'all', 'no remaining') names the bounded, rerunnable enumeration that produced it; without the artifact, no claim.",
       "body": [
-        "Born from the batch 17 argv-closure arc: every unenumerated closure sentence was false in at least one direction, and each fix was a script whose output the sentence could then cite.",
+        "An unenumerated closure sentence is false in at least one direction more often than not; the fix is always a script whose output the sentence can then cite.",
         "The enumeration lives at a path that outlives the session and reruns cleanly; its own summary line states the counts the claim cites, so a reader checks the artifact, not the prose.",
-        "A migration or flip closure names its zero-hit sweep of the RETIRED form (the grep pattern and its variants), rerunnable at HEAD; the enumeration is of the old form's residue, not the new form's presence (ruled batch 19: presence enumerations confirm known work, only residue sweeps falsify closure — batch 18 T6 and batch 19 T2 both failed this way).",
-        "The enumeration artifact is executable: a script whose own run prints the counts the claim cites, not a static dump or a hand-asserted mapping (batch 20: an asserted mapping hid a live coverage drop; grep dumps matched no command at HEAD until an executable sweep replaced them; a /tmp list failed durability until the comparison reran from git history).",
-        "The enumeration's pattern derives from the claim's SUBJECT, widened to every spelling the corpus itself uses - run a spelling-discovery probe first and retain it - never from one artifact's name (batch 21: a name-keyed sweep missed six subject-spelling lines; a /tmp-only regex missed six scratchpad citations; a hand-asserted home list omitted a live home).",
-        "The enumeration names its corpus AND its pattern classes, and the pattern set derives from the corpus's own spellings: run a spelling-discovery probe first and retain it beside the verification script. Batch 22 hit all three failure sub-shapes - a spelling the pattern never tested for, an assigned file absent from the file list, and a marker class the script's own header claimed but did not encode."
+        "A migration or flip closure names its zero-hit sweep of the RETIRED form (the grep pattern and its variants), rerunnable at HEAD; the enumeration is of the old form's residue, not the new form's presence — a presence enumeration only confirms known work, a residue sweep is what falsifies closure.",
+        "The enumeration artifact is executable: a script whose own run prints the counts the claim cites, not a static dump or a hand-asserted mapping — an asserted mapping can hide a live coverage drop, a grep dump that matches no command at HEAD proves nothing until an executable sweep replaces it, and a scratch-directory list fails durability until the comparison reruns from git history.",
+        "The enumeration's pattern derives from the claim's SUBJECT, widened to every spelling the corpus itself uses - run a spelling-discovery probe first and retain it - never from one artifact's name: a name-keyed sweep can miss subject-spelling lines, a scratch-directory-only regex can miss scratchpad citations, and a hand-asserted home list can omit a live home.",
+        "The enumeration names its corpus AND its pattern classes, and the pattern set derives from the corpus's own spellings: run a spelling-discovery probe first and retain it beside the verification script. Three failure sub-shapes recur: a spelling the pattern never tested for, an assigned file absent from the file list, and a marker class the script's own header claimed but did not encode."
       ],
       "tags": [
         "reports",
@@ -632,7 +598,7 @@
       "source": {
         "date": "2026-09-05",
         "by": "user",
-        "ref": "batch 17 report ruling; branch review retrospective"
+        "ref": "owner ruling; branch review retrospective"
       }
     },
     {
@@ -642,8 +608,7 @@
       "standing": true,
       "summary": "A review finding stating a measurement, a reproduction, or a proposed fix's behavior is verified by running it before filing; restated claims are re-derived.",
       "body": [
-        "Batch 17 caught the reviewer wrong twice (a prescribed device that provably did not work; a divergence tally measured with the wrong command names) and the controller's dispatch premises wrong twice - each caught only because someone re-ran the thing. The discipline that binds the implementer's report binds the review's findings and the dispatch's diagnosis alike.",
-        "The paired task-reviewer template clause lands with HR-060."
+        "A reviewer can be wrong (a prescribed device that provably does not work; a divergence tally measured with the wrong command names), and so can a controller's dispatch premise - each caught only because someone re-ran the thing. The discipline that binds the implementer's report binds the review's findings and the dispatch's diagnosis alike."
       ],
       "tags": [
         "review",
@@ -652,7 +617,7 @@
       "source": {
         "date": "2026-09-05",
         "by": "user",
-        "ref": "batch 17 report ruling; branch review retrospective"
+        "ref": "owner ruling; branch review retrospective"
       }
     },
     {
@@ -663,8 +628,9 @@
       "summary": "Another agent's suggested wording, pin, or count is a draft, not evidence: re-derive every number, quote, and reference from the tree before transcribing it.",
       "body": [
         "A reviewer's finding text and a controller's course correction are claims by their authors; the agent who lands them owns their truth at the landing revision.",
-        "Origin: batch 22 T3a round 3 - a review's suggested wording carried line pins wrong in the suggestion itself, and the fix transcribed them unchecked; the repair dropped pins for stable function names.",
-        "This is the transcriber's half of process.review-findings-are-claims-too, which binds only the finding's author."
+        "A review's suggested wording can carry a wrong pin in the suggestion itself; transcribing it unchecked repairs nothing and can drop a pin for a stable name that needed none.",
+        "This is the transcriber's half of process.review-findings-are-claims-too, which binds only the finding's author.",
+        "Your own earlier prose is another agent's suggestion once the tree has moved: re-derive it too, not only text someone else wrote."
       ],
       "tags": [
         "reports",
@@ -673,7 +639,7 @@
       "source": {
         "date": "2026-09-12",
         "by": "user",
-        "ref": "batch 22 report, standing proposal 3"
+        "ref": "owner ruling, standing proposal"
       }
     },
     {
@@ -684,7 +650,7 @@
       "summary": "A fix round closes only with a written verification record: a re-review deliverable, or a controller note naming each finding and the artifact proving its fix.",
       "body": [
         "A re-review deliverable in the workspace is the default for rounds with executable changes or any critical finding. A controller verification note suffices for report-only or prose rounds when it names finding-by-finding evidence.",
-        "Origin: batch 23 T2's fix round closed on a ledger note alone; the verifications were real and reproducible, but nothing pinned where such a record must live or what it must name."
+        "A fix round can close on a ledger note alone even when the verifications are real and reproducible, if nothing pins where such a record must live or what it must name - that gap is exactly what this rule closes."
       ],
       "tags": [
         "review",
@@ -694,7 +660,136 @@
       "source": {
         "date": "2026-09-12",
         "by": "review",
-        "ref": "batch 23 branch review, retrospective"
+        "ref": "branch review retrospective"
+      }
+    },
+    {
+      "id": "process.fix-proofs-extend-the-reviewers-run",
+      "kind": "rule",
+      "area": "process",
+      "standing": true,
+      "summary": "A fix round's proof re-runs the review's own reproduction, extended to cover the fix -- never a fresh, narrower proof.",
+      "body": [
+        "If the reviewer ran the full pipeline, the fix is proven on the full pipeline, not a narrower stand-in.",
+        "Escalation tends to happen one level at a time: a proof that falls back to a source read where the task read live config, to a full-pipeline run where the fix ported the consumer out, or to the real merge base where the report used the fix-diff base, are all the same pattern - the reviewer running one level deeper than the fix's own proof.",
+        "Convergence begins when the implementer adopts and extends the reviewer's own simulation instead of replacing it with a fresh, smaller one."
+      ],
+      "tags": [
+        "review",
+        "fix-round",
+        "verification"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
+    },
+    {
+      "id": "process.owner-rulings-need-owner-supersession",
+      "kind": "rule",
+      "area": "process",
+      "standing": true,
+      "summary": "Only the owner supersedes an owner ruling: a controller with latitude proposes the reversal at the next checkpoint and builds nothing on it until ruled.",
+      "body": [
+        "Work that depends on the reversal waits, or takes the reversal-free path, until the owner rules.",
+        "A controller may correctly flag that an owner ruling should reverse mid-task under fix-round latitude, but building further work on the proposed reversal before it is ruled risks a design that a later rejection discards and reopens.",
+        "Check for a path reachable without the reversal at all before betting the task on an unruled proposal."
+      ],
+      "tags": [
+        "rulings",
+        "owner"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
+    },
+    {
+      "id": "process.verify-in-persisted-state",
+      "kind": "gotcha",
+      "area": "process",
+      "standing": false,
+      "summary": "Verify behavior against the persisted state the code reads in production; a one-off override is a different state and can falsify the measurement.",
+      "body": [
+        "A process-scoped flag or environment variable can make two tools look like they share a blind spot when only one of them reads that kind of override at all; with the value persisted the way a user actually would (a config file, not a flag), the tools can diverge - and the reversed measurement is the real finding, the one that produces the right fix.",
+        "Before citing a tool's behavior under configuration, persist the configuration the way a user would, then run both sides from that persisted state. State the persistence mechanism in the capture."
+      ],
+      "tags": [
+        "testing",
+        "configuration"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
+    },
+    {
+      "id": "process.wiring-checks-run-the-resolution",
+      "kind": "rule",
+      "area": "global",
+      "standing": false,
+      "summary": "A trigger, pin, or wiring check runs the resolution end to end - feed the produced value to its consumer; a string, glob, or schema match proves nothing.",
+      "body": [
+        "A tag or version glob can match exactly the tag a release will produce while the actual downstream resolution still fails on that same tag - the pattern check passes while the pipeline is broken on every tag the flow would ever produce.",
+        "The proof is the consumer's own run, captured: the actual planning or build command for a tag wiring, the updater's replacement count for a pin wiring, an as-CI shell for a workflow step. The match check stays as the cheap first gate, never the verdict.",
+        "A third-party breakage claim states WHEN it fires, derived from the pinned source's call path - never hedged as 'may fail', because the hedge is what mis-schedules the fix.",
+        "Run the resolution at the version the pinned consumer actually BUNDLES (read its own build metadata), never at the newest schema or docs version, and pin the two together with a cross-check test.",
+        "A comment or rule that names a gate also names the job or task that invokes it, so the claim is greppable against the project's own CI and task configuration."
+      ],
+      "tags": [
+        "wiring",
+        "ci",
+        "gates"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
+    },
+    {
+      "id": "process.pointer-sweep-unfiltered",
+      "kind": "gotcha",
+      "area": "docs",
+      "standing": false,
+      "summary": "When a file moves or is deleted, sweep for its old path with an unfiltered grep over the whole tree; an extension-limited grep is not a pointer audit.",
+      "body": [
+        "An include-pattern or file-extension filter on the sweep misses a stale pointer sitting in an unusual place: a .gitignore entry, a comment in an uncommon file extension, an assertion message string.",
+        "Exclude only the directories that never carry source content (a dependency directory, a version-control directory, a build output directory, a scratch workspace) - never a file extension."
+      ],
+      "tags": [
+        "sweeps",
+        "grep",
+        "migration"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
+    },
+    {
+      "id": "process.report-evidence-verbatim",
+      "kind": "rule",
+      "area": "global",
+      "standing": false,
+      "summary": "A deliverable pastes only real command output; a re-review reproduces at least one RED or audit before accepting a fix round.",
+      "body": [
+        "A fabricated capture and an overclaimed TDD RED are both caught only by a reviewer actually re-running the thing, never by a gate - the failure is invisible until someone reproduces it.",
+        "An implementer that cannot reproduce a piece of evidence says so and labels what it reconstructs instead; asserting an unrecorded chronology as observed is a violation even when the underlying work was done correctly."
+      ],
+      "tags": [
+        "reports",
+        "evidence",
+        "reproduction"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
       }
     }
   ]

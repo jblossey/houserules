@@ -1,8 +1,11 @@
 //! Integration test for `template/.githooks/commit-msg`. The hook's own
-//! doc comment states its contract: the trailer gate always runs;
-//! `houserules check-commit` runs only after a quiet `houserules
-//! check-commit --help` probe succeeds, so an older or absent binary
-//! degrades to the trailer gate alone instead of blocking every commit.
+//! doc comment states its contract: `houserules check-commit` runs only
+//! after a quiet `houserules check-commit --help` probe succeeds, so an
+//! older or absent binary is a no-op instead of blocking every commit.
+//! The hook carries no attribution-trailer gate of its own (T2 review
+//! ruling 5.81: attribution is fully project-ruled) -- a project that
+//! wants one files its own `commits`-type knowledge check and `check-commit`
+//! picks it up the same way it picks up `process.conventional-commits`.
 //! Every case here spawns the real POSIX-shell hook against a scratch
 //! temp directory, on a hermetic `PATH` (any directory already carrying a
 //! `houserules` executable removed) with, where the case needs one, a
@@ -157,21 +160,17 @@ fn accepts_a_trailer_free_message_with_no_output_when_houserules_is_absent_from_
 }
 
 #[test]
-fn rejects_a_co_authored_by_trailer_with_one_line_naming_it_before_any_probe() {
+fn accepts_a_co_authored_by_trailer_with_no_output_when_houserules_is_absent_from_path() {
     let (code, stderr) = run_hook("feat: x\n\nCo-Authored-By: Someone <a@b.com>\n", None);
-    assert_eq!(code, Some(1));
-    let lines: Vec<&str> = stderr.trim().split('\n').collect();
-    assert_eq!(lines.len(), 1, "{stderr}");
-    assert!(stderr.contains("Co-Authored-By"), "{stderr}");
+    assert_eq!(code, Some(0));
+    assert_eq!(stderr, "");
 }
 
 #[test]
-fn rejects_a_claude_session_trailer_with_one_line_naming_it_before_any_probe() {
+fn accepts_a_claude_session_trailer_with_no_output_when_houserules_is_absent_from_path() {
     let (code, stderr) = run_hook("feat: x\n\nClaude-Session: https://example.test/s\n", None);
-    assert_eq!(code, Some(1));
-    let lines: Vec<&str> = stderr.trim().split('\n').collect();
-    assert_eq!(lines.len(), 1, "{stderr}");
-    assert!(stderr.contains("Claude-Session"), "{stderr}");
+    assert_eq!(code, Some(0));
+    assert_eq!(stderr, "");
 }
 
 #[test]
@@ -199,15 +198,14 @@ fn passes_check_commit_and_the_message_files_own_path_as_argv() {
 }
 
 #[test]
-fn degrades_to_the_trailer_gate_alone_when_houserules_is_absent_from_path() {
+fn is_a_no_op_when_houserules_is_absent_from_path() {
     let (code, stderr) = run_hook("bad subject\n", None);
     assert_eq!(code, Some(0));
     assert_eq!(stderr, "");
 }
 
 #[test]
-fn degrades_to_the_trailer_gate_alone_when_an_on_path_houserules_rejects_the_check_commit_subcommand()
- {
+fn is_a_no_op_when_an_on_path_houserules_rejects_the_check_commit_subcommand() {
     let path_dir = fake_houserules_rejecting_check_commit();
     let (code, stderr) = run_hook("bad subject\n", Some(path_dir.path()));
     assert_eq!(code, Some(0));

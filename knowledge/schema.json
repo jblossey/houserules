@@ -95,7 +95,8 @@
             "commits",
             "co-change",
             "diff-append-only",
-            "report-field"
+            "report-field",
+            "durable-sha"
           ]
         },
         "level": {

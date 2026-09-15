@@ -84,10 +84,13 @@ const SEED_ONCE: &[&str] = &[
     ".claude/evals/docs-edit.json",
     ".claude/evals/record.json",
     ".claude/evals/seeded-violations.json",
-    ".github/workflows/knowledge.yml",
     "docs/README.md",
     "CLAUDE.md",
 ];
+
+/// Every `GITHUB_HOSTED_SEED_ONCE` path -- `install.rs`'s own array,
+/// duplicated here for the same reason `KIT_OWNED` above is.
+const GITHUB_HOSTED_SEED_ONCE: &[&str] = &[".github/workflows/knowledge.yml"];
 
 /// `env!("CARGO_PKG_VERSION")` at THIS test binary's own compile time --
 /// the same value `install::kit_version` bakes in for the binary under
@@ -100,7 +103,11 @@ fn kit_version() -> String {
 fn files_prints_the_kit_owned_and_seed_once_lists_as_json() {
     let output = houserules().arg("files").output().expect("run files");
     assert!(output.status.success());
-    let expected = serde_json::json!({"kitOwned": KIT_OWNED, "seedOnce": SEED_ONCE});
+    let expected = serde_json::json!({
+        "kitOwned": KIT_OWNED,
+        "seedOnce": SEED_ONCE,
+        "githubHostedSeedOnce": GITHUB_HOSTED_SEED_ONCE,
+    });
     let actual: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("files prints JSON");
     assert_eq!(actual, expected);
@@ -189,9 +196,18 @@ fn init_into_a_fresh_repo_writes_every_kit_owned_and_seed_once_file_then_renders
         .chain(SEED_ONCE)
         .map(|file| format!("wrote {file}"))
         .collect();
+    // `scratch_git_repo` configures no `origin` remote, so the
+    // GitHub-hosted-only file is skipped, not written -- a fresh scratch
+    // repository is never GitHub-hosted.
+    for file in GITHUB_HOSTED_SEED_ONCE {
+        expected_lines.push(format!(
+            "skipped {file} (origin is not GitHub-hosted; see the migrating-knowledge skill to add your own CI gate)"
+        ));
+    }
     expected_lines.push("wrote .claude/settings.json".to_string());
     expected_lines.push(".claude/rules/standing-rules.md: written".to_string());
     expected_lines.push(".claude/rules/docs.md: written".to_string());
+    expected_lines.push(".claude/rules/tools.md: written".to_string());
     expected_lines.push(".claude/skills/project-knowledge/SKILL.md: written".to_string());
     expected_lines.push(format!("houserules: initialized {}", dir.path().display()));
     expected_lines.push("next: houserules check-knowledge && houserules check-backlog".to_string());
@@ -200,6 +216,12 @@ fn init_into_a_fresh_repo_writes_every_kit_owned_and_seed_once_file_then_renders
 
     for file in KIT_OWNED.iter().chain(SEED_ONCE) {
         assert!(dir.path().join(file).is_file(), "{file} was not written");
+    }
+    for file in GITHUB_HOSTED_SEED_ONCE {
+        assert!(
+            !dir.path().join(file).exists(),
+            "{file} was written into a non-GitHub-hosted target"
+        );
     }
     assert!(dir.path().join(".claude/settings.json").is_file());
 
@@ -596,6 +618,16 @@ fn a_second_init_keeps_seed_once_files_and_settings_but_still_overwrites_kit_own
         assert!(
             stdout.contains(&format!("kept {file}\n")),
             "expected `kept {file}` in:\n{stdout}"
+        );
+    }
+    // No `origin` remote is configured, so both the first and second
+    // `init` skip the GitHub-hosted-only file the same way.
+    for file in GITHUB_HOSTED_SEED_ONCE {
+        assert!(
+            stdout.contains(&format!(
+                "skipped {file} (origin is not GitHub-hosted; see the migrating-knowledge skill to add your own CI gate)\n"
+            )),
+            "expected `skipped {file}` in:\n{stdout}"
         );
     }
     for file in KIT_OWNED {

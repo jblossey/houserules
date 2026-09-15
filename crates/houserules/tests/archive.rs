@@ -658,10 +658,12 @@ fn see_citations_resolve_against_archived_backlog_items_across_a_sweep() {
     );
 }
 
-/// `get` resolves an archived item id in a default-prefix (`WI`) project,
-/// where the active id-shape matcher would never route the id to the
-/// backlog branch at all -- the archive fallback tries both domains
-/// regardless of that routing.
+/// `get` resolves an archived item id in a default-prefix (`WI`) project.
+/// HR-100 makes the id-shape matcher honor the project's own stamped
+/// `idPrefix`, so `WI-001` now routes to the backlog branch on the first
+/// try, same as an `HR-`/custom-prefixed project's own items do; this
+/// pins that the archive fallback still finds it once the active lookup
+/// there fails (the id was moved out of `backlog/items/` by the sweep).
 #[test]
 fn get_resolves_an_archived_item_with_the_default_id_prefix() {
     let dir = scratch_git_repo();

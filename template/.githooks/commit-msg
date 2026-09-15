@@ -1,18 +1,13 @@
 #!/usr/bin/env sh
-# commit-msg hook: the trailer gate below always runs. `houserules
-# check-commit` runs only when a quiet `houserules check-commit --help`
-# probe succeeds (the binary is on PATH and understands the subcommand,
-# not merely present -- an older binary without it degrades here instead
-# of blocking every commit); nothing else executes.
+# commit-msg hook: runs `houserules check-commit` (Conventional Commits and
+# any other `commits`-type knowledge check the project has ruled, attribution
+# trailers included once a project files its own no-coauthor entry) only
+# when a quiet `houserules check-commit --help` probe succeeds -- the binary
+# is on PATH and understands the subcommand, not merely present. An older
+# binary without it is a no-op here instead of blocking every commit.
 set -eu
 
 msg_file="$1"
-
-trailer=$(grep -iE '^(Co-Authored-By|Claude-Session):' "$msg_file" | head -n1)
-if [ -n "$trailer" ]; then
-  echo "commit-msg: trailer not allowed: ${trailer%%:*}" >&2
-  exit 1
-fi
 
 if houserules check-commit --help >/dev/null 2>&1; then
   exec houserules check-commit "$msg_file"

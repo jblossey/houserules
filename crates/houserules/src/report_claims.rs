@@ -67,7 +67,47 @@
 //!   every commit sha the report names (including one a sentence itself
 //!   marks as replaced, like a pre-review amend) reads as unresolvable,
 //!   and this tool cannot yet tell that shape of "correct but aged"
-//!   report from a genuinely broken one.
+//!   report from a genuinely broken one. `check_citation_lines` (HR-107)
+//!   carries the identical "correct but aged" exposure for a FILE
+//!   citation, not only a sha: a report correctly citing a file that
+//!   existed when the report was written reads as unresolvable once that
+//!   file is later renamed, moved, or deleted. This task's own corpus run
+//!   found the batch-20 T3 JS-to-Rust migration is by far the largest
+//!   source of this shape (retired `.mjs`/`bin/houserules.mjs` citations
+//!   in a pre-migration report), with a same-language in-repo rename a
+//!   rarer instance of the identical exposure (a report once correctly
+//!   citing `check-report-claims.rs`, since moved to this very file).
+//! - `check_narrative_shas_resolve` and `check_self_audit_narrative` both
+//!   assume every sha-shaped token in narrative prose names a commit in
+//!   THIS repository's own object database; neither has, or can safely
+//!   gain, a notion of a citation whose repository is named and foreign
+//!   (batch 25 T1: a sha from the read-only tag-pilot checkout,
+//!   `houserules.tag-pilot-is-read-only`, correctly does not resolve
+//!   here). A syntax this tool recognised and then skipped verifying
+//!   (`tag-pilot@<sha>`, say) would not actually check the foreign sha
+//!   against anything -- tag-pilot's checkout is outside this repository
+//!   and this tool has no business reading it even if a path to it were
+//!   known -- so such a form would let a typo'd or fabricated foreign sha
+//!   pass exactly as clean as a real one, which is worse than the current
+//!   plain false positive. The safe answer is procedural, not a checker
+//!   change: keep a foreign-repository commit sha out of the four scanned
+//!   narrative fields (a `source` field, or any field `collect_narrative`
+//!   does not read, carries it without tripping either check) -- T1's own
+//!   fix already did exactly this.
+//! - `find_citations` (so every one of `check_citation_lines`,
+//!   `check_narrative_number_claims`, and `check_narrative_sweep_coverage`)
+//!   carries the file-citation sibling of the bullet above: a path naming
+//!   a file in ANOTHER codebase entirely -- another tool's own source
+//!   tree, or a third-party crate's own source read via the package
+//!   registry cache while verifying a `docs_verified` entry -- never
+//!   resolves against this repository's tracked tree or batch workspace,
+//!   and never can. The same reasoning applies: a recognised-but-
+//!   unverified "foreign path" syntax would let a typo'd or fabricated
+//!   citation to a codebase this tool cannot read pass as clean, which is
+//!   worse than the current plain false positive. The safe answer is the
+//!   same procedural one -- name the foreign file by prose only, with no
+//!   `path:NNN` shape, or keep it out of the four scanned narrative
+//!   fields.
 //! - `check_paste_run_lint` flags a command field carrying an
 //!   angle-bracket placeholder, text appended after the command that a
 //!   shell would run as a second, separate command, or quoting that does
@@ -124,7 +164,7 @@
 //!   repository-relative path naming one (e.g. `docs/scratchpad/notes.md`)
 //!   over-flags the same way an unanchored `/tmp/` match would. A glued
 //!   NON-punctuation prefix is also invisible to both shapes:
-//!   `EPHEMERAL_PATH_LEADING_PUNCTUATION` trims neither `=` nor `:`, so a
+//!   `NARRATIVE_LEADING_PUNCTUATION` trims neither `=` nor `:`, so a
 //!   word like `OUT=/tmp/x` or `dest:/tmp/x` -- an env-var assignment or a
 //!   labeled value quoted in prose -- keeps that prefix after the trim, no
 //!   longer starts with `/`, and `word_qualifies` rejects it the same way
@@ -147,6 +187,90 @@
 //!   `check_ephemeral_paths` has nothing to flag there, and nothing needs
 //!   flagging -- the durable evidence lives in the retained capture, not
 //!   the narrative.
+//! - `find_citations` (the shared helper `check_citation_lines`,
+//!   `check_narrative_number_claims`, and `check_narrative_sweep_coverage`
+//!   all build on) only recognises a path ending in one of a small, closed
+//!   set of extensions (its own doc names them); a real cited file with
+//!   another extension is invisible to all three checks. It also reads
+//!   only the FIRST `:NNN` or `:NNN-MMM` suffix on a token: a comma- or
+//!   semicolon-separated multi-line citation (`file.rs:23,24,41`, a real
+//!   shape in this repository's own review prose) is read for `:23` alone
+//!   -- the remaining numbers in the list are not checked. Neither is a
+//!   range's ordering (`path:50-10` is read as-is; NNN and MMM are each
+//!   checked against the file's line count independently, never against
+//!   each other).
+//! - `resolve_citation_path`'s bare-basename fallback refuses to guess
+//!   when more than one tracked file shares a basename (this repository's
+//!   own tree has several: `install.rs`, `check_commit.rs`, `model.rs`,
+//!   `mod.rs`, `archive.rs` each name both a `src/` and a `tests/` file;
+//!   `kit.json` names both `backlog/items/` and `backlog/archive/`;
+//!   `SKILL.md` and `implementer.md` each name several skills or agent
+//!   templates), so a bare citation of one of these reads as unresolvable
+//!   even when the intended file plainly exists -- the task's own corpus
+//!   run found this the single largest false-positive class by line
+//!   count. It also does not extend a bare name to a PARTIAL relative
+//!   path (`common/mod.rs` naming `crates/houserules/tests/common/mod.rs`
+//!   reads as unresolvable too, since `common/mod.rs` contains a `/` and
+//!   never reaches the basename fallback at all); nor does it recognise a
+//!   glob or an ellipsis a sentence uses to reference many files or an
+//!   elided middle segment at once (`task-*.json`, `tests/*.test.mjs`,
+//!   `docs/specs/...-template-cluster.md`) -- each reads as one specific,
+//!   nonexistent file rather than the descriptive shorthand it is.
+//! - `find_citations`' extension anchor also matches an adjective built
+//!   on a real extension ("an `install.rs`-shaped fixture", read here as
+//!   citing a file literally named `install.rs-shaped`): the hyphen after
+//!   the extension is a word-internal character to `word_end`'s walk, not
+//!   a boundary, so the analogy's own suffix rides along into the path. A
+//!   single instance in the task's own corpus run; not special-cased.
+//! - `check_citation_lines` (HR-107) reads a citation's target file from
+//!   `root` with the same fs read every other check in this module uses:
+//!   the report's own artifacts are expected to be checked from a clean
+//!   checkout at HEAD, not a git blob pinned to any particular commit, so
+//!   a dirty working tree can shift what "the file's line count" means
+//!   between two runs of this tool. It also does not flag a citation of
+//!   line `0`, since `0` never exceeds a real file's line count.
+//! - `check_narrative_number_claims` (HR-110) implements only the number
+//!   class HR-110's item body names ("N passed", "N files"), not the
+//!   locative class ("the X live in Y") the same item also describes:
+//!   the two batch-23 locative instances that motivated it both sat in a
+//!   commit body and a plan file, neither a report narrative field this
+//!   tool scans, so a mechanical, low-noise trigger for "this sentence
+//!   asserts a location" could not be derived from this repository's own
+//!   corpus (`quality.gates-derive-their-scope`); a future widening needs
+//!   its own real instances to calibrate against, not this tool's report-
+//!   narrative surface. "Citing a capture" is approximated as "naming
+//!   EXACTLY ONE `find_citations` path within `NARRATIVE_CLAIM_WINDOW`
+//!   bytes of the count phrase" -- a byte window, not a real sentence
+//!   boundary, the same proxy `check_self_audit_narrative` already uses
+//!   for a ratio and its co-located sha; requiring exactly one, not "at
+//!   least one", rules out the enumeration-list shape the task's own
+//!   corpus run found repeatedly ("N files (a.rs, b.rs, ...)" naming N as
+//!   the list's own length), at the cost of also skipping a genuine
+//!   count sitting near two unrelated citations. `contains_number_token`
+//!   reads the claimed count as a literal digit string: a capture that
+//!   spells the same count in words ("five hundred twenty-eight") or
+//!   with a comma thousands separator ("1,234") reads as absent.
+//! - `check_narrative_sweep_coverage` (HR-111) derives "this citation is
+//!   sweep proof" from TWO signals together: the word "sweep" or
+//!   "enumeration" sitting within `NARRATIVE_CLAIM_WINDOW` bytes of a
+//!   citation (the sentence pattern), and the citation's own path ending
+//!   in `.sh`/`.py`/`.txt`/`.log` (`looks_like_sweep_artifact`, the
+//!   "cited artifact's shape" half) -- neither a hand list of known
+//!   sweep script names, but still a lexical guess: a sweep citation
+//!   phrased without either keyword, or one whose retained artifact
+//!   happens to carry another extension (the task's own corpus run found
+//!   exactly one such case, a `.md` disposition write-up), reads as a
+//!   plain file mention and is not checked for coverage. It also runs
+//!   only when the report's `files_changed` names exactly one file (see
+//!   `check_narrative_sweep_coverage`'s own doc for the false-positive
+//!   shape a wider comparison produced on this task's own corpus run) --
+//!   a report touching more files never gets a coverage check from this
+//!   function at all, whatever it cites. Coverage itself is a plain
+//!   substring search for the one changed file inside the cited
+//!   artifact's content, so a sweep that lists it under a different
+//!   spelling (a relative path shortened, a renamed file cited by its
+//!   old name) reads as vacuous even when the underlying sweep really did
+//!   cover it.
 //!
 //! Further constraints (this tool carries no frozen-corpus parity
 //! contract, unlike the flat command surface, so these are simply its own
@@ -908,17 +1032,21 @@ const EPHEMERAL_PATH_PREFIX: &str = "/tmp/";
 /// absolute-path requirement -- see the module doc's Limits.
 const EPHEMERAL_SCRATCHPAD_SEGMENT: &str = "scratchpad/";
 
-/// Leading bytes this project's own narrative prose glues onto an ephemeral
-/// citation that belong to the surrounding SENTENCE, not the path itself:
+/// Leading bytes this project's own narrative prose glues onto a cited
+/// token that belong to the surrounding SENTENCE, not the citation itself:
 /// an opening bracket/brace/paren, or a quote or backtick opening a
-/// markdown code span (`(scratchpad/task2-scratch-audit.mjs)`).
-const EPHEMERAL_PATH_LEADING_PUNCTUATION: &[char] = &['(', '[', '{', '\'', '"', '`'];
+/// markdown code span (`(scratchpad/task2-scratch-audit.mjs)`). Shared by
+/// `flag_ephemeral_words` and `find_citations`: both trim a whitespace-
+/// delimited word down to the path a reader would actually follow.
+const NARRATIVE_LEADING_PUNCTUATION: &[char] = &['(', '[', '{', '\'', '"', '`'];
 
-/// Trailing bytes this project's own narrative prose glues onto an
-/// ephemeral citation that belong to the surrounding SENTENCE, not the path
-/// itself: a comma or period ending the clause, a closing bracket/paren/
-/// brace, a quote, or a backtick closing a markdown code span.
-const EPHEMERAL_PATH_TRAILING_PUNCTUATION: &[char] =
+/// Trailing bytes this project's own narrative prose glues onto a cited
+/// token that belong to the surrounding SENTENCE, not the citation itself:
+/// a comma or period ending the clause, a closing bracket/paren/brace, a
+/// quote, or a backtick closing a markdown code span. Shared by
+/// `flag_ephemeral_words` and `find_citations` (see that constant's own
+/// doc).
+const NARRATIVE_TRAILING_PUNCTUATION: &[char] =
     &[',', ';', ':', ')', ']', '}', '\'', '"', '`', '.'];
 
 /// The byte offset of the end of the maximal non-whitespace run starting at
@@ -977,8 +1105,8 @@ fn flag_ephemeral_words<'a>(
         let raw = &text[start..end];
         search_from = end;
         let path = raw
-            .trim_start_matches(EPHEMERAL_PATH_LEADING_PUNCTUATION)
-            .trim_end_matches(EPHEMERAL_PATH_TRAILING_PUNCTUATION);
+            .trim_start_matches(NARRATIVE_LEADING_PUNCTUATION)
+            .trim_end_matches(NARRATIVE_TRAILING_PUNCTUATION);
         if path.len() <= trigger.len() || !word_qualifies(trigger, path) || seen.contains(&path) {
             continue;
         }
@@ -1004,6 +1132,519 @@ fn check_ephemeral_paths(narrative: &[(String, String)], errors: &mut Vec<String
     }
 }
 
+// ---- the shared capture-resolution helper (HR-107/HR-110/HR-111 all build on this) ----
+
+/// File extensions a citation's path must end in -- the small, closed set
+/// this repository's own tracked tree and batch workspaces actually use
+/// (`rs`, `json`, `md`, `sh`, `toml`, `yml`/`yaml`, `txt`, `py`, `ts`,
+/// `js`, `mjs`, `lock`, `log`, `html`). A knowledge or backlog id
+/// (`houserules.crash-paths-are-named`, `process.tdd`) has exactly the
+/// same `word.word` shape a looser "any short suffix" pattern would also
+/// match, and narrative prose cites ids constantly -- this very module
+/// doc does, throughout. Anchoring `find_citations` on a real extension
+/// instead is what keeps a citation search from flagging every id a
+/// report names; see the module doc's Limits for what a new extension
+/// needs before this list covers it.
+const CITATION_EXTENSION_PATTERN: &str =
+    r"\.(?:rs|json|md|sh|toml|ya?ml|txt|py|ts|js|mjs|lock|log|html)\b";
+
+/// A path-shaped citation `find_citations` locates in narrative prose,
+/// with the optional `:NNN` or `:NNN-MMM` line range HR-107 checks --
+/// `line`/`line_end` are `None` when the token carried no such suffix, the
+/// shape HR-110 and HR-111 also resolve (a bare mention of a retained
+/// capture or a sweep script, with no line pinned). `range` is the
+/// trimmed token's own byte span in the source text, so a caller can test
+/// proximity to some other match the way `check_self_audit_narrative`
+/// already does for a ratio and a co-located sha.
+struct Citation {
+    path: String,
+    line: Option<u64>,
+    line_end: Option<u64>,
+    range: std::ops::Range<usize>,
+}
+
+/// Splits a trimmed citation token's optional `:NNN`/`:NNN-MMM` suffix off
+/// its path, at the FIRST `:` rather than the last: a path itself never
+/// carries a colon, so the first one always marks the line suffix's
+/// start, and a Rust-panic-style `file:NNN:MM` column citation (a real
+/// shape this task's own corpus run found) keeps `NNN` as its line and
+/// drops the trailing `:MM` rather than reading `NNN:MM` as YET more path.
+/// Falls back to treating the whole token as a bare path (no line fields)
+/// when the text right after that `:` has no leading digit at all -- a
+/// citation with a genuinely non-numeric trailing colon (none observed in
+/// this repository's own narrative prose) is not this tool's business to
+/// split further. A range whose second half fails to parse (`path:170-abc`)
+/// still keeps the first number: `path:170` alone is already a valid
+/// citation this function found by construction.
+fn split_line_suffix(token: &str) -> (&str, Option<u64>, Option<u64>) {
+    let Some(colon) = token.find(':') else {
+        return (token, None, None);
+    };
+    let path = &token[..colon];
+    let suffix = &token[colon + 1..];
+    let digit_end = suffix
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(suffix.len());
+    if digit_end == 0 {
+        return (token, None, None);
+    }
+    let Ok(line) = suffix[..digit_end].parse::<u64>() else {
+        return (token, None, None);
+    };
+    let line_end = suffix[digit_end..].strip_prefix('-').and_then(|range_end| {
+        let range_digit_end = range_end
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(range_end.len());
+        (range_digit_end > 0)
+            .then(|| range_end[..range_digit_end].parse::<u64>().ok())
+            .flatten()
+    });
+    (path, Some(line), line_end)
+}
+
+/// Strips `NARRATIVE_TRAILING_PUNCTUATION` from `text`, then a trailing
+/// possessive `'s` (straight or curly apostrophe), repeating until
+/// neither applies. This repository's own narrative prose routinely cites
+/// a file possessively ("`install.rs`'s own module doc has ..."), and
+/// that suffix is not sentence punctuation `trim_end_matches` alone
+/// strips -- left untrimmed, `find_citations` would read the citation as
+/// `install.rs's`, a file that can never exist.
+fn trim_trailing_citation_glue(text: &str) -> &str {
+    let mut trimmed = text;
+    loop {
+        let before = trimmed;
+        trimmed = trimmed.trim_end_matches(NARRATIVE_TRAILING_PUNCTUATION);
+        if let Some(stripped) = trimmed
+            .strip_suffix("'s")
+            .or_else(|| trimmed.strip_suffix("\u{2019}s"))
+        {
+            trimmed = stripped;
+        }
+        if trimmed == before {
+            return trimmed;
+        }
+    }
+}
+
+/// Every path-shaped citation `text` names. Each `CITATION_EXTENSION_PATTERN`
+/// match anchors a search for its whole whitespace-delimited word
+/// (`word_start`/`word_end`, the same walk `flag_ephemeral_words` already
+/// does); `NARRATIVE_LEADING_PUNCTUATION` trims the sentence punctuation
+/// glued to its start, `trim_trailing_citation_glue` trims the
+/// punctuation and any possessive `'s` glued to its end, and
+/// `split_line_suffix` splits off any trailing `:NNN`/`:NNN-MMM` that
+/// survives that trim. `search_from` only advances, so no two returned
+/// citations can name the exact same token twice.
+fn find_citations(text: &str) -> Vec<Citation> {
+    let extension =
+        Regex::new(CITATION_EXTENSION_PATTERN).expect("valid citation-extension pattern");
+    let mut citations = Vec::new();
+    let mut search_from = 0;
+    while let Some(found) = extension.find(&text[search_from..]) {
+        let anchor = search_from + found.start();
+        let word_bound_start = word_start(text, anchor);
+        let word_bound_end = word_end(text, anchor);
+        search_from = word_bound_end.max(anchor + 1);
+        let raw = &text[word_bound_start..word_bound_end];
+        let after_leading_trim = raw.trim_start_matches(NARRATIVE_LEADING_PUNCTUATION);
+        let leading_trimmed_len = raw.len() - after_leading_trim.len();
+        let trimmed = trim_trailing_citation_glue(after_leading_trim);
+        if trimmed.is_empty() {
+            continue;
+        }
+        let range_start = word_bound_start + leading_trimmed_len;
+        let range = range_start..range_start + trimmed.len();
+        let (path, line, line_end) = split_line_suffix(trimmed);
+        citations.push(Citation {
+            path: path.to_string(),
+            line,
+            line_end,
+            range,
+        });
+    }
+    citations
+}
+
+/// One `collect_narrative` field, its citations already parsed: `label`
+/// and `text` are exactly `collect_narrative`'s own pair, and `citations`
+/// is `find_citations(&text)`, run here exactly once. `check_citation_lines`,
+/// `check_narrative_number_claims`, and `check_narrative_sweep_coverage`
+/// all read `citations` from this shared pass instead of each calling
+/// `find_citations` on the same text again -- fix round 1, minor issue 7:
+/// round 0 parsed a report's four narrative fields up to three times each
+/// (once per check) and recompiled `CITATION_EXTENSION_PATTERN` every
+/// time.
+struct NarrativeField {
+    label: String,
+    text: String,
+    citations: Vec<Citation>,
+}
+
+/// Runs `find_citations` once per `narrative` field, pairing each with its
+/// own `label`/`text` for the three checks built on `NarrativeField` below.
+fn collect_narrative_fields(narrative: &[(String, String)]) -> Vec<NarrativeField> {
+    narrative
+        .iter()
+        .map(|(label, text)| {
+            let citations = find_citations(text);
+            NarrativeField {
+                label: label.clone(),
+                text: text.clone(),
+                citations,
+            }
+        })
+        .collect()
+}
+
+/// Every path `git ls-files` names under `root` -- this repository's own
+/// tracked-file authority (`quality.gates-derive-their-scope`), used to
+/// resolve a bare-filename citation below. `None` when `root` is not a
+/// git working tree, `git` itself is missing, or the command otherwise
+/// fails; a citation resolver given `None` degrades to the literal,
+/// root-relative join for every citation rather than treating the
+/// failure as its own finding -- the same silent-degrade precedent
+/// `resolve_commit`/`is_ancestor` above already set for this module's
+/// other `git` shell-outs (see the module doc's Further constraints).
+fn list_tracked_files(root: &Path) -> Option<Vec<String>> {
+    let output = Command::new("git")
+        .args(["ls-files", "-z"])
+        .current_dir(root)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(
+        output
+            .stdout
+            .split(|&byte| byte == 0)
+            .filter(|entry| !entry.is_empty())
+            .map(|entry| String::from_utf8_lossy(entry).into_owned())
+            .collect(),
+    )
+}
+
+/// Resolves a citation's `path` to the file it names under `root`: the
+/// literal, root-relative join when that exists, or -- for a bare
+/// filename (no `/`) with no such literal match -- the one entry in
+/// `tracked_files` whose own basename equals it, when exactly one such
+/// file exists. This repository's own narrative prose overwhelmingly
+/// cites a source file by its bare basename (`install.rs:170`, never
+/// `crates/houserules/src/install.rs:170`, a real shape this task's own
+/// corpus run measured at 21 citations for that one file alone); without
+/// this fallback nearly every such citation in the retained corpus would
+/// read as "does not exist" even though the file plainly does. See the
+/// module doc's Limits for the zero- and multiple-match cases this still
+/// falls back on the literal join for.
+fn resolve_citation_path(root: &Path, path: &str, tracked_files: &[String]) -> PathBuf {
+    let literal = resolve_against(root, path);
+    if literal.is_file() || path.contains('/') {
+        return literal;
+    }
+    let mut matches = tracked_files.iter().filter(|tracked| {
+        Path::new(tracked)
+            .file_name()
+            .and_then(|name| name.to_str())
+            == Some(path)
+    });
+    let Some(only_match) = matches.next() else {
+        return literal;
+    };
+    if matches.next().is_some() {
+        return literal; // ambiguous basename: more than one tracked file matches
+    }
+    root.join(only_match)
+}
+
+/// Loads a citation's target file from `root`: a bare filename resolves
+/// through `resolve_citation_path` first (the tracked-tree basename
+/// fallback), and everything else falls back to the same fs-read
+/// (`resolve_against` + `read_utf8_lossy`) every other check in this
+/// module already uses -- this tool has never distinguished a tracked-
+/// tree citation from one naming a file in the gitignored batch
+/// workspace a report cites (`resolve_against` just joins).
+fn load_citation(
+    root: &Path,
+    citation: &Citation,
+    tracked_files: &[String],
+) -> std::io::Result<String> {
+    read_utf8_lossy(&resolve_citation_path(root, &citation.path, tracked_files))
+}
+
+/// `true` when `a` and `b` sit within `window` bytes of each other (zero
+/// distance when they overlap or touch) -- the deterministic "same
+/// sentence" proxy this module already uses for a self-audit ratio and
+/// its co-located sha (`RATIO_SHA_WINDOW`); HR-110 and HR-111 reuse the
+/// same proxy for a citation and the claim it is offered to support. See
+/// the module doc's Limits for why a byte window stands in for a real
+/// sentence boundary.
+fn ranges_close(a: &std::ops::Range<usize>, b: &std::ops::Range<usize>, window: usize) -> bool {
+    let gap = b
+        .start
+        .saturating_sub(a.end)
+        .max(a.start.saturating_sub(b.end));
+    gap <= window
+}
+
+// ---- HR-107: a citation's line range must fit the file it names ----
+
+/// Every `path:NNN`/`path:NNN-MMM` citation `collect_narrative`'s four
+/// fields carry must name a file that reads clean under `root`, and NNN
+/// (and MMM, for a range) must not exceed that file's line count. A bare
+/// citation with no line suffix (`NarrativeField::citations` also carries
+/// those, for HR-110 and HR-111 below) is not this check's business. See
+/// the module doc's Limits for the comma-list and range-ordering shapes
+/// this does not chase.
+fn check_citation_lines(
+    root: &Path,
+    narrative: &[NarrativeField],
+    tracked_files: &[String],
+    errors: &mut Vec<String>,
+) {
+    let mut seen: Vec<(String, String)> = Vec::new();
+    for field in narrative {
+        let label = &field.label;
+        for citation in &field.citations {
+            let Some(line) = citation.line else {
+                continue;
+            };
+            let token = match citation.line_end {
+                Some(end) => format!("{}:{line}-{end}", citation.path),
+                None => format!("{}:{line}", citation.path),
+            };
+            let key = (label.clone(), token.clone());
+            if seen.contains(&key) {
+                continue;
+            }
+            match load_citation(root, citation, tracked_files) {
+                Ok(content) => {
+                    let count = line_count(&content) as u64;
+                    let max_cited = citation.line_end.unwrap_or(line);
+                    if max_cited > count {
+                        seen.push(key);
+                        errors.push(format!(
+                            "{label}: cites \"{token}\", but {} has only {count} lines",
+                            citation.path
+                        ));
+                    }
+                }
+                Err(error) => {
+                    seen.push(key);
+                    errors.push(format!(
+                        "{label}: cites \"{token}\", which could not be read ({error})"
+                    ));
+                }
+            }
+        }
+    }
+}
+
+// ---- HR-110: a narrative count must appear in the capture it cites ----
+
+/// Characters either side of a citation searched for a co-located count
+/// claim, or of a "sweep"/"enumeration" keyword searched for a co-located
+/// citation -- the same deterministic "same sentence" proxy as
+/// `RATIO_SHA_WINDOW`, at the same value, for the same reason (see
+/// `ranges_close`'s own doc).
+const NARRATIVE_CLAIM_WINDOW: usize = 100;
+
+/// `true` when `number` (an ASCII decimal string, e.g. `"528"`) appears in
+/// `content` as a standalone token: flanked by a non-digit or the text's
+/// edge on each side, so `"3"` does not read as present inside `"23"`.
+fn contains_number_token(content: &str, number: &str) -> bool {
+    let pattern =
+        Regex::new(&format!(r"\b{number}\b")).expect("a decimal-digit string is a valid pattern");
+    pattern.find(content).is_some()
+}
+
+/// HR-110's number class: a narrative sentence stating a count ("N
+/// passed", "N files") while citing a capture must find that count
+/// inside the capture it cites. "Citing a capture" is approximated as
+/// "naming exactly one `find_citations` path within `NARRATIVE_CLAIM_WINDOW`
+/// bytes of the count phrase" -- the same citation `check_citation_lines`
+/// resolves, bare mention or not. Requiring exactly one nearby citation
+/// (not "at least one") rules out the enumeration-list shape this task's
+/// own corpus run found repeatedly: "N files (a.rs, b.rs, ..., z.rs)"
+/// names N as the LIST's own length, not a fact any one of a/b/.../z's
+/// content should contain, and a citation-per-item count check flagged
+/// every listed file as failing to "contain" the list's own size. This
+/// scope is deliberately narrow (`quality.gates-derive-their-scope`); see
+/// the module doc's Limits for what it leaves uncovered, including the
+/// locative ("the X live in Y") class this function does not attempt.
+fn check_narrative_number_claims(
+    root: &Path,
+    narrative: &[NarrativeField],
+    tracked_files: &[String],
+    errors: &mut Vec<String>,
+) {
+    let count_phrase = Regex::with_flags(r"\b(\d+)\s+(?:passed|files?)\b", "i")
+        .expect("valid count-phrase pattern");
+    for field in narrative {
+        let (label, text, citations) = (&field.label, &field.text, &field.citations);
+        if citations.is_empty() {
+            continue;
+        }
+        for found in count_phrase.find_iter(text) {
+            let phrase_range = found.range();
+            let phrase_text = found.as_str(text).to_string();
+            let number =
+                text[found.group(1).expect("group 1 always captures on a match")].to_string();
+            let mut nearby = citations.iter().filter(|citation| {
+                ranges_close(&phrase_range, &citation.range, NARRATIVE_CLAIM_WINDOW)
+            });
+            let Some(citation) = nearby.next() else {
+                continue; // no citation nearby: nothing to cross-check
+            };
+            if nearby.next().is_some() {
+                continue; // more than one nearby citation: an enumeration list, not one capture
+            }
+            match load_citation(root, citation, tracked_files) {
+                Ok(content) => {
+                    if !contains_number_token(&content, &number) {
+                        errors.push(format!(
+                            "{label}: \"{phrase_text}\" cites \"{}\", which does not contain \"{number}\"",
+                            citation.path
+                        ));
+                    }
+                }
+                Err(error) => errors.push(format!(
+                    "{label}: \"{phrase_text}\" cites \"{}\", which could not be read ({error})",
+                    citation.path
+                )),
+            }
+        }
+    }
+}
+
+// ---- HR-111: a cited sweep must cover the file it certifies ----
+
+/// Every path `report["files_changed"]` names -- the plain string list
+/// every task-report and branch-review already carries.
+/// `check_narrative_sweep_coverage` treats each as a file a cited sweep
+/// should cover: this schema field exists on every deliverable this tool
+/// already reads, so no narrative-parsing heuristic is needed to know
+/// which files a sweep's clean result has to certify.
+fn collect_files_changed(report: &Value) -> Vec<String> {
+    report
+        .get("files_changed")
+        .and_then(Value::as_array)
+        .map(|files| {
+            files
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Extensions a citation's path must end in before `check_narrative_sweep_coverage`
+/// treats it as a candidate sweep/enumeration ARTIFACT at all -- the
+/// "cited artifact's shape" half of HR-111's mechanical trigger, alongside
+/// the "sweep"/"enumeration" keyword. A real retained sweep in this
+/// repository's own corpus is always a script or a captured run (`.sh`,
+/// `.py`, `.txt`, `.log`); a `.md`/`.json`/`.toml`/`.rs`/`.yml` citation
+/// near the same keyword is, in every corpus instance found, the sentence
+/// naming the sweep's SCOPE ("the sweep (README.md, CLAUDE.md, ...)") or
+/// an unrelated file the sentence happens to also mention -- not the
+/// sweep's own output. See the module doc's Limits for the corpus count
+/// this excludes on purpose, and the one true positive (a `.md`
+/// disposition write-up) it also excludes as the cost of that precision.
+const SWEEP_ARTIFACT_EXTENSIONS: &[&str] = &["sh", "py", "txt", "log"];
+
+/// `true` when `path`'s extension is one of `SWEEP_ARTIFACT_EXTENSIONS`.
+fn looks_like_sweep_artifact(path: &str) -> bool {
+    SWEEP_ARTIFACT_EXTENSIONS
+        .iter()
+        .any(|extension| path.ends_with(&format!(".{extension}")))
+}
+
+/// HR-111's mechanical trigger for "this citation is offered as sweep or
+/// enumeration proof": the word "sweep" or "enumeration" (case-
+/// insensitive) within `NARRATIVE_CLAIM_WINDOW` bytes of a citation whose
+/// own path `looks_like_sweep_artifact` -- a sentence pattern plus an
+/// artifact-shape filter, not a hand list of known sweep script names
+/// (see the module doc's Limits for what this still misses).
+///
+/// Runs only when `files_changed` names exactly one file. A report that
+/// touches many files makes "the sweep's content names every one of
+/// them" the wrong test -- a real, narrowly-scoped sweep (checking one
+/// concern across the tracked tree) has no reason to mention a plan file
+/// or a schema copy the same task also happened to edit, and the corpus
+/// run behind this item found exactly that shape of false positive at
+/// every files_changed count above one. A single-file task is the shape
+/// HR-111's own origin names (batch 23 T1: `deliverable.rs`, the file the
+/// task changed most, missing from a sweep's ten-file list) and the one
+/// case this comparison is precise for; see the module doc's Limits for
+/// what this leaves uncovered.
+fn check_narrative_sweep_coverage(
+    root: &Path,
+    narrative: &[NarrativeField],
+    files_changed: &[String],
+    tracked_files: &[String],
+    errors: &mut Vec<String>,
+) {
+    if files_changed.len() != 1 {
+        return;
+    }
+    let keyword =
+        Regex::with_flags(r"\b(?:sweep|enumeration)\b", "i").expect("valid sweep-keyword pattern");
+    for field in narrative {
+        let (label, text, citations) = (&field.label, &field.text, &field.citations);
+        let sweep_citations: Vec<&Citation> = citations
+            .iter()
+            .filter(|citation| looks_like_sweep_artifact(&citation.path))
+            .collect();
+        if sweep_citations.is_empty() {
+            continue;
+        }
+        // Every sweep-shaped citation within NARRATIVE_CLAIM_WINDOW of ANY
+        // keyword match, deduplicated by citation identity (its own byte
+        // range): a field naming "sweep" more than once near the same
+        // citation still reads that citation's target file exactly once
+        // below (fix round 1, minor issue 7 -- round 0 called
+        // `load_citation` once per keyword match instead of once per
+        // qualifying citation).
+        let mut qualifying: Vec<&Citation> = Vec::new();
+        for keyword_match in keyword.find_iter(text) {
+            let keyword_range = keyword_match.range();
+            for citation in &sweep_citations {
+                let already_queued = qualifying
+                    .iter()
+                    .any(|queued| queued.range.start == citation.range.start);
+                if !already_queued
+                    && ranges_close(&keyword_range, &citation.range, NARRATIVE_CLAIM_WINDOW)
+                {
+                    qualifying.push(citation);
+                }
+            }
+        }
+        for citation in qualifying {
+            let content = match load_citation(root, citation, tracked_files) {
+                Ok(content) => content,
+                Err(error) => {
+                    errors.push(format!(
+                        "{label}: cites \"{}\" as a sweep, which could not be read ({error})",
+                        citation.path
+                    ));
+                    continue;
+                }
+            };
+            for changed in files_changed {
+                if content.contains(changed.as_str()) {
+                    continue;
+                }
+                errors.push(format!(
+                    "{label}: cites \"{}\" as a sweep, but its retained content does not name \"{changed}\", a file this report's own files_changed lists",
+                    citation.path
+                ));
+            }
+        }
+    }
+}
+
 /// Reads and parses `path` as a JSON report, naming the file in any read
 /// or parse error (`houserules.crash-paths-are-named`):
 /// `cmd_check_report_claims`, the one caller, maps a read failure and a
@@ -1024,6 +1665,8 @@ fn check_report_claims(report_path: &Path, root: &Path) -> Result<Vec<String>, S
     let report = load_report(report_path)?;
     let runs = collect_runs(&report);
     let narrative = collect_narrative(&report);
+    let narrative_fields = collect_narrative_fields(&narrative);
+    let tracked_files = list_tracked_files(root).unwrap_or_default();
     let mut errors = Vec::new();
     check_redirected_captures(root, &runs, &mut errors);
     check_truncation_markers(root, &runs, &mut errors);
@@ -1032,6 +1675,15 @@ fn check_report_claims(report_path: &Path, root: &Path) -> Result<Vec<String>, S
     check_self_audit_narrative(&narrative, &report, &mut errors);
     check_paste_run_lint(&runs, &mut errors);
     check_ephemeral_paths(&narrative, &mut errors);
+    check_citation_lines(root, &narrative_fields, &tracked_files, &mut errors);
+    check_narrative_number_claims(root, &narrative_fields, &tracked_files, &mut errors);
+    check_narrative_sweep_coverage(
+        root,
+        &narrative_fields,
+        &collect_files_changed(&report),
+        &tracked_files,
+        &mut errors,
+    );
     Ok(errors)
 }
 
@@ -1790,5 +2442,448 @@ mod tests {
                 "implemented: cites \"/var/tmp/capture.txt\", an ephemeral path that will not exist once the session ends".to_string()
             ]
         );
+    }
+
+    // ---- the citation-line check (HR-107) ----
+
+    /// Passes a `path:NNN` citation whose line sits within the named
+    /// file's line count.
+    #[test]
+    fn passes_a_citation_whose_line_is_within_the_named_files_line_count() {
+        let (dir, head) = init_scratch_repo("check-report-claims-citation-ok-");
+        std::fs::write(dir.path().join("cited.rs"), "one\ntwo\nthree\n").unwrap();
+        let mut report = base_report(&head);
+        report["implemented"] = json!("Fixed the panic at cited.rs:2.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// A Rust-panic-style `path:NNN:MM` column citation reads NNN as the
+    /// line and drops the trailing `:MM` -- not `NNN:MM` glued together
+    /// as an unresolvable path.
+    #[test]
+    fn passes_a_file_line_column_citation_reading_the_line_and_dropping_the_column() {
+        let (dir, head) = init_scratch_repo("check-report-claims-citation-line-col-");
+        std::fs::write(dir.path().join("cited.rs"), "one\ntwo\nthree\n").unwrap();
+        let mut report = base_report(&head);
+        report["implemented"] = json!("Fixed the panic at cited.rs:2:14.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// Flags a `path:NNN` citation whose line exceeds the named file's
+    /// line count -- the stream-index-as-file-line class HR-107 exists
+    /// to catch.
+    #[test]
+    fn flags_a_citation_whose_line_exceeds_the_named_files_line_count() {
+        let (dir, head) = init_scratch_repo("check-report-claims-citation-overflow-");
+        std::fs::write(dir.path().join("cited.rs"), "one\ntwo\nthree\n").unwrap();
+        let mut report = base_report(&head);
+        report["implemented"] = json!("Fixed the panic at cited.rs:99.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(
+            errors,
+            vec!["implemented: cites \"cited.rs:99\", but cited.rs has only 3 lines".to_string()]
+        );
+    }
+
+    /// Flags a `path:NNN-MMM` citation whose range end exceeds the named
+    /// file's line count, even though the range start is in bounds.
+    #[test]
+    fn flags_a_citation_range_whose_end_exceeds_the_named_files_line_count() {
+        let (dir, head) = init_scratch_repo("check-report-claims-citation-range-overflow-");
+        std::fs::write(dir.path().join("cited.rs"), "one\ntwo\nthree\n").unwrap();
+        let mut report = base_report(&head);
+        report["self_review"] = json!(["Reviewed the fix at cited.rs:2-10."]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(
+            errors,
+            vec![
+                "self_review[0]: cites \"cited.rs:2-10\", but cited.rs has only 3 lines"
+                    .to_string()
+            ]
+        );
+    }
+
+    /// Flags a citation naming a file that does not exist under `root`,
+    /// tracked tree or batch workspace alike.
+    #[test]
+    fn flags_a_citation_naming_a_file_that_does_not_exist() {
+        let (dir, head) = init_scratch_repo("check-report-claims-citation-missing-");
+        let mut report = base_report(&head);
+        report["implemented"] = json!("See notes at .superpowers/sdd/batch-1/evidence.txt:5.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            errors[0].starts_with(
+                "implemented: cites \".superpowers/sdd/batch-1/evidence.txt:5\", which could not be read ("
+            ),
+            "unexpected error: {}",
+            errors[0]
+        );
+    }
+
+    /// A bare path mention with no `:NNN` suffix is not this check's
+    /// business (HR-110/HR-111 resolve those instead): citing a source
+    /// file by name alone, with no line pinned, never triggers HR-107,
+    /// even when the file does not exist.
+    #[test]
+    fn does_not_flag_a_bare_path_citation_with_no_line_suffix() {
+        let (dir, head) = init_scratch_repo("check-report-claims-citation-bare-");
+        let mut report = base_report(&head);
+        report["implemented"] = json!("See nonexistent.rs for the old shape.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// A `path:NNN`-shaped token inside a `command` field is exempt, the
+    /// same ephemeral-path precedent HR-107's own item body names: only
+    /// `collect_narrative`'s four fields are ever scanned for a citation.
+    #[test]
+    fn does_not_flag_a_path_nnn_shaped_token_inside_a_command_field() {
+        let (dir, head) = init_scratch_repo("check-report-claims-citation-command-exempt-");
+        let mut report = base_report(&head);
+        report["live_run"] =
+            json!([{"command": "sed -n '1,999p' cited.rs:999", "output": "irrelevant"}]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// A knowledge or backlog id's `area.hyphenated-name` shape never
+    /// reads as a citation: `CITATION_EXTENSION_PATTERN` requires a real
+    /// extension immediately after the dot, and no shipped id ends that
+    /// way.
+    #[test]
+    fn does_not_flag_a_knowledge_id_as_a_citation() {
+        let (dir, head) = init_scratch_repo("check-report-claims-citation-knowledge-id-");
+        let mut report = base_report(&head);
+        report["implemented"] =
+            json!("Relied on houserules.crash-paths-are-named and process.deliverables-json.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// A bare-basename citation (`install.rs:170`, this repository's own
+    /// dominant citation style -- no directory prefix) resolves through
+    /// the one tracked file with that basename, even though it sits in a
+    /// nested directory the citation never names.
+    #[test]
+    fn resolves_a_bare_basename_citation_to_the_one_tracked_file_it_names() {
+        let (dir, head) = init_scratch_repo("check-report-claims-citation-basename-");
+        std::fs::create_dir_all(dir.path().join("crates/houserules/src")).unwrap();
+        std::fs::write(
+            dir.path().join("crates/houserules/src/install.rs"),
+            "one\ntwo\nthree\n",
+        )
+        .unwrap();
+        git(dir.path(), &["add", "crates/houserules/src/install.rs"]);
+        commit(dir.path(), "add install.rs");
+        let mut report = base_report(&head);
+        report["implemented"] = json!("Fixed the panic at install.rs:2.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// A bare-basename citation matching more than one tracked file falls
+    /// back to the literal, root-relative join (here, nonexistent) rather
+    /// than guessing which tracked file the citation meant.
+    #[test]
+    fn falls_back_to_the_literal_path_when_a_bare_basename_is_ambiguous() {
+        let (dir, head) = init_scratch_repo("check-report-claims-citation-basename-ambiguous-");
+        std::fs::create_dir_all(dir.path().join("a")).unwrap();
+        std::fs::create_dir_all(dir.path().join("b")).unwrap();
+        std::fs::write(dir.path().join("a/mod.rs"), "one\ntwo\n").unwrap();
+        std::fs::write(dir.path().join("b/mod.rs"), "one\ntwo\nthree\n").unwrap();
+        git(dir.path(), &["add", "a/mod.rs", "b/mod.rs"]);
+        commit(dir.path(), "add two mod.rs files");
+        let mut report = base_report(&head);
+        report["implemented"] = json!("Fixed the panic at mod.rs:2.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            errors[0].starts_with("implemented: cites \"mod.rs:2\", which could not be read ("),
+            "unexpected error: {}",
+            errors[0]
+        );
+    }
+
+    // ---- the narrative number-claim cross-check (HR-110) ----
+
+    /// Flags a narrative count that does not appear in the capture it
+    /// cites -- the 523-vs-528 shape HR-110's own item body names.
+    #[test]
+    fn flags_a_narrative_count_absent_from_its_cited_capture() {
+        let (dir, head) = init_scratch_repo("check-report-claims-number-claim-stale-");
+        std::fs::write(
+            dir.path().join("t2-full-suite.txt"),
+            "test result: ok. 528 passed; 0 failed\n",
+        )
+        .unwrap();
+        let mut report = base_report(&head);
+        report["implemented"] =
+            json!("cargo test --locked (523 passed, captured in t2-full-suite.txt).");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(
+            errors,
+            vec![
+                "implemented: \"523 passed\" cites \"t2-full-suite.txt\", which does not contain \"523\"".to_string()
+            ]
+        );
+    }
+
+    /// Passes a narrative count that does appear in the capture it cites.
+    #[test]
+    fn passes_a_narrative_count_present_in_its_cited_capture() {
+        let (dir, head) = init_scratch_repo("check-report-claims-number-claim-ok-");
+        std::fs::write(
+            dir.path().join("t2-full-suite.txt"),
+            "test result: ok. 528 passed; 0 failed\n",
+        )
+        .unwrap();
+        let mut report = base_report(&head);
+        report["implemented"] =
+            json!("cargo test --locked (528 passed, captured in t2-full-suite.txt).");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// Passes a narrative "N files" count present in the capture it
+    /// cites -- the item body's second named count shape.
+    #[test]
+    fn passes_a_narrative_files_count_present_in_its_cited_capture() {
+        let (dir, head) = init_scratch_repo("check-report-claims-number-claim-files-ok-");
+        std::fs::write(
+            dir.path().join("corpus-run.txt"),
+            "checked 3 files, 0 hits\n",
+        )
+        .unwrap();
+        let mut report = base_report(&head);
+        report["implemented"] = json!("Swept 3 files, retained at corpus-run.txt.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// A count with no citation anywhere nearby is not this check's
+    /// business: nothing to cross-check it against.
+    #[test]
+    fn does_not_flag_a_count_with_no_nearby_citation() {
+        let (dir, head) = init_scratch_repo("check-report-claims-number-claim-no-citation-");
+        let mut report = base_report(&head);
+        report["implemented"] = json!("Captured 523 passed, not written down anywhere.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// A count naming the length of an enumerated list ("2 files
+    /// (a.rs, b.rs)") is not a claim about either listed file's own
+    /// content: more than one citation sitting near the count phrase
+    /// means it counts the list, not one capture, so neither citation is
+    /// checked -- the real corpus shape this scope choice exists for.
+    #[test]
+    fn does_not_flag_a_count_naming_an_enumerated_lists_own_length() {
+        let (dir, head) = init_scratch_repo("check-report-claims-number-claim-enumeration-");
+        std::fs::write(dir.path().join("a.rs"), "fn a() {}\n").unwrap();
+        std::fs::write(dir.path().join("b.rs"), "fn b() {}\n").unwrap();
+        let mut report = base_report(&head);
+        report["implemented"] = json!("2 files touched (a.rs, b.rs).");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// Flags a narrative count citing a capture that does not exist,
+    /// rather than silently passing an unresolvable citation.
+    #[test]
+    fn flags_a_narrative_count_citing_a_capture_that_does_not_exist() {
+        let (dir, head) = init_scratch_repo("check-report-claims-number-claim-missing-");
+        let mut report = base_report(&head);
+        report["implemented"] =
+            json!("cargo test --locked (523 passed, see missing-evidence.txt).");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            errors[0].starts_with(
+                "implemented: \"523 passed\" cites \"missing-evidence.txt\", which could not be read ("
+            ),
+            "unexpected error: {}",
+            errors[0]
+        );
+    }
+
+    /// A trailing possessive `'s` glued onto a citation ("`corpus-run.txt`'s
+    /// own summary", a shape this repository's own narrative prose uses
+    /// constantly) is not part of the path: `find_citations` resolves the
+    /// file underneath it, not a `corpus-run.txt's` that can never exist.
+    #[test]
+    fn passes_a_narrative_count_citing_a_capture_through_a_trailing_possessive() {
+        let (dir, head) = init_scratch_repo("check-report-claims-number-claim-possessive-");
+        std::fs::write(
+            dir.path().join("corpus-run.txt"),
+            "checked 6 files, 0 hits\n",
+        )
+        .unwrap();
+        let mut report = base_report(&head);
+        report["implemented"] = json!("6 files, per corpus-run.txt's own summary.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    // ---- the narrative sweep-coverage check (HR-111) ----
+
+    /// Flags a sweep citation whose retained content omits a file this
+    /// report's own `files_changed` lists -- the vacuous-zero shape
+    /// HR-111's own item body names (batch 23 T1 round 0's sweep, whose
+    /// ten-file list omitted `deliverable.rs`).
+    #[test]
+    fn flags_a_sweep_citation_whose_retained_content_omits_a_changed_file() {
+        let (dir, head) = init_scratch_repo("check-report-claims-sweep-vacuous-");
+        std::fs::write(
+            dir.path().join("coverage-check.txt"),
+            "9 hits across backlog and docs, 0 remaining\n",
+        )
+        .unwrap();
+        let mut report = base_report(&head);
+        report["files_changed"] = json!(["crates/houserules/src/rules/deliverable.rs"]);
+        report["implemented"] = json!("The retained sweep (coverage-check.txt) still exits 0.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(
+            errors,
+            vec![
+                "implemented: cites \"coverage-check.txt\" as a sweep, but its retained content does not name \"crates/houserules/src/rules/deliverable.rs\", a file this report's own files_changed lists".to_string()
+            ]
+        );
+    }
+
+    /// Passes a sweep citation whose retained content names every file
+    /// this report's own `files_changed` lists.
+    #[test]
+    fn passes_a_sweep_citation_whose_retained_content_covers_every_changed_file() {
+        let (dir, head) = init_scratch_repo("check-report-claims-sweep-covered-");
+        std::fs::write(
+            dir.path().join("coverage-check.txt"),
+            "9 hits: crates/houserules/src/rules/deliverable.rs among them, 0 remaining\n",
+        )
+        .unwrap();
+        let mut report = base_report(&head);
+        report["files_changed"] = json!(["crates/houserules/src/rules/deliverable.rs"]);
+        report["implemented"] = json!("The retained sweep (coverage-check.txt) still exits 0.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// A report naming no `files_changed` at all gives this check nothing
+    /// to certify, so a citation that would otherwise look like a vacuous
+    /// sweep is not flagged.
+    #[test]
+    fn does_not_flag_a_sweep_citation_when_files_changed_is_empty() {
+        let (dir, head) = init_scratch_repo("check-report-claims-sweep-no-files-changed-");
+        std::fs::write(
+            dir.path().join("coverage-check.txt"),
+            "9 hits across backlog and docs, 0 remaining\n",
+        )
+        .unwrap();
+        let mut report = base_report(&head);
+        report["implemented"] = json!("The retained sweep (coverage-check.txt) still exits 0.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// A report naming TWO changed files gives this check nothing
+    /// precise to certify (HR-111's own doc: comparing a sweep against
+    /// every changed file floods a multi-file report with false
+    /// positives), so a citation that would otherwise look like a
+    /// vacuous sweep is not flagged -- pins the `files_changed.len() !=
+    /// 1` boundary (fix round 1, important issue 4).
+    #[test]
+    fn does_not_flag_a_vacuous_sweep_citation_when_files_changed_has_two_entries() {
+        let (dir, head) = init_scratch_repo("check-report-claims-sweep-multi-file-");
+        std::fs::write(
+            dir.path().join("coverage-check.txt"),
+            "9 hits across backlog and docs, 0 remaining\n",
+        )
+        .unwrap();
+        let mut report = base_report(&head);
+        report["files_changed"] = json!([
+            "crates/houserules/src/rules/deliverable.rs",
+            "crates/houserules/src/rules/check.rs"
+        ]);
+        report["implemented"] = json!("The retained sweep (coverage-check.txt) still exits 0.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// A `.md` artifact cited beside "sweep" is not a candidate sweep
+    /// artifact (`SWEEP_ARTIFACT_EXTENSIONS`), so it is not flagged even
+    /// though its content omits the report's own single changed file --
+    /// pins the artifact-shape boundary (fix round 1, important issue 4).
+    #[test]
+    fn does_not_flag_a_non_sweep_shaped_artifact_cited_beside_sweep_omitting_the_changed_file() {
+        let (dir, head) = init_scratch_repo("check-report-claims-sweep-non-sweep-shape-");
+        std::fs::write(dir.path().join("notes.md"), "unrelated prose\n").unwrap();
+        let mut report = base_report(&head);
+        report["files_changed"] = json!(["crates/houserules/src/rules/deliverable.rs"]);
+        report["implemented"] = json!("The retained sweep (notes.md) still exits 0.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// A citation with no "sweep"/"enumeration" keyword nearby is a plain
+    /// file mention, not sweep proof, even when its content omits a
+    /// changed file: HR-107 and HR-110 are this shape's checks, not
+    /// HR-111.
+    #[test]
+    fn does_not_flag_a_plain_citation_with_no_sweep_keyword_nearby() {
+        let (dir, head) = init_scratch_repo("check-report-claims-sweep-no-keyword-");
+        std::fs::write(dir.path().join("other-evidence.txt"), "unrelated content\n").unwrap();
+        let mut report = base_report(&head);
+        report["files_changed"] = json!(["crates/houserules/src/rules/deliverable.rs"]);
+        report["implemented"] = json!("See other-evidence.txt for details.");
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
     }
 }

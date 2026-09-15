@@ -50,6 +50,7 @@ fn check_fields(check_type: &str) -> Option<&'static [&'static str]> {
         "co-change" => Some(&["if", "then"]),
         "diff-append-only" => Some(&["files"]),
         "report-field" => Some(&["if", "field"]),
+        "durable-sha" => Some(&["files"]),
         _ => None,
     }
 }
@@ -320,6 +321,40 @@ fn type_name(type_spec: &Value) -> String {
     }
 }
 
+/// Every schema-node keyword `validate` (below) recognizes: the twelve it
+/// enforces as constraints (`$ref`, `enum`, `type`, `pattern`,
+/// `minLength`, `maxLength`, `minimum`, `items`, `uniqueItems`,
+/// `required`, `properties`, `additionalProperties`), plus four
+/// annotation/structural keywords it deliberately never enforces
+/// (`$schema`, `$defs`, `title`, `description` -- `$schema` and `$defs`
+/// are meta/structural, consulted by `deref` rather than `validate`
+/// itself; `title`/`description` are documentation JSON Schema itself
+/// defines as non-constraining). This is the ONE list HR-109's
+/// unsupported-keyword check measures a schema node's own keys against
+/// (`quality.gates-derive-their-scope`: no second, hand-maintained copy
+/// of "what this engine supports" exists anywhere else in this binary --
+/// a keyword that gains real enforcement below enters this list in the
+/// same change, and nothing needs to be updated in two places to keep
+/// them in sync since there is only the one).
+const RECOGNIZED_KEYWORDS: [&str; 16] = [
+    "$ref",
+    "enum",
+    "type",
+    "pattern",
+    "minLength",
+    "maxLength",
+    "minimum",
+    "items",
+    "uniqueItems",
+    "required",
+    "properties",
+    "additionalProperties",
+    "$schema",
+    "$defs",
+    "title",
+    "description",
+];
+
 /// Validates `value` against a JSON Schema subset: local `$ref`, `type`
 /// (string or list), `enum`, `pattern`, `minLength`, `maxLength`,
 /// `minimum`, `items`, `uniqueItems`, `required`, `properties`,
@@ -332,6 +367,17 @@ fn type_name(type_spec: &Value) -> String {
 /// compile is itself a named finding (`schema pattern ... does not
 /// compile`), never a silent skip of the constraint -- a malformed input
 /// is reported, not swallowed.
+///
+/// Before any of that: every key `schema` itself carries (when it is an
+/// object) is checked against `RECOGNIZED_KEYWORDS`. A schema naming a
+/// keyword this engine does not implement -- `oneOf`, `anyOf`, `allOf`,
+/// `const`, `maximum`, `format`, and so on -- used to fall through every
+/// branch below silently, leaving the field it decorated completely
+/// unchecked (HR-109: a scratch schema whose `taskNumber` carried `oneOf`
+/// stopped raising ANY finding for that field at all). Now it is its own
+/// named finding, `{at}: unsupported schema keyword "{key}"`, run first
+/// so it fires even on a schema node `$ref` would otherwise short-
+/// circuit past.
 pub(crate) fn validate(
     value: &Value,
     schema: &Value,
@@ -339,6 +385,13 @@ pub(crate) fn validate(
     errors: &mut Vec<String>,
     root: &Value,
 ) {
+    if let Value::Object(map) = schema {
+        for key in map.keys() {
+            if !RECOGNIZED_KEYWORDS.contains(&key.as_str()) {
+                errors.push(format!("{at}: unsupported schema keyword {key:?}"));
+            }
+        }
+    }
     if let Some(reference) = schema.get("$ref").and_then(Value::as_str) {
         match deref(root, reference) {
             Ok(target) => validate(value, target, at, errors, root),
@@ -2216,5 +2269,246 @@ mod tests {
             errors,
             vec!["field: schema pattern \"(\" does not compile".to_string()]
         );
+    }
+
+    /// HR-109's own regression: a schema keyword this engine does not
+    /// implement (`oneOf`, here) used to fall through every branch
+    /// silently, leaving the field it decorated completely unchecked --
+    /// `true` is neither an integer nor a string, yet the old engine
+    /// raised nothing at all. Now the keyword itself is the finding.
+    #[test]
+    fn validate_reports_an_unimplemented_oneof_keyword_as_a_named_finding() {
+        let schema = json!({"oneOf": [{"type": "integer"}, {"type": "string"}]});
+        let mut errors = Vec::new();
+        validate(&json!(true), &schema, "taskNumber", &mut errors, &schema);
+        assert_eq!(
+            errors,
+            vec!["taskNumber: unsupported schema keyword \"oneOf\"".to_string()]
+        );
+    }
+
+    /// Every keyword this engine actually enforces -- `RECOGNIZED_KEYWORDS`'s
+    /// own twelve constraint keywords, exercised together on one schema
+    /// node -- passes cleanly: adding the unsupported-keyword scan never
+    /// starts flagging a keyword the engine already supports.
+    #[test]
+    fn validate_accepts_every_keyword_it_actually_implements_on_one_schema_node() {
+        let schema = json!({
+            "type": "object",
+            "required": ["id"],
+            "additionalProperties": false,
+            "properties": {
+                "id": {"type": "string", "minLength": 1, "maxLength": 3, "pattern": "^[a-z]+$"},
+                "count": {"type": "number", "minimum": 0},
+                "tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+                "kind": {"enum": ["a", "b"]},
+            },
+        });
+        let value = json!({"id": "ab", "count": 1, "tags": ["x"], "kind": "a"});
+        let mut errors = Vec::new();
+        validate(&value, &schema, "field", &mut errors, &schema);
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// An annotation keyword (`title`/`description`) alongside `$schema`
+    /// and `$defs` at a schema root never trips the unsupported-keyword
+    /// scan: these four are recognized but deliberately unenforced,
+    /// never a second undocumented exception.
+    #[test]
+    fn validate_accepts_the_four_annotation_and_structural_keywords() {
+        let schema = json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "t",
+            "description": "d",
+            "type": "string",
+            "$defs": {"unused": {"type": "string"}},
+        });
+        let mut errors = Vec::new();
+        validate(&json!("ok"), &schema, "field", &mut errors, &schema);
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// Every keyword `validate`'s own body reads via a literal
+    /// `schema.get("<keyword>")` call, extracted from THIS FILE's own
+    /// source text -- an in-process string scan, no subprocess spawned
+    /// (`houserules.platform-gated-tests`: the crate's own text-
+    /// processing already does this, so nothing external needs
+    /// spawning, gated or not). Bounded to the text between
+    /// `pub(crate) fn validate(`'s own definition and its closing brace
+    /// (the first `\n}\n` after it, matching this crate's own
+    /// flush-left-closing-brace convention), so a `schema.get` call
+    /// elsewhere in this file -- `schema_nodes`'s own walk, just below,
+    /// reads several of the same keys for a different reason -- is never
+    /// swept in as if `validate` itself enforced it.
+    fn validate_schema_get_keywords() -> HashSet<String> {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/rules/check.rs");
+        let source =
+            fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let start = source
+            .find("pub(crate) fn validate(")
+            .expect("validate's own definition is in this file");
+        let body = &source[start..];
+        let end = body
+            .find("\n}\n")
+            .expect("validate's own flush-left closing brace");
+        let body = &body[..end];
+        let marker = "schema.get(\"";
+        let mut keywords = HashSet::new();
+        let mut cursor = 0;
+        while let Some(offset) = body[cursor..].find(marker) {
+            let after = cursor + offset + marker.len();
+            let close = body[after..]
+                .find('"')
+                .expect("schema.get(\"...\" closing quote");
+            keywords.insert(body[after..after + close].to_string());
+            cursor = after + close;
+        }
+        keywords
+    }
+
+    /// HR-109's own `quality.gates-derive-their-scope` proof: the twelve
+    /// constraint keywords `RECOGNIZED_KEYWORDS` names (every entry
+    /// besides the four annotation/structural ones, `$schema`/`$defs`/
+    /// `title`/`description`) are exactly the keywords `validate`'s own
+    /// body reads, mechanically extracted rather than trusted by
+    /// inspection. A future branch that starts enforcing a keyword
+    /// without adding it here, or a stale entry left after its
+    /// enforcement branch is deleted, fails this test immediately --
+    /// the same "derive, then assert equality" shape
+    /// `vacuous_exception_gate`'s own
+    /// `gates_is_exactly_the_trees_two_declared_exception_lists` uses.
+    #[test]
+    fn recognized_keywords_constraint_half_is_derived_from_validates_own_source() {
+        const ANNOTATION_KEYWORDS: [&str; 4] = ["$schema", "$defs", "title", "description"];
+        let constraint_half: HashSet<&str> = RECOGNIZED_KEYWORDS
+            .iter()
+            .copied()
+            .filter(|keyword| !ANNOTATION_KEYWORDS.contains(keyword))
+            .collect();
+        let derived = validate_schema_get_keywords();
+        let derived_refs: HashSet<&str> = derived.iter().map(String::as_str).collect();
+        assert_eq!(derived_refs, constraint_half);
+    }
+
+    /// Every DISTINCT schema node reachable from `schema`'s own root via
+    /// `$ref` (resolved against `root`), `items`, each `properties`
+    /// value, an object-valued `additionalProperties`, AND every value
+    /// under `$defs` -- the same positions `validate` itself ever passes
+    /// as its own `schema` argument, but walked STRUCTURALLY here,
+    /// independent of any particular document: a keyword no shipped test
+    /// document happens to exercise via `validate`'s own data-driven
+    /// recursion is still reached by this walk. `$defs` is walked in its
+    /// OWN right, not only through whichever `$ref`s happen to point
+    /// into it: a `$defs` entry nothing currently references (a `oneOf`
+    /// added there, say) is still part of the schema and still checked
+    /// -- a branch-review finding (HR-109's own closure-claims artifact
+    /// originally reached only the root object of four of six schema
+    /// copies, exactly because it never followed `$defs`: `{$schema,
+    /// title, description, $defs}`, one node). `$ref` still stops the
+    /// walk at the referenced target without also reading a sibling
+    /// keyword, the same way `validate` itself does.
+    ///
+    /// `seen` dedupes by pointer identity, not content: `schema` and
+    /// `root` are the same parsed document for every real caller, so a
+    /// `$defs` entry reached BOTH through some `$ref` chain from the
+    /// root and through this function's own direct `$defs` walk is the
+    /// exact same `Value` in memory either way, and `deref`'s `&'a Value`
+    /// returns a reference into that same tree rather than a copy --
+    /// pointer equality is therefore exact here, unlike a content-hash
+    /// dedupe, which would also (wrongly) merge two structurally
+    /// identical but distinct definitions.
+    fn schema_nodes<'a>(
+        schema: &'a Value,
+        root: &'a Value,
+        seen: &mut HashSet<*const Value>,
+        out: &mut Vec<&'a Value>,
+    ) {
+        if !seen.insert(std::ptr::from_ref(schema)) {
+            return;
+        }
+        out.push(schema);
+        if let Some(reference) = schema.get("$ref").and_then(Value::as_str) {
+            if let Ok(target) = deref(root, reference) {
+                schema_nodes(target, root, seen, out);
+            }
+            return;
+        }
+        if let Some(items) = schema.get("items") {
+            schema_nodes(items, root, seen, out);
+        }
+        if let Some(properties) = schema.get("properties").and_then(Value::as_object) {
+            for value in properties.values() {
+                schema_nodes(value, root, seen, out);
+            }
+        }
+        if let Some(additional) = schema.get("additionalProperties")
+            && additional.is_object()
+        {
+            schema_nodes(additional, root, seen, out);
+        }
+        if let Some(defs) = schema.get("$defs").and_then(Value::as_object) {
+            for value in defs.values() {
+                schema_nodes(value, root, seen, out);
+            }
+        }
+    }
+
+    /// HR-109's migration proof: every schema node in every schema copy
+    /// this repository carries -- both `knowledge/schema.json` copies,
+    /// both `.claude/schemas/deliverables.json` copies, both `backlog/
+    /// schema.json` copies -- uses only `RECOGNIZED_KEYWORDS`. A
+    /// rerunnable, bounded enumeration
+    /// (`process.closure-claims-carry-enumeration`): each file gets its
+    /// OWN minimum assertion (not one combined total that a single rich
+    /// file could satisfy alone while a thin one contributed almost
+    /// nothing -- the branch-review finding this test now fixes: four of
+    /// six copies previously contributed exactly one node, their root
+    /// object, because the walk never followed `$defs`, and a single
+    /// `total_nodes > 20` bound never caught it since the two knowledge
+    /// copies alone already cleared it). The six minimums below
+    /// (48, 48, 191, 191, 91, 91) are this rerun's own measured counts,
+    /// restated as the floor a future edit must not fall under, in the
+    /// same order as `relative_paths`; `schema_nodes`'s pointer-identity
+    /// dedup is what makes 48 the same before and after `$defs` joined
+    /// the walk for the two knowledge copies (every `$defs` entry there
+    /// was already `$ref`-reachable from `properties`), while the other
+    /// two pairs grow from 1 (root only) to 191/91 (`$defs` follows
+    /// where nothing at their root pointed into it at all).
+    #[test]
+    fn every_shipped_schema_copy_uses_only_recognized_keywords() {
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let relative_paths_and_minimums = [
+            ("template/knowledge/schema.json", 48),
+            ("knowledge/schema.json", 48),
+            ("template/.claude/schemas/deliverables.json", 191),
+            (".claude/schemas/deliverables.json", 191),
+            ("template/backlog/schema.json", 91),
+            ("backlog/schema.json", 91),
+        ];
+        for (relative, minimum) in relative_paths_and_minimums {
+            let path = repo_root.join(relative);
+            let schema: Value = serde_json::from_str(
+                &fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {relative}: {e}")),
+            )
+            .unwrap_or_else(|e| panic!("parse {relative}: {e}"));
+            let mut nodes = Vec::new();
+            schema_nodes(&schema, &schema, &mut HashSet::new(), &mut nodes);
+            assert!(
+                nodes.len() >= minimum,
+                "{relative}: expected at least {minimum} distinct schema nodes ($defs \
+                 followed), got {} -- a walk this thin cannot back HR-109's migration claim",
+                nodes.len()
+            );
+            for node in &nodes {
+                if let Value::Object(map) = node {
+                    for key in map.keys() {
+                        assert!(
+                            RECOGNIZED_KEYWORDS.contains(&key.as_str()),
+                            "{relative}: schema node uses unsupported keyword {key:?}: {node}"
+                        );
+                    }
+                }
+            }
+        }
     }
 }

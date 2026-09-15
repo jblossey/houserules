@@ -35,6 +35,13 @@
 //! commit-msg hook, CI's commitlint job -- its CLI shape is derived
 //! from).
 //!
+//! `durable_sha` is `CheckType::DurableSha`'s own git-plumbing (a diff
+//! hunk's added lines, a hex-candidate scan, and the two `git`
+//! subprocesses that decide whether a candidate resolves to a commit
+//! reachable from the check's own `--base`), reusing `audit`'s own
+//! `git_diff`/`range` rather than a second diff invocation
+//! (`durable_sha.rs`'s own module doc has the full account; HR-120).
+//!
 //! No command in this binary ever constructs or strictly parses a
 //! schema-exact deliverable: `validate_deliverable` validates every
 //! deliverable kind through the generic schema engine directly (never a
@@ -52,6 +59,7 @@ mod check;
 mod check_commit;
 mod check_shape;
 mod deliverable;
+mod durable_sha;
 mod glob;
 mod model;
 mod read;

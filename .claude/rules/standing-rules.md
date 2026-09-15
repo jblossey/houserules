@@ -2,6 +2,8 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 # Standing rules
 
+- [houserules.1-0-surface-is-frozen] Past 1.0, a CLI command/flag change or a schema constraint change is a breaking change: get an owner ruling and bump the major version.
+- [houserules.controller-gates-use-the-tree-binary] While the branch changes generated output, run controller gates and update/render through the tree binary, never the installed houserules.
 - [houserules.pnpm-only] Use cargo for every package operation in this repository (`cargo add <crate>@=<version>`); pnpm, npm, and npx left the toolchain at batch 20 T3.
 - [houserules.tag-pilot-is-read-only] Treat the tag-pilot checkout outside this repository as read-only: never modify it, commit there, run its agents, or run `init` or `update` against it.
 - [houserules.template-is-the-source] Edit the kit in `template/`, then run `houserules update --dir .`; never hand-edit the root copies or the generated rules and skill.
@@ -16,7 +18,8 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [process.evidence-outlives-the-session] Cite evidence only at paths that outlive the session: the batch workspace or the tracked tree, never a session scratchpad.
 - [process.ff-only-merges] Merge fast-forward only, from the CLI, after aggregating the branch into clean logical commits. No merge commits, no GitHub squash merges.
 - [process.fix-proofs-extend-the-reviewers-run] A fix round's proof re-runs the review's own reproduction, extended to cover the fix -- never a fresh, narrower proof.
-- [process.gates-cover-generated-commits] Walk every commit author class a new gate will hit -- bots and generated commits included -- through the gate on paper before it ships; state each accepted red.
+- [process.gates-cover-generated-commits] Before a new gate or pipeline step ships, walk every commit author class and every generated resource it touches through it on paper; state each accepted red.
+- [process.keep-knowledge-current] Add knowledge future sessions need to `knowledge/`; session memory is not portable, repo files are.
 - [process.knowledge-first] Before you change a file, read its knowledge: the ids in your task and `houserules for <path>`. Cite the ids you relied on in your report.
 - [process.live-run-before-ci] Verify a change live (run the app, service, or tool for real; capture evidence) before any PR, merge, or deploy spend.
 - [process.model-policy] Every review runs on a mightier model than the implementer it reviews. Implementers use the cheapest model that fits the task.

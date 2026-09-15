@@ -53,25 +53,28 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 
 /// The `houserules` command line.
-///
-/// `--help` and `--version` come from clap; `--version` reports the crate
-/// version (`CARGO_PKG_VERSION`), which IS the kit's own version
-/// (`Cargo.toml`'s own comment has the full account).
-///
-/// `arg_required_else_help = true`: a bare `houserules`, no subcommand and
-/// no flag, prints help on stderr and exits 2, instead of clap's own
-/// default for an all-`Option` derive struct (silently succeeding). This
-/// struct's own doc comment is clap's `--help` "about" text verbatim, so
-/// every paragraph here is adopter-visible output, not only internal
-/// documentation.
-///
-/// `bin_name = "houserules"`: without it, clap derives the name shown in
-/// `Usage:` from `argv[0]` at runtime, which is `houserules.exe` on
-/// Windows -- the same fix clap's own `typed-derive` example carries, for
-/// the same reason (its own comment: "avoid `.exe` in Usage on Windows").
-/// `name` above only sets the program's own identity (used for
-/// `--version`, for instance); it does not reach the usage line clap
-/// builds from the binary's real invocation name.
+//
+// This doc comment IS clap's `--help`/`-h` "about" text (`derive(Parser)`
+// reads it verbatim), so it stays to exactly this one adopter-facing
+// line; every constraint below is a plain comment for exactly that
+// reason -- `clap_derive` reads only `///`/`#[doc]`, never a bare `//`,
+// so none of these reach an adopter's terminal.
+//
+// `--help` and `--version` come from clap; `--version` reports the crate
+// version (`CARGO_PKG_VERSION`), which IS the kit's own version
+// (`Cargo.toml`'s own comment has the full account).
+//
+// `arg_required_else_help = true`: a bare `houserules`, no subcommand and
+// no flag, prints help on stderr and exits 2, instead of clap's own
+// default for an all-`Option` derive struct (silently succeeding).
+//
+// `bin_name = "houserules"`: without it, clap derives the name shown in
+// `Usage:` from `argv[0]` at runtime, which is `houserules.exe` on
+// Windows -- the same fix clap's own `typed-derive` example carries, for
+// the same reason (its own comment: "avoid `.exe` in Usage on Windows").
+// `name` above only sets the program's own identity (used for
+// `--version`, for instance); it does not reach the usage line clap
+// builds from the binary's real invocation name.
 #[derive(Parser)]
 #[command(
     name = "houserules",
@@ -109,8 +112,10 @@ enum Command {
         dir: Option<PathBuf>,
     },
     /// Prints one or more items by id, each resolved by its own shape: a
-    /// backlog item, amendment, or parked item (`HR-\d{3}`, `A-\d{2}`,
-    /// `PP-\d+-\d{2}`), or otherwise a knowledge entry.
+    /// backlog item (`<idPrefix>-\d{3}`, the project's own stamped
+    /// prefix), an amendment or parked item (`A-\d{2}`, `PP-\d+-\d{2}`,
+    /// both kit-fixed regardless of idPrefix), or otherwise a knowledge
+    /// entry.
     Get {
         /// Backlog and/or knowledge ids to print, in any mix.
         ids: Vec<String>,
@@ -426,5 +431,122 @@ fn main() -> ExitCode {
             report_claims::cmd_check_report_claims(dir, report_path)
         }
         Some(Command::Archive { dir }) => archive::cmd_archive(dir),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    /// `Cli`'s own doc comment IS clap's `about`/`long_about` text: keeping
+    /// it to one adopter-facing line means `--help` (long help) shows
+    /// nothing more than `-h` (short help) does. `long_about` is `None`,
+    /// not `Some` duplicating `about` -- `clap_derive` only sets
+    /// `long_about` when a doc comment carries a second, blank-line-
+    /// separated paragraph.
+    #[test]
+    fn the_top_level_about_is_the_one_adopter_facing_line_with_no_long_about() {
+        let command = Cli::command();
+        assert_eq!(
+            command.get_about().map(ToString::to_string),
+            Some("The `houserules` command line".to_string())
+        );
+        assert!(
+            command.get_long_about().is_none(),
+            "long_about must stay unset, not carry a maintainer-narration paragraph back: {:?}",
+            command.get_long_about().map(ToString::to_string)
+        );
+    }
+
+    /// The same maintainer-narration class swept across every subcommand:
+    /// none carries a `long_about` distinct from its own short `about`
+    /// either. Enumerated from `Cli::command().get_subcommands()` -- the
+    /// same set clap itself renders, not a hand-typed list -- exactly the
+    /// 20 `Command` variants (clap's own built-in `help` subcommand is
+    /// rendered separately and is not itself one of `get_subcommands()`'s
+    /// entries).
+    #[test]
+    fn no_subcommand_carries_a_long_about_beyond_its_short_one() {
+        let command = Cli::command();
+        let subcommands: Vec<_> = command.get_subcommands().collect();
+        assert_eq!(
+            subcommands.len(),
+            20,
+            "expected the full flat subcommand surface (20 Command variants), got: {:?}",
+            subcommands.iter().map(|s| s.get_name()).collect::<Vec<_>>()
+        );
+        for subcommand in subcommands {
+            let about = subcommand.get_about().map(ToString::to_string);
+            let long_about = subcommand.get_long_about().map(ToString::to_string);
+            assert!(
+                long_about.is_none() || long_about == about,
+                "{}: long_about {long_about:?} diverges from about {about:?} -- a maintainer-\
+                 narration paragraph beyond the short about",
+                subcommand.get_name(),
+            );
+        }
+    }
+
+    /// The 1.0 frozen CLI surface (design.md 5.82): exactly these 20
+    /// subcommand names, in `--help`'s own declaration order. The count
+    /// assertion above cannot see a same-length rename (batch 25 T5
+    /// review: a renamed variant keeps `get_subcommands().len() == 20`
+    /// and this file's own test green); comparing the names themselves
+    /// does.
+    #[test]
+    fn the_1_0_cli_surface_names_exactly_these_20_subcommands() {
+        let command = Cli::command();
+        let names: Vec<&str> = command.get_subcommands().map(|s| s.get_name()).collect();
+        assert_eq!(
+            names,
+            [
+                "render",
+                "check-knowledge",
+                "get",
+                "list",
+                "batch",
+                "set",
+                "check-backlog",
+                "audit",
+                "validate",
+                "stats",
+                "index",
+                "for",
+                "topics",
+                "standing",
+                "check-commit",
+                "init",
+                "files",
+                "update",
+                "check-report-claims",
+                "archive",
+            ],
+            "the 1.0 frozen CLI surface (design.md 5.82) changed"
+        );
+    }
+
+    /// `get`'s own about text is adopter-visible (`houserules --help`'s
+    /// Commands list); HR-100 made the item shape follow the project's
+    /// own stamped `idPrefix`, so this text must not assert the
+    /// hardcoded `HR-` shape the fix removed from the code itself.
+    #[test]
+    fn get_subcommand_about_states_the_item_shape_follows_idprefix_not_a_hardcoded_hr() {
+        let command = Cli::command();
+        let get = command
+            .find_subcommand("get")
+            .expect("get is a declared subcommand");
+        let about = get
+            .get_about()
+            .map(ToString::to_string)
+            .expect("get has an about");
+        assert!(
+            !about.contains("HR-"),
+            "get's about still names the hardcoded HR- shape: {about:?}"
+        );
+        assert!(
+            about.contains("idPrefix"),
+            "get's about does not state that the item shape follows idPrefix: {about:?}"
+        );
     }
 }

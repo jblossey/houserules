@@ -18,7 +18,7 @@
         "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test.",
         "A dedicated compliance pass over the existing codebase is its own backlog item; new code complies immediately.",
         "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test; an auto-restore setting covers only spies, so a mock created in a module-mock factory gets its own explicit afterEach reset.",
-        "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided (batch 16: the glob translator missed nested braces and panicked; the regex scan flipped four verdicts against V8)."
+        "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided."
       ],
       "tags": ["quality"],
       "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" },
@@ -36,7 +36,7 @@
         "A genuinely optional concept stays optional on its merits; optionality is never a compatibility device."
       ],
       "tags": ["quality", "compatibility"],
-      "source": { "date": "2026-09-02", "by": "user", "ref": "owner instruction of 2026-09-02, batch 7" },
+      "source": { "date": "2026-09-02", "by": "user", "ref": "owner instruction" },
       "see": ["process.no-tech-debt"]
     },
     {
@@ -48,10 +48,54 @@
       "body": [
         "The orchestrator researches candidate libraries or packages AT SPEC TIME with maintenance evidence, and presents them for the owner's ruling - never delegated to implementers, never deferred to plan time. The choice is ultimately the owner's.",
         "Wherever the codebase is touched, existing custom code that a well-maintained library should replace is refactored in that batch: the refactor folds into the spec and plan. Deferring the rewrite is not an option.",
+        "A whole-codebase sweep can conclude 'named but not adopted this batch': record the candidate and the reason adoption waits (a competing spec priority, a not-yet-ruled owner decision), rather than silently dropping the finding. The next batch that touches the same code re-reads the record before repeating the search.",
         "quality.principles carries the underlying preference; security-hygiene.dependency-vetting and exact-pins govern each adoption."
       ],
       "tags": ["libraries", "dependencies", "process"],
-      "source": { "date": "2026-09-05", "by": "user", "ref": "owner ruling, batch 18" }
+      "source": { "date": "2026-09-05", "by": "user", "ref": "owner ruling" }
+    },
+    {
+      "id": "quality.gates-derive-their-scope",
+      "kind": "rule",
+      "area": "tools",
+      "standing": false,
+      "summary": "A permanent gate derives its scope (tracked files minus declared, reasoned exclusions) and fails loudly on unreadable input; a hand-typed list is ungated.",
+      "body": [
+        "A hand-typed inclusion list cannot cover a file that does not exist yet, and it can already miss ones that do: a seeded violation passes a gate whose file was never added to its list. A gate declared permanent has to default to gated, not to remembering.",
+        "Derive the walk set (the tracked-file list minus a named, reasoned exclusions constant) so a newly tracked file is gated the moment it lands; pin the boundary with a test that classifies every real tracked path.",
+        "An input the gate cannot read is a named, fatal error, never a silent continue: a silent-skip version under-counts and can pass a seeded violation hiding behind a rename. A readable-but-binary input may be a counted, printed skip.",
+        "A gate's file list comes from the authoritative set (the tracked files, never the working directory); every finding names which derivation decided it; every skip is counted and printed on every branch, including the one where the primary derivation returns nothing; and an enumeration feeding a closure claim fails loudly on input it cannot read.",
+        "A gate that needs a toolchain component derives that need from declared configuration (a tool-version file, a lockfile), never from what the authoring machine happens to have installed; prove a new gate on a runner shaped like CI's fresh, declared install."
+      ],
+      "tags": ["gates", "scope", "tooling"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+    },
+    {
+      "id": "quality.pin-copies-byte-exact",
+      "kind": "rule",
+      "area": "global",
+      "standing": false,
+      "summary": "Pin a hand-synced copy byte-exact modulo its one designed difference, expressed as the production transform; never normalize by deleting the differing field.",
+      "body": [
+        "Deleting the differing property from both sides pins the copies modulo the property, not modulo its value: a dropped field, whitespace drift, or key reordering all still pass.",
+        "Assert copyA equals transform(copyB) with the transform the production code actually applies, so the test and the shipped rewrite cannot drift apart.",
+        "When the copies are already in sync, prove the test can fail with a disclosed mutation and label the cycle mode mutation."
+      ],
+      "tags": ["testing", "pins"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
+    },
+    {
+      "id": "quality.tests-clean-temp-dirs",
+      "kind": "rule",
+      "area": "global",
+      "standing": false,
+      "summary": "A test that creates a temp directory removes it in its own teardown; never leak fixture directories into the OS temp directory.",
+      "body": [
+        "Track the directory at the same site that creates it, and remove it in the test framework's own teardown hook (an afterEach, a Drop guard, a finally block) rather than relying on a separate cleanup pass.",
+        "A suite that leaks its own scratch directories can silently fill a shared temp filesystem, breaking unrelated work on the same host until someone notices and clears it by hand."
+      ],
+      "tags": ["testing", "scratch-dirs"],
+      "source": { "date": "2026-08-30", "by": "docs", "ref": "houserules seed" }
     }
   ]
 }

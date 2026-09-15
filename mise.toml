@@ -1,4 +1,8 @@
 [tools]
+# Linux-only: cargo-dist backs dist-generate-check.rs, the lint step
+# below. That step runs only in ci.yml's ubuntu-only checks job, so the
+# rust job's macOS/Windows legs never need cargo-dist installed at all.
+cargo-dist = { version = "0.32.0", os = ["linux"] }
 rust = { version = "1.98.1", components = ["clippy", "rustfmt"], targets = ["x86_64-pc-windows-gnu"] }
 shellcheck = "0.11.0"
 "ubi:EmbarkStudios/cargo-deny" = "0.20.2"
@@ -19,7 +23,7 @@ description = "Front the houserules binary (built from crates/houserules); pass 
 run = "cargo run --quiet --bin houserules --"
 
 [tasks.lint]
-description = "shellcheck, cargo deny, a cross-target compile check, the knowledge/backlog gates, a stale-render check, the residue gate, then the payload-stamp gate"
+description = "shellcheck, cargo deny, a cross-target compile check, the knowledge/backlog gates, a stale-render check, the residue gate, the vacuous-exception gate, the payload-stamp gate, then the dist-generate-check gate"
 run = [
   "shellcheck tools/*.sh template/tools/*.sh .githooks/commit-msg template/.githooks/commit-msg",
   "cargo deny check",
@@ -28,7 +32,9 @@ run = [
   "mise run houserules -- check-backlog",
   "mise run houserules -- render --check",
   "cargo run --quiet --bin residue-gate",
+  "cargo run --quiet --bin vacuous-exception-gate",
   "cargo run --quiet --bin payload-stamp-gate",
+  "cargo run --quiet --bin dist-generate-check",
 ]
 
 [tasks.audit]

@@ -10,15 +10,15 @@
 //!
 //! # Scope (the two places a shipped reference can live)
 //!
-//! Every file under `template/` (recursive), and five Rust source files
+//! Every file under `template/` (recursive), and four Rust source files
 //! that hold literals the CLI prints or embeds in generated output:
-//! `rules/render.rs`, `rules/check.rs`, `install.rs`, `rules/read.rs`, and
-//! `main.rs` (its struct doc comment IS `houserules --help`'s "about" text
-//! verbatim, so a stale reference there is adopter-visible). Every OTHER
-//! Rust source file under `crates/` is source the compiler and the test
-//! suite verify, not instructional prose an adopter follows -- a stale
-//! reference there cannot mislead anyone the way an adopter-facing string
-//! can -- so this script does not search there.
+//! `rules/render.rs`, `rules/check.rs`, `install.rs`, and `main.rs` (its
+//! struct doc comment IS `houserules --help`'s "about" text verbatim, so
+//! a stale reference there is adopter-visible). Every OTHER Rust source
+//! file under `crates/` is source the compiler and the test suite verify,
+//! not instructional prose an adopter follows -- a stale reference there
+//! cannot mislead anyone the way an adopter-facing string can -- so this
+//! script does not search there.
 //!
 //! `PATTERNS` matches `kb.sh`/`backlog.sh` bare, without requiring a
 //! `tools/` prefix: `template/tools/claude-session-start.sh` can invoke
@@ -29,11 +29,6 @@
 //!
 //! Named here, not hidden in a blanket file skip -- the "zero remaining"
 //! claim means "zero UNEXPECTED", not "the search saw nothing":
-//!   - `template/tools/kb.mjs` (whole file): matches nothing today -- the
-//!     file does not exist. HR-101 tracks removing this entry.
-//!   - `crates/houserules/src/rules/read.rs` (whole file): also matches
-//!     nothing today -- the one line it named is gone. HR-101 tracks
-//!     removing this entry too.
 //!   - `crates/houserules/src/install.rs`: narrowed to exactly the
 //!     `RETIRED` constant's own item doc and declaration, plus the doc and
 //!     body of its test function -- not the whole file, since `RETIRED`
@@ -70,12 +65,11 @@ const RETIRED_TEST_FN: &str = "retired_holds_the_shell_tools_and_the_js_engines_
 
 /// The Rust source files holding literals the CLI prints or embeds in
 /// generated output -- this module's own doc has the full account of why
-/// these five and no others.
-const RUST_FILES: [&str; 5] = [
+/// these four and no others.
+const RUST_FILES: [&str; 4] = [
     "crates/houserules/src/rules/render.rs",
     "crates/houserules/src/rules/check.rs",
     "crates/houserules/src/install.rs",
-    "crates/houserules/src/rules/read.rs",
     "crates/houserules/src/main.rs",
 ];
 
@@ -249,47 +243,56 @@ struct Exception {
     matches: fn(&Hit, &str) -> bool,
 }
 
-/// The three named, auditable exceptions -- this module's own doc has the
-/// full reasoning for each.
+/// The one named, auditable exception -- this module's own doc has the
+/// full reasoning.
 fn exceptions() -> Vec<Exception> {
-    vec![
-        Exception {
-            label: "template/tools/kb.mjs",
-            reason: "the frozen-but-shipped JS engine this exception named through phase 4, \
-                while it stayed shipped-but-inert (spec §4), live-invoked only by this repo's own \
-                dev tests (tests/kb.test.mjs, tests/backlog.test.mjs, tests/entry.test.mjs) and by \
-                tools/make-corpus.mjs's frozen-worktree regeneration. Retired at phase 5 (batch 20 \
-                T3, HR-047) along with every caller named above; matches nothing now that the file \
-                is gone, kept as the record of why it once did.",
-            matches: |hit, _file_text| hit.file == "template/tools/kb.mjs",
+    vec![Exception {
+        label: "crates/houserules/src/install.rs (RETIRED's own doc/test only)",
+        reason: "RETIRED and its own item doc and test literally are \
+            \"tools/kb.sh\"/\"tools/backlog.sh\" -- FILE PATHS the deletion mechanism removes, \
+            not command instructions a rewrite could flip. Narrowed to exactly that window \
+            (RETIRED's own doc and test) so a whole-file exception cannot swallow an unrelated \
+            hit.",
+        matches: |hit, file_text| {
+            hit.file == "crates/houserules/src/install.rs"
+                && install_rs_exempt_lines(file_text).contains(&hit.line)
         },
-        Exception {
-            label: "crates/houserules/src/rules/read.rs",
-            reason: "its one remaining hit narrates a batch 17 fix's measured JS behaviour \
-                (porting-parity history, not an adopter-facing instruction) -- the same class of \
-                comment every unsearched Rust source file under crates/ carries. STANDING_COMMAND \
-                itself no longer needs this exception: fix round 1 rewrote it to the flat form.",
-            matches: |hit, _file_text| hit.file == "crates/houserules/src/rules/read.rs",
-        },
-        Exception {
-            label: "crates/houserules/src/install.rs (RETIRED's own doc/test only)",
-            reason: "RETIRED and its own item doc and test literally are \
-                \"tools/kb.sh\"/\"tools/backlog.sh\" -- FILE PATHS the deletion mechanism removes, \
-                not command instructions a rewrite could flip. Narrowed at fix round 1 from a \
-                whole-file exception, which wrongly swallowed the two next: println literals this \
-                task had to rewrite.",
-            matches: |hit, file_text| {
-                hit.file == "crates/houserules/src/install.rs"
-                    && install_rs_exempt_lines(file_text).contains(&hit.line)
-            },
-        },
-    ]
+    }]
+}
+
+/// Every declared exception's own real hit count against `excepted`, in
+/// `exceptions`' declared order, `0` included for one that matched
+/// nothing this run -- `excepted` alone cannot show that: an exception
+/// with zero hits never appears in it at all. `bin/vacuous-exception-
+/// gate.rs` reads this printed count to flag exactly that shape (a
+/// declared exception the current tree no longer needs).
+/// `residue-gate.rs` carries the identical helper -- each `src/bin/*.rs`
+/// file keeps its own copy rather than sharing one, since this package
+/// has no library target for a `src/bin/*.rs` file to share code through
+/// (`gen-goldens.rs`'s own module doc explains why).
+fn declared_exception_counts(
+    exceptions: &[Exception],
+    excepted: &[(Hit, &'static str, &'static str)],
+) -> Vec<(&'static str, usize)> {
+    let mut counts: Vec<(&'static str, usize)> = exceptions
+        .iter()
+        .map(|exception| (exception.label, 0))
+        .collect();
+    for (_, label, _) in excepted {
+        if let Some(entry) = counts.iter_mut().find(|(existing, _)| existing == label) {
+            entry.1 += 1;
+        }
+    }
+    counts
 }
 
 /// Walks `template/` and `RUST_FILES`, classifies every `PATTERNS` hit as
 /// excepted or a rewrite target, prints both lists plus the summary line,
 /// and exits 1 if any target remains (0 otherwise) -- this module's own
-/// doc has the full scope and exception account.
+/// doc has the full scope and exception account. This gate's own exit
+/// code never depends on whether a declared exception matched zero hits:
+/// `bin/vacuous-exception-gate.rs` reads the printed counts below and is
+/// the one gate that fails on that condition (HR-115).
 fn main() {
     let root = repo_root();
     let mut all_files = Vec::new();
@@ -345,6 +348,15 @@ fn main() {
                 println!("  {}:{}: {}", hit.file, hit.line, hit.text);
             }
         }
+    }
+
+    let declared_counts = declared_exception_counts(&exceptions, &excepted);
+    println!(
+        "\n-- {} declared exception(s), by label --",
+        declared_counts.len()
+    );
+    for (label, count) in &declared_counts {
+        println!("{label}: {count} hit(s)");
     }
 
     println!(
@@ -477,5 +489,190 @@ mod tests {
                 "line {line} of RETIRED's own multi-line array must stay exempt, got: {exempt:?}"
             );
         }
+    }
+
+    /// `declared_exception_counts` names every declared label, in
+    /// declared order, with its real count -- `0` for one `excepted`
+    /// never carries, proven here against two synthetic labels rather
+    /// than this file's own real (currently non-zero) exception.
+    #[test]
+    fn declared_exception_counts_includes_zero_for_a_label_excepted_names_nothing_for() {
+        let declared = vec![
+            Exception {
+                label: "alpha",
+                reason: "r",
+                matches: |_, _| false,
+            },
+            Exception {
+                label: "beta",
+                reason: "r",
+                matches: |_, _| false,
+            },
+        ];
+        let hit = Hit {
+            file: "f".to_string(),
+            line: 1,
+            text: "t".to_string(),
+        };
+        let excepted = vec![(hit, "alpha", "r")];
+        assert_eq!(
+            declared_exception_counts(&declared, &excepted),
+            vec![("alpha", 1), ("beta", 0)]
+        );
+    }
+
+    /// `true` when `text` holds a whole `T<digits>` token (a task
+    /// reference like `T3`/`T20`) -- split on every non-alphanumeric
+    /// byte so `T3` inside a longer word never false-positives, and a
+    /// bare `T` (no digits) never counts.
+    fn contains_task_reference(text: &str) -> bool {
+        text.split(|c: char| !c.is_ascii_alphanumeric())
+            .any(|word| {
+                word.len() >= 2
+                    && word.starts_with('T')
+                    && word[1..].chars().all(|c| c.is_ascii_digit())
+            })
+    }
+
+    /// `true` when `text` holds a maximal run of 7-40 ASCII hex
+    /// characters -- a git commit sha's own shape, the identical bound
+    /// `rules::durable_sha::hex_candidates` uses (kept as its own copy
+    /// here: this package has no library target for a `src/bin/*.rs`
+    /// file to share code through). A longer run (a sha256 digest, say)
+    /// is excluded the same way: it merely looks hex.
+    fn contains_hex_sha(text: &str) -> bool {
+        let mut run = 0usize;
+        for ch in text.chars().chain(std::iter::once(' ')) {
+            if ch.is_ascii_hexdigit() {
+                run += 1;
+            } else {
+                if (7..=40).contains(&run) {
+                    return true;
+                }
+                run = 0;
+            }
+        }
+        false
+    }
+
+    /// `true` when `text` cites a backlog id as historical NARRATION --
+    /// `"per HR-"` (the reviewer's own probe shape, "... per HR-084.")
+    /// or `"HR-<digits>,"` (a citation-list shape, "citing HR-115,
+    /// HR-047") -- rather than every backlog-id occurrence. A bare
+    /// parenthetical pointer, `"(HR-115)"`, is the tree's own established
+    /// CURRENT-CONTRACT convention (this file's own `main`'s doc keeps
+    /// exactly that shape, and `FIXTURE`'s `HR-047` is fixture data, not
+    /// narration) and must not trip this check.
+    fn contains_backlog_id_narration(text: &str) -> bool {
+        if text.contains("per HR-") {
+            return true;
+        }
+        for (index, _) in text.match_indices("HR-") {
+            let after = &text[index + "HR-".len()..];
+            let digits = after.chars().take_while(char::is_ascii_digit).count();
+            if digits > 0 && after.as_bytes().get(digits) == Some(&b',') {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// The current, disclosed set of history-narration marker classes a
+    /// printed `reason` string must never carry: the literal phrases
+    /// `"fix round"`, `"task had"`, and `"this task"`; a `"batch "`
+    /// substring; a whole `T<n>` task-reference token; a backlog-id
+    /// NARRATIVE citation (`"per HR-"` or `"HR-<n>,"`); and a 7-40
+    /// character hex run (a commit sha's own shape -- this also catches
+    /// a bare CI run id, since ASCII decimal digits are hex digits too).
+    /// Returns the matched class's own name, or `None` when `reason` is
+    /// clean.
+    ///
+    /// Out of scope, by design: HR-106's own sweep (docs/specs/2026-09-
+    /// 11-batch-22-stewardship.md §3's keep/drop line) additionally
+    /// drops dates, spec and archive paths, and a non-`HR` id prefix
+    /// (its own example is `WI-`). This is a one-string guard over one
+    /// project's own reason literal, and this repository's own stamped
+    /// `idPrefix` is `HR`; a date, a doc path, or another project's own
+    /// id prefix reaching this string is the reviewer's and HR-106's
+    /// own sweep's job to catch, not this guard's.
+    fn history_narration_marker(reason: &str) -> Option<&'static str> {
+        let lower = reason.to_lowercase();
+        if lower.contains("fix round") {
+            return Some("\"fix round\"");
+        }
+        if lower.contains("task had") {
+            return Some("\"task had\"");
+        }
+        if lower.contains("this task") {
+            return Some("\"this task\"");
+        }
+        if lower.contains("batch ") {
+            return Some("\"batch \"");
+        }
+        if contains_task_reference(reason) {
+            return Some("a T<n> task reference");
+        }
+        if contains_backlog_id_narration(reason) {
+            return Some("a backlog-id narrative citation (\"per HR-\" or \"HR-<n>,\")");
+        }
+        if contains_hex_sha(reason) {
+            return Some("a 7-40 character hex run (a commit sha's own shape)");
+        }
+        None
+    }
+
+    /// The reviewer's own round-1 probe: appending this sentence to the
+    /// `install.rs` exception's reason once passed the (too-narrow)
+    /// history-marker check, so it stays pinned here as a permanent
+    /// regression test independent of the live `reason` literal's own
+    /// current wording.
+    #[test]
+    fn history_narration_marker_catches_the_reviewers_batch_task_sha_and_backlog_id_probe() {
+        let probe = "Introduced at batch 20 T3, commit e36c4b2, per HR-084.";
+        assert!(
+            history_narration_marker(probe).is_some(),
+            "the widened marker check no longer catches the reviewer's own probe sentence"
+        );
+    }
+
+    /// `history_narration_marker` never flags this file's own legitimate,
+    /// current-contract backlog-id pointers -- a bare parenthetical
+    /// reference, not a narrative citation.
+    #[test]
+    fn history_narration_marker_does_not_flag_a_bare_parenthetical_backlog_id_pointer() {
+        assert_eq!(
+            history_narration_marker("the one gate that fails on that condition (HR-115)."),
+            None
+        );
+    }
+
+    /// The surviving `install.rs` exception's own printed `reason` states
+    /// the present-tense rule (RETIRED's own doc and test ARE the file
+    /// paths the deletion mechanism removes, narrowed to exactly that
+    /// window) and carries none of `history_narration_marker`'s classes
+    /// -- this is USER-FACING gate output (`find-shell-tool-refs`'s own
+    /// printed exceptions section), not a comment a sweep would catch.
+    #[test]
+    fn the_install_rs_exceptions_reason_states_the_rule_not_its_own_history() {
+        let reason = exceptions()
+            .into_iter()
+            .find(|exception| {
+                exception
+                    .label
+                    .starts_with("crates/houserules/src/install.rs")
+            })
+            .expect("the install.rs exception is still declared")
+            .reason;
+        assert_eq!(
+            history_narration_marker(reason),
+            None,
+            "reason carries a history marker: {reason}"
+        );
+        assert!(
+            reason
+                .to_lowercase()
+                .contains("narrowed to exactly that window"),
+            "reason does not state the current narrowing rule: {reason}"
+        );
     }
 }

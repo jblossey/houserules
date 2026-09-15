@@ -17,5 +17,5 @@ Project knowledge — rules, invariants, gotchas, procedures, decisions, history
 
 - Invoke the `orchestrating` skill at session start, at every batch start or resume, and before any dispatch.
 - The backlog (`backlog/`) drives all work. Read it with `houserules list --open`, `get <id>`, `batch <n>`; tick with `set <id> status=done batch=<n>`.
-- A batch runs: brainstorm or spec, user gate, plan, sequential subagent development, live run, `finishing-a-feature`, rollout, acceptance.
-- Dispatch subagents only through the templates in `.claude/agents/`: `implementer`, `task-reviewer`, `branch-reviewer`. Every dispatch carries `Knowledge:` ids and `BASE:`. All agent work runs strictly sequentially.
+- A batch runs: brainstorm or spec, a decision gate from the project's owner or decider, plan, subagent development, live run, `finishing-a-feature`, rollout, acceptance.
+- Dispatch subagents only through the templates in `.claude/agents/`: `implementer`, `task-reviewer`, `branch-reviewer`. Every dispatch carries `Knowledge:` ids and `BASE:`. Dispatch agent work sequentially by default, until the project rules its own parallelism discipline.

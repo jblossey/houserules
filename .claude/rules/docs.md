@@ -21,4 +21,8 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [knowledge-base.summary-is-the-rule] The `summary` states the rule in one sentence; `body` carries why, how, exceptions; examples in docs and skills model this split. No time-sensitive phrasing.
 - [process.evals-rerun] Re-run every `.claude/evals/` scenario when the implementer or task-reviewer template or a scenario changes; append the run to `.claude/evals/record.json`.
 
+## Gotchas
+
+- [process.pointer-sweep-unfiltered] When a file moves or is deleted, sweep for its old path with an unfiltered grep over the whole tree; an extension-limited grep is not a pointer audit.
+
 Detail: houserules get <id>

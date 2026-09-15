@@ -53,14 +53,21 @@ the codebase in the exact style which you deem perfect.
   `branch-reviewer`) with rule-adherence audits and a JSON deliverables
   contract (`.claude/schemas/deliverables.json`), an `orchestrating` skill,
   a `finishing-a-feature` skill, a `migrating-knowledge` skill, a
-  SessionStart hook, a commit-msg hook that gates harness trailers, and
+  SessionStart hook, a commit-msg hook that gates Conventional Commits, and
   eval scenarios.
 - **Seed rules**: a generic standing-rule set (TDD, conventional commits,
-  ff-only merges, sequential agents, no tech debt, dependency vetting, exact
-  pins, doc comments, ASD-STE100 writing style, and more). Your project adds
-  its own topics, areas, and rules on top.
-- **A CI gate** (`.github/workflows/knowledge.yml`): `check-knowledge`,
-  `check-backlog`, and a PR audit, through the `houserules` binary alone.
+  no tech debt, dependency vetting, exact pins, doc comments, ASD-STE100
+  writing style, and more). Merge discipline, commit attribution, and agent
+  parallelism are left to your own project's ruling instead of shipped
+  fixed — the `migrating-knowledge` skill's "Elicit your own operating
+  discipline" step elicits and records them. Your project adds its own
+  topics, areas, and rules on top.
+- **A CI gate** (`.github/workflows/knowledge.yml`), for a GitHub-hosted
+  project: `check-knowledge`, `check-backlog`, and a PR audit, through the
+  `houserules` binary alone. `init` detects your origin remote and seeds
+  this only when it resolves to GitHub; elsewhere it prints a skip note and
+  the `migrating-knowledge` skill's own instruction covers generating the
+  equivalent gate for your host.
 
 ## Install
 
@@ -162,6 +169,19 @@ Verified against the documented `xattr -d <attribute> <file>` form
 live in this Linux development environment — no macOS host is available
 here, a permanent constraint, not a pending-release one.
 
+A GUI alternative to `xattr`: run the binary once and let macOS block
+it, then open System Settings, click Privacy & Security, scroll to the
+blocked-software notice, and click Open Anyway; click Open again to
+confirm. Apple's own article introduces these steps with "After you've
+tried to open the app" (support.apple.com/en-us/102445, checked
+2026-09-15) — the Open Anyway button appears only after that blocked
+launch. Apple removed the older Control-click/right-click bypass
+starting macOS Sequoia, so it is not documented here.
+
+The 1.0 revisit (docs/design.md §5.79(4)) keeps the binary unsigned:
+HR-121 books signing and notarization, triggered by real adopter
+friction with Gatekeeper, not a date.
+
 Live-verified (HR-049, HR-064): all five archive links resolve; each
 returned HTTP 200 through the alias, a scrubbed-environment capture.
 The x64 Linux (musl) row — this development environment's own
@@ -181,7 +201,8 @@ git add -A && git commit -m 'chore: install houserules knowledge setup'
 ```
 
 `init` writes the kit-owned machinery, seeds your starting knowledge
-topics, backlog, schemas, and CI workflow, then runs `render` and stamps
+topics, backlog, and schemas (plus the CI workflow, on a GitHub-hosted
+origin), then runs `render` and stamps
 `.houserules.json` with the binary's own version — no drift to correct
 right after. `houserules update --dir .` stays safe and idempotent to
 run any time later; it brings the generated files to whatever binary you
@@ -195,7 +216,8 @@ houserules get process.tdd   # one entry, in full
 
 Restart Claude Code once after the first install (the first
 `.claude/agents/` file and the new hook need a fresh session). Set `git
-config core.hooksPath .githooks` to activate the commit-msg trailer gate.
+config core.hooksPath .githooks` to activate the commit-msg Conventional
+Commits gate.
 
 ## Adding to an existing project
 
@@ -214,7 +236,7 @@ houserules init --id-prefix ABC
   Nothing else in your settings is touched.
 - `.githooks/commit-msg` is kit-owned: `init` replaces any hook of that name
   your project already has. Set `git config core.hooksPath .githooks` to
-  activate its commit-msg trailer gate.
+  activate its commit-msg Conventional Commits gate.
 - Existing files under `knowledge/`, `backlog/`, evals, or the workflow are
   kept as they are.
 
@@ -236,7 +258,10 @@ Every path houserules writes falls into one of three buckets:
   alone. It is yours from the first write on. `.claude/settings.json` is
   the one exception: `init` merges its two SessionStart hook entries into
   an existing file instead of skipping it; `update` never touches the
-  file either way.
+  file either way. `.github/workflows/knowledge.yml` is seed-once with one
+  extra gate: written only when your `origin` remote resolves to
+  GitHub, skipped with a printed note otherwise; `update` backfills it
+  later if your origin becomes GitHub-hosted after the fact.
 - **Yours** — everything else: your knowledge entries, your backlog items,
   your project code. houserules never touches it.
 
@@ -247,7 +272,10 @@ Every path houserules writes falls into one of three buckets:
 | `tools/claude-session-start.sh` | `knowledge/` schema, areas, topics |
 | `.claude/agents/*.md` | `backlog/` schema and data |
 | `.claude/skills/orchestrating`, `finishing-a-feature`, `migrating-knowledge` | `.claude/schemas/deliverables.json`, evals |
-| `.githooks/commit-msg` | `.github/workflows/knowledge.yml`, `CLAUDE.md`, settings |
+| `.githooks/commit-msg` | `CLAUDE.md`, settings |
+
+`.github/workflows/knowledge.yml` seeds separately, only for a
+GitHub-hosted `origin` (above).
 
 ## The agent workflow
 
@@ -264,9 +292,10 @@ into every change:
   batch's reviews.
 
 An `orchestrating` skill drives the batch lifecycle — brainstorm or spec,
-user gate, plan, sequential dispatch, live run, finish, rollout; a
-`finishing-a-feature` skill handles the fast-forward merge; a
-`migrating-knowledge` skill moves an existing project's rules into the
+a decision gate from the project's owner or decider, plan, dispatch, live
+run, finish, rollout; a `finishing-a-feature` skill handles the merge
+(ff-only from the CLI by default, or the project's own ruled discipline);
+a `migrating-knowledge` skill moves an existing project's rules into the
 kit.
 
 `houserules audit --base <ref>` checks a change against the rule package
@@ -315,7 +344,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor workflow.
 
 ```sh
 mise run setup    # activates the commit-msg hook (trailer gate + check-commit)
-mise run lint     # shellcheck, cargo deny, check-knowledge, check-backlog, render --check
+mise run lint     # shellcheck, cargo deny, a cross-target compile check,
+                  # check-knowledge, check-backlog, render --check, the
+                  # residue/vacuous-exception/payload-stamp gates, and
+                  # dist generate --check
 cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 ```
 
