@@ -181,6 +181,81 @@ above), then again only when the registration itself needs an update
 | asdf plugin | An `asdf-houserules` plugin repository implementing asdf's plugin API against the same release archives | A new repository under the `jblossey` account |
 | Scoop / winget | A Scoop manifest in a bucket repository, and/or a winget manifest PR against `microsoft/winget-pkgs`, both pointing at the Windows archive | A Scoop bucket repository; a PR to `microsoft/winget-pkgs` |
 
+## Self-update
+
+`houserules update` self-updates the installed binary before its repo
+sync (HR-133, `crates/houserules/src/selfupdate.rs`) on the shell/
+PowerShell installer channel only, since only that channel writes a
+cargo-dist install receipt -- and, on that channel, only when the
+receipt names the install this process is itself running from; a
+receipt for a different install gets a declined-update line instead
+(below), never a silent "up to date".
+
+### Mechanism, from axoupdater 0.10.2's own source
+
+`AxoUpdater::is_update_needed` calls the crate's own
+`check_receipt_is_for_this_executable` (`receipt.rs:91-118`) before ever
+contacting GitHub; when the running executable's directory differs from
+the receipt's own recorded install root, it returns `Ok(false)` with no
+network call, and `run()` reports `Ok(None)` -- indistinguishable, from
+that return value alone, from a receipt that matches and is simply
+already current. `selfupdate.rs` calls the same check explicitly
+(`AxoUpdater::check_receipt_is_for_this_executable`, itself public) so
+the two cases get different lines: a real up-to-date receipt prints
+nothing, and a receipt for a different install names that install and
+declines outright, before any release is even queried.
+
+axoupdater's `run()` (`src/lib.rs:537-540`) forces the newly-downloaded
+release's own installer to the RECEIPT's recorded `install_prefix`, via
+the `CARGO_DIST_FORCE_INSTALL_DIR` environment variable -- never the
+current release's own configured default (`~/.local/bin` since
+T1/HR-135). A stale receipt from before that move therefore keeps
+self-updating in place at its own old location, PROVIDED this process
+is itself running from that location; it never follows the binary to
+the new default on its own, which is exactly the shadow-copy case the
+post-phase PATH scan exists to surface.
+
+On Linux, re-executing the updated binary must use the running
+process's own pre-replace `current_exe()` path, captured before the
+replace runs, never a fresh post-replace call: `/proc/self/exe` appends
+" (deleted)" once the file this process was loaded from is unlinked out
+from under it (a plain `mv`-into-place replace does exactly that), even
+though the same path string now names the freshly-installed file. A
+fresh call after the replace fails the re-exec with `No such file or
+directory`.
+
+### Observed live, 2026-09-15
+
+A v1.0.0 install, scratch `HOME`, its receipt's `version` field
+hand-edited down to force a real newer-release detection against the
+actual latest release, v1.0.0 -- the "previous" and "latest" published
+release were the same tag at task time, so this was the only way to
+force a real self-replace without waiting for a release:
+
+- The self-replace landed at the receipt's own recorded
+  `install_prefix` and rewrote the receipt's `version` field to match
+  the newly-installed release, consistent with the mechanism above.
+- The post-phase PATH scan reported this machine's other, real
+  houserules install as a distinct copy on `PATH`.
+- A first run, still calling `current_exe()` again after the replace,
+  failed the re-exec with `No such file or directory` -- the defect the
+  pre-replace-capture fix above addresses. Fixed, then re-run clean
+  end to end (fix round 1, `t2-evidence/fix-round-1/`).
+- The same scratch receipt, invoked from a binary copied outside its
+  `install_prefix`, printed only the checking line and the PATH-scan
+  line -- no update, no declined-update line, before the explicit
+  ownership check above landed. Invoked from the binary inside that
+  prefix, same receipt, same `HOME`, it self-updated as the first
+  bullet describes. After the fix, the outside-the-prefix run instead
+  names the receipt's install and declines (fix round 3,
+  `t2-evidence/fix-round-3/`).
+- That decline line's actionable half named the receipt's bare
+  `install_prefix`; for a `CARGO_HOME`-layout receipt (exactly the
+  stale, pre-HR-135 population this line serves) that root holds only a
+  `bin` subdirectory, no `houserules` binary directly inside it. Re-run
+  with the fix landed, same divergent pair: the line now names the
+  `bin`-joined path instead (fix round 4, `t2-evidence/fix-round-4/`).
+
 ## After a release-please merge, check for baseline drift
 
 release-please's PR bumps `crates/houserules/Cargo.toml`'s version (the

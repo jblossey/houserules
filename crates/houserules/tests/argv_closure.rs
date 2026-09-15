@@ -53,8 +53,13 @@ use std::process::Command;
 /// about the rest of it as dead code (`render_parity.rs`'s own module doc
 /// names this exact tension for a different helper) is worse than a
 /// three-line duplicate of the one function this file actually needs.
+/// Sets `HOUSERULES_SKIP_SELF_UPDATE` so `update`'s self-update phase
+/// (`selfupdate.rs`) never runs here -- `tests/update.rs`'s own copy of
+/// this helper has the full account.
 fn houserules() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_houserules"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_houserules"));
+    command.env("HOUSERULES_SKIP_SELF_UPDATE", "1");
+    command
 }
 
 /// Every flat subcommand name, the CLI's full list.

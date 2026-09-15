@@ -32,7 +32,17 @@
 //! entries, and knowledge entries into their `archive/` mirrors;
 //! `archive.rs`'s own module doc has the full account, including the
 //! fallback lookups `get` (above) falls back to once an id it resolves
-//! moves out of the active set.
+//! moves out of the active set. `selfupdate`
+//! (`selfupdate::run_before_repo_phase`) is the one call `cmd_update`
+//! makes before its own repo sync: keeps the installed binary itself
+//! current on the shell/PowerShell installer channel, or degrades to a
+//! guidance line or a warning everywhere else (`selfupdate.rs`'s own
+//! module doc has the full account). `update_check`
+//! (`update_check::maybe_print_header`) is the one call `main` makes
+//! before dispatching to any command but `update` itself: prints the
+//! update-available header on stderr when a cached, receipt-free check
+//! says a newer release exists, or stays silent on every gate and every
+//! failure (`update_check.rs`'s own module doc has the full account).
 
 mod archive;
 mod backlog;
@@ -46,6 +56,8 @@ mod root;
 mod rules;
 #[cfg(test)]
 mod schema_pin;
+mod selfupdate;
+mod update_check;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -314,9 +326,11 @@ enum Command {
     },
     /// Prints the kit-owned and seed-once file lists the embedded payload defines.
     Files,
-    /// Syncs an already-`init`ed target's `KIT_OWNED` files from the
-    /// embedded payload, deletes any retired kit file still present, and
-    /// reports the stamped-to-running version drift.
+    /// Self-updates the installed binary first, where the install channel
+    /// supports it (`HOUSERULES_SKIP_SELF_UPDATE` opts out), then syncs an
+    /// already-`init`ed target's `KIT_OWNED` files from the embedded
+    /// payload, deletes any retired kit file still present, and reports
+    /// the stamped-to-running version drift.
     Update {
         /// The target directory; defaults to the current directory. Resolved
         /// the same way `init`'s own `--dir` is (`install::cmd_update`'s own
@@ -356,6 +370,7 @@ enum Command {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    update_check::maybe_print_header(matches!(cli.command, Some(Command::Update { .. })));
     match cli.command {
         // Unreachable through the CLI itself: `arg_required_else_help` makes
         // clap exit the process before `main` ever sees a bare invocation.

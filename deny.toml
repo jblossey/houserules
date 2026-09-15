@@ -5,8 +5,34 @@
 ignore = []
 
 [licenses]
-# Every license found in the tree at the time of adoption (`cargo deny list`).
-allow = ["MIT", "Apache-2.0", "Unicode-3.0", "Unlicense"]
+# Every license found in the tree at the time of adoption (`cargo deny list`),
+# plus the ones axoupdater's TLS stack (HR-133, batch 27 T2) added: BSD-3-Clause
+# and ISC (aws-lc-rs, aws-lc-sys, rustls-webpki, untrusted, subtle -- all
+# OSI-approved, FSF Free/Libre, MIT-equivalent permissive terms), MIT-0 (an
+# aws-lc-sys sub-component, MIT with the attribution clause dropped), and
+# CDLA-Permissive-2.0 (webpki-root-certs' bundled Mozilla CA data -- a
+# permissive data license with no share-alike or attribution term, the same
+# risk tier as the Unlicense entry already below). MPL-2.0 (HR-134, batch 27
+# T3) came in with `dirs`: `option-ext`, an unconditional `dirs-sys`
+# dependency (no target gate in dirs-sys's own Cargo.toml) that compiles on
+# all three of this project's shipped targets (`cargo tree --locked -e normal
+# --target <t> -i option-ext` for x86_64-unknown-linux-musl,
+# x86_64-pc-windows-msvc, and aarch64-apple-darwin each show option-ext ->
+# dirs-sys -> dirs -> houserules); its one use site is dirs-sys's non-Apple
+# unix (Linux) xdg_user_dirs path. OSI-approved, FSF Free/Libre, and a
+# file-level (not whole-project) copyleft, so combining it changes no term of
+# this crate's own MIT license.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "BSD-3-Clause",
+    "ISC",
+    "MIT-0",
+    "CDLA-Permissive-2.0",
+    "MPL-2.0",
+]
 confidence-threshold = 0.8
 
 [bans]
