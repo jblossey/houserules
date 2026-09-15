@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0](https://github.com/jblossey/houserules/compare/v0.3.0...v1.0.0) (2026-09-15)
+
+
+### Features
+
+* **v1:** the v1-readiness batch - the ratified template, the gate family, the frozen surface ([1d7951d](https://github.com/jblossey/houserules/commit/1d7951d92da447bf7477f24360b5470afd01861b))
+
+
+### Bug Fixes
+
+* **release:** create-release = false stops dist colliding with release-please ([0e30f55](https://github.com/jblossey/houserules/commit/0e30f5535f8d6f07c48c6f1337cd8bf4713111d3))
+
+
+### Miscellaneous Chores
+
+* **release:** cut 1.0.0 ([3203f9e](https://github.com/jblossey/houserules/commit/3203f9e80694fb6b99e86591b1a40851c1b49a14))
+
 ## [0.3.0](https://github.com/jblossey/houserules/compare/v0.2.0-alpha...v0.3.0) (2026-09-13)
 
 
