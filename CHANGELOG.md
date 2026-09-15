@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.0](https://github.com/jblossey/houserules/compare/v1.0.0...v1.1.0) (2026-09-15)
+
+
+### Features
+
+* **cli:** update self-updates the binary; every command checks for a newer release (HR-133, HR-134) ([2b56e51](https://github.com/jblossey/houserules/commit/2b56e5118bcd230c9db1a4dcf79fe4917b6bccfa))
+* **release:** move the install path to ~/.local/bin (HR-135) ([716abdc](https://github.com/jblossey/houserules/commit/716abdc0f054d56b713f33a296e65f22dcca4c1c))
+* **template:** AGENTS.md is the canonical instruction file; CLAUDE.md points to it (HR-136) ([382b963](https://github.com/jblossey/houserules/commit/382b96347ac9702ed930edd21687a96770a93f60))
+* **template:** seed the README-principles rule ([ea17fc6](https://github.com/jblossey/houserules/commit/ea17fc66759900a20d54f83e5a0ae3dbfd27a9b4))
+
 ## [1.0.0](https://github.com/jblossey/houserules/compare/v0.3.0...v1.0.0) (2026-09-15)
 
 
