@@ -23,6 +23,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 - [houserules.actions-default-shell-lacks-pipefail] An Actions run step with no shell key runs bash -e without pipefail: a failing left side of a pipe passes silently; name shell: bash for -eo pipefail.
 - [houserules.default-token-tags-start-no-workflows] A tag or commit pushed with the default GITHUB_TOKEN triggers no workflow; a release hand-off needs a PAT/App token or an explicit workflow_dispatch hop.
+- [houserules.main-takes-only-checked-commits] The main ruleset rejects pushes whose commits lack the 8 required checks: even a one-line tick rides a branch and PR; only a green PR head ff-merges clean.
 - [houserules.mise-cooldown-on-release-day] mise's minimum_release_age (default 24h) keeps a repository's first-ever release from resolving via @latest for a day; later releases fall back unaffected.
 - [houserules.release-footer-survives-aggregation] A Release-As footer must survive aggregation: keep its empty commit or restate it on a crates-touching commit; no other body line starts 'Release-As:'.
 

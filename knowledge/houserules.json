@@ -730,6 +730,26 @@
         "by": "user",
         "ref": "docs/specs/2026-09-14-batch-25-v1-readiness.md §3; design.md 5.82"
       }
+    },
+    {
+      "id": "houserules.main-takes-only-checked-commits",
+      "kind": "gotcha",
+      "area": "tools",
+      "summary": "The main ruleset rejects pushes whose commits lack the 8 required checks: even a one-line tick rides a branch and PR; only a green PR head ff-merges clean.",
+      "body": [
+        "Observed live 2026-09-15 (the HR-081 close): a direct one-commit push to main failed GH013 'Changes must be made through a pull request' / '8 of 8 required status checks are expected', while the ff-only merge push of batch-26's green PR head minutes earlier landed (its commits carried the PR's passing checks; only the approving-review rule reported as bypassed).",
+        "Consequence for the runbook's restamp step and finishing-a-feature step 8: a post-merge restamp or tick commit goes on a short branch with its own PR and check run, then merges ff-only - never a direct push.",
+        "The owner's GitHub UI merge of a release PR is unaffected; the rule binds CLI pushes of unchecked commits."
+      ],
+      "source": {
+        "by": "controller",
+        "date": "2026-09-15"
+      },
+      "tags": [
+        "git",
+        "ci",
+        "main"
+      ]
     }
   ]
 }

@@ -204,7 +204,9 @@ After you merge a release-please PR, check for that drift:
    extra-files entry above did not fire and needs investigating.
 2. If `.houserules.json` changed (a `baselines` hash, ordinarily),
    commit it: `chore(release): restamp the kit baselines`.
-3. Push the commit to main.
+3. Land the commit through a short branch and PR, then merge it
+   ff-only. The main ruleset rejects a direct push of unchecked
+   commits (`houserules.main-takes-only-checked-commits`).
 
 An unstamped baseline drift does not fail `dogfood.rs`'s version test
 (that test pins only `version` and `idPrefix`), but it does leave
