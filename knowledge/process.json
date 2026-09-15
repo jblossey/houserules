@@ -686,7 +686,8 @@
         "The proof is the consumer's own run, captured: dist plan for a tag wiring, the updater's replacement count for a pin wiring, the as-CI shell for a workflow step. The match check stays as the cheap first gate, never the verdict.",
         "A third-party breakage claim states WHEN it fires, derived from the pinned source's call path - never hedged as 'may fail' - because the hedge is what mis-schedules the fix (batch 20: HR-073's original wording queued a push-time failure behind a release-time track until the source derivation re-scoped it pre-merge).",
         "Run the resolution at the version the pinned consumer BUNDLES (read its dist/build metadata), never at the newest schema or docs version, and pin the two together with a cross-check test.",
-        "A comment or rule that names a gate also names the job or task that invokes it, so the claim is greppable against ci.yml and mise.toml (batch 24: two fails claimed a check runs where nothing runs it)."
+        "A comment or rule that names a gate also names the job or task that invokes it, so the claim is greppable against ci.yml and mise.toml (batch 24: two fails claimed a check runs where nothing runs it).",
+        "Batch-27 retrospective: when the execution environment cannot run the real resolution (no root for the real package, no runner for the real OS), the compliant shape is the substitute run PLUS a filed risk item naming the real-leg proof and its trigger (the HR-137 pattern); an undisclosed substitute is the violation."
       ],
       "tags": [
         "verification",

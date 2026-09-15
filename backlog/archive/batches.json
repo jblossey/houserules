@@ -390,6 +390,21 @@
         "state": "done",
         "text": "Done 2026-09-15: the README reworked to the research-derived funnel per the 5.84 triage (evidence narration stripped, Why/ToC/CLI-reference/Stability/Contributing/Uninstalling added), the readme-is-an-adopter-funnel rule seeded in the template, HR-133..135 booked from the owner mid-batch directions (5.85)."
       }
+    },
+    {
+      "number": 27,
+      "items": [
+        "HR-133",
+        "HR-134",
+        "HR-135",
+        "HR-136"
+      ],
+      "kickoff": "the owner's direction of 2026-09-15 (design.md 5.86)",
+      "status": {
+        "state": "done",
+        "text": "Done 2026-09-15: update self-updates the binary (axoupdater, receipt-gated, honest ReceiptElsewhere decline), the cached TTY-only update-available header, install-path moved to ~/.local/bin per 5.86, AGENTS.md canonical with CLAUDE.md as the endorsed pointer and check_base requiring/budgeting AGENTS.md. HR-137 stays open: the accepted-red risk item proving the new C-toolchain dependency's CI and release legs at the first real PR and cut."
+      },
+      "summary": "The install-and-update UX cluster (self-update, update-available header, the ~/.local/bin move) and the agent-agnostic kit (HR-136)."
     }
   ]
 }

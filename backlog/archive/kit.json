@@ -1900,6 +1900,90 @@
       "status": "done",
       "batch": 26,
       "see": []
+    },
+    {
+      "id": "HR-081",
+      "type": "fix",
+      "title": "release-please misses commits that change the embedded template/ payload but not crates/houserules/**",
+      "body": [
+        "HR-073's release-type: rust at crates/houserules moved release-please's commit attribution off the repository root: CommitSplit.split (commit-split.ts:99) now counts a commit toward the crate's next version only when it touches crates/houserules/**, since the ROOT_PROJECT_PATH special case that used to assign every commit (manifest.ts:700-701) no longer applies. crates/houserules/src/install.rs:232-234 embeds `../../template/` into the shipped binary via #[derive(RustEmbed)], so a commit that changes only template/ (or README.md, or another root-level path) changes shipped code and, under the new attribution, opens no release PR at all.",
+        "Measured over v0.2.0-alpha..6aa19e0 (batch 20 T5 fix round 1 review): 82 of 119 commits touch no path under crates/houserules/, and 7 of 27 feat/fix commits are unattributed under the new package path -- four of them (7460c77b feat(template), 6ac1aaa7 fix(template), 719d3f58 fix(tools), 101555ef fix(template)) change the embedded payload directly, per t5-evidence/hr081-template-payload-commits.sh's own enumeration by touched path rather than commit subject (fix round 2: a subject-scoped read of the same range missed 719d3f58, 'fix(tools): validate rejects incomplete terminal reports', which touches no crates/houserules/ path and two template/ files). Today enough crate-side commits ride along that a release PR still opens; a cycle whose only changes are template/, README.md, or the knowledge base would silently ship nothing.",
+        "The package path is not the thing to change: release-type rust at '.' (the root) would take the Rust strategy's workspace branch and push a CargoToml update for the root manifest, which cargo-toml.ts:37-40 throws on ('is not a package manifest') since the root Cargo.toml carries no [package] section under this workspace's virtual-manifest shape -- reviewer-confirmed and re-verified by the implementer. The gap needs a different remedy, not a reversal of HR-073's ruling.",
+        "Candidate remedies (this item carries the question, not the answer): (a) an extra-files or component-mapping addition to release-please-config.json that attributes template/** changes to the crate's own path for commit-attribution purposes; (b) a documented pre-release rule that a payload-changing commit always rides alongside a crate-side commit before a release is cut, checked by hand or by a gate. Owner picks.",
+        "MECHANISM (task-1 fix round 4, provisional pending owner ratification at the batch report): remedy (b), concretized. crates/houserules/payload.stamp records a sha256 digest of template/'s tracked file set, recomputed and compared by payload-stamp-gate (crates/houserules/src/bin/payload-stamp-gate.rs), wired into mise run lint (houserules.payload-stamp-gate). That gate is a TREE-LEVEL check only: a branch splitting the template/ edit from the stamp regeneration across two commits still passes it at the tip. Fix round 5 closed that gap: houserules check-commit now also runs this entry's own co-change check (if template/**, then crates/houserules/payload.stamp) per commit, over the PR's full range in CI, so a split commit pair fails before merge, not only a stale tree.",
+        "Still gating this item's own close: the mechanism above is proven by source-level review and a full-pipeline simulation against real git history (batch-24 task-1's own t1-evidence/), never by a genuine release-please run. The first real template-only change that lands on main after T2 -- one commit touching template/ and crates/houserules/payload.stamp together, nothing else -- is that live proof.",
+        "Source: batch 20 T5 fix round 1 review (task-5-review.json), important finding 1.",
+        "CLOSED by live proof, 2026-09-15: batch 26's merge put ea17fc6 feat(template) on main - a commit whose only crates/houserules/** path is payload.stamp. release-please run 34951127224 opened release PR #28 (chore(main): release 1.1.0) whose changelog carries exactly that commit as its one feature: the stamp pairing attributed the template-payload change to the crate and drove the minor bump. The release PR itself is owner-attended."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 25,
+      "see": [
+        "HR-073"
+      ]
+    },
+    {
+      "id": "HR-133",
+      "type": "feat",
+      "title": "houserules update self-updates the installed binary",
+      "body": [
+        "Owner (2026-09-15): 'houserules update does update a repo but it doesn't update the installed houserules binary. It should.' Design at spec time: the mechanism must respect the install channel (shell installer, mise, direct download) - a mise-managed binary is mise's to update, a self-replaced one needs the dist install receipt. Cluster with HR-134 and HR-135."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 27,
+      "see": [
+        "HR-134",
+        "HR-135",
+        "HR-137"
+      ]
+    },
+    {
+      "id": "HR-134",
+      "type": "feat",
+      "title": "Update-available notice on every command when a newer release exists",
+      "body": [
+        "Owner (2026-09-15): when a new houserules version is published, the binary states that an update is available on every command, as a small header, like other CLI tools do. Design at spec time: version check against the GitHub latest release with a local cache and a short TTL; never a network call per invocation; silent on network failure; an opt-out env var. Cluster with HR-133 and HR-135."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 27,
+      "see": [
+        "HR-133",
+        "HR-135"
+      ]
+    },
+    {
+      "id": "HR-135",
+      "type": "question",
+      "title": "Install path: does ~/.cargo/bin make sense for a toolchain-neutral binary?",
+      "body": [
+        "Owner (2026-09-15): houserules currently installs into .cargo; 'I am asking myself if that makes sense for a pure binary that has nothing to do with rust anymore on the user systems.' The shell installer's target comes from dist-workspace.toml (cargo-dist install-path; CARGO_HOME is the default). Candidate: ~/.local/bin (XDG) with a PATH fallback. Needs an owner ruling; a move also needs a migration story for existing installs and feeds HR-133's self-update mechanism. Cluster with HR-133 and HR-134.",
+        "RULED (owner, 2026-09-15, design.md 5.86): ~/.local/bin is correct. The move needs the dist-workspace.toml install-path change plus a migration story for existing ~/.cargo/bin installs; it feeds HR-133's self-update mechanism. Scheduled batch 27."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 27,
+      "see": [
+        "HR-133",
+        "HR-134"
+      ]
+    },
+    {
+      "id": "HR-136",
+      "type": "feat",
+      "title": "Agent-agnostic kit: the seeded structures work with Codex and other non-Claude harnesses",
+      "body": [
+        "Owner (2026-09-15): the codebase must be made agent-agnostic so it also works flawlessly with Codex and other harnesses that do not know how to treat Claude structures. Today the kit seeds CLAUDE.md, .claude/rules/*, .claude/skills/*, .claude/agents/*, and .claude/settings.json - all Claude-Code-specific loading paths. The knowledge base, backlog, and CLI gates are already harness-neutral JSON and binaries. Spec-time research: the AGENTS.md convention and what Codex and other harnesses actually read; whether render grows pluggable output targets; what replaces hooks and skills where a harness has neither. Scheduled batch 27."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 27,
+      "see": [
+        "HR-133",
+        "HR-134",
+        "HR-135"
+      ]
     }
   ]
 }

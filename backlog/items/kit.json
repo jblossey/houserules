@@ -61,7 +61,8 @@
       "body": [
         "Batch 16 branch review, template defect 1: task-4-report.json reached 583KB because all 41 tdd entries embed verbatim RED/GREEN inline; reviewers re-ran cycles anyway, and T5's fix round already invented the better shape (bulk evidence in named workspace files, byte-prefix-matching inline excerpts).",
         "Change: let a tdd or live_run entry cite a workspace capture file by path for output beyond a stated size, keeping the first lines plus exit inline; standardize the t5-evidence/ convention in .claude/schemas/deliverables.json and both agent templates. Deferred from batch 16 because template changes trigger process.evals-rerun and the batch was already closing.",
-        "Source: batch 16 branch review retrospective, 2026-09-04."
+        "Source: batch 16 branch review retrospective, 2026-09-04.",
+        "Batch-27 branch review re-confirmed the need: task-2-report.json reached 672KB by inlining verbatim outputs already retained as workspace evidence files, exceeding the harness's own 256KB read cap. Proposed shape: an optional evidence_file field per run/tdd/live_run entry (path + exit + short excerpt) once output exceeds a stated size; the implementer template states the threshold."
       ],
       "tags": [
         "template",
@@ -99,27 +100,6 @@
       "batch": null,
       "see": [
         "HR-071"
-      ]
-    },
-    {
-      "id": "HR-081",
-      "type": "fix",
-      "title": "release-please misses commits that change the embedded template/ payload but not crates/houserules/**",
-      "body": [
-        "HR-073's release-type: rust at crates/houserules moved release-please's commit attribution off the repository root: CommitSplit.split (commit-split.ts:99) now counts a commit toward the crate's next version only when it touches crates/houserules/**, since the ROOT_PROJECT_PATH special case that used to assign every commit (manifest.ts:700-701) no longer applies. crates/houserules/src/install.rs:232-234 embeds `../../template/` into the shipped binary via #[derive(RustEmbed)], so a commit that changes only template/ (or README.md, or another root-level path) changes shipped code and, under the new attribution, opens no release PR at all.",
-        "Measured over v0.2.0-alpha..6aa19e0 (batch 20 T5 fix round 1 review): 82 of 119 commits touch no path under crates/houserules/, and 7 of 27 feat/fix commits are unattributed under the new package path -- four of them (7460c77b feat(template), 6ac1aaa7 fix(template), 719d3f58 fix(tools), 101555ef fix(template)) change the embedded payload directly, per t5-evidence/hr081-template-payload-commits.sh's own enumeration by touched path rather than commit subject (fix round 2: a subject-scoped read of the same range missed 719d3f58, 'fix(tools): validate rejects incomplete terminal reports', which touches no crates/houserules/ path and two template/ files). Today enough crate-side commits ride along that a release PR still opens; a cycle whose only changes are template/, README.md, or the knowledge base would silently ship nothing.",
-        "The package path is not the thing to change: release-type rust at '.' (the root) would take the Rust strategy's workspace branch and push a CargoToml update for the root manifest, which cargo-toml.ts:37-40 throws on ('is not a package manifest') since the root Cargo.toml carries no [package] section under this workspace's virtual-manifest shape -- reviewer-confirmed and re-verified by the implementer. The gap needs a different remedy, not a reversal of HR-073's ruling.",
-        "Candidate remedies (this item carries the question, not the answer): (a) an extra-files or component-mapping addition to release-please-config.json that attributes template/** changes to the crate's own path for commit-attribution purposes; (b) a documented pre-release rule that a payload-changing commit always rides alongside a crate-side commit before a release is cut, checked by hand or by a gate. Owner picks.",
-        "MECHANISM (task-1 fix round 4, provisional pending owner ratification at the batch report): remedy (b), concretized. crates/houserules/payload.stamp records a sha256 digest of template/'s tracked file set, recomputed and compared by payload-stamp-gate (crates/houserules/src/bin/payload-stamp-gate.rs), wired into mise run lint (houserules.payload-stamp-gate). That gate is a TREE-LEVEL check only: a branch splitting the template/ edit from the stamp regeneration across two commits still passes it at the tip. Fix round 5 closed that gap: houserules check-commit now also runs this entry's own co-change check (if template/**, then crates/houserules/payload.stamp) per commit, over the PR's full range in CI, so a split commit pair fails before merge, not only a stale tree.",
-        "Still gating this item's own close: the mechanism above is proven by source-level review and a full-pipeline simulation against real git history (batch-24 task-1's own t1-evidence/), never by a genuine release-please run. The first real template-only change that lands on main after T2 -- one commit touching template/ and crates/houserules/payload.stamp together, nothing else -- is that live proof.",
-        "Source: batch 20 T5 fix round 1 review (task-5-review.json), important finding 1.",
-        "CLOSED by live proof, 2026-09-15: batch 26's merge put ea17fc6 feat(template) on main - a commit whose only crates/houserules/** path is payload.stamp. release-please run 34951127224 opened release PR #28 (chore(main): release 1.1.0) whose changelog carries exactly that commit as its one feature: the stamp pairing attributed the template-payload change to the crate and drove the minor bump. The release PR itself is owner-attended."
-      ],
-      "milestone": null,
-      "status": "done",
-      "batch": 25,
-      "see": [
-        "HR-073"
       ]
     },
     {
@@ -276,48 +256,59 @@
       "see": []
     },
     {
-      "id": "HR-133",
-      "type": "feat",
-      "title": "houserules update self-updates the installed binary",
+      "id": "HR-137",
+      "type": "risk",
+      "title": "Confirm aws-lc-sys builds clean on every rust-job OS and every release leg",
       "body": [
-        "Owner (2026-09-15): 'houserules update does update a repo but it doesn't update the installed houserules binary. It should.' Design at spec time: the mechanism must respect the install channel (shell installer, mise, direct download) - a mise-managed binary is mise's to update, a self-replaced one needs the dist install receipt. Cluster with HR-134 and HR-135."
+        "HR-133's axoupdater dependency pulled in aws-lc-sys (rustls' crypto provider) transitively. Walked on paper at batch 27 T2 fix round 1: prebuilt-nasm is already active for aws-lc-sys in this tree (rustls and rustls-webpki's own \"aws-lc-rs\" features each request \"aws-lc-rs/prebuilt-nasm\", confirmed by `cargo tree -e features -p aws-lc-sys` and a verbose `x86_64-pc-windows-gnu` build passing `--cfg feature=\"prebuilt-nasm\"` to rustc), so no leg needs a real NASM install. Every platform's own native C toolchain should cover the rest: macOS (Xcode CLT), Windows (MSVC, both ci.yml's windows-latest `rust`-job leg and release.yml's windows-msvc leg, both on GitHub-hosted images that ship it), and the two musl release legs (`dist plan --output-format=json`'s own artifacts_matrix runs them un-containerized on ubuntu-22.04(-arm) with `packages_install: apt-get install musl-tools`, already dist's own provisioning, not ci.yml's).",
+        "None of this is proven by an actual build: only the ubuntu `checks` job's windows-gnu cross-check has really compiled aws-lc-sys in this task, and even that ran with a substitute llvm-mingw toolchain (no root available to install the real gcc-mingw-w64-x86-64 package in the sandbox). The `rust` job's macos-latest and windows-latest legs, and release.yml's five target legs, have not run since this dependency landed. Confirm all of them green at the first real PR and the first real release cut after this change; if any leg fails, the fix is almost certainly a dist-workspace.toml packages/build-environment addition (never a hand edit of the generated release.yml) or the missing system package on ci.yml's own runner."
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 27,
       "see": [
-        "HR-134",
-        "HR-135"
+        "HR-133"
       ]
     },
     {
-      "id": "HR-134",
+      "id": "HR-138",
       "type": "feat",
-      "title": "Update-available notice on every command when a newer release exists",
+      "title": "audit: byte-compare self_audit against a fresh run; sanctions for judged rows",
       "body": [
-        "Owner (2026-09-15): when a new houserules version is published, the binary states that an update is available on every command, as a small header, like other CLI tools do. Design at spec time: version check against the GitHub latest release with a local cache and a short TTL; never a network call per invocation; silent on network failure; an opt-out env var. Cluster with HR-133 and HR-135."
+        "Batch-27 branch review template defects, both in houserules audit: (1) teach --report/--workspace mode to byte-compare the report's self_audit deterministic rows and summary against its own fresh run and fail the deliverables row on divergence - the batch-27 T1 failure (one hand-reworded row) is what reviewers now catch by hand every round, and the tool holds both sides in memory. (2) --sanctioned only covers deterministic rows: a booked interim fail on a JUDGED rule (process.wiring-checks-run-the-resolution=HR-137) came back stale_sanctions, forcing hand-narration. Accept a sanction for a judged row and record it on the row so the judging reviewer sees the booking structurally."
       ],
       "milestone": null,
       "status": "open",
       "batch": null,
       "see": [
-        "HR-133",
-        "HR-135"
+        "HR-137"
       ]
     },
     {
-      "id": "HR-135",
-      "type": "question",
-      "title": "Install path: does ~/.cargo/bin make sense for a toolchain-neutral binary?",
+      "id": "HR-139",
+      "type": "feat",
+      "title": "live-run-recipe: a check that requires named command patterns, not just a set field",
       "body": [
-        "Owner (2026-09-15): houserules currently installs into .cargo; 'I am asking myself if that makes sense for a pure binary that has nothing to do with rust anymore on the user systems.' The shell installer's target comes from dist-workspace.toml (cargo-dist install-path; CARGO_HOME is the default). Candidate: ~/.local/bin (XDG) with a PATH fallback. Needs an owner ruling; a move also needs a migration story for existing installs and feeds HR-133's self-update mechanism. Cluster with HR-133 and HR-134."
+        "Batch-27 branch review: houserules.live-run-recipe's check (type report-field, field live_run) proves the field is set, not that the recipe's required entries exist - T2 passed every audit while missing the scratch-repo check-knowledge/check-backlog entries the entry's own body requires. Add a check variant that requires named command patterns among a report list-field's entries, or fold the requirement into the summary so a judging reviewer reads it without opening the body."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": []
+    },
+    {
+      "id": "HR-140",
+      "type": "process",
+      "title": "A balancing mechanism against micro-management and over-bureaucratizing in review rounds",
+      "body": [
+        "Owner (2026-09-15): 'i observe that fix and review rounds have become longer due to menial defects that are more adhering to a protocol than actually producing valuable output. We need to introduce a balancing mechanism against micro-management and over-bureaucratizing.' Observed in batch 27: T2 took five review rounds and T4 three; several late rounds turned on prose wording, comment phrasing, and report-narrative fidelity rather than shipped behavior. Candidate mechanisms for the spec discussion: a severity floor below which a reviewer records a note instead of a blocking finding; a fix-round budget per task with overflow deferred as batch-report items; letting Minor-only rounds close controller-verified without a re-review dispatch; distinguishing contract surfaces (code, user-facing text, gates) from narrative surfaces (report prose) in the rules' blast radius. Needs an owner-gated spec: the mechanism must not soften process.no-tech-debt's core (real defects still get fixed) - it targets the cost of the loop, not the standard."
       ],
       "milestone": null,
       "status": "open",
       "batch": null,
       "see": [
-        "HR-133",
-        "HR-134"
+        "HR-138",
+        "HR-139"
       ]
     }
   ]

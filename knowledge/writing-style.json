@@ -94,7 +94,8 @@
         "A shipped instruction that names a repo-local resource states what every other population does instead (batch 20 T2: the closing act's false-positive arm named a Limits-file edit only the kit repository can make; the fix branches on source-present vs installed-binary populations).",
         "An instruction naming the populations it governs enumerates all of them: test the sentence against each population the code path actually handles (batch 22 T2: a README bullet named two of the three populations a path override governs).",
         "A procedure's state space includes the states its own automation creates: walk every generated commit and bot-authored PR through the gates the procedure depends on (batch 24: the release PR's own commit was the uncovered state, three gates deep).",
-        "Instructions that branch on host or environment enumerate every branch as shipped text, and the reviewer walks each arm live (batch 25: the non-GitHub origin and the hook-vs-attribution arms)."
+        "Instructions that branch on host or environment enumerate every branch as shipped text, and the reviewer walks each arm live (batch 25: the non-GitHub origin and the hook-vs-attribution arms).",
+        "Batch-27 retrospective: a seed-once file's instruction set is keyed to an enumerated field with three values - absent, present-generic, present-with-own-content; an instruction written for one names what holds for the other two. The batch-27 instance was the untested third state (own CLAUDE.md content, no AGENTS.md, reached by update's backfill)."
       ],
       "tags": [
         "templates",

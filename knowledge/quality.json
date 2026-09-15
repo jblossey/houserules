@@ -178,7 +178,8 @@
       "body": [
         "Help output, error messages, and documented step sequences are contract surfaces the way exported symbols are; a behavior fix that leaves them stating the old behavior ships the old defect to the user in prose form.",
         "Enumerate the surfaces mechanically: grep the user-visible strings for the changed concept (the old flag, shape, or step) rather than recalling where it is mentioned.",
-        "A documented procedure is verified by executing its printed steps in order, on the environment it targets or the closest disclosed proxy; a paraphrase check misses preconditions the source text carries."
+        "A documented procedure is verified by executing its printed steps in order, on the environment it targets or the closest disclosed proxy; a paraphrase check misses preconditions the source text carries.",
+        "Batch-27 retrospective: the surface list for a CLI change includes --help for every touched subcommand and every printed receipt line; run the command and read its own output as a user before closing the task. Both batch-27 instances were surfaces the implementer never re-read after the behavior moved (update's about text; a receipt line update never prints)."
       ],
       "tags": [
         "cli",
