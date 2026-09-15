@@ -27,19 +27,17 @@ installers = ["shell", "powershell"]
 # ubi's current source) passes a musl-only asset name unfiltered on a glibc
 # host but drops any glibc-named asset on a musl host, so musl-only installs
 # on both, where gnu-only would fail on musl. The musl legs ship one
-# statically linked binary (t1-evidence/dist-build-binary-file.log,
-# -binary-ldd.log, x86_64-unknown-linux-musl only); macOS and Windows link
-# their platform runtimes.
+# statically linked binary (x86_64-unknown-linux-musl only); macOS and
+# Windows link their platform runtimes.
 targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "x86_64-unknown-linux-musl", "x86_64-pc-windows-msvc"]
-# Path that installers should place binaries in: stays at dist's own
-# CARGO_HOME default. The shell/powershell installers add it to PATH
-# themselves (houserules-installer.sh calls add_install_dir_to_path for
-# .profile, .zshrc/.zshenv and fish's conf.d unless HOUSERULES_NO_MODIFY_PATH
-# is set; t1-evidence/houserules-installer.sh,
-# houserules-installer-path-excerpt.log), and the mise/ubi channel never
-# reads this setting at all, so nothing here needs a non-Rust-toolchain-
-# shaped path.
-install-path = "CARGO_HOME"
+# Path that installers should place binaries in: ~/.local/bin, not
+# CARGO_HOME -- a toolchain-neutral binary does not belong under a
+# Rust-toolchain-shaped default (HR-135, design.md 5.86). The
+# shell/powershell installers add this directory to PATH themselves
+# (houserules-installer.sh calls add_install_dir_to_path for .profile,
+# .zshrc/.zshenv and fish's conf.d unless HOUSERULES_NO_MODIFY_PATH is
+# set); the mise/ubi channel never reads this setting at all.
+install-path = "~/.local/bin"
 # Where to host releases
 hosting = "github"
 # release-please creates the GitHub release on the tag push (its own

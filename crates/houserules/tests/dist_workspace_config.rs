@@ -1,13 +1,15 @@
-//! Pins the permanent fix for HR-118: `dist-workspace.toml`'s `[dist]`
-//! table carries `create-release = false`, and the generated
-//! `.github/workflows/release.yml` host job uploads into an existing
-//! GitHub Release instead of creating one.
+//! Pins two ruled `[dist]` settings in `dist-workspace.toml` that a silent
+//! regression would ship unnoticed: `create-release = false` (HR-118) and
+//! `install-path = "~/.local/bin"` (HR-135), the second alongside its
+//! pairing with the generated `.github/workflows/release.yml`.
 //!
-//! T2's live `v0.3.0` cut hit the collision this fix closes:
-//! release-please (on its PAT) created the release on the tag push, then
-//! dist's host job failed at `gh release create` ("a release with the same
-//! tag name already exists") -- both tools tried to create the same
-//! release (docs/design.md 5.77). cargo-dist 0.32.0's own docs
+//! `create-release = false` is the permanent fix for HR-118: without it,
+//! the generated host job creates a GitHub Release instead of uploading
+//! into an existing one. T2's live `v0.3.0` cut hit the collision this fix
+//! closes: release-please (on its PAT) created the release on the tag
+//! push, then dist's host job failed at `gh release create` ("a release
+//! with the same tag name already exists") -- both tools tried to create
+//! the same release (docs/design.md 5.77). cargo-dist 0.32.0's own docs
 //! (`reference/config.html#create-release`, checked 2026-09-13) state the
 //! fix directly: "If false, dist will assume a draft GitHub Release for the
 //! current git tag already exists with the title/body you want ... upload
@@ -17,8 +19,14 @@
 //!
 //! `release.yml` is generated from `dist-workspace.toml`
 //! (`houserules.release-workflow-is-generated`); this file pins both
-//! halves so a hand-edit to either one that loses the pairing fails here
-//! instead of shipping a config whose generated workflow no one re-checked.
+//! halves of the create-release setting so a hand-edit to either one that
+//! loses the pairing fails here instead of shipping a config whose
+//! generated workflow no one re-checked. `install-path` (HR-135, design.md
+//! 5.86: a toolchain-neutral binary installs to `~/.local/bin`, not a
+//! Rust-toolchain-shaped `CARGO_HOME`) is pinned against
+//! `dist-workspace.toml` alone: the setting bakes into the generated
+//! installer script at release-build time, not into `release.yml`, so
+//! there is no generated-workflow half to pin for it.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -72,6 +80,24 @@ fn dist_workspace_sets_create_release_false() {
             .lines()
             .any(|line| line.trim() == "create-release = false"),
         "[dist] table does not set create-release = false:\n{dist_table}"
+    );
+}
+
+/// The `[dist]` table carries an uncommented `install-path = "~/.local/bin"`
+/// line (HR-135, design.md 5.86: a toolchain-neutral binary installs to
+/// `~/.local/bin`, not a Rust-toolchain-shaped `CARGO_HOME`). Losing this
+/// line reopens the pre-ruling default and ships binaries to `~/.cargo/bin`
+/// again.
+#[test]
+fn dist_workspace_sets_install_path_to_local_bin() {
+    let raw = fs::read_to_string(repo_root().join("dist-workspace.toml"))
+        .expect("read dist-workspace.toml");
+    let dist_table = dist_table_text(&raw);
+    assert!(
+        dist_table
+            .lines()
+            .any(|line| line.trim() == "install-path = \"~/.local/bin\""),
+        "[dist] table does not set install-path = \"~/.local/bin\":\n{dist_table}"
     );
 }
 
