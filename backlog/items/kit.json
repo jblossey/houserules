@@ -124,7 +124,8 @@
       "body": [
         "Owner ruling 2026-09-11: only the owner merges to main without an approval; every other contributor's PR needs the owner's approving review. Applied as a second ruleset `approval` on the default branch (one approving review, code-owner review required, stale reviews dismissed on push, threads resolved) whose only bypass actor is the repository admin role. The first ruleset `main` (the eight required checks incl. CodeQL, linear history, no force-push, PR required) keeps no bypass and binds the owner too. GitHub cannot exempt one rule inside a ruleset, hence the split.",
         "Consequence and the ruled fix: GitHub refuses the Actions app as a bypass actor on a user-owned repository, so a merge enabled with GITHUB_TOKEN now waits for an approval and the HR-092 auto-merge stalls. The owner chose the token route: .github/workflows/dependabot-auto-merge.yml enables auto-merge with a fine-grained personal access token of the owner (Contents and Pull requests read/write on this repository only), stored as the Dependabot secret DEPENDABOT_AUTOMERGE_TOKEN (a Dependabot-triggered workflow reads that store, not Actions secrets). A merge performed as the owner also starts the push workflows on main, which lifts HR-092's GITHUB_TOKEN limit for these merges.",
-        "PENDING proof: the next minor or patch Dependabot PR merging on its own with the workflow green. Flip to done with that PR's number. HR-068 (a token for the release flow) stays a separate ruling: release-please edits a workflow file, which needs the `workflows` permission this token does not carry."
+        "PENDING proof: the next minor or patch Dependabot PR merging on its own with the workflow green. Flip to done with that PR's number. HR-068 (a token for the release flow) stays a separate ruling: release-please edits a workflow file, which needs the `workflows` permission this token does not carry.",
+        "Proof run, read 2026-10-01: negative. PR #31 (clap 4.6.6 to 4.6.7, a patch) got auto-merge enabled by the owner's token eleven seconds after it opened on 2026-09-18, then waited: it merged on 2026-09-21, seconds after the owner's own approving review. The token enables auto-merge; it does not satisfy the approval ruleset, because an enabled auto-merge waits for every requirement and the admin bypass does not apply to it. PRs #33 and #34 (github/codeql-action analyze and init, 4.38.0 to 4.38.1, opened 2026-09-25) stand blocked on two counts: the approving review is still required, and both CodeQL `analyze` jobs fail with `Loaded a configuration file for version '4.38.0', but running version '4.38.1'` - Dependabot bumps the two actions in separate PRs, and they must share one version. PR #32 (dependabot/fetch-metadata 2.5.0 to 3.1.0, a major) is approved, carries no auto-merge by design, and is behind main. OWNER RULING NEEDED on the repair."
       ],
       "milestone": null,
       "status": "partial",
@@ -261,10 +262,11 @@
       "title": "Confirm aws-lc-sys builds clean on every rust-job OS and every release leg",
       "body": [
         "HR-133's axoupdater dependency pulled in aws-lc-sys (rustls' crypto provider) transitively. Walked on paper at batch 27 T2 fix round 1: prebuilt-nasm is already active for aws-lc-sys in this tree (rustls and rustls-webpki's own \"aws-lc-rs\" features each request \"aws-lc-rs/prebuilt-nasm\", confirmed by `cargo tree -e features -p aws-lc-sys` and a verbose `x86_64-pc-windows-gnu` build passing `--cfg feature=\"prebuilt-nasm\"` to rustc), so no leg needs a real NASM install. Every platform's own native C toolchain should cover the rest: macOS (Xcode CLT), Windows (MSVC, both ci.yml's windows-latest `rust`-job leg and release.yml's windows-msvc leg, both on GitHub-hosted images that ship it), and the two musl release legs (`dist plan --output-format=json`'s own artifacts_matrix runs them un-containerized on ubuntu-22.04(-arm) with `packages_install: apt-get install musl-tools`, already dist's own provisioning, not ci.yml's).",
-        "None of this is proven by an actual build: only the ubuntu `checks` job's windows-gnu cross-check has really compiled aws-lc-sys in this task, and even that ran with a substitute llvm-mingw toolchain (no root available to install the real gcc-mingw-w64-x86-64 package in the sandbox). The `rust` job's macos-latest and windows-latest legs, and release.yml's five target legs, have not run since this dependency landed. Confirm all of them green at the first real PR and the first real release cut after this change; if any leg fails, the fix is almost certainly a dist-workspace.toml packages/build-environment addition (never a hand edit of the generated release.yml) or the missing system package on ci.yml's own runner."
+        "None of this is proven by an actual build: only the ubuntu `checks` job's windows-gnu cross-check has really compiled aws-lc-sys in this task, and even that ran with a substitute llvm-mingw toolchain (no root available to install the real gcc-mingw-w64-x86-64 package in the sandbox). The `rust` job's macos-latest and windows-latest legs, and release.yml's five target legs, have not run since this dependency landed. Confirm all of them green at the first real PR and the first real release cut after this change; if any leg fails, the fix is almost certainly a dist-workspace.toml packages/build-environment addition (never a hand edit of the generated release.yml) or the missing system package on ci.yml's own runner.",
+        "Proven live 2026-09-15, both halves. PR #30 (batch 27): the `rust` job passed on ubuntu-latest, macos-latest, and windows-latest. The v1.1.0 release run: all five `build-local-artifacts` legs passed (x86_64-apple-darwin, aarch64-apple-darwin, x86_64-pc-windows-msvc, x86_64-unknown-linux-musl, aarch64-unknown-linux-musl), then `build-global-artifacts`, `host`, and `announce`."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 27,
       "see": [
         "HR-133"
@@ -309,6 +311,107 @@
       "see": [
         "HR-138",
         "HR-139"
+      ]
+    },
+    {
+      "id": "HR-141",
+      "type": "feat",
+      "title": "Reports re-open every file:line citation at HEAD; check-report-claims compares the cited line",
+      "body": [
+        "GitHub issue #35 (owner, 2026-09-30). The issue reports from the adopter project orrery, batch 1: process.claims-match-artifacts failed in 7 of 13 tasks, and every failure was drift - a line number, a timestamp, a command string, or a count carried from a draft into the final report. Each failure cost a review round.",
+        "Request, two parts. (1) The closing act of the implementer template lists every file-and-line citation in the report after the last edit and re-opens each cited line at HEAD; it copies every command field from the shell history and never retypes a command. (2) check-report-claims resolves each <file>:<line> citation against the tree at HEAD and reports a line whose text differs from the fragment the report quotes.",
+        "Triage 2026-10-01: check-report-claims already resolves a citation's file and fails a line number past the end of the file (crates/houserules/src/report_claims.rs); it does not compare the cited line's text with a quoted fragment. Part 2 extends that check. Part 1 changes .claude/agents/implementer.md, so process.evals-rerun applies."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-128"
+      ]
+    },
+    {
+      "id": "HR-142",
+      "type": "feat",
+      "title": "The tdd mode label is proven with the capture and commit timestamps",
+      "body": [
+        "GitHub issue #36 (owner, 2026-09-30). The issue reports from the adopter project orrery, batch 1: process.tdd failed in 3 of 13 tasks, all three label failures - a RED capture taken after the commit was filed as `natural`. The task-reviewer template checks the label by hand, so each failure cost a review round.",
+        "Request. Before the implementer writes a `tdd` entry, the template has it run `stat -c %y <red capture>` and `git log -1 --format=%cI <commit>`, label the entry `natural` only when the capture predates the commit and `reconstructed` otherwise, and paste both timestamps in the entry. Optional deterministic arm: check-report-claims compares the capture's mtime with the commit time for every entry labeled `natural`.",
+        "Triage 2026-10-01: the template half changes .claude/agents/implementer.md, so process.evals-rerun applies. The deterministic arm needs a design answer first: a file mtime does not survive a copy or a checkout, so the check holds only inside the session that made the capture."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-141"
+      ]
+    },
+    {
+      "id": "HR-143",
+      "type": "feat",
+      "title": "A script that builds a report validates its own output",
+      "body": [
+        "GitHub issue #37 (owner, 2026-09-30). The issue reports from the adopter project orrery, batch 1: one task report failed `houserules validate` in a fix round (process.deliverables-json). The implementer built the report with a script; the template tells the implementer to validate a temporary copy before the move into place, and the builder script skipped that step.",
+        "Request. One line in .claude/agents/implementer.md: a script that builds a report runs `houserules validate` on its output and exits non-zero on failure.",
+        "Triage 2026-10-01: a template-only change; process.evals-rerun applies."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-141",
+        "HR-142"
+      ]
+    },
+    {
+      "id": "HR-144",
+      "type": "feat",
+      "title": "Lifecycle: an adversarial review gate in the design phase",
+      "body": [
+        "GitHub issue #38 (owner, 2026-09-30). The batch lifecycle reviews code three times (implementer self-review, task reviewer, branch reviewer) and reviews design zero times: the Design row of the orchestrating skill asks only for a spec and the owner's approval, so the owner is the first and only adversarial check on a design decision. The issue reports from the adopter project orrery: in one batch and one spec draft, four design decisions were overturned, each refuted by a cheap check. Named causes: the controller argued before it tested, did not state the rejected option's best case, and inherited concepts unexamined.",
+        "Request, three parts. (1) A design-phase gate in the lifecycle table and the orchestrating skill: before the owner sees a spec, a fresh-context reviewer on the strongest model attacks its decisions and reruns its probes, and its findings are fixed. (2) A `spec-reviewer` agent template beside `task-reviewer` and `branch-reviewer`, and a `spec-review` deliverable kind in .claude/schemas/deliverables.json, so `houserules validate` and `houserules stats` cover it. (3) Seed rules for the design phase: a decision that rejects a library or departs from the source research or an approved spec carries a captured probe, the rejected option's best case, and a reversal condition; each supporting claim is labelled run, read, or assumed, and an assumed claim is never the sole reason for a rejection; a spec lists every concept it takes from its sources, with the source's own status and a check against the goal; every decision the owner or a reviewer overturns is a `Reversal:` ledger line, and the batch retrospective counts reversals beside rule violations.",
+        "Triage 2026-10-01: part 2 adds a deliverable kind to both parity-pinned copies of the deliverables schema, a frozen surface (houserules.1-0-surface-is-frozen): it needs an owner ruling on whether the addition is a breaking change. The gate adds a review round to the lifecycle, so its design must be weighed against HR-140 (the balancing mechanism against over-bureaucratizing). A new kit-owned template changes KIT_OWNED (houserules.readme-mirrors-kit-owned)."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-140"
+      ]
+    },
+    {
+      "id": "HR-145",
+      "type": "fix",
+      "title": "stats aborts on a non-JSON deliverable; a draft report's first audit fails; the gates need git",
+      "body": [
+        "GitHub issue #39 (owner, 2026-09-30): three tooling defects and one note, all seen in one batch of the adopter project orrery.",
+        "(1) `houserules stats <workspace>` exits 2 for the whole workspace on one unreadable file. Request: report unreadable files in a `skipped` field and continue; the task-reviewer template says that probe outputs go to `.txt` files. Triage 2026-10-01, reproduced: a non-JSON file named `task-*-audit*.json`, `task-*-review*.json`, or `task-*-report.json` makes stats exit 2 with `invalid JSON`; a non-JSON `.json` file with another name is ignored. The abort is tested behavior (crates/houserules/src/rules/stats.rs), and quality.gates-derive-their-scope requires a gate to fail loudly on unreadable input, so the request needs a ruling.",
+        "(2) The first audit of a draft report fails process.deliverables-json. The retrieval protocol has the implementer write the report with `self_audit: null` and then audit it with `--report`; the issue reports that this first audit fails the report-field check (`report lacks a value for self_audit`) and that stats later counts the draft as a violation. Request: skip the `self_audit` presence check when `--report` is given and the field is null, or let stats ignore `*-draft.json`. Triage 2026-10-01: not reproduced yet; the template line (`self_audit` is `null` until the next step) is confirmed.",
+        "(3) check-knowledge and check-backlog need a git top level. Request: a `--dir` fallback that resolves the root without git, or a sentence in the reviewer templates. Triage 2026-10-01, reproduced: in a `git archive | tar` copy both gates exit 2 with git's own `fatal: not a git repository`; both pass there with `--dir .`. The flag exists; the gap is the unnamed error and the missing template sentence.",
+        "(4) Note: .claude/evals/record.json is seeded as `[]`, and the branch-reviewer template asks for a comparison against it that cannot run until a baseline exists. Request: a seeded baseline or a documented first-run step."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-138",
+        "HR-146"
+      ]
+    },
+    {
+      "id": "HR-146",
+      "type": "fix",
+      "title": "Kit-owned files cite a seeded knowledge entry an adopter can delete; no gate flags the dangling id",
+      "body": [
+        "GitHub issue #40 (owner, 2026-10-01). The issue reports that kit 1.1.0 does not ship process.evals-rerun although .claude/skills/orchestrating/SKILL.md (section Template evaluation) and .claude/agents/branch-reviewer.md cite it: in the adopter project orrery `houserules get process.evals-rerun` answered `unknown id`, two agent-template changes shipped with .claude/evals/record.json still `[]`, and no audit failed. Request: ship the entry as a standing rule with a deterministic co-change check, or remove the two sentences and the evals directory from the install.",
+        "Triage 2026-10-01: the premise does not hold. template/knowledge/process.json carries process.evals-rerun with its co-change check, and a fresh `init` from the 1.1.0 tree seeds it (`get` prints it). The adopter project deleted the entry in its own knowledge ruling after the install, with other seeded process entries, and restored it later.",
+        "The defect that remains, reproduced in a scratch install: with the entry deleted, `houserules check-knowledge` still passes while the kit-owned orchestrating skill and branch-reviewer template keep citing the id. Seeded knowledge is the adopter's to edit; kit-owned files are not. Candidate fixes for the spec: a check-knowledge lint that fails when a kit-owned file cites a knowledge id that does not resolve; a sentence in the migrating-knowledge skill that names the seeded entries the kit-owned files depend on."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-145",
+        "HR-130"
       ]
     }
   ]
