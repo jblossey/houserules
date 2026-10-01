@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/jblossey/houserules/security/advisories/new
+    about: Report it privately. Do not open a public issue.
+  - name: Ask a question
+    url: https://github.com/jblossey/houserules/discussions/new?category=q-a
+    about: Ask how to use houserules, or discuss an idea before you request it.
+  - name: Read the documentation
+    url: https://github.com/jblossey/houserules#readme
+    about: The README covers install, the commands, and the batch workflow.
