@@ -1,0 +1,92 @@
+name: Bug report
+description: A houserules command or an installed kit file does the wrong thing.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report one problem per issue. Three problems need three issues.
+
+        We can fix only what we can reproduce. Give the exact commands and their full output.
+
+        Do not report a security vulnerability here. Use the **Security** tab to report it privately.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Where does the problem show?
+      options:
+        - CLI command (houserules <command>)
+        - Install or update (init, update, the installers)
+        - Agent template (.claude/agents/)
+        - Skill (.claude/skills/)
+        - Seeded knowledge, backlog, or schema
+        - CI workflow or git hook
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: >-
+        Run `houserules --version`. If the `version` field in your `.houserules.json` differs,
+        give both.
+      placeholder: "houserules 1.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform and install method
+      description: Run `uname -orsm`, or give your Windows version. Say how you installed houserules.
+      placeholder: "6.9.7 x86_64 GNU/Linux; shell installer"
+    validations:
+      required: false
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Give the command you ran, its full output, and its exit code (`echo $?`).
+      placeholder: |
+        `houserules stats .ws/batch-3` exited 2. It stopped at `probe.json`, which is not JSON,
+        and listed no other file.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      placeholder: "`stats` lists `probe.json` as skipped and reports every other file."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: >-
+        Give the commands in order. Start from a fresh `houserules init` if you can.
+        Put the output in "What happened", not here.
+      render: shell
+      placeholder: |
+        houserules init
+        houserules get process.evals-rerun
+    validations:
+      required: true
+
+  - type: textarea
+    id: local-workaround
+    attributes:
+      label: Local workaround
+      description: >-
+        What does your project do until this is fixed? For example, an override in
+        `.houserules.json` or an edited knowledge entry.
+    validations:
+      required: false
