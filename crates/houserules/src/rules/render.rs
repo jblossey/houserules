@@ -212,25 +212,72 @@ pub(crate) fn render(base: &Base, check: bool) -> io::Result<Vec<String>> {
 /// `cmd_check_knowledge` in `check.rs` and the `backlog` module's CLI
 /// wrappers) performs before loading its base. Crate-visible, not
 /// `rules`-private: the `backlog` module needs the identical resolution
-/// and would otherwise duplicate it.
+/// and would otherwise duplicate it. `root::resolve_root` is the one
+/// caller; it prints the error this returns.
 ///
-/// On failure (no enclosing repository, for instance) git itself can
-/// print more than one stderr line: `git rev-parse --show-toplevel`
-/// outside any repository prints "fatal: not a git repository ..." AND
-/// a second "Stopping at filesystem boundary ..." line, so this keeps
-/// only the first non-empty one, to hold the recorded one-line error
-/// contract.
+/// Every failure arm is one line that names what failed:
+/// - the working directory cannot be read: `cannot read the current
+///   directory: <OS error>`;
+/// - `git` cannot run: `cannot run git: <OS error>`;
+/// - git finds no repository above the directory (see
+///   `GIT_NO_REPOSITORY_FOUND`): this binary's own line, `<cwd> is not
+///   inside a git repository; pass --dir <repository root>`;
+/// - any other git failure keeps git's first non-empty stderr line, which
+///   holds the recorded one-line error contract: git can print more than
+///   one line.
 pub(crate) fn repo_root_from_cwd() -> io::Result<PathBuf> {
-    let output = Command::new("git")
+    let cwd = std::env::current_dir().map_err(|error| {
+        io::Error::new(
+            error.kind(),
+            format!("cannot read the current directory: {error}"),
+        )
+    })?;
+    repo_root_in(&cwd)
+}
+
+/// The start of the first stderr line `git rev-parse --show-toplevel`
+/// prints when its upward search for a repository finds none. Both
+/// wordings of that search start this way: `LC_ALL=C git rev-parse
+/// --show-toplevel` outside a repository prints `fatal: not a git
+/// repository (or any parent up to mount point /)` then a second line,
+/// `Stopping at filesystem boundary ...`, and with
+/// `GIT_DISCOVERY_ACROSS_FILESYSTEM=1` it prints `fatal: not a git
+/// repository (or any of the parent directories): .git` (git 2.55.0). A
+/// `GIT_DIR` that names a missing directory prints `fatal: not a git
+/// repository: '<dir>'` instead, which does not start this way: the
+/// directory may sit inside a repository, so that line stays git's own.
+const GIT_NO_REPOSITORY_FOUND: &str = "fatal: not a git repository (or any";
+
+/// `git rev-parse --show-toplevel` run in `dir`, with `LC_ALL=C`: without
+/// it git translates its messages (`LC_ALL=de_DE.UTF-8` prints
+/// `Schwerwiegend: Kein Git-Repository ...`), and the check against
+/// `GIT_NO_REPOSITORY_FOUND` reads English text.
+fn git_show_toplevel(dir: &Path) -> Command {
+    let mut command = Command::new("git");
+    command
         .args(["rev-parse", "--show-toplevel"])
-        .output()?;
+        .current_dir(dir)
+        .env("LC_ALL", "C");
+    command
+}
+
+/// `repo_root_from_cwd`'s body, for any directory `dir`.
+fn repo_root_in(dir: &Path) -> io::Result<PathBuf> {
+    let output = git_show_toplevel(dir)
+        .output()
+        .map_err(|error| io::Error::new(error.kind(), format!("cannot run git: {error}")))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        let first_line = stderr.lines().find(|line| !line.trim().is_empty());
+        let first_line = stderr.lines().map(str::trim).find(|line| !line.is_empty());
+        if first_line.is_some_and(|line| line.starts_with(GIT_NO_REPOSITORY_FOUND)) {
+            return Err(io::Error::other(format!(
+                "{} is not inside a git repository; pass --dir <repository root>",
+                dir.display()
+            )));
+        }
         return Err(io::Error::other(
             first_line
                 .unwrap_or("git rev-parse --show-toplevel failed")
-                .trim()
                 .to_string(),
         ));
     }
@@ -310,6 +357,82 @@ mod tests {
 
     use super::super::model::{AreaDef, CheckField, TopicMeta};
     use super::*;
+
+    /// A fresh scratch directory with `git init` already run.
+    fn scratch_git_repo() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let status = Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(dir.path())
+            .status()
+            .expect("run git init");
+        assert!(status.success(), "git init failed");
+        dir
+    }
+
+    /// Outside any repository the error names the directory and the
+    /// `--dir` remedy, in place of git's own `fatal:` text.
+    #[test]
+    fn repo_root_in_names_the_dir_remedy_outside_a_repository() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let error = repo_root_in(dir.path()).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "{} is not inside a git repository; pass --dir <repository root>",
+                dir.path().display()
+            )
+        );
+    }
+
+    /// A git failure that is not "no repository" keeps git's own line:
+    /// `git rev-parse --show-toplevel` fails in a bare repository, which
+    /// has no work tree.
+    #[test]
+    fn repo_root_in_keeps_the_git_line_for_another_git_failure() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let status = Command::new("git")
+            .args(["init", "-q", "--bare"])
+            .current_dir(dir.path())
+            .status()
+            .expect("run git init --bare");
+        assert!(status.success(), "git init --bare failed");
+        let message = repo_root_in(dir.path()).unwrap_err().to_string();
+        assert!(message.starts_with("fatal: "), "{message}");
+        assert!(!message.contains("--dir"), "{message}");
+    }
+
+    /// The git command runs with `LC_ALL=C` on every host: the end-to-end
+    /// German-locale test in `tests/check_parity.rs` proves the effect
+    /// only where the `de_DE.UTF-8` locale is installed, and this test
+    /// pins the cause everywhere.
+    #[test]
+    fn git_show_toplevel_runs_git_with_lc_all_c() {
+        let command = git_show_toplevel(Path::new("."));
+        let lc_all = command
+            .get_envs()
+            .find(|(key, _)| *key == std::ffi::OsStr::new("LC_ALL"));
+        assert_eq!(
+            lc_all,
+            Some((
+                std::ffi::OsStr::new("LC_ALL"),
+                Some(std::ffi::OsStr::new("C"))
+            ))
+        );
+    }
+
+    /// Inside a repository the top level resolves from a subdirectory.
+    #[test]
+    fn repo_root_in_resolves_the_top_level_from_a_subdirectory() {
+        let repo = scratch_git_repo();
+        let sub = repo.path().join("a");
+        fs::create_dir(&sub).expect("create subdirectory");
+        let root = repo_root_in(&sub).expect("resolve inside a repository");
+        assert_eq!(
+            root.canonicalize().expect("canonicalize resolved root"),
+            repo.path().canonicalize().expect("canonicalize repository")
+        );
+    }
 
     fn entry(id: &str, kind: &str, area: &str, standing: bool, summary: &str) -> Entry {
         Entry {

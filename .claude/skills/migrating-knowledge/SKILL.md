@@ -95,6 +95,10 @@ its own `history` entry when it is long enough to want one.
   `houserules standing` for a seeded rule that already says it. Drop the
   duplicate instead of filing it — the seed already carries 33 standing
   rules (conventional commits, TDD, exact pins, and more).
+- Before you delete a seeded entry, search the kit-owned files for its id
+  (`grep -rn '<id>' .claude/agents .claude/skills`):
+  `houserules check-knowledge` fails when a kit-owned file cites an id the
+  knowledge base no longer holds.
 - `summary` states the rule in one sentence, ≤ 160 characters, with no
   time-sensitive phrasing (`knowledge-base.summary-is-the-rule`). Dates
   belong in `source.date`.
@@ -208,11 +212,16 @@ two apart.
 `origin`; every other host gets a printed skip note and nothing written,
 since a GitHub Actions workflow runs nowhere else. Generate the equivalent
 gate for your own host, right after `init`, fresh project or migration
-alike: install `houserules` in
-the CI image, then run the same three steps the seeded workflow runs —
-`houserules check-knowledge`, `houserules check-backlog`, and, on a
-pull/merge request, `houserules audit --base <the request's base sha>
---head <the request's head sha>` — on every push and pull/merge request.
+alike: install in the CI image the `houserules` release that
+`.houserules.json` records in its `version` field, then run the same three
+steps the seeded workflow runs — `houserules check-knowledge`,
+`houserules check-backlog`, and, on a pull/merge request, `houserules audit
+--base <the request's base sha> --head <the request's head sha>` — on every
+push and pull/merge request.
+The shell installer of release `<version>` is
+`https://github.com/jblossey/houserules/releases/download/v<version>/houserules-installer.sh`.
+Do not install the latest release: it can run a check that your kit files
+do not satisfy until you run `houserules update` and commit the result.
 Name the job and its trigger once written, so the wiring is a claim
 someone can grep against (`process.wiring-checks-run-the-resolution`), and
 prove it with a real run before trusting it, not a syntax check alone.

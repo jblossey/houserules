@@ -44,7 +44,9 @@
 //! `baselines` map (`baseline::classify`'s own doc has the decision rule
 //! every one of them shares) and its `overrides` list (a hand-edited JSON
 //! array of paths and knowledge-entry ids the adopter has declared their
-//! own, documented for adopters at `docs/README.md`):
+//! own, documented for adopters at `docs/README.md`; `check-knowledge`'s
+//! kit-owned citation lint reads the same list through `kit_citation_scope`
+//! and checks no kit-owned path the list names):
 //!
 //! - Every `KIT_OWNED` file not in `overrides` gets overwritten and
 //!   restamped, same as an unconditional sync would, when its content is:
@@ -136,11 +138,13 @@
 //!
 //! # Failure paths (`houserules.crash-paths-are-named`)
 //!
-//! `init` prints one named stderr line and exits 2 for: a missing `.git`
-//! in the target, a malformed `--id-prefix`, and a pre-existing
-//! `.houserules.json` that is not valid JSON, is valid JSON but not an
-//! object, carries an invalid `idPrefix`, or carries an empty/non-string
-//! `version`. An invalid-JSON marker's inner message text is
+//! `init` prints one named stderr line and exits 2 for: a target that is
+//! not a git repository's top level (`ensure_repository_top_level`: a
+//! target without `.git` whose ancestor holds one names that ancestor, any
+//! other target names `git init`), a malformed `--id-prefix`,
+//! and a pre-existing `.houserules.json` that is not valid JSON, is valid
+//! JSON but not an object, carries an invalid `idPrefix`, or carries an
+//! empty/non-string `version`. An invalid-JSON marker's inner message text is
 //! `serde_json`'s own (`read_json_object`'s own doc), the same shape
 //! `rules::deliverable::read_deliverable_value` carries for the same
 //! reason. A target directory that already holds unrelated files, or a
@@ -184,9 +188,11 @@ use crate::node_path::resolve_like_node;
 #[folder = "../../template/"]
 struct Payload;
 
-/// Machinery files houserules owns: `init` writes them and `update`
-/// overwrites them. `tests/install.rs`'s own copy pins this list, so the
-/// two cannot silently drift apart.
+/// Machinery files houserules owns: `init` writes them, and `update`
+/// overwrites each one the adopter has not changed (this module's own doc,
+/// "`update` and the ownership baseline", has the keep and override cases).
+/// `tests/install.rs`'s own copy pins this list, so the two cannot silently
+/// drift apart.
 const KIT_OWNED: &[&str] = &[
     "tools/claude-session-start.sh",
     ".githooks/commit-msg",
@@ -494,6 +500,46 @@ fn read_overrides(marker: &Map<String, Value>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// What `check-knowledge`'s kit-owned citation lint needs from this module
+/// (`rules::KitScope`'s own doc has the contract): the `KIT_OWNED` paths
+/// minus the ones `is_overridden` accepts for the stamp's `overrides` -- the
+/// same test `update` applies, so one function decides which kit-owned files
+/// are the adopter's own --, the topic names `knowledge_topic_files` seeds,
+/// and the id of every entry the embedded payload seeds in those files. An
+/// absent stamp reads as no overrides; a present stamp that `read_marker`
+/// rejects is `read_marker`'s own named error.
+pub(crate) fn kit_citation_scope(root: &Path) -> Result<crate::rules::KitScope, String> {
+    let marker = read_marker(&root.join(MARKER_PATH), "WI")?;
+    let overrides = read_overrides(&marker);
+    let mut seeded_ids = Vec::new();
+    for topic_file in knowledge_topic_files() {
+        let payload: Value = serde_json::from_slice(&payload_content(topic_file, "WI")?)
+            .expect("the embedded topic file is valid JSON");
+        seeded_ids.extend(
+            entries_array(&payload)
+                .iter()
+                .filter_map(|entry| entry.get("id").and_then(Value::as_str))
+                .map(str::to_string),
+        );
+    }
+    Ok(crate::rules::KitScope {
+        owned_files: KIT_OWNED
+            .iter()
+            .filter(|file| !is_overridden(&overrides, file))
+            .map(|file| file.to_string())
+            .collect(),
+        seeded_topics: knowledge_topic_files()
+            .into_iter()
+            .filter_map(|file| {
+                file.strip_prefix("knowledge/")?
+                    .strip_suffix(".json")
+                    .map(str::to_string)
+            })
+            .collect(),
+        seeded_ids,
+    })
+}
+
 /// Reads `marker`'s `baselines` field: a JSON object mapping each
 /// `KIT_OWNED` path or knowledge-entry id to the hex SHA-256 the kit last
 /// wrote for it (`baseline::hash`). `read_marker` has already rejected a
@@ -751,6 +797,60 @@ fn origin_is_github_hosted(target: &Path) -> bool {
         .contains("github.com")
 }
 
+/// The nearest directory above `dir`, nearest first, that holds a `.git`
+/// entry: a directory in a repository's top level, or the file in a linked
+/// worktree's. `dir` itself is not a candidate. The ancestors are those of
+/// the path as passed, so the result is a prefix of `dir`; the caller
+/// decides which spelling of the path is walked. No git setting (`GIT_DIR`,
+/// `GIT_WORK_TREE`, `core.worktree`) changes which directory it names.
+fn nearest_ancestor_holding_git(dir: &Path) -> Option<&Path> {
+    dir.ancestors()
+        .skip(1)
+        .find(|ancestor| ancestor.join(".git").exists())
+}
+
+/// Checks that `target` is a git repository's top level, where `seed` and
+/// `update` install: it holds a `.git` entry, reached through any symlink
+/// in its path. `seed` and `update` pass an absolute `target`:
+/// `node_path::resolve_like_node` has already resolved `--dir`, collapsing
+/// `..` and keeping symlinks. A `target` without a `.git` entry is refused
+/// in one of two ways, decided by the same filesystem evidence:
+/// - an existing directory whose resolved path has an ancestor that holds
+///   a `.git` entry: the nesting line. It prints the resolved target (every
+///   symlink followed, so a spelling that may differ from the one the user
+///   typed) and the resolved ancestor, which is a prefix of it, so the
+///   named directory lies above the printed target by construction. A
+///   symlink into a repository subdirectory is inside the repository by the
+///   same rule;
+/// - any other target, one outside any repository, one that does not exist
+///   yet, and one that cannot be resolved included: the `git init` advice,
+///   which prints `target` as passed.
+fn ensure_repository_top_level(target: &Path) -> Result<(), String> {
+    if target.join(".git").exists() {
+        return Ok(());
+    }
+    let resolved = target
+        .canonicalize()
+        .and_then(|canonical| resolve_like_node(&canonical))
+        .ok()
+        .filter(|resolved| resolved.is_dir());
+    let nesting = resolved.as_deref().and_then(|resolved| {
+        nearest_ancestor_holding_git(resolved).map(|top_level| (resolved, top_level))
+    });
+    match nesting {
+        Some((resolved, top_level)) => Err(format!(
+            "{} is inside the git repository at {}, not its top level; \
+             houserules installs at the repository root",
+            resolved.display(),
+            top_level.display()
+        )),
+        None => Err(format!(
+            "{} is not a git repository (run git init first)",
+            target.display()
+        )),
+    }
+}
+
 /// Deletes each `retired` path found under `target`, returning the ones
 /// actually removed, in call order -- `update`'s own report prints one
 /// `removed <path>` line per entry this returns (this module's own doc,
@@ -858,12 +958,7 @@ fn merge_settings(path: &Path, prefix: &str) -> Result<bool, String> {
 /// over an install that already committed to a prefix cannot backfill a
 /// `PREFIXED` file under a different one.
 fn seed(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
-    if !target.join(".git").exists() {
-        return Err(format!(
-            "{} is not a git repository (run git init first)",
-            target.display()
-        ));
-    }
+    ensure_repository_top_level(target)?;
     let prefix = id_prefix.unwrap_or_else(|| "WI".to_string());
     if !is_id_prefix(&prefix) {
         return Err(format!("id-prefix {ID_PREFIX_HINT}"));
@@ -1005,12 +1100,7 @@ pub(crate) fn cmd_init(dir: Option<PathBuf>, id_prefix: Option<String>) -> ExitC
 /// resolution (`seed`'s own doc explains why the marker's stamped prefix
 /// wins over the flag).
 fn update(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
-    if !target.join(".git").exists() {
-        return Err(format!(
-            "{} is not a git repository (run git init first)",
-            target.display()
-        ));
-    }
+    ensure_repository_top_level(target)?;
     let prefix = id_prefix.unwrap_or_else(|| "WI".to_string());
     if !is_id_prefix(&prefix) {
         return Err(format!("id-prefix {ID_PREFIX_HINT}"));
@@ -1330,5 +1420,246 @@ mod tests {
     fn origin_is_github_hosted_false_for_a_non_github_origin() {
         let dir = git_repo_with_origin("https://gitlab.com/jblossey/houserules.git");
         assert!(!origin_is_github_hosted(dir.path()));
+    }
+
+    #[test]
+    fn nearest_ancestor_holding_git_names_the_nearest_directory_with_a_git_directory() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join("a").join("b");
+        fs::create_dir_all(&target).expect("create target");
+        fs::create_dir(dir.path().join(".git")).expect("create .git directory");
+        assert_eq!(nearest_ancestor_holding_git(&target), Some(dir.path()));
+    }
+
+    #[test]
+    fn nearest_ancestor_holding_git_prefers_the_nearest_of_two_and_reads_a_git_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let middle = dir.path().join("a");
+        let target = middle.join("b");
+        fs::create_dir_all(&target).expect("create target");
+        fs::create_dir(dir.path().join(".git")).expect("create .git directory");
+        fs::write(middle.join(".git"), "gitdir: elsewhere\n").expect("write .git file");
+        assert_eq!(
+            nearest_ancestor_holding_git(&target),
+            Some(middle.as_path())
+        );
+    }
+
+    #[test]
+    fn nearest_ancestor_holding_git_never_names_the_target_itself() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join("a");
+        fs::create_dir_all(target.join(".git")).expect("create target with .git");
+        assert_eq!(nearest_ancestor_holding_git(&target), None);
+    }
+
+    #[test]
+    fn nearest_ancestor_holding_git_is_none_when_no_ancestor_holds_one() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join("a").join("b");
+        fs::create_dir_all(&target).expect("create target");
+        assert_eq!(nearest_ancestor_holding_git(&target), None);
+    }
+
+    /// This checkout's `template/` directory, resolved at compile time from
+    /// the crate's manifest directory.
+    fn template_dir() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../template")
+    }
+
+    /// The scope lists the `KIT_OWNED` paths as they are, one seeded topic
+    /// for each topic file `template/knowledge/` ships, and the id of every
+    /// entry in those files. The expected topics and ids come from that
+    /// directory, not from `SEED_ONCE` or the embedded payload, so a topic
+    /// file or entry added to one side only fails here.
+    #[test]
+    fn kit_citation_scope_carries_the_kit_owned_paths_and_the_seeded_topics_and_ids() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let scope = kit_citation_scope(dir.path()).expect("an absent stamp is no error");
+        assert_eq!(scope.owned_files, KIT_OWNED);
+        let mut shipped: Vec<String> = fs::read_dir(template_dir().join("knowledge"))
+            .expect("read template/knowledge")
+            .filter_map(|entry| entry.ok())
+            .filter_map(|entry| entry.file_name().into_string().ok())
+            .filter(|name| name != "schema.json" && name != "areas.json")
+            .filter_map(|name| name.strip_suffix(".json").map(str::to_string))
+            .collect();
+        shipped.sort();
+        let mut seeded = scope.seeded_topics.clone();
+        seeded.sort();
+        assert_eq!(seeded, shipped);
+        let mut shipped_ids: Vec<String> = shipped
+            .iter()
+            .flat_map(|topic| {
+                let text =
+                    fs::read_to_string(template_dir().join(format!("knowledge/{topic}.json")))
+                        .expect("read a template topic file");
+                let value: Value =
+                    serde_json::from_str(&text).expect("parse a template topic file");
+                entries_array(&value)
+                    .iter()
+                    .filter_map(|entry| entry.get("id").and_then(Value::as_str).map(str::to_string))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        shipped_ids.sort();
+        let mut seeded_ids = scope.seeded_ids.clone();
+        seeded_ids.sort();
+        assert!(!shipped_ids.is_empty(), "the template ships no entry");
+        assert_eq!(seeded_ids, shipped_ids);
+    }
+
+    /// The scope leaves out each kit-owned path the stamp's `overrides` lists,
+    /// by the same `is_overridden` test `update` applies. An id or a topic
+    /// file path in `overrides` removes no kit-owned file.
+    #[test]
+    fn kit_citation_scope_leaves_out_the_kit_owned_files_the_stamp_overrides() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::write(
+            dir.path().join(MARKER_PATH),
+            r#"{"idPrefix": "WI", "overrides": [".claude/agents/branch-reviewer.md", "process.tdd", "knowledge/process.json"]}"#,
+        )
+        .expect("write the stamp");
+        let scope = kit_citation_scope(dir.path()).expect("a valid stamp");
+        let expected: Vec<String> = KIT_OWNED
+            .iter()
+            .filter(|file| **file != ".claude/agents/branch-reviewer.md")
+            .map(|file| file.to_string())
+            .collect();
+        assert_eq!(scope.owned_files, expected);
+    }
+
+    /// A stamp that `read_marker` rejects is its own named error, never an
+    /// empty override list.
+    #[test]
+    fn kit_citation_scope_names_a_malformed_stamp() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let marker = dir.path().join(MARKER_PATH);
+        fs::write(&marker, r#"{"idPrefix": "WI", "overrides": "process.tdd"}"#)
+            .expect("write the stamp");
+        let Err(error) = kit_citation_scope(dir.path()) else {
+            panic!("a stamp with a string `overrides` is an error");
+        };
+        assert_eq!(
+            error,
+            format!(
+                "{}: overrides must be an array of strings",
+                marker.display()
+            )
+        );
+    }
+
+    /// The knowledge base, the scope, and the citation scan of `template/`,
+    /// the shipped state. Fails when a kit-owned file is absent from
+    /// `template/`, because the lint would skip it without a line.
+    fn template_citations() -> (
+        crate::rules::Base,
+        crate::rules::KitScope,
+        crate::rules::Scan,
+    ) {
+        let template = template_dir();
+        let base = crate::rules::load_base(&template).expect("template/ loads as a knowledge base");
+        let scope = kit_citation_scope(&template).expect("template/ carries no stamp");
+        for file in &scope.owned_files {
+            assert!(
+                template.join(file).is_file(),
+                "{file} is kit-owned but absent from template/, so the lint would skip it"
+            );
+        }
+        let scan = crate::rules::scan_kit_citations(&base, &scope);
+        (base, scope, scan)
+    }
+
+    /// The kit-side proof: every id a kit-owned file under `template/`
+    /// cites resolves in `template/knowledge/`. Both sides come from the
+    /// code: the kit-owned list from `kit_citation_scope`, the ids from the
+    /// lint's own extractor. Two controls keep the pass from being vacuous:
+    /// the extractor sees a citation the kit is known to make, and the lint
+    /// reports that citation once its entry leaves the base. The test prints
+    /// the count of distinct ids it checked (visible with `--nocapture`).
+    #[test]
+    fn shipped_kit_owned_files_cite_only_shipped_ids() {
+        let (base, scope, scan) = template_citations();
+        let distinct: std::collections::BTreeSet<&str> = scan
+            .cited
+            .iter()
+            .map(|citation| citation.id.as_str())
+            .collect();
+        assert!(
+            distinct.contains("process.evals-rerun"),
+            "the extractor missed the citation of process.evals-rerun in branch-reviewer.md"
+        );
+        assert_eq!(
+            crate::rules::kit_citation_findings(&base, &scope),
+            Vec::<String>::new()
+        );
+        // The control: with the entry removed from the base, the lint names
+        // each file that cites it. The empty result above therefore comes
+        // from resolving every id, not from a lint that reports nothing.
+        let mut without_it = base;
+        without_it.entries.remove("process.evals-rerun");
+        let findings = crate::rules::kit_citation_findings(&without_it, &scope);
+        assert_eq!(
+            findings.len(),
+            2,
+            "expected one finding per citing file: {findings:?}"
+        );
+        assert!(
+            findings
+                .iter()
+                .all(|finding| finding.contains("cites \"process.evals-rerun\"")),
+            "unexpected findings: {findings:?}"
+        );
+        eprintln!(
+            "shipped_kit_owned_files_cite_only_shipped_ids: {} distinct ids in {} files",
+            distinct.len(),
+            scan.cited
+                .iter()
+                .map(|citation| citation.file.as_str())
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+        );
+    }
+
+    /// The `migrating-knowledge` skill tells an adopter to search two
+    /// directories for an id before deleting its entry. Every kit-owned file
+    /// that cites an id must sit under one of them, or the sentence misses a
+    /// citing file. The directories come from the skill's own text. Each
+    /// must hold a citing file, or the skill names a directory the kit does
+    /// not cite from.
+    #[test]
+    fn the_migrating_skill_search_covers_every_kit_owned_file_that_cites_an_id() {
+        let skill =
+            fs::read_to_string(template_dir().join(".claude/skills/migrating-knowledge/SKILL.md"))
+                .expect("read the migrating-knowledge skill");
+        let search = skill
+            .split("`grep -rn '<id>' ")
+            .nth(1)
+            .and_then(|rest| rest.split('`').next())
+            .expect("the skill names its grep before deleting a seeded entry");
+        let directories: Vec<&str> = search.split_whitespace().collect();
+        assert!(
+            !directories.is_empty(),
+            "the skill's grep names no directory"
+        );
+        let (_, _, scan) = template_citations();
+        for citation in &scan.cited {
+            assert!(
+                directories
+                    .iter()
+                    .any(|dir| citation.file.starts_with(&format!("{dir}/"))),
+                "{} cites {} outside the directories the skill searches: {directories:?}",
+                citation.file,
+                citation.id
+            );
+        }
+        for dir in &directories {
+            assert!(
+                scan.cited
+                    .iter()
+                    .any(|citation| citation.file.starts_with(&format!("{dir}/"))),
+                "no kit-owned file under {dir} cites an id"
+            );
+        }
     }
 }

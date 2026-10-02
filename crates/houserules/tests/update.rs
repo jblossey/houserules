@@ -1719,6 +1719,113 @@ fn update_into_a_missing_git_repo_is_a_named_usage_error_exit_2() {
     );
 }
 
+/// Asserts `stderr` is the subdirectory refusal for `target`, naming
+/// `top_level` as the directory above it that holds `.git` -- `install.rs`'s
+/// own copy of `assert_subdirectory_refusal`, whose doc has the account of
+/// what form of the paths the line prints. This file keeps its own copy
+/// because `mod common;` would make that module's other helpers warn as
+/// dead code in this binary (`check_commit.rs`'s own `houserules` helper
+/// doc has the account).
+fn assert_subdirectory_refusal(stderr: &str, target: &Path, top_level: &Path) {
+    let (printed_target, printed_top_level) = stderr
+        .strip_suffix(", not its top level; houserules installs at the repository root\n")
+        .and_then(|named_paths| named_paths.split_once(" is inside the git repository at "))
+        .unwrap_or_else(|| panic!("not the subdirectory refusal: {stderr:?}"));
+    assert_eq!(
+        Path::new(printed_target)
+            .canonicalize()
+            .expect("canonicalize the printed target"),
+        target.canonicalize().expect("canonicalize target"),
+        "the line names the target"
+    );
+    assert!(
+        Path::new(printed_target).starts_with(printed_top_level)
+            && printed_target != printed_top_level,
+        "the target lies beneath the printed top level: {stderr:?}"
+    );
+    assert_eq!(
+        Path::new(printed_top_level)
+            .canonicalize()
+            .expect("canonicalize the printed top level"),
+        top_level.canonicalize().expect("canonicalize top level"),
+        "the line names the directory that holds .git"
+    );
+}
+
+/// A target inside a repository but not at its top level gets the same
+/// refusal `init` gives, naming the enclosing top level.
+#[test]
+fn update_refuses_a_subdirectory_naming_the_top_level() {
+    let repo = seeded_repo();
+    let sub = repo.path().join("sub");
+    fs::create_dir(&sub).expect("create subdirectory");
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(&sub)
+        .output()
+        .expect("run update");
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    assert_subdirectory_refusal(
+        &String::from_utf8(output.stderr).expect("utf8 stderr"),
+        &sub,
+        repo.path(),
+    );
+    // Nothing was written into the rejected target.
+    assert_eq!(fs::read_dir(&sub).unwrap().count(), 0);
+}
+
+/// With `GIT_WORK_TREE` at a directory that does not contain the target,
+/// git answers with that directory as the top level (`GIT_WORK_TREE=<other>
+/// git rev-parse --show-toplevel` run in `<repo>/sub` prints `<other>`); the
+/// refusal still names the directory above the target that holds `.git`.
+#[test]
+fn update_names_the_ancestor_that_holds_git_under_a_foreign_git_work_tree() {
+    let repo = seeded_repo();
+    let sub = repo.path().join("sub");
+    fs::create_dir(&sub).expect("create subdirectory");
+    let foreign = tempfile::tempdir().expect("tempdir");
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(&sub)
+        .env("GIT_WORK_TREE", foreign.path())
+        .output()
+        .expect("run update");
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    assert_subdirectory_refusal(
+        &String::from_utf8(output.stderr).expect("utf8 stderr"),
+        &sub,
+        repo.path(),
+    );
+    // Nothing was written into the rejected target.
+    assert_eq!(fs::read_dir(&sub).unwrap().count(), 0);
+}
+
+/// A symlink to a repository subdirectory is inside the repository; the
+/// refusal names the repository root, as `init`'s does.
+#[cfg(unix)]
+#[test]
+fn update_names_the_repository_for_a_symlinked_subdirectory_target() {
+    let repo = seeded_repo();
+    let sub = repo.path().join("sub");
+    fs::create_dir(&sub).expect("create subdirectory");
+    let links = tempfile::tempdir().expect("tempdir");
+    let link = links.path().join("link");
+    std::os::unix::fs::symlink(&sub, &link).expect("create symlink");
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(&link)
+        .output()
+        .expect("run update");
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert_subdirectory_refusal(&stderr, &link, repo.path());
+    // Nothing was written into the rejected target.
+    assert_eq!(fs::read_dir(&sub).unwrap().count(), 0);
+}
+
 #[test]
 fn update_rejects_a_malformed_id_prefix_flag_exit_2() {
     let dir = seeded_repo();

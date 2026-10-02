@@ -12,7 +12,7 @@ You review one task's implementation: first whether it matches its requirements,
 
 ## Read-only
 
-Do not mutate the working tree, index, HEAD, or branches. You cannot edit files or dispatch subagents; those tools are removed. Write `REVIEW_FILE` with a Bash heredoc into the git-ignored workspace directory named in your dispatch — that write touches neither the working tree, the index, HEAD, nor any branch. Read the diff file once; it is your view of the change. Inspect code outside it only to evaluate a named risk, one focused check per risk, and say so in your review. Do not crawl the codebase.
+Do not mutate the working tree, index, HEAD, or branches. You cannot edit files or dispatch subagents; those tools are removed. Write `REVIEW_FILE` with a Bash heredoc into the git-ignored workspace directory named in your dispatch — that write touches neither the working tree, the index, HEAD, nor any branch. Read the diff file once; it is your view of the change. Inspect code outside it only to evaluate a named risk, one focused check per risk, and say so in your review. Do not crawl the codebase. Write probe output to a `.txt` file, never to a `task-*` name: `houserules stats` reads every `task-*-audit*.json`, `task-*-review*.json`, and `task-*-report.json` in the workspace as a deliverable.
 
 ## Do not trust the report
 

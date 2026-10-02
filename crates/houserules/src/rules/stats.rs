@@ -44,6 +44,21 @@ fn tasks_json(tasks: &BTreeSet<String>) -> Value {
     Value::Array(tasks.iter().cloned().map(Value::String).collect())
 }
 
+/// What `stats` tells a person whose workspace holds a file it cannot
+/// read as a deliverable. `stats` aborts on such a file
+/// (`quality.gates-derive-their-scope`); this text names the way out.
+const UNREADABLE_DELIVERABLE_REMEDY: &str = "stats reads every task-*-audit*.json, \
+    task-*-review*.json, and task-*-report.json in the workspace as a deliverable; \
+    rename the file or repair it";
+
+/// Reads one workspace deliverable with `read_deliverable_value`, then
+/// appends `UNREADABLE_DELIVERABLE_REMEDY` to a failure. The shared reader
+/// keeps its own text: `validate` and `audit` read through it too.
+fn read_workspace_deliverable(path: &Path) -> Result<Value, String> {
+    read_deliverable_value(path)
+        .map_err(|error| format!("{error}. {UNREADABLE_DELIVERABLE_REMEDY}"))
+}
+
 /// Aggregates rule violations and unused injected ids across a
 /// workspace's JSON deliverables: `task-*-audit*.json` for injected ids
 /// and deterministic failures, `task-*-review*.json` for judged
@@ -54,7 +69,7 @@ pub(super) fn stats(dir: &Path) -> Result<Value, String> {
     let mut injected: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
 
     for name in &files.audits {
-        let data = read_deliverable_value(&dir.join(name))?;
+        let data = read_workspace_deliverable(&dir.join(name))?;
         let task = stats_task(name).to_string();
         let ids = array_field(&data, "ids").map_err(|error| format!("{name}: {error}"))?;
         for id in ids.into_iter().filter_map(Value::as_str) {
@@ -70,7 +85,7 @@ pub(super) fn stats(dir: &Path) -> Result<Value, String> {
         }
     }
     for name in &files.reviews {
-        let data = read_deliverable_value(&dir.join(name))?;
+        let data = read_workspace_deliverable(&dir.join(name))?;
         let task = stats_task(name).to_string();
         let rule_adherence =
             array_field(&data, "rule_adherence").map_err(|error| format!("{name}: {error}"))?;
@@ -85,7 +100,7 @@ pub(super) fn stats(dir: &Path) -> Result<Value, String> {
     }
     let mut cited: HashSet<String> = HashSet::new();
     for name in &files.reports {
-        let data = read_deliverable_value(&dir.join(name))?;
+        let data = read_workspace_deliverable(&dir.join(name))?;
         let knowledge_used =
             array_field(&data, "knowledge_used").map_err(|error| format!("{name}: {error}"))?;
         for id in knowledge_used.into_iter().filter_map(Value::as_str) {
@@ -278,6 +293,43 @@ mod tests {
         fs::write(dir.path().join("task-3-audit.json"), "{\"ids\": [").unwrap();
         let error = stats(dir.path()).unwrap_err();
         assert!(error.contains("task-3-audit.json"), "{error}");
+    }
+
+    /// The remedy `stats` appends to an unreadable deliverable's error,
+    /// spelled out here so a change to the contract text fails a test.
+    const REMEDY: &str = "stats reads every task-*-audit*.json, task-*-review*.json, \
+        and task-*-report.json in the workspace as a deliverable; rename the file or repair it";
+
+    /// Asserts that `stats` aborts on `name` holding non-JSON text with
+    /// the shared reader's own first part, then the remedy.
+    fn assert_names_the_remedy_for_a_non_json(name: &str) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join(name);
+        fs::write(&path, "not json").unwrap();
+        let error = stats(dir.path()).unwrap_err();
+        assert!(
+            error.starts_with(&format!("{}: invalid JSON (", path.display())),
+            "{error}"
+        );
+        assert!(error.ends_with(&format!(". {REMEDY}")), "{error}");
+    }
+
+    /// A non-JSON `task-*-audit*.json` aborts `stats` and names the remedy.
+    #[test]
+    fn stats_names_the_remedy_for_a_non_json_audit() {
+        assert_names_the_remedy_for_a_non_json("task-1-audit.json");
+    }
+
+    /// A non-JSON `task-*-review*.json` aborts `stats` and names the remedy.
+    #[test]
+    fn stats_names_the_remedy_for_a_non_json_review() {
+        assert_names_the_remedy_for_a_non_json("task-1-review.json");
+    }
+
+    /// A non-JSON `task-*-report.json` aborts `stats` and names the remedy.
+    #[test]
+    fn stats_names_the_remedy_for_a_non_json_report() {
+        assert_names_the_remedy_for_a_non_json("task-1-report.json");
     }
 
     /// A present-but-wrongly-typed `rules` field is a named finding, not

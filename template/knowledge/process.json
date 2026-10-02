@@ -287,7 +287,7 @@
       "body": [
         "Every deliverable an agent writes is structured data in the batch workspace: `task-<N>-report.json`, `task-<N>-review.json`, `task-<N>-review-r<R>.json`, `branch-review.json`. The `kind` field names the definition.",
         "Write the file, run `houserules validate <file>`, fix every error, then audit. A deliverable that does not validate is incomplete; the controller re-dispatches.",
-        "The implementer's `self_audit` starts as `null` and holds the audit's `summary` and deterministic rows after the audit; the check below fails until it does. `self_audit` always covers the whole task (`BASE..HEAD` at report time); a fix round's audit over the fix diff goes into that `fix_rounds` entry's `tests`.",
+        "The implementer's `self_audit` starts as `null` and holds the audit's `summary` and deterministic rows after the audit. A single-report audit (`--report`) passes the check below while the field is `null`, the draft state; a `--workspace` audit fails it, and `houserules validate` rejects a `null` `self_audit` at status `DONE` or `DONE_WITH_CONCERNS`. `self_audit` always covers the whole task (`BASE..HEAD` at report time); a fix round's audit over the fix diff goes into that `fix_rounds` entry's `tests`.",
         "`houserules stats` and the branch retrospective read these files; prose is invisible to them."
       ],
       "tags": [

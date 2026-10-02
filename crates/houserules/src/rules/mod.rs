@@ -7,7 +7,8 @@
 //! `audit`, `validate`, `stats`, and the commands that read the
 //! generated files: the glob union matcher (`glob`), the knowledge
 //! loading `render` needs (`model`), `render_all`/`render` (`render`),
-//! `check_base` and `check-knowledge` (`check`), and `validate`/`stats`
+//! `check_base` and `check-knowledge` (`check`), the kit-owned citation
+//! lint `check-knowledge` also runs (`kit_citations`), and `validate`/`stats`
 //! (`validate_deliverable`, `stats`) on tolerant `serde_json::Value`
 //! reads (see `deliverable.rs`'s and `validate_deliverable.rs`'s own
 //! module docs for the data-layer reasoning). `check_shape::CheckDef`
@@ -61,6 +62,7 @@ mod check_shape;
 mod deliverable;
 mod durable_sha;
 mod glob;
+mod kit_citations;
 mod model;
 mod read;
 mod render;
@@ -70,6 +72,9 @@ mod validate_deliverable;
 pub(crate) use audit::cmd_audit;
 pub(crate) use check::{cmd_check_knowledge, validate};
 pub(crate) use check_commit::cmd_check_commit;
+pub(crate) use kit_citations::KitScope;
+#[cfg(test)]
+pub(crate) use kit_citations::{Scan, kit_citation_findings, scan_kit_citations};
 pub(crate) use model::{Base, load_base};
 pub(crate) use read::{IndexOpts, cmd_for, cmd_index, cmd_standing, cmd_topics, get_entries};
 pub(crate) use render::{cmd_render, render_and_report, repo_root_from_cwd};

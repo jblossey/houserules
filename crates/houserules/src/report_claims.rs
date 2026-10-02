@@ -196,9 +196,9 @@
 //!   semicolon-separated multi-line citation (`file.rs:23,24,41`, a real
 //!   shape in this repository's own review prose) is read for `:23` alone
 //!   -- the remaining numbers in the list are not checked. Neither is a
-//!   range's ordering (`path:50-10` is read as-is; NNN and MMM are each
-//!   checked against the file's line count independently, never against
-//!   each other).
+//!   range's ordering (a reversed range such as `path:3-2` is read as-is
+//!   and passes while both numbers fit the file; NNN and MMM are each
+//!   checked against the file's line count, never against each other).
 //! - `resolve_citation_path`'s bare-basename fallback refuses to guess
 //!   when more than one tracked file shares a basename (this repository's
 //!   own tree has several: `install.rs`, `check_commit.rs`, `model.rs`,
@@ -229,6 +229,14 @@
 //!   a dirty working tree can shift what "the file's line count" means
 //!   between two runs of this tool. It also does not flag a citation of
 //!   line `0`, since `0` never exceeds a real file's line count.
+//! - `check_citation_lines` compares a cited line number with the file's
+//!   line count and never compares the text of the line with anything. A
+//!   citation whose number still fits the file after an edit moved the code
+//!   is not caught: the only findings are a file that does not read, and a
+//!   cited line number, or either number of a range, past the end of the
+//!   file. Backlog item HR-141 holds the measured reason that a rule
+//!   matching the code a sentence quotes against the cited line is not
+//!   wired.
 //! - `check_narrative_number_claims` (HR-110) implements only the number
 //!   class HR-110's item body names ("N passed", "N files"), not the
 //!   locative class ("the X live in Y") the same item also describes:
@@ -271,6 +279,23 @@
 //!   spelling (a relative path shortened, a renamed file cited by its
 //!   old name) reads as vacuous even when the underlying sweep really did
 //!   cover it.
+//! - `natural_red::check_natural_red_labels` (HR-142) compares a `natural`
+//!   RED capture's modification time with the newest commit the report
+//!   itself lists (`commits[]` plus `fix_rounds[].commits[]`), so a RED
+//!   captured between two commits of one task is not caught. It compares
+//!   whole seconds, because a commit time has no finer unit: a capture
+//!   written in the newest commit's own second is not newer either. It
+//!   reads only a `red.command` ending in a plain `> <file> 2>&1`; a
+//!   command with no redirect, an append (`>>`), or a redirect followed by
+//!   more command is silent, and so is a RED captured another way.
+//! - A modification time holds only in the workspace that made the
+//!   capture. `natural_red::check_natural_red_labels` therefore skips a
+//!   capture file git tracks (its time is the checkout's), and proves
+//!   nothing after a copy: a copy that does not preserve times reads as a
+//!   newer capture, so the check can flag a genuine `natural` entry there.
+//!   It recognizes a tracked file by its root-relative path, compared
+//!   lexically, so a spelling with a `..` segment, or one through a
+//!   symlinked directory, reads as untracked and is compared.
 //!
 //! Further constraints (this tool carries no frozen-corpus parity
 //! contract, unlike the flat command surface, so these are simply its own
@@ -286,6 +311,8 @@
 //!   message, exit 2. A `git` failure (not a repository, `git` missing)
 //!   is likewise a named error rather than an uncaught crash
 //!   (`houserules.crash-paths-are-named`).
+
+mod natural_red;
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
@@ -416,6 +443,37 @@ fn read_utf8_lossy(path: &Path) -> std::io::Result<String> {
     std::fs::read(path).map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
 }
 
+/// Compiles the one pattern this module reads a capture redirect with: a
+/// command ending in `> <path> 2>&1` (group 1 is the path). Every check
+/// that names a capture file takes it from this pattern through
+/// `redirect_capture`, so no two checks can disagree on what a capture
+/// redirect is.
+fn redirect_capture_pattern() -> Regex {
+    Regex::new(r">\s*(\S+)\s+2>&1\s*$").expect("valid redirect-capture pattern")
+}
+
+/// A command's trailing `> <path> 2>&1` redirect, as `redirect_capture`
+/// reads it.
+struct RedirectCapture<'a> {
+    /// The capture path exactly as the command spells it.
+    path: &'a str,
+    /// `true` for an append (`>>`, `2>>`): the pattern also matches
+    /// `>> <path> 2>&1`, from its second `>`, so the file holds the output
+    /// of every earlier run too. `natural_red`'s
+    /// `the_shared_redirect_parser_marks_an_append` pins that match.
+    appends: bool,
+}
+
+/// The capture redirect `command` ends in, or `None` when it does not end
+/// in a `> <path> 2>&1` redirect. `pattern` is
+/// `redirect_capture_pattern()`'s result, compiled once by the caller.
+fn redirect_capture<'a>(pattern: &Regex, command: &'a str) -> Option<RedirectCapture<'a>> {
+    let found = pattern.find(command)?;
+    let path = &command[found.group(1)?];
+    let appends = command[..found.start()].ends_with('>');
+    Some(RedirectCapture { path, appends })
+}
+
 /// Checks every `collect_runs` entry whose `command` ends in a `> <path>
 /// 2>&1` redirect: `output` must be byte-identical to the named file's
 /// current content, resolved against `root`. A command that redirects to
@@ -423,15 +481,13 @@ fn read_utf8_lossy(path: &Path) -> std::io::Result<String> {
 /// most literal claim a `run` entry can make, so this check accepts no
 /// near-match, unlike the truncation-marker check below.
 fn check_redirected_captures(root: &Path, runs: &[(String, Run)], errors: &mut Vec<String>) {
-    let redirect = Regex::new(r">\s*(\S+)\s+2>&1\s*$").expect("valid redirect-capture pattern");
+    let redirect = redirect_capture_pattern();
     for (label, run) in runs {
-        let Some(found) = redirect.find(&run.command) else {
+        let Some(RedirectCapture { path: rel_path, .. }) =
+            redirect_capture(&redirect, &run.command)
+        else {
             continue;
         };
-        let Some(group) = found.group(1) else {
-            continue;
-        };
-        let rel_path = &run.command[group];
         let target = resolve_against(root, rel_path);
         match read_utf8_lossy(&target) {
             Ok(content) => {
@@ -581,18 +637,26 @@ fn is_ancestor(root: &Path, ancestor: &str, descendant: &str) -> bool {
         .is_ok_and(|status| status.success())
 }
 
-/// The one sha among `shas` that every other sha is an ancestor of, or
-/// `None` when no such total order exists (an empty list, or shas from
-/// unrelated history). `shas` are expected to form one straight line --
+/// The one sha among `shas` that every other sha is an ancestor of (a sha
+/// equal to the candidate counts, so duplicates and a single sha qualify),
+/// or `None` when no such sha exists: an empty list, shas from unrelated
+/// or divergent history, or two or more distinct shas of which one git
+/// cannot resolve -- `is_ancestor` returns `false` for every pairing that
+/// includes it, so no candidate can satisfy its own `all()` check. That
+/// last `None` is indistinguishable from the divergent-history one. The
+/// result is not resolved here: a single sha is returned as it stands,
+/// resolvable or not. `shas` are expected to form one straight line --
 /// this task's own commit-by-commit history -- so this is the list's tip,
 /// found by testing each candidate against every other rather than
-/// assuming list order. Every element of `shas` must already resolve to a
-/// real commit: one that does not makes `is_ancestor` return `false` for
-/// every pairing it appears in, so no candidate can ever satisfy its own
-/// `all()` check and this returns `None` for the whole list -- the same
-/// `None` an honest unrelated-history list produces.
-/// `check_self_audit_head_is_current`, this function's only caller,
-/// resolves that ambiguity itself before calling in (see its own doc).
+/// assuming list order.
+///
+/// Two callers meet that contract differently.
+/// `check_self_audit_head_is_current` resolves every listed sha first and
+/// reports an unresolved one as its own error, so for it `None` means only
+/// "no single line". `natural_red::newest_listed_commit`, which
+/// `natural_red::check_labels_with` calls, passes the listed shas as they are,
+/// resolves the result itself, and treats `None` and an unresolvable result
+/// alike as silence (its `an_unresolvable_sha_is_silent` test).
 fn newest_listed_commit(root: &Path, shas: &[String]) -> Option<String> {
     for candidate in shas {
         if shas
@@ -1391,12 +1455,15 @@ fn ranges_close(a: &std::ops::Range<usize>, b: &std::ops::Range<usize>, window: 
 // ---- HR-107: a citation's line range must fit the file it names ----
 
 /// Every `path:NNN`/`path:NNN-MMM` citation `collect_narrative`'s four
-/// fields carry must name a file that reads clean under `root`, and NNN
-/// (and MMM, for a range) must not exceed that file's line count. A bare
-/// citation with no line suffix (`NarrativeField::citations` also carries
-/// those, for HR-110 and HR-111 below) is not this check's business. See
-/// the module doc's Limits for the comma-list and range-ordering shapes
-/// this does not chase.
+/// fields carry must name a file that reads clean under `root`, and every
+/// number the citation names -- NNN, and MMM for a range -- must not
+/// exceed that file's line count. A range is compared by its larger
+/// number, so a reversed range (`path:5-2`) is a finding when either
+/// number is past the end and passes when both fit (`path:3-2`): this
+/// check never judges a range's order. A bare citation with no line suffix
+/// (`NarrativeField::citations` also carries those, for HR-110 and HR-111
+/// below) is not this check's business. See the module doc's Limits for
+/// the comma-list shape this does not chase.
 fn check_citation_lines(
     root: &Path,
     narrative: &[NarrativeField],
@@ -1421,7 +1488,7 @@ fn check_citation_lines(
             match load_citation(root, citation, tracked_files) {
                 Ok(content) => {
                     let count = line_count(&content) as u64;
-                    let max_cited = citation.line_end.unwrap_or(line);
+                    let max_cited = citation.line_end.map_or(line, |end| end.max(line));
                     if max_cited > count {
                         seen.push(key);
                         errors.push(format!(
@@ -1661,6 +1728,11 @@ fn load_report(path: &Path) -> Result<Value, String> {
 /// marker, narrative claim, and command field this tool knows how to
 /// check matched its artifact and could paste-run. `Err` only when
 /// `report_path` could not be read as JSON.
+///
+/// Each call below has a phrase in the `check-report-claims` about in
+/// `main.rs`. The test `the_check_report_claims_about_names_every_check`
+/// there derives the calls from this body and pins the pairing, so a call
+/// added here fails that test until the about names it.
 fn check_report_claims(report_path: &Path, root: &Path) -> Result<Vec<String>, String> {
     let report = load_report(report_path)?;
     let runs = collect_runs(&report);
@@ -1670,6 +1742,7 @@ fn check_report_claims(report_path: &Path, root: &Path) -> Result<Vec<String>, S
     let mut errors = Vec::new();
     check_redirected_captures(root, &runs, &mut errors);
     check_truncation_markers(root, &runs, &mut errors);
+    natural_red::check_natural_red_labels(root, &report, &tracked_files, &mut errors);
     check_self_audit_head_is_current(root, &report, &mut errors);
     check_narrative_shas_resolve(root, &narrative, &mut errors);
     check_self_audit_narrative(&narrative, &report, &mut errors);
@@ -2511,6 +2584,42 @@ mod tests {
                     .to_string()
             ]
         );
+    }
+
+    /// Flags a `path:NNN-MMM` citation whose range start exceeds the named
+    /// file's line count, even though the range end is in bounds: every
+    /// number a citation names must fit the file, whatever the order.
+    #[test]
+    fn flags_a_citation_range_whose_start_exceeds_the_named_files_line_count() {
+        let (dir, head) = init_scratch_repo("check-report-claims-citation-range-start-overflow-");
+        std::fs::write(dir.path().join("cited.rs"), "one\ntwo\nthree\n").unwrap();
+        let mut report = base_report(&head);
+        report["self_review"] = json!(["Reviewed the fix at cited.rs:5-2."]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(
+            errors,
+            vec![
+                "self_review[0]: cites \"cited.rs:5-2\", but cited.rs has only 3 lines".to_string()
+            ]
+        );
+    }
+
+    /// Passes a `path:NNN-MMM` range whose two numbers both fit the named
+    /// file, reversed or not: this check compares each number with the
+    /// file's line count and never judges a range's order (the module
+    /// doc's Limits say so).
+    #[test]
+    fn passes_a_range_whose_numbers_both_fit_the_named_file_in_either_order() {
+        let (dir, head) = init_scratch_repo("check-report-claims-citation-range-order-");
+        std::fs::write(dir.path().join("cited.rs"), "one\ntwo\nthree\nfour\nfive\n").unwrap();
+        let mut report = base_report(&head);
+        report["self_review"] = json!(["Reviewed cited.rs:2-3 and then cited.rs:3-2."]);
+        let report_path = dir.path().join("report.json");
+        write_json(&report_path, &report);
+        let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
+        assert_eq!(errors, Vec::<String>::new());
     }
 
     /// Flags a citation naming a file that does not exist under `root`,

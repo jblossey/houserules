@@ -238,9 +238,9 @@ fn dir_resolves_the_root_independently_of_the_report_paths_own_location() {
 /// falls back to `repo_root_from_cwd`, fails the same way every other
 /// flat-surface command's own git-resolution leg does (`check_parity.rs`'s
 /// `check_knowledge_outside_a_git_repository_prints_a_named_error_and_exits_2`,
-/// mirrored here) -- one named, non-empty stderr line, exit 2. Not an
-/// exact-text pin: the line is git's own stderr, whose wording this crate
-/// does not own.
+/// mirrored here) -- one named, non-empty stderr line, exit 2. The exact
+/// text is pinned once for every such command, by `check_parity.rs`'s
+/// `resolve_root_names_the_dir_remedy_outside_a_repository`.
 #[test]
 fn outside_a_git_repository_prints_a_named_error_and_exits_2() {
     let dir = tempfile::tempdir().expect("tempdir");

@@ -115,8 +115,10 @@ enum Command {
         #[arg(long)]
         dir: Option<PathBuf>,
     },
-    /// Validates the knowledge base: schema, cross-entry invariants, and
-    /// every generated file's freshness and budget.
+    /// Validates the knowledge base: schema, cross-entry invariants, every
+    /// generated file's freshness and budget, and that every id a kit-owned
+    /// file cites from a topic the kit seeds is an entry of the knowledge
+    /// base.
     CheckKnowledge {
         /// Repository root to check; defaults to the enclosing git
         /// repository's top level, resolved from the current directory.
@@ -317,7 +319,8 @@ enum Command {
         /// The target directory; defaults to the current directory. Unlike
         /// every read command's `--dir` above, this is not resolved against
         /// an enclosing git repository -- the target itself must already be
-        /// one (`install::cmd_init`'s own doc has the full account).
+        /// a git repository's top level (`install::cmd_init`'s own doc has
+        /// the full account).
         #[arg(long)]
         dir: Option<PathBuf>,
         /// The backlog id prefix seeded schemas carry; defaults to `WI`.
@@ -344,8 +347,13 @@ enum Command {
     },
     /// Cross-checks one deliverable report's claims against the artifacts
     /// and git history it cites: redirected captures, truncation markers,
-    /// listed commit shas, self-audit narrative, and the bounded
-    /// no-execution paste-run lint over every captured command field.
+    /// the natural label of tdd entries (RED capture time against commit
+    /// time), the self-audit head against the newest listed commit, commit
+    /// shas in the narrative, self-audit pass ratios in the narrative, the
+    /// bounded no-execution paste-run lint over every captured command
+    /// field, ephemeral paths in the narrative, line numbers of cited
+    /// files, counts beside a cited capture, and a cited sweep against the
+    /// files the report changed.
     CheckReportClaims {
         /// The report file to check.
         report_path: PathBuf,
@@ -377,7 +385,9 @@ fn main() -> ExitCode {
         // Kept for match exhaustiveness over `Option<Command>`.
         None => ExitCode::SUCCESS,
         Some(Command::Render { check, dir }) => rules::cmd_render(dir, check),
-        Some(Command::CheckKnowledge { dir }) => rules::cmd_check_knowledge(dir),
+        Some(Command::CheckKnowledge { dir }) => {
+            rules::cmd_check_knowledge(dir, install::kit_citation_scope)
+        }
         Some(Command::Get { ids, dir }) => get::cmd_get(dir, ids),
         Some(Command::List {
             open,
@@ -501,6 +511,191 @@ mod tests {
                 subcommand.get_name(),
             );
         }
+    }
+
+    /// The checks `report_claims::check_report_claims` runs, in call order,
+    /// each with the phrase the `check-report-claims` about must carry for
+    /// it. A callee is written as the call spells it (`natural_red::` and
+    /// all). `the_check_report_claims_about_names_every_check` derives the
+    /// callees from the source and compares them with this list.
+    const HELP_CHECKS: [(&str, &str); 11] = [
+        ("check_redirected_captures", "redirected captures"),
+        ("check_truncation_markers", "truncation markers"),
+        (
+            "natural_red::check_natural_red_labels",
+            "natural label of tdd entries",
+        ),
+        ("check_self_audit_head_is_current", "self-audit head"),
+        (
+            "check_narrative_shas_resolve",
+            "commit shas in the narrative",
+        ),
+        ("check_self_audit_narrative", "pass ratios in the narrative"),
+        ("check_paste_run_lint", "paste-run lint"),
+        ("check_ephemeral_paths", "ephemeral paths"),
+        ("check_citation_lines", "line numbers of cited files"),
+        (
+            "check_narrative_number_claims",
+            "counts beside a cited capture",
+        ),
+        ("check_narrative_sweep_coverage", "cited sweep"),
+    ];
+
+    /// The callee of every check call in the body of `fn
+    /// check_report_claims` in `source`, in call order. Fails with a named
+    /// message when the function or its body cannot be found, or when the
+    /// body holds no check call: an empty derivation is never a pass.
+    ///
+    /// What counts as a check call: a statement of the body that ends in
+    /// `;` and names `errors` (every check reports through that
+    /// accumulator), other than the `let mut errors` declaration. The callee
+    /// is the text before the statement's first `(`. A call split over
+    /// several lines is one statement and counts once. Whole-line `//`
+    /// comments are dropped first. A check that is not called through a
+    /// statement naming `errors` is not counted; the callee comparison in
+    /// the test then names the difference.
+    fn check_calls_in(source: &str) -> Result<Vec<String>, String> {
+        let source = format!("\n{source}");
+        let start = source.find("\nfn check_report_claims(").ok_or_else(|| {
+            "the source has no `fn check_report_claims(` at the start of a line".to_string()
+        })?;
+        let body_start = source[start..]
+            .find('{')
+            .map(|offset| start + offset + 1)
+            .ok_or_else(|| "`fn check_report_claims` has no body".to_string())?;
+        let body_end = source[body_start..]
+            .find("\n}")
+            .map(|offset| body_start + offset)
+            .ok_or_else(|| {
+                "the body of `fn check_report_claims` has no closing brace at the start of a line"
+                    .to_string()
+            })?;
+        let body = source[body_start..body_end]
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut statements: Vec<&str> = body.split(';').collect();
+        // The text after the last `;` is the tail expression, or nothing.
+        statements.pop();
+        let calls: Vec<String> = statements
+            .iter()
+            .map(|statement| statement.trim())
+            .filter(|statement| {
+                statement.contains("errors") && !statement.starts_with("let mut errors")
+            })
+            .map(|statement| {
+                statement
+                    .split('(')
+                    .next()
+                    .unwrap_or(statement)
+                    .trim()
+                    .to_string()
+            })
+            .collect();
+        if calls.is_empty() {
+            return Err("the body of `fn check_report_claims` holds no check call (a `;`-terminated statement that names `errors`)".to_string());
+        }
+        Ok(calls)
+    }
+
+    /// A call split over several lines counts once, a commented-out call
+    /// does not count, and the callee keeps its module path.
+    #[test]
+    fn check_calls_in_counts_a_split_call_once_and_skips_comments() {
+        let source = "fn other() {}\n\nfn check_report_claims(path: &Path) -> Result<Vec<String>, String> {\n    let report = load_report(path)?;\n    let mut errors = Vec::new();\n    // check_commented_out(&mut errors);\n    check_one(&report, &mut errors);\n    module::check_two(\n        &report,\n        &mut errors,\n    );\n    Ok(errors)\n}\n";
+        assert_eq!(
+            check_calls_in(source),
+            Ok(vec![
+                "check_one".to_string(),
+                "module::check_two".to_string()
+            ])
+        );
+    }
+
+    /// A source without the function fails with a message that names it.
+    #[test]
+    fn check_calls_in_names_a_missing_function() {
+        let error = check_calls_in("fn other() {}\n").expect_err("no function to derive from");
+        assert!(error.contains("fn check_report_claims("), "got: {error}");
+    }
+
+    /// A body with no check call fails with a message that names the
+    /// shape it looked for, instead of deriving an empty list.
+    #[test]
+    fn check_calls_in_names_a_body_without_a_check_call() {
+        let source = "fn check_report_claims() -> Result<Vec<String>, String> {\n    let mut errors = Vec::new();\n    Ok(errors)\n}\n";
+        let error = check_calls_in(source).expect_err("no check call to derive");
+        assert!(error.contains("holds no check call"), "got: {error}");
+    }
+
+    /// `check-report-claims --help` names every check the command runs. The
+    /// callees come from the source of `check_report_claims` (read with
+    /// `include_str!`, see `check_calls_in` for what counts as a call), so
+    /// a check added there without a pair in `HELP_CHECKS` fails here, and
+    /// so does a phrase added to the about with no call behind it. The
+    /// about is read as a comma-separated list after its first `: `, in
+    /// call order: item `i` must carry the phrase of pair `i`.
+    #[test]
+    fn the_check_report_claims_about_names_every_check() {
+        let calls = check_calls_in(include_str!("report_claims.rs"))
+            .expect("derive the check calls of check_report_claims");
+        let pinned: Vec<&str> = HELP_CHECKS.iter().map(|(callee, _)| *callee).collect();
+        assert_eq!(
+            calls,
+            pinned,
+            "check_report_claims makes {} check calls but HELP_CHECKS pairs {} with a help phrase; \
+             add or remove the pair here and its phrase in the about of `CheckReportClaims` in main.rs",
+            calls.len(),
+            pinned.len()
+        );
+        let command = Cli::command();
+        let about = command
+            .find_subcommand("check-report-claims")
+            .and_then(|subcommand| subcommand.get_about())
+            .map(ToString::to_string)
+            .expect("check-report-claims has an about");
+        let list = about
+            .split_once(": ")
+            .map(|(_, list)| list.trim_end_matches('.'))
+            .expect("the about lists its checks after a colon");
+        let normalized = list.replace(", and ", ", ");
+        let items: Vec<&str> = normalized.split(", ").collect();
+        assert_eq!(
+            items.len(),
+            HELP_CHECKS.len(),
+            "the about names {} checks ({items:?}) but check_report_claims makes {}",
+            items.len(),
+            HELP_CHECKS.len()
+        );
+        for (item, (callee, phrase)) in items.iter().zip(HELP_CHECKS) {
+            assert!(
+                item.contains(phrase),
+                "the about item `{item}` does not carry `{phrase}`, the phrase of {callee}"
+            );
+        }
+    }
+
+    /// `check-knowledge --help` names the kit-owned citation lint, the
+    /// check that is none of schema, cross-entry invariants, or a generated
+    /// file's freshness and budget, and the vocabulary the lint reads: the
+    /// ids of the topics the kit seeds, not those of a topic the adopter adds.
+    #[test]
+    fn the_check_knowledge_about_names_the_kit_owned_citation_lint() {
+        let command = Cli::command();
+        let about = command
+            .find_subcommand("check-knowledge")
+            .and_then(|subcommand| subcommand.get_about())
+            .map(ToString::to_string)
+            .expect("check-knowledge has an about");
+        assert!(
+            about.contains("kit-owned file cites"),
+            "the about does not name the kit-owned citation lint: {about:?}"
+        );
+        assert!(
+            about.contains("from a topic the kit seeds"),
+            "the about does not name the topics the lint reads: {about:?}"
+        );
     }
 
     /// The 1.0 frozen CLI surface (design.md 5.82): exactly these 20

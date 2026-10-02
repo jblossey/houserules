@@ -179,7 +179,8 @@
         "Help output, error messages, and documented step sequences are contract surfaces the way exported symbols are; a behavior fix that leaves them stating the old behavior ships the old defect to the user in prose form.",
         "Enumerate the surfaces mechanically: grep the user-visible strings for the changed concept (the old flag, shape, or step) rather than recalling where it is mentioned.",
         "A documented procedure is verified by executing its printed steps in order, on the environment it targets or the closest disclosed proxy; a paraphrase check misses preconditions the source text carries.",
-        "Batch-27 retrospective: the surface list for a CLI change includes --help for every touched subcommand and every printed receipt line; run the command and read its own output as a user before closing the task. Both batch-27 instances were surfaces the implementer never re-read after the behavior moved (update's about text; a receipt line update never prints)."
+        "Batch-27 retrospective: the surface list for a CLI change includes --help for every touched subcommand and every printed receipt line; run the command and read its own output as a user before closing the task. Both batch-27 instances were surfaces the implementer never re-read after the behavior moved (update's about text; a receipt line update never prints).",
+        "When a configuration key gains a second consumer, sweep the texts that define the key, not only the texts of the command that changed (batch 28: `overrides` also decides which kit-owned files check-knowledge reads, and the seeded docs/README.md that defines the key was outside the sweep)."
       ],
       "tags": [
         "cli",
@@ -191,6 +192,32 @@
         "by": "review",
         "ref": "batch 25 branch review retrospective"
       }
+    },
+    {
+      "id": "quality.lint-the-token-not-the-document",
+      "kind": "rule",
+      "area": "rust",
+      "summary": "A lint whose subject is a delimited token matches the token and its delimiters with one pattern; it pairs no delimiters and models no document around it.",
+      "body": [
+        "Batch 28 task 6 needed three designs for one extractor: knowledge ids in backticks in kit-owned markdown. Per-line pairing lost every id after a code span that wraps a line. Whole-text pairing lost every id after one stray backtick. The third design pairs nothing: a backtick, the id pattern of the schema, and a lookahead for a backtick.",
+        "Pairing delimiters is parsing. A parser for the enclosing format needs the block rules of that format, and a hand-written subset fails on the first input outside it. Use a maintained parser, which is a dependency the owner rules, or define the subject so that no parser is needed.",
+        "State the limits of the token form in the module doc and pin each with a test: the text that is not extracted (a padded or wrapped token) and the text that is extracted although a renderer shows no span.",
+        "A reviewer who proposes the fix design runs it against the classes of the reviewer's own counter-example before filing (process.review-findings-are-claims-too). The round-0 proposal to pair as CommonMark does became the round-1 regression."
+      ],
+      "tags": [
+        "lint",
+        "parsing",
+        "markdown"
+      ],
+      "source": {
+        "date": "2026-10-02",
+        "by": "review",
+        "ref": "batch 28 branch review; task 6 rounds 0 to 2"
+      },
+      "see": [
+        "process.review-findings-are-claims-too",
+        "quality.well-maintained-libraries"
+      ]
     }
   ]
 }

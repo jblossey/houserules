@@ -524,6 +524,22 @@ fn has_field(data: &Value, field: &str) -> bool {
     !matches!(field_value(data, field), None | Some(Value::Null))
 }
 
+/// The one report field that holds the audit's own output. An implementer
+/// writes the draft report with `self_audit: null`, runs the audit, and
+/// copies the audit's printed `summary` and deterministic rows into the
+/// field. `houserules validate` guards the field's final state: it rejects a
+/// `DONE` or `DONE_WITH_CONCERNS` report whose `self_audit` is `null`
+/// (`check_task_report_audit` in `validate_deliverable.rs`).
+const SELF_AUDIT_FIELD: &str = "self_audit";
+
+/// `true` when `field` is `self_audit` and `report` holds that key, filled or
+/// as an explicit JSON `null` (the draft state, before the implementer has
+/// copied the audit's rows into it). A report that lacks the key is not a
+/// draft, and no other field has a draft state.
+fn self_audit_is_present(report: &Value, field: &str) -> bool {
+    field == SELF_AUDIT_FIELD && field_value(report, field).is_some()
+}
+
 /// The per-check evaluation context: the range's changed files, the
 /// `--report`/`--workspace` inputs a `report-field` check reads, and the
 /// tree/blob/commit git reads every check type may need, each cached
@@ -574,6 +590,101 @@ impl AuditContext<'_> {
     fn removed(&self, files: &[String]) -> Result<Vec<String>, String> {
         removed_lines(self.root, &self.base_sha, &self.head_sha, files)
     }
+}
+
+/// Judges one `report-field` check: with `--report`, whether that report
+/// holds a value for `check.field`; with `--workspace`, whether every
+/// report whose `files_changed` triggers the check does; with neither,
+/// the row is `skipped`. A `--report` run also accepts the draft state of
+/// `self_audit` (see `self_audit_is_present`): a `null` and a filled field get
+/// the same row, `report field self_audit is present`. A `--workspace` run
+/// does not accept the draft state. `row` builds an audit row for this
+/// check's entry and `violated_result` is the result a violation carries
+/// (`fail` or `warn`, from the check's level).
+fn run_report_field_check(
+    check: &CheckDef,
+    ctx: &AuditContext,
+    row: &dyn Fn(&str, String) -> Value,
+    violated_result: &str,
+) -> Result<Value, String> {
+    let pass = |evidence: String| row("pass", evidence);
+    let violate = |evidence: String| row(violated_result, evidence);
+    let trigger = filter_matching(ctx.changed, &check.if_changed)?;
+    if trigger.is_empty() {
+        return Ok(pass("not triggered".to_string()));
+    }
+    let field = check.field.as_deref().unwrap_or_default();
+    if let Some(report) = ctx.report {
+        if self_audit_is_present(report, field) {
+            return Ok(pass(format!("report field {field} is present")));
+        }
+        if has_field(report, field) {
+            return Ok(pass(format!("report field {field} is set")));
+        }
+        return Ok(violate(format!(
+            "report lacks a value for {field} (triggered by {})",
+            trigger[0]
+        )));
+    }
+    if let Some(reports) = ctx.reports {
+        // A `files_changed` array holding a non-string element is
+        // just as unusable for glob-matching as one that is not an
+        // array at all, so both shapes are named the same "lacks
+        // files_changed" finding here, not silently filtered
+        // element-by-element.
+        let has_valid_files_changed = |data: &Value| matches!(data.get("files_changed"), Some(Value::Array(items)) if items.iter().all(Value::is_string));
+        let malformed = reports
+            .iter()
+            .find(|(_, data)| !has_valid_files_changed(data));
+        if let Some((name, _)) = malformed {
+            return Ok(violate(format!("{name} lacks files_changed")));
+        }
+        fn report_files_changed(data: &Value) -> Vec<&str> {
+            data.get("files_changed")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .collect()
+        }
+        // The first of a report's `files_changed` matching `check.if_changed`,
+        // or `None` when none do -- propagates a malformed glob with `?`
+        // instead of `unwrap_or(false)`, which would hide it behind a
+        // false "did not match".
+        fn matching_file<'a>(
+            data: &'a Value,
+            globs: &Option<Glob>,
+        ) -> Result<Option<&'a str>, String> {
+            for f in report_files_changed(data) {
+                if match_any(f, globs)? {
+                    return Ok(Some(f));
+                }
+            }
+            Ok(None)
+        }
+        let mut hits: Vec<&(String, Value)> = Vec::new();
+        for entry in reports {
+            if matching_file(&entry.1, &check.if_changed)?.is_some() {
+                hits.push(entry);
+            }
+        }
+        if hits.is_empty() {
+            return Ok(pass("not triggered by any report".to_string()));
+        }
+        for (name, data) in &hits {
+            if !has_field(data, field) {
+                let file = matching_file(data, &check.if_changed)?.unwrap_or_default();
+                return Ok(violate(format!(
+                    "{name} lacks a value for {field} (triggered by {file})"
+                )));
+            }
+        }
+        return Ok(pass(format!(
+            "report field {field} is set in {} reports",
+            hits.len()
+        )));
+    }
+    Ok(row("skipped", "no --report given".to_string()))
 }
 
 /// Runs one entry's deterministic `check` and returns its audit row (see
@@ -685,81 +796,7 @@ fn run_check(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result<Valu
             }
             Ok(pass(format!("{}: no removed lines", files.join(", "))))
         }
-        CheckType::ReportField => {
-            let trigger = filter_matching(ctx.changed, &check.if_changed)?;
-            if trigger.is_empty() {
-                return Ok(pass("not triggered".to_string()));
-            }
-            let field = check.field.as_deref().unwrap_or_default();
-            if let Some(report) = ctx.report {
-                if has_field(report, field) {
-                    return Ok(pass(format!("report field {field} is set")));
-                }
-                return Ok(violate(format!(
-                    "report lacks a value for {field} (triggered by {})",
-                    trigger[0]
-                )));
-            }
-            if let Some(reports) = ctx.reports {
-                // A `files_changed` array holding a non-string element is
-                // just as unusable for glob-matching as one that is not an
-                // array at all, so both shapes are named the same "lacks
-                // files_changed" finding here, not silently filtered
-                // element-by-element.
-                let has_valid_files_changed = |data: &Value| matches!(data.get("files_changed"), Some(Value::Array(items)) if items.iter().all(Value::is_string));
-                let malformed = reports
-                    .iter()
-                    .find(|(_, data)| !has_valid_files_changed(data));
-                if let Some((name, _)) = malformed {
-                    return Ok(violate(format!("{name} lacks files_changed")));
-                }
-                fn report_files_changed(data: &Value) -> Vec<&str> {
-                    data.get("files_changed")
-                        .and_then(Value::as_array)
-                        .into_iter()
-                        .flatten()
-                        .filter_map(Value::as_str)
-                        .collect()
-                }
-                // The first of a report's `files_changed` matching `check.if_changed`,
-                // or `None` when none do -- propagates a malformed glob with `?`
-                // instead of `unwrap_or(false)`, which would hide it behind a
-                // false "did not match".
-                fn matching_file<'a>(
-                    data: &'a Value,
-                    globs: &Option<Glob>,
-                ) -> Result<Option<&'a str>, String> {
-                    for f in report_files_changed(data) {
-                        if match_any(f, globs)? {
-                            return Ok(Some(f));
-                        }
-                    }
-                    Ok(None)
-                }
-                let mut hits: Vec<&(String, Value)> = Vec::new();
-                for entry in reports {
-                    if matching_file(&entry.1, &check.if_changed)?.is_some() {
-                        hits.push(entry);
-                    }
-                }
-                if hits.is_empty() {
-                    return Ok(pass("not triggered by any report".to_string()));
-                }
-                for (name, data) in &hits {
-                    if !has_field(data, field) {
-                        let file = matching_file(data, &check.if_changed)?.unwrap_or_default();
-                        return Ok(violate(format!(
-                            "{name} lacks a value for {field} (triggered by {file})"
-                        )));
-                    }
-                }
-                return Ok(pass(format!(
-                    "report field {field} is set in {} reports",
-                    hits.len()
-                )));
-            }
-            Ok(row("skipped", "no --report given".to_string()))
-        }
+        CheckType::ReportField => run_report_field_check(check, ctx, &row, violated_result),
         CheckType::DurableSha => {
             let files = filter_matching(ctx.changed, &check.files)?;
             if files.is_empty() {
@@ -1380,6 +1417,42 @@ mod tests {
         }))
     }
 
+    /// A repository with a rule that checks `field` on any change, and a
+    /// range that changes `a.txt`; returns the repository and the range's
+    /// base sha.
+    fn make_repo_checking_field_on_a_change(field: &str) -> (tempfile::TempDir, String) {
+        let dir = make_repo(&[entry(json!({
+            "id": "process.fieldcheck",
+            "summary": "Every report carries the field.",
+            "check": {"type": "report-field", "level": "fail", "if": "**", "field": field},
+        }))]);
+        let root = dir.path();
+        let base_sha = git(root, &["rev-parse", "HEAD"]).trim().to_string();
+        write_file(root, "a.txt", "x\n");
+        commit(root, "feat: change", None);
+        (dir, base_sha)
+    }
+
+    /// The row a single-report (`--report`) audit gives a report-field check
+    /// on `field` for `report`.
+    fn single_report_field_row(field: &str, report: Value) -> Value {
+        let (dir, base_sha) = make_repo_checking_field_on_a_change(field);
+        let root = dir.path();
+        let base = load_base(root).unwrap();
+        let report_path = root.join("report.json");
+        std::fs::write(&report_path, serde_json::to_string(&report).unwrap()).unwrap();
+        let outcome = audit(
+            &base,
+            AuditOptions {
+                base_ref: Some(base_sha),
+                report: Some(report_path),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        outcome.result["rules"][0].clone()
+    }
+
     fn write_workspace(reports: &[(&str, Value)]) -> tempfile::TempDir {
         let dir = tempfile::tempdir().expect("tempdir");
         for (name, body) in reports {
@@ -1850,6 +1923,101 @@ mod tests {
         )
         .unwrap();
         assert_eq!(outcome2.result["rules"][0]["result"], json!("pass"));
+    }
+
+    /// The draft state of an implementer report: `self_audit` is an explicit
+    /// `null` until the implementer copies the audit's printed `summary` and
+    /// deterministic rows into it. The row must equal the row of a filled
+    /// `self_audit`, so the rows the implementer copies out of this run stay
+    /// true after the field holds them. The evidence says the field is
+    /// `present`, not `set`: a `null` field is present and not set.
+    /// `validate` guards the final state
+    /// (`rejects_a_done_report_with_a_null_self_audit` and
+    /// `rejects_a_done_with_concerns_report_with_a_null_self_audit` in
+    /// `validate_deliverable.rs`).
+    #[test]
+    fn report_field_passes_a_null_self_audit_in_a_single_report_run() {
+        let draft = single_report_field_row("self_audit", json!({"self_audit": Value::Null}));
+        let filled = single_report_field_row(
+            "self_audit",
+            json!({"self_audit": {"summary": {"pass": 1}, "rows": []}}),
+        );
+
+        assert_eq!(draft, filled);
+        assert_eq!(draft["result"], json!("pass"));
+        assert_eq!(
+            draft["evidence"],
+            json!("report field self_audit is present")
+        );
+    }
+
+    /// Only an explicit `null` is the draft state: a report that lacks the
+    /// key still fails with the text a missing field has always had.
+    #[test]
+    fn report_field_fails_an_absent_self_audit_key() {
+        let row = single_report_field_row("self_audit", json!({"live_run": []}));
+
+        assert_eq!(row["result"], json!("fail"));
+        assert_eq!(
+            row["evidence"],
+            json!("report lacks a value for self_audit (triggered by a.txt)")
+        );
+    }
+
+    /// `--workspace` judges finished reports: a null `self_audit` there is
+    /// still a violation, naming the report.
+    #[test]
+    fn report_field_fails_a_null_self_audit_in_a_workspace_run() {
+        let (dir, base_sha) = make_repo_checking_field_on_a_change("self_audit");
+        let base = load_base(dir.path()).unwrap();
+        let workspace = write_workspace(&[(
+            "task-1-report.json",
+            json!({
+                "kind": "task-report", "files_changed": ["a.txt"], "self_audit": Value::Null,
+            }),
+        )]);
+
+        let outcome = audit(
+            &base,
+            AuditOptions {
+                base_ref: Some(base_sha),
+                workspace: Some(workspace.path().to_path_buf()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert!(outcome.failed);
+        let row = &outcome.result["rules"][0];
+        assert_eq!(row["result"], json!("fail"));
+        assert_eq!(
+            row["evidence"],
+            json!("task-1-report.json lacks a value for self_audit (triggered by a.txt)")
+        );
+    }
+
+    /// `self_audit` is the one field with a draft state: a null value of
+    /// any other field, a dotted path under a null `self_audit` included,
+    /// still fails.
+    #[test]
+    fn report_field_still_fails_a_null_value_of_another_field() {
+        let other = single_report_field_row(
+            "dependency_vetting",
+            json!({"dependency_vetting": Value::Null}),
+        );
+        assert_eq!(other["result"], json!("fail"));
+        assert_eq!(
+            other["evidence"],
+            json!("report lacks a value for dependency_vetting (triggered by a.txt)")
+        );
+
+        let nested =
+            single_report_field_row("self_audit.summary", json!({"self_audit": Value::Null}));
+        assert_eq!(nested["result"], json!("fail"));
+        assert_eq!(
+            nested["evidence"],
+            json!("report lacks a value for self_audit.summary (triggered by a.txt)")
+        );
     }
 
     /// A malformed `then` glob must be named, never swallowed into a

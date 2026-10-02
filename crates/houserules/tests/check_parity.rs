@@ -228,6 +228,225 @@ fn check_knowledge_outside_a_git_repository_prints_a_named_error_and_exits_2() {
     assert!(!stderr.trim().is_empty(), "the error line is not empty");
 }
 
+/// Every command that resolves its root through `root::resolve_root`,
+/// each with the arguments it needs to get past argument parsing.
+const ROOT_RESOLVING_COMMANDS: &[&[&str]] = &[
+    &["check-knowledge"],
+    &["check-backlog"],
+    &["render"],
+    &["topics"],
+    &["standing"],
+    &["index"],
+    &["for", "a.rs"],
+    &["get", "x"],
+    &["list"],
+    &["batch", "1"],
+    &["set", "X-1", "status=done"],
+    &["stats", "workspace"],
+    &["validate", "x.json"],
+    &["audit", "--base", "HEAD"],
+    &["check-commit", "--from", "HEAD"],
+    &["check-report-claims", "r.json"],
+    &["archive"],
+];
+
+/// The subcommands `ROOT_RESOLVING_COMMANDS` leaves out: `files` reads no
+/// repository, `init` and `update` resolve `--dir` like Node's
+/// `path.resolve` and never an enclosing repository (`install.rs`'s own
+/// module doc), and `help` is clap's own.
+const NOT_ROOT_RESOLVING: &[&str] = &["files", "init", "update", "help"];
+
+/// `ROOT_RESOLVING_COMMANDS` names every subcommand `--help` lists except
+/// `NOT_ROOT_RESOLVING`, so a new subcommand fails here until it is
+/// covered.
+#[test]
+fn root_resolving_commands_cover_every_subcommand() {
+    let output = houserules().arg("--help").output().expect("run --help");
+    let help = String::from_utf8(output.stdout).expect("utf8 stdout");
+    let mut listed: Vec<&str> = help
+        .lines()
+        .skip_while(|line| *line != "Commands:")
+        .skip(1)
+        .take_while(|line| !line.is_empty())
+        .filter_map(|line| line.split_whitespace().next())
+        .filter(|name| !NOT_ROOT_RESOLVING.contains(name))
+        .collect();
+    let mut covered: Vec<&str> = ROOT_RESOLVING_COMMANDS.iter().map(|args| args[0]).collect();
+    listed.sort_unstable();
+    covered.sort_unstable();
+    assert_eq!(covered, listed);
+}
+
+/// `resolve_root` is the one place every `--dir`-defaulting command
+/// resolves its root. Outside any git repository it prints one line that
+/// names the current directory and the `--dir` remedy, in place of git's
+/// own `fatal:` text, and exits 2. The directory is compared canonically:
+/// a temp path may resolve through a symlink (macOS) or a short name
+/// (Windows) before the binary reads it back as its working directory.
+#[test]
+fn resolve_root_names_the_dir_remedy_outside_a_repository() {
+    const REMEDY: &str = " is not inside a git repository; pass --dir <repository root>\n";
+    let dir = tempfile::tempdir().expect("tempdir");
+    let expected = dir.path().canonicalize().expect("canonicalize tempdir");
+
+    for args in ROOT_RESOLVING_COMMANDS {
+        let output = houserules()
+            .args(*args)
+            .current_dir(dir.path())
+            .output()
+            .expect("run command");
+        assert_eq!(output.status.code(), Some(2), "{args:?}: exit code");
+        assert_eq!(output.stdout, b"", "{args:?}: no stdout on the error path");
+        let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+        let printed = stderr
+            .strip_suffix(REMEDY)
+            .unwrap_or_else(|| panic!("{args:?}: not the named line: {stderr:?}"));
+        assert_eq!(
+            std::path::Path::new(printed)
+                .canonicalize()
+                .expect("canonicalize the printed directory"),
+            expected,
+            "{args:?}: the line names the working directory"
+        );
+    }
+}
+
+/// Git translates its own messages, so the no-repository check cannot
+/// read the text of a translated git. The binary runs git with
+/// `LC_ALL=C`; this test shows the effect by asking git for German. It
+/// shows it only on a host that has the `de_DE.UTF-8` locale and a
+/// translated git (`LC_ALL=de_DE.UTF-8 git rev-parse --show-toplevel`
+/// outside a repository prints `Schwerwiegend: Kein Git-Repository ...`
+/// there); elsewhere git prints English and the test passes alone. The
+/// unit test `git_show_toplevel_runs_git_with_lc_all_c` in `render.rs`
+/// pins the override itself on every host.
+#[test]
+fn resolve_root_names_the_dir_remedy_under_a_translated_git_locale() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let output = houserules()
+        .arg("check-knowledge")
+        .env("LC_ALL", "de_DE.UTF-8")
+        .env("LANGUAGE", "de")
+        .current_dir(dir.path())
+        .output()
+        .expect("run check-knowledge");
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(
+        stderr.ends_with(" is not inside a git repository; pass --dir <repository root>\n"),
+        "{stderr:?}"
+    );
+}
+
+/// A working directory removed after the process started: `getcwd` fails,
+/// and the one line names that operation and keeps the operating system's
+/// own text. The shell removes its own working directory, then replaces
+/// itself with the binary. The expected text comes from a real `ENOENT` on
+/// the removed path, not from a literal.
+#[cfg(unix)]
+#[test]
+fn resolve_root_names_the_current_directory_failure_from_a_removed_directory() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let gone = dir.path().join("gone");
+    fs::create_dir(&gone).expect("create the directory to remove");
+    let output = std::process::Command::new("sh")
+        .args([
+            "-c",
+            r#"cd "$1" && rmdir "$1" && exec "$2" check-knowledge"#,
+            "sh",
+        ])
+        .arg(&gone)
+        .arg(env!("CARGO_BIN_EXE_houserules"))
+        .output()
+        .expect("run the binary from a removed directory");
+    let os_error = fs::metadata(&gone).expect_err("the directory is gone");
+
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("utf8 stderr"),
+        format!("cannot read the current directory: {os_error}\n")
+    );
+}
+
+/// A host with no `git` on `PATH`: the one line names the failed command
+/// and keeps the operating system's own text, derived from a real `ENOENT`
+/// on the path where `git` would be.
+#[cfg(unix)]
+#[test]
+fn resolve_root_names_a_git_that_cannot_run() {
+    let empty_path = tempfile::tempdir().expect("tempdir");
+    let output = houserules()
+        .arg("check-knowledge")
+        .env("PATH", empty_path.path())
+        .current_dir(empty_path.path())
+        .output()
+        .expect("run check-knowledge");
+    let os_error = fs::metadata(empty_path.path().join("git")).expect_err("no git there");
+
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("utf8 stderr"),
+        format!("cannot run git: {os_error}\n")
+    );
+}
+
+/// Inside a repository, a `GIT_DIR` that names a missing directory makes
+/// git refuse with its own line, which names that directory. The working
+/// directory is inside a repository, so "is not inside a git repository"
+/// would be false there: git's line stays.
+#[test]
+fn resolve_root_keeps_git_s_line_when_git_dir_names_a_missing_directory() {
+    let repo = tempfile::tempdir().expect("tempdir");
+    let status = std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(repo.path())
+        .status()
+        .expect("run git init");
+    assert!(status.success(), "git init failed");
+    let missing = repo.path().join("missing");
+    let output = houserules()
+        .arg("check-knowledge")
+        .env("GIT_DIR", &missing)
+        .current_dir(repo.path())
+        .output()
+        .expect("run check-knowledge");
+
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(
+        stderr.starts_with("fatal: not a git repository: "),
+        "{stderr:?}"
+    );
+    assert!(
+        !stderr.contains("is not inside a git repository"),
+        "{stderr:?}"
+    );
+}
+
+/// git's other wording for a failed upward search, `fatal: not a git
+/// repository (or any of the parent directories): .git`, gets the same
+/// line (`GIT_DISCOVERY_ACROSS_FILESYSTEM=1` makes git print it outside a
+/// repository).
+#[test]
+fn resolve_root_names_the_dir_remedy_for_gits_other_search_wording() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let output = houserules()
+        .arg("check-knowledge")
+        .env("GIT_DISCOVERY_ACROSS_FILESYSTEM", "1")
+        .current_dir(dir.path())
+        .output()
+        .expect("run check-knowledge");
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(
+        stderr.ends_with(" is not inside a git repository; pass --dir <repository root>\n"),
+        "{stderr:?}"
+    );
+}
+
 // ---- the ruled clap argv deviation, for `check-knowledge`: probing an
 // unknown flag or unexpected positional live (`tools/kb.mjs check
 // --bogus`/`extra`) finds the same JS-ignores-it-and-succeeds divergence

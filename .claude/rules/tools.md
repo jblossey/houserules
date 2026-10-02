@@ -22,7 +22,9 @@ Generated from knowledge/ by houserules render. Do not edit.
 ## Gotchas
 
 - [houserules.actions-default-shell-lacks-pipefail] An Actions run step with no shell key runs bash -e without pipefail: a failing left side of a pipe passes silently; name shell: bash for -eo pipefail.
+- [houserules.auto-merge-waits-for-every-ruleset-rule] An enabled auto-merge waits for every ruleset requirement, the approving review included; a bypass actor's exemption does not apply to it.
 - [houserules.c-toolchain-crates-need-ci-mingw] A dependency with a C build script (a `-sys` crate) breaks the windows-gnu cross check unless ci.yml installs a mingw-w64 C compiler first.
+- [houserules.codeql-action-steps-share-one-version] The `github/codeql-action` `init` and `analyze` steps must run one version; a bump of one step alone fails `analyze` on the configuration-version mismatch.
 - [houserules.default-token-tags-start-no-workflows] A tag or commit pushed with the default GITHUB_TOKEN triggers no workflow; a release hand-off needs a PAT/App token or an explicit workflow_dispatch hop.
 - [houserules.main-takes-only-checked-commits] The main ruleset rejects pushes whose commits lack the 8 required checks: even a one-line tick rides a branch and PR; only a green PR head ff-merges clean.
 - [houserules.mise-cooldown-on-release-day] mise's minimum_release_age (default 24h) keeps a repository's first-ever release from resolving via @latest for a day; later releases fall back unaffected.

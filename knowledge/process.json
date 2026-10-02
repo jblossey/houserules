@@ -325,7 +325,7 @@
       "body": [
         "Every deliverable an agent writes is structured data in the batch workspace: `task-<N>-report.json`, `task-<N>-review.json`, `task-<N>-review-r<R>.json`, `branch-review.json`. The `kind` field names the definition.",
         "Write the file, run `houserules validate <file>`, fix every error, then audit. A deliverable that does not validate is incomplete; the controller re-dispatches.",
-        "The implementer's `self_audit` starts as `null` and holds the audit's `summary` and deterministic rows after the audit; the check below fails until it does. `self_audit` always covers the whole task (`BASE..HEAD` at report time); a fix round's audit over the fix diff goes into that `fix_rounds` entry's `tests`.",
+        "The implementer's `self_audit` starts as `null` and holds the audit's `summary` and deterministic rows after the audit. A single-report audit (`--report`) passes the check below while the field is `null`, the draft state; a `--workspace` audit fails it, and `houserules validate` rejects a `null` `self_audit` at status `DONE` or `DONE_WITH_CONCERNS`. `self_audit` always covers the whole task (`BASE..HEAD` at report time); a fix round's audit over the fix diff goes into that `fix_rounds` entry's `tests`.",
         "`houserules stats` and the branch retrospective read these files; prose is invisible to them."
       ],
       "tags": [
@@ -459,7 +459,8 @@
         "Plan the sweep at pre-flight: refresh rounds run right after the contract task closes and before the next task dispatch, so every later review reads a valid workspace (batch 7 ran them after T4, before T5).",
         "Semantic decisions in a refresh (which tdd mode, which narrative) belong to the task's reviewer, not the refresh dispatch: batch 7's controller over-steered one mode and the re-reviewer had to correct it.",
         "Controller verification replaces a further review round only for reviewer-prescribed mechanical edits whose expected outcome the reviewer pre-verified; it is scripted (byte-equal audit rows, field presence), gated with && chains, and logged in the ledger. Judged findings always get a real review round.",
-        "The branch review reads the full workspace regardless, so the sweep is auditable end to end."
+        "The branch review reads the full workspace regardless, so the sweep is auditable end to end.",
+        "A change to the text of an audit row is no contract change for a closed report: `self_audit` records the audit run at report time. The sweep is due only when a closed report stops passing `validate` or `check-report-claims`; run both over every closed report to decide (batch 28 task 3: the row text became \"is present\", every earlier report stayed valid and claim-clean, no sweep)."
       ],
       "tags": [
         "process",
@@ -524,7 +525,8 @@
       "body": [
         "Batch 13: an owner-side agent merged HR-047/048 to main while the branch carried candidate filings under the same ids. Never-merged branch-local filings can be dropped without breaching knowledge-base.ids-are-permanent.",
         "Verify overlap yourself with git diff --name-only on both sides; another agent's no-overlap claim is a claim, not evidence.",
-        "Record the old-to-new sha map in a workspace file and the batch report: closed tasks' deliverables keep pre-rebuild shas, and gc can prune those objects."
+        "Record the old-to-new sha map in a workspace file and the batch report: closed tasks' deliverables keep pre-rebuild shas, and gc can prune those objects.",
+        "At the branch pre-check, fetch and compare the branch's merge base with the remote main, even when no collision is known: a pull request of a second session can land a rebased copy of a branch commit on main mid-batch (batch 28: PR 42 put a copy of the branch's first commit and the new issue forms on main while the local main ref stayed at the old base; a soft reset after a late fetch would have reverted the issue forms)."
       ],
       "tags": [
         "backlog",
@@ -752,7 +754,7 @@
       "standing": false,
       "summary": "A fix round closes only with a written verification record: a re-review deliverable, or a controller note naming each finding and the artifact proving its fix.",
       "body": [
-        "A re-review deliverable in the workspace is the default for rounds with executable changes or any critical finding. A controller verification note suffices for report-only or prose rounds when it names finding-by-finding evidence.",
+        "A re-review deliverable in the workspace is the default for rounds with executable changes or any critical finding. A controller verification note suffices in two cases. First: a report-only or prose round, a finding that is critical only by its rule class included, when the note names finding-by-finding evidence. Second: a reviewer-prescribed mechanical edit whose outcome the reviewer pre-verified, when the round's commit holds that edit and its test alone. A commit that holds more gets the re-review, or the branch review reads it in full and says so (batch 28 task 6 round 3).",
         "Origin: batch 23 T2's fix round closed on a ledger note alone; the verifications were real and reproducible, but nothing pinned where such a record must live or what it must name."
       ],
       "tags": [

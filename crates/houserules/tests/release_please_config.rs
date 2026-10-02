@@ -46,10 +46,11 @@
 //! (`src/util/commit-split.ts`) already attributes to `crates/
 //! houserules`. `release-please`'s own generated commits touch no path
 //! under `template/**` at all: the seeded `template/.github/workflows/
-//! knowledge.yml` installer now pins `releases/latest/download`, with no
-//! `extra-files` entry left under `template/` for a release commit to
-//! rewrite (branch review, batch 24, issue 1) -- this invariant needs no
-//! bot-commit carve-out.
+//! knowledge.yml` holds no version literal (its install step reads the
+//! install's own `.houserules.json` when it runs, pinned by
+//! `tests/knowledge_workflow.rs`), with no `extra-files` entry left under
+//! `template/` for a release commit to rewrite (branch review, batch 24,
+//! issue 1) -- this invariant needs no bot-commit carve-out.
 //!
 //! `cargo-workspace` (`src/plugins/cargo-workspace.ts:345-350`) writes
 //! the workspace-root `Cargo.lock` directly (`path: 'Cargo.lock'`,
@@ -260,9 +261,9 @@ fn extra_files_are_anchored_to_the_repository_root() {
 /// `json`/`jsonpath` update that folds this repository's own kit-version
 /// restamp into the release PR itself (`houserules.post-release-restamp`,
 /// branch review batch 24 issue 2). `template/.github/workflows/
-/// knowledge.yml`'s former entry is retired (issue 1: the seeded
-/// installer now pins `releases/latest/download` and needs no per-release
-/// rewrite), so this is the array's only member, not one of several.
+/// knowledge.yml`'s former entry is retired (issue 1: the seeded workflow
+/// holds no version literal and needs no per-release rewrite), so this is
+/// the array's only member, not one of several.
 #[test]
 fn extra_files_contains_only_the_version_entry() {
     let config = config();

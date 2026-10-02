@@ -56,11 +56,12 @@ changing anything under `template/`, run `cargo run --quiet --bin
 payload-stamp-gate -- --write` and commit the regenerated
 `payload.stamp` in the same commit as the `template/` change.
 release-please's own release commit touches no path under `template/`:
-the seeded `template/.github/workflows/knowledge.yml` installer pins
-`releases/latest/download`, needing no per-release rewrite, so
-`extra-files` carries no entry there (branch review batch 24, issue 1) —
-this gate and `check-commit`'s co-change enforcement need no bot-commit
-carve-out.
+the seeded `template/.github/workflows/knowledge.yml` holds no version.
+Its install step reads the version from the install's own
+`.houserules.json` when it runs (HR-154), needing no per-release
+rewrite, so `extra-files` carries no entry there (branch review batch
+24, issue 1) — this gate and `check-commit`'s co-change enforcement need
+no bot-commit carve-out.
 
 ## Cutting a release
 
@@ -150,7 +151,7 @@ One release runs:
    stamps for every `KIT_OWNED` file and kit-shipped knowledge entry.
    Follow the restamp procedure below to check and, if needed, refresh
    them — referenced here, not repeated.
-6. **Every mechanism above is live-proven; nothing remains due.**
+6. **Every mechanism above is live-proven.**
    Before `v0.3.0`, the proofs were the pinned release-please source,
    `release_please_config.rs`'s config-shape pins (its module doc:
    "this file pins only the config shape ... with no release-please
@@ -165,6 +166,27 @@ One release runs:
    `houserules init` repository's PR gate installed the binary through
    the latest-alias installer inside the runner and passed end to end
    (HR-063, captures in the batch workspace's `t3b-evidence/`).
+7. **Two duties are due at the first release that carries the stamped
+   install step** (HR-154, design.md 5.88): the seeded workflow installs
+   the version `.houserules.json` records. Do both for that release, and
+   confirm both before you close HR-154.
+   - *The seeded-repository run, owner-attended.* Until that run, the
+     step has run only under the shell flags Actions uses (`bash
+     --noprofile --norc -eo pipefail`) against the real releases, never
+     inside Actions. Follow
+     `houserules.seeded-repo-live-proof`: a throwaway private repository
+     seeded with `houserules init` from the released kit, a pull
+     request, and the seeded workflow green. The run must show the step
+     reading the version that `init` stamped and downloading that
+     release's installer inside the runner. Capture the run into the
+     batch workspace.
+   - *The release-note text.* `update` never rewrites an existing
+     `.github/workflows/knowledge.yml` (seed-once), so an install that
+     keeps its old copy keeps installing the latest binary. The release
+     note prints the changed install step (the `run:` block of
+     `template/.github/workflows/knowledge.yml` at the release tag) and
+     points to README's Updating section for the procedure (delete the
+     file and run `houserules update`, or copy the install step).
 
 ### Owner-attended external acts
 

@@ -41,7 +41,9 @@
         "Before shipping a uniqueness or attribution sentence ('the only', 'caused by'), run the enumeration that would falsify it against the tree at HEAD - batch 21's two instances (a misattributed gate failure; a false only-bin-that-walks claim) were each falsifiable by one grep the writer did not run.",
         "A rewritten doc comment is teaching prose under this rule: re-derive caller counts, uniqueness claims, and cross-references from the tree at the revision under edit, never from the pre-rewrite text or another agent's summary (batch 22 T3a/T3c).",
         "Prose stating an invariant about commit history ('always', 'never', 'by the time it reaches main') enumerates every author class that writes such commits - bot-authored release and dependency commits included; a release-please extra-files commit falsified one such 'always' in batch 24.",
-        "When a commit closes an item, grep the tracked docs for that item's id in the same commit: the closing commit owns every sentence that scheduled the work (batch 24 close, three occurrences of the same forward-reading class)."
+        "When a commit closes an item, grep the tracked docs for that item's id in the same commit: the closing commit owns every sentence that scheduled the work (batch 24 close, three occurrences of the same forward-reading class).",
+        "A premise in a spec or a brief about what another module does is a claim: open that module's doc or code before a doc comment or a dispatch restates it (batch 28 task 6: 'update overwrites kit-owned files' went from the spec into the brief, a module doc, and the README, while `update` keeps a locally modified file).",
+        "One quoted message for two runs is two claims: copy the text from the log of each run (batch 28: the CodeQL message of PR 34 has its two versions in the other order than the quote taken from PR 33)."
       ],
       "tags": [
         "knowledge",
