@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/jblossey/houserules/compare/v1.1.0...v1.2.0) (2026-10-02)
+
+
+### Features
+
+* **cli:** lints for kit citations and natural TDD labels; refusals that name the way out ([50c5393](https://github.com/jblossey/houserules/commit/50c53939366ac1b65054c256e075b9624d4d0c91))
+
 ## [1.1.0](https://github.com/jblossey/houserules/compare/v1.0.0...v1.1.0) (2026-09-15)
 
 
