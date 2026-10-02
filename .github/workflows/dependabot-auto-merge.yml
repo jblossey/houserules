@@ -11,6 +11,10 @@ name: dependabot-auto-merge
 # The only secrets a workflow that a Dependabot event triggers can read are Dependabot
 # secrets (https://docs.github.com/en/code-security/dependabot/troubleshooting-dependabot/troubleshooting-dependabot-on-github-actions),
 # so the token lives there: `gh secret set DEPENDABOT_AUTOMERGE_TOKEN --app dependabot`.
+# The token lives in the Actions store too, under the same name. This workflow reads the
+# Dependabot secret. dependabot-rebase.yml starts on a push to main, with the owner as actor,
+# and reads the Actions secret: `gh secret set DEPENDABOT_AUTOMERGE_TOKEN`
+# (houserules.secret-store-follows-the-triggering-actor).
 on:
   pull_request:
 
