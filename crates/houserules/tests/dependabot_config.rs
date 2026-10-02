@@ -25,6 +25,8 @@ mod workflow_reader;
 use std::fs;
 
 #[cfg(unix)]
+use stubbed_step::StubbedStep;
+#[cfg(unix)]
 use workflow_reader::step_script;
 use workflow_reader::{
     indent, nested_under, position_of_step_running, repo_root, step_key, step_scalar,
@@ -206,18 +208,83 @@ fn approve_and_merge_steps_name_bash() {
     }
 }
 
-/// Runs the approve step's own script under the shell Actions uses for
-/// `shell: bash` (`bash --noprofile --norc -eo pipefail {0}`, per
-/// `houserules.actions-default-shell-lacks-pipefail`), with a stub `gh`
-/// first on `PATH`. The script reads the review decision, approves a
-/// pull request whose decision is not `APPROVED`, and fails without an
-/// approval when the read fails.
+/// A step script and a stub `gh`, written into a scratch directory that
+/// the value removes when it drops.
+#[cfg(unix)]
+mod stubbed_step {
+    use std::ffi::OsString;
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::PathBuf;
+    use std::process::{Command, Output};
+
+    /// A step script beside a stub `gh` that comes first on `PATH`.
+    pub struct StubbedStep {
+        _scratch: tempfile::TempDir,
+        script_path: PathBuf,
+        log_path: PathBuf,
+        path: OsString,
+    }
+
+    impl StubbedStep {
+        /// Writes `script` and an executable `gh` with the body `stub_body`
+        /// into a fresh scratch directory. The stub appends one line per
+        /// call to the file that its `GH_LOG` variable names.
+        pub fn new(script: &str, stub_body: &str) -> Self {
+            let scratch = tempfile::TempDir::new().expect("create scratch dir");
+            let bin_dir = scratch.path().join("bin");
+            fs::create_dir(&bin_dir).expect("create stub bin dir");
+            let stub = bin_dir.join("gh");
+            fs::write(&stub, stub_body).expect("write stub gh");
+            fs::set_permissions(&stub, fs::Permissions::from_mode(0o755))
+                .expect("make stub gh executable");
+            let script_path = scratch.path().join("step.sh");
+            fs::write(&script_path, script).expect("write the step script");
+            let log_path = scratch.path().join("gh.log");
+            let inherited_path = std::env::var_os("PATH").unwrap_or_default();
+            let path = std::env::join_paths(
+                std::iter::once(bin_dir).chain(std::env::split_paths(&inherited_path)),
+            )
+            .expect("join PATH");
+            Self {
+                _scratch: scratch,
+                script_path,
+                log_path,
+                path,
+            }
+        }
+
+        /// Runs the script under the shell Actions uses for `shell: bash`
+        /// (`bash --noprofile --norc -eo pipefail {0}`, per
+        /// `houserules.actions-default-shell-lacks-pipefail`) with `envs`
+        /// set. Returns the process output and the lines the stub logged
+        /// during this run.
+        pub fn run(&self, envs: &[(&str, &str)]) -> (Output, Vec<String>) {
+            let _ = fs::remove_file(&self.log_path);
+            let output = Command::new("bash")
+                .args(["--noprofile", "--norc", "-eo", "pipefail"])
+                .arg(&self.script_path)
+                .env("PATH", &self.path)
+                .env("GH_LOG", &self.log_path)
+                .envs(envs.iter().copied())
+                .output()
+                .expect("run the step script under bash");
+            let calls = fs::read_to_string(&self.log_path)
+                .unwrap_or_default()
+                .lines()
+                .map(str::to_string)
+                .collect();
+            (output, calls)
+        }
+    }
+}
+
+/// Runs the approve step's own script against a stub `gh`. The script
+/// reads the review decision, approves a pull request whose decision is not
+/// `APPROVED`, and fails without an approval when the read fails.
 #[cfg(unix)]
 #[test]
 fn approve_script_approves_only_a_pull_request_that_is_not_approved() {
-    use std::os::unix::fs::PermissionsExt;
-    use std::process::Command;
-
     const PR_URL: &str = "https://github.com/jblossey/houserules/pull/99";
     const STUB_GH: &str = r#"#!/bin/sh
 echo "$*" >> "$GH_LOG"
@@ -230,23 +297,7 @@ fi
     let raw = read_repo_file(WORKFLOW);
     let steps = workflow_steps(&raw);
     let approve = position_of_step_running(&steps, APPROVE_COMMAND);
-    let script = step_script(&steps[approve]);
-
-    let scratch = tempfile::TempDir::new().expect("create scratch dir");
-    let bin_dir = scratch.path().join("bin");
-    fs::create_dir(&bin_dir).expect("create stub bin dir");
-    let stub = bin_dir.join("gh");
-    fs::write(&stub, STUB_GH).expect("write stub gh");
-    fs::set_permissions(&stub, fs::Permissions::from_mode(0o755)).expect("make stub gh executable");
-    let script_path = scratch.path().join("approve.sh");
-    fs::write(&script_path, script).expect("write the approve script");
-    let log_path = scratch.path().join("gh.log");
-
-    let inherited_path = std::env::var_os("PATH").unwrap_or_default();
-    let path = std::env::join_paths(
-        std::iter::once(bin_dir).chain(std::env::split_paths(&inherited_path)),
-    )
-    .expect("join PATH");
+    let step = StubbedStep::new(&step_script(&steps[approve]), STUB_GH);
 
     let view = format!("pr view {PR_URL} --json reviewDecision --jq .reviewDecision");
     let approval = format!("pr review --approve {PR_URL}");
@@ -258,27 +309,19 @@ fi
         ("APPROVED", "1", false, vec![&view]),
     ];
     for (decision, view_exit, succeeds, expected_calls) in cases {
-        let _ = fs::remove_file(&log_path);
-        let output = Command::new("bash")
-            .args(["--noprofile", "--norc", "-eo", "pipefail"])
-            .arg(&script_path)
-            .env("PATH", &path)
-            .env("PR_URL", PR_URL)
-            .env("GH_TOKEN", "unused")
-            .env("GH_LOG", &log_path)
-            .env("STUB_DECISION", decision)
-            .env("STUB_VIEW_EXIT", view_exit)
-            .output()
-            .expect("run the approve script under bash");
-        let calls = fs::read_to_string(&log_path).unwrap_or_default();
+        let (output, calls) = step.run(&[
+            ("PR_URL", PR_URL),
+            ("GH_TOKEN", "unused"),
+            ("STUB_DECISION", decision),
+            ("STUB_VIEW_EXIT", view_exit),
+        ]);
         assert_eq!(
             output.status.success(),
             succeeds,
             "decision {decision:?}, view exit {view_exit}: {output:?}"
         );
         assert_eq!(
-            calls.lines().collect::<Vec<_>>(),
-            expected_calls,
+            calls, expected_calls,
             "decision {decision:?}, view exit {view_exit}"
         );
     }
