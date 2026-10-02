@@ -1264,4 +1264,7 @@ Each item records the ruling with its date, or stays marked open.
     untouched. The fix for a Dependabot PR that falls behind
     (HR-156) is designed now, as batch 30, before batch 29;
     PR #48 stays untouched and is its proof. Source: owner,
-    2026-10-02, the batch-28 rollout.
+    2026-10-02, the batch-28 rollout. Later the same day the
+    owner's account asked Dependabot to recreate PR #48, and it
+    merged; the batch-30 spec, section 8, names the proof that
+    replaces it.
