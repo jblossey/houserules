@@ -1,6 +1,8 @@
 # Dependabot: weekly version updates for the Rust crates and the GitHub
 # Actions the workflows pin. The commit prefix keeps every PR title a
 # conventional commit so the check-commit gate accepts it.
+# The two codeql-action steps must share one version, so they move in one PR
+# (houserules.codeql-action-steps-share-one-version).
 version: 2
 updates:
   - package-ecosystem: cargo
@@ -19,3 +21,14 @@ updates:
       prefix: chore
       include: scope
     open-pull-requests-limit: 5
+    groups:
+      codeql-action:
+        patterns:
+          - github/codeql-action*
+      # A group with no applies-to covers version updates only, so a security update
+      # needs its own group to move both steps together
+      # (https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).
+      codeql-action-security:
+        applies-to: security-updates
+        patterns:
+          - github/codeql-action*
