@@ -27,6 +27,18 @@
       }
     },
     {
+      "number": 30,
+      "items": [
+        "HR-156"
+      ],
+      "summary": "A Dependabot PR that falls behind main gets its rebase without the owner; the batch-28 rollout record rides the branch.",
+      "kickoff": "docs/specs/2026-10-02-batch-30-dependabot-rebase.md",
+      "status": {
+        "state": "in-progress",
+        "text": "Built and reviewed 2026-10-02 (spec section 9). Before the merge the owner stores the token as an Actions secret. HR-156 stays partial: it and HR-098 close on the first run that finds a behind pull request with auto-merge on and ends in a merge with no owner action (spec section 5)."
+      }
+    },
+    {
       "number": 29,
       "items": [
         "HR-144",

@@ -166,27 +166,19 @@ One release runs:
    `houserules init` repository's PR gate installed the binary through
    the latest-alias installer inside the runner and passed end to end
    (HR-063, captures in the batch workspace's `t3b-evidence/`).
-7. **Two duties are due at the first release that carries the stamped
-   install step** (HR-154, design.md 5.88): the seeded workflow installs
-   the version `.houserules.json` records. Do both for that release, and
-   confirm both before you close HR-154.
-   - *The seeded-repository run, owner-attended.* Until that run, the
-     step has run only under the shell flags Actions uses (`bash
-     --noprofile --norc -eo pipefail`) against the real releases, never
-     inside Actions. Follow
-     `houserules.seeded-repo-live-proof`: a throwaway private repository
-     seeded with `houserules init` from the released kit, a pull
-     request, and the seeded workflow green. The run must show the step
-     reading the version that `init` stamped and downloading that
-     release's installer inside the runner. Capture the run into the
-     batch workspace.
-   - *The release-note text.* `update` never rewrites an existing
-     `.github/workflows/knowledge.yml` (seed-once), so an install that
-     keeps its old copy keeps installing the latest binary. The release
-     note prints the changed install step (the `run:` block of
-     `template/.github/workflows/knowledge.yml` at the release tag) and
-     points to README's Updating section for the procedure (delete the
-     file and run `houserules update`, or copy the install step).
+7. **The stamped install step is live-proven** (HR-154, design.md 5.88
+   and 5.89): the seeded workflow installs the version
+   `.houserules.json` records. The `v1.2.0` cut supplied the run
+   (2026-10-02), per `houserules.seeded-repo-live-proof`: in a
+   throwaway private repository seeded with `houserules init` from the
+   released 1.2.0 archive, the PR gate downloaded 1.2.0 with the stamp
+   at 1.2.0, and downloaded 1.1.0 with the stamp edited to 1.1.0 while
+   1.2.0 was the latest release. Every gate passed in both runs
+   (captures in `.superpowers/sdd/2026-10-01-batch-28/hr154-evidence/`).
+   `update` never rewrites an existing
+   `.github/workflows/knowledge.yml` (seed-once), so the 1.2.0 release
+   note states the `check-knowledge` red first, prints the install
+   step of the release tag, and points to README's Updating section.
 
 ### Owner-attended external acts
 
