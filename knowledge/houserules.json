@@ -646,7 +646,8 @@
       "summary": "Prove adopter-facing changes with a throwaway seeded repo: init from the released kit, open a PR, and require the seeded knowledge workflow green end to end.",
       "body": [
         "One green PR run proves the installer URL, the binary, and the gates together. Steps (batch 24 close, HR-063): create a private throwaway repository; run houserules init from the RELEASED kit (a downloaded archive, not the dev build); push and open a PR; the seeded knowledge workflow must read the version that init stamped into .houserules.json, curl the installer of that release inside the runner, and pass check-knowledge, check-backlog, and audit. Capture the run JSON and full log into the batch workspace.",
-        "The CLI token usually lacks delete_repo: book the owner's deletion of the throwaway repo in the same turn the proof lands. Never use the tag-pilot checkout for this (houserules.tag-pilot-is-read-only)."
+        "The CLI token usually lacks delete_repo: book the owner's deletion of the throwaway repo in the same turn the proof lands. Never use the tag-pilot checkout for this (houserules.tag-pilot-is-read-only).",
+        "Two facts from the 1.2.0 run (HR-154, 2026-10-02). `init` writes `.github/workflows/knowledge.yml` only when the `origin` remote is GitHub-hosted: create the repository and add the remote before `init`. A run whose stamp names the latest release cannot show which release the install step reads: open a second pull request that edits the stamp to an older release, and require the log line `downloading houserules <that version>`."
       ],
       "tags": [
         "release",
@@ -825,10 +826,11 @@
       "id": "houserules.auto-merge-waits-for-every-ruleset-rule",
       "kind": "gotcha",
       "area": "tools",
-      "summary": "An enabled auto-merge waits for every ruleset requirement, the approving review included; a bypass actor's exemption does not apply to it.",
+      "summary": "An enabled auto-merge waits for every ruleset requirement, approval and up-to-date branch included; a bypass actor's exemption does not apply to it.",
       "body": [
         "Observed live on PR #31 (a Dependabot patch update): the owner's token enabled auto-merge eleven seconds after the PR opened on 2026-09-18; the PR merged on 2026-09-21, seconds after the owner's own approving review. The `approval` ruleset's only bypass actor is the repository admin role, and the token is the admin's.",
-        "Consequence: a workflow that wants an unattended merge must satisfy the requirement, not rely on the bypass. `.github/workflows/dependabot-auto-merge.yml` therefore approves a minor or patch Dependabot PR with the owner's token before it enables auto-merge (design.md 5.87, HR-098)."
+        "Consequence: a workflow that wants an unattended merge must satisfy the requirement, not rely on the bypass. `.github/workflows/dependabot-auto-merge.yml` therefore approves a minor or patch Dependabot PR with the owner's token before it enables auto-merge (design.md 5.87, HR-098).",
+        "Observed live on PR #48 (2026-10-02): the workflow approved the PR and enabled auto-merge thirteen seconds after it opened, and every check passed. The PR still waited, because a push reached main first and the `main` ruleset requires an up-to-date branch. Dependabot's documentation promises a rebase only for conflicts, and two weekly runs left PR #32 behind main untouched (HR-156)."
       ],
       "tags": [
         "github",
@@ -839,7 +841,7 @@
       "source": {
         "date": "2026-10-01",
         "by": "controller",
-        "ref": "the PR #31 timeline; backlog HR-098; design.md 5.87"
+        "ref": "the PR #31 and PR #48 timelines; backlog HR-098 and HR-156; design.md 5.87 and 5.89"
       }
     },
     {

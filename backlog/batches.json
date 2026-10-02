@@ -27,6 +27,18 @@
       }
     },
     {
+      "number": 30,
+      "items": [
+        "HR-156"
+      ],
+      "summary": "A Dependabot PR that falls behind main gets its rebase without the owner; the batch-28 rollout record rides the branch.",
+      "kickoff": "the owner's direction of 2026-10-02 (design.md 5.89)",
+      "status": {
+        "state": "planned",
+        "text": "Runs before batch 29. Needs its brainstorm. PR #48 is the proof; HR-098 closes with it."
+      }
+    },
+    {
       "number": 29,
       "items": [
         "HR-144",

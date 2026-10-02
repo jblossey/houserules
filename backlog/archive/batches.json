@@ -422,7 +422,7 @@
       "kickoff": "docs/specs/2026-10-01-batch-28-issue-batch.md",
       "status": {
         "state": "done",
-        "text": "Built 2026-10-02 (spec section 7 holds the outcomes, section 8 the owner's checkpoint rulings): HR-142, HR-143, HR-145, and HR-146 delivered. HR-141 partial: the template step and a range fix shipped; the checker rule failed its corpus gate and stays open. HR-147 partial: the refusal text shipped; the subdirectory install stays open. HR-154 partial: the seeded workflow installs the stamped version; its seeded-repository run and its release-note text are due at the first release that carries it. HR-098 stays partial until the first minor or patch Dependabot PR merges with no owner action. Follow-ups filed: HR-148 to HR-153 and HR-155."
+        "text": "Built 2026-10-02 (spec section 7 holds the outcomes, section 8 the owner's checkpoint rulings): HR-142, HR-143, HR-145, and HR-146 delivered. HR-141 partial: the template step and a range fix shipped; the checker rule failed its corpus gate and stays open. HR-147 partial: the refusal text shipped; the subdirectory install stays open. HR-154 partial: the seeded workflow installs the stamped version; its seeded-repository run and its release-note text are due at the first release that carries it. HR-098 stays partial until the first minor or patch Dependabot PR merges with no owner action. Follow-ups filed: HR-148 to HR-153 and HR-155. Rollout 2026-10-02 (design.md 5.89): the owner reviewed and merged PR #46 and released 1.2.0; HR-154 closed with the seeded-repository run and the release note; HR-156 filed for the Dependabot PR that falls behind main."
       }
     }
   ]
