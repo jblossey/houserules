@@ -1,13 +1,16 @@
 name: dependabot-auto-merge
-# Minor and patch Dependabot updates merge on their own once the required
-# checks pass (rebase, the only merge method the main ruleset allows).
-# A major update gets no auto-merge: the code owner reviews it.
+# For a minor or patch Dependabot update, the owner's fine-grained token
+# approves the PR and then enables auto-merge (rebase, the only merge method
+# the main ruleset allows). An enabled auto-merge waits for every ruleset
+# requirement, the approving review included, so the approval comes first
+# (houserules.auto-merge-waits-for-every-ruleset-rule).
+# A major update gets neither: the code owner reviews it.
 #
-# The merge is enabled with the owner's fine-grained token, not GITHUB_TOKEN
-# (HR-098): the approval ruleset exempts the repository admin alone, and a
-# merge performed as the owner also starts the push workflows on main.
-# A workflow that a Dependabot event triggers reads Dependabot secrets, so
-# the token lives there: `gh secret set DEPENDABOT_AUTOMERGE_TOKEN --app dependabot`.
+# The owner's token acts, not GITHUB_TOKEN: GitHub starts no workflow run for an
+# event that GITHUB_TOKEN creates (houserules.default-token-tags-start-no-workflows).
+# The only secrets a workflow that a Dependabot event triggers can read are Dependabot
+# secrets (https://docs.github.com/en/code-security/dependabot/troubleshooting-dependabot/troubleshooting-dependabot-on-github-actions),
+# so the token lives there: `gh secret set DEPENDABOT_AUTOMERGE_TOKEN --app dependabot`.
 on:
   pull_request:
 
@@ -24,6 +27,19 @@ jobs:
       - if: >
           steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
           steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        shell: bash
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
+        run: |
+          decision=$(gh pr view "$PR_URL" --json reviewDecision --jq .reviewDecision)
+          if [ "$decision" != "APPROVED" ]; then
+            gh pr review --approve "$PR_URL"
+          fi
+      - if: >
+          steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        shell: bash
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
