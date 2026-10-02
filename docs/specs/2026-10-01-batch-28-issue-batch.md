@@ -498,3 +498,23 @@ The owner ruled at the checkpoint before the push:
   duties: the owner-attended seeded-repository run, and the release
   note that prints the changed step. HR-155 files the missing lint
   over a script embedded in a workflow.
+
+## 9. Rollout (controller record, 2026-10-02; design.md 5.89)
+
+- The owner reviewed and merged PR #46 and released 1.2.0.
+- HR-154 is closed. The release note of 1.2.0 states the
+  `check-knowledge` red first and prints the install step; the owner
+  approved the text. The seeded-repository run is green: the step
+  downloaded 1.2.0 with the stamp at 1.2.0, and 1.1.0 with the stamp
+  edited to 1.1.0 while 1.2.0 was the latest release. The second run is
+  an addition to the runbook's procedure: a run whose stamp names the
+  latest release cannot show which release the step reads.
+- HR-098 stays partial. PR #48 proves both parts of the repair (the
+  approval with the owner's token; the two CodeQL steps in one PR, both
+  `analyze` jobs green). It did not merge: the release commit reached
+  main first, and the `main` ruleset requires an up-to-date branch.
+- HR-156 files that stall. The owner first ruled to observe the weekly
+  Dependabot run of 2026-10-09. The controller then read the timeline
+  of PR #32, which it had not read before it asked: two weekly runs
+  left that PR behind main untouched. The owner superseded the ruling:
+  the fix is designed now, as batch 30.

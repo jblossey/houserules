@@ -127,7 +127,8 @@
         "Consequence and the ruled fix: GitHub refuses the Actions app as a bypass actor on a user-owned repository, so a merge enabled with GITHUB_TOKEN now waits for an approval and the HR-092 auto-merge stalls. The owner chose the token route: .github/workflows/dependabot-auto-merge.yml enables auto-merge with a fine-grained personal access token of the owner (Contents and Pull requests read/write on this repository only), stored as the Dependabot secret DEPENDABOT_AUTOMERGE_TOKEN (a Dependabot-triggered workflow reads that store, not Actions secrets). A merge performed as the owner also starts the push workflows on main, which lifts HR-092's GITHUB_TOKEN limit for these merges.",
         "PENDING proof: the next minor or patch Dependabot PR merging on its own with the workflow green. Flip to done with that PR's number. HR-068 (a token for the release flow) stays a separate ruling: release-please edits a workflow file, which needs the `workflows` permission this token does not carry.",
         "Proof run, read 2026-10-01: negative. PR #31 (clap 4.6.6 to 4.6.7, a patch) got auto-merge enabled by the owner's token eleven seconds after it opened on 2026-09-18, then waited: it merged on 2026-09-21, seconds after the owner's own approving review. The token enables auto-merge; it does not satisfy the approval ruleset, because an enabled auto-merge waits for every requirement and the admin bypass does not apply to it. PRs #33 and #34 (github/codeql-action analyze and init, 4.38.0 to 4.38.1, opened 2026-09-25) stand blocked on two counts: the approving review is still required, and both CodeQL `analyze` jobs fail on each PR - Dependabot bumps the two actions in separate PRs, and they must share one version. PR #33 (analyze at 4.38.1) prints `Loaded a configuration file for version '4.38.0', but running version '4.38.1'`; PR #34 (init at 4.38.1) prints the same line with the two versions exchanged. PR #32 (dependabot/fetch-metadata 2.5.0 to 3.1.0, a major) is approved, carries no auto-merge by design, and is behind main.",
-        "Repair ruled 2026-10-01 (design.md 5.87): the workflow approves a minor or patch Dependabot PR with the owner's token before it enables auto-merge, and a Dependabot group moves the `github/codeql-action` pair in one PR. The item closes on the first minor or patch Dependabot PR that merges with no owner action."
+        "Repair ruled 2026-10-01 (design.md 5.87): the workflow approves a minor or patch Dependabot PR with the owner's token before it enables auto-merge, and a Dependabot group moves the `github/codeql-action` pair in one PR. The item closes on the first minor or patch Dependabot PR that merges with no owner action.",
+        "Proof run 2, read 2026-10-02: the repair works as built, and the merge still waits. Dependabot closed PRs #33, #34, #44, and #45. It opened PR #48 (the `codeql-action` group, both steps in one PR) at 08:27:16 UTC, after batch 28 reached main. The workflow approved PR #48 with the owner's token at 08:27:26 and enabled auto-merge at 08:27:29. Every required check passed, both CodeQL `analyze` jobs included. The release commit of 1.2.0 reached main at 08:33:39, and the PR had not merged by then. The `main` ruleset requires an up-to-date branch (`strict_required_status_checks_policy: true`), so PR #48 is `BEHIND` and its auto-merge waits. HR-156 holds that stall and its fix. Owner ruling 2026-10-02 (design.md 5.89): nobody touches PR #48; it is the proof of HR-156. This item closes when PR #48, or a later minor or patch Dependabot PR, merges with no owner action."
       ],
       "milestone": null,
       "status": "partial",
@@ -431,22 +432,6 @@
       ]
     },
     {
-      "id": "HR-154",
-      "type": "fix",
-      "title": "The seeded CI installs the latest binary: a release that tightens a gate reddens every install before it updates",
-      "body": [
-        "Found in the batch-28 branch review. template/.github/workflows/knowledge.yml installs houserules from releases/latest, while the kit files in an adopter's tree stay at the version of its last `houserules update`. A release that adds a check to check-knowledge or check-backlog therefore runs the new check over old kit files. It has happened before. Derived from the source at the release tags, not run: the 1.1.0 binary requires AGENTS.md, and the kit files of 0.3.0 and 1.0.0 hold none, so release 1.1.0 failed check-knowledge in every earlier install until `update` backfilled the file. Batch 28 does the same through the citation lint: the finishing-a-feature skill of 0.3.0, 1.0.0, and 1.1.0 cites knowledge-base.cite-durable-refs, an id the kit never seeded, and the new citation lint fails on it until `houserules update` runs and its result is committed.",
-        "Ruled by the owner on 2026-10-02 (design.md 5.88): the seeded workflow installs the version `.houserules.json` records, and batch 28 builds it. The lint ships as built; the release note states the red first. The workflow is a seed-once file, so the change reaches new installs; an existing install edits its own workflow, and the release note says how.",
-        "Status after batch 28: partial. Built: the seeded workflow reads the top-level `version` line of `.houserules.json` with a POSIX tool and installs the installer of that release; a stamp with no such line falls back to the latest release with a notice; a version that is no release version is rejected before any download; a failed download prints a named error. The step's own script ran for real against the published releases with the home directory at a scratch directory. Two duties stay open and are due at the first release that carries the step (docs/runbook.md, the release procedure): (1) the owner-attended seeded-repository run of houserules.seeded-repo-live-proof, which is the only real Actions run of the step; (2) the release note prints the changed install step for installs that keep their seed-once workflow, and states first that check-knowledge fails in every existing install until `houserules update` runs. The item closes with the run of (1)."
-      ],
-      "milestone": null,
-      "status": "partial",
-      "batch": 28,
-      "see": [
-        "HR-146"
-      ]
-    },
-    {
       "id": "HR-155",
       "type": "chore",
       "title": "No lint covers a script embedded in a workflow",
@@ -720,6 +705,23 @@
       "status": "open",
       "batch": null,
       "see": []
+    },
+    {
+      "id": "HR-156",
+      "type": "fix",
+      "title": "A Dependabot PR that falls behind main waits: the ruleset requires an up-to-date branch, and no rebase is promised",
+      "body": [
+        "Found at the batch-28 rollout on PR #48 (HR-098, proof run 2). The `main` ruleset requires an up-to-date branch. A push to main while a Dependabot PR is open leaves the PR behind, and its enabled auto-merge then waits. GitHub's documentation promises an automatic Dependabot rebase only for conflicts ('Managing pull requests for dependency updates', read 2026-10-02: 'By default, Dependabot automatically rebases pull requests to resolve any conflicts'). By the same rule, one weekly run that opens two PRs strands the second when the first merges, unless the two conflict.",
+        "Evidence from this repository's PR timelines, read 2026-10-02. PR #32 was behind main from 2026-09-21. The weekly runs of 2026-09-25 and 2026-10-02 (about 03:55 UTC, Fridays) opened new PRs and did not rebase it. The run that batch 28's change of .github/dependabot.yml started did rebase behind PRs: it force-pushed PR #32 and PR #43 at 08:26 UTC on 2026-10-02. PR #43 changes only .github/workflows/ci.yml, which batch 28 did not touch, so that rebase resolved no conflict.",
+        "Owner rulings 2026-10-02 (design.md 5.89). First ruling: observe the weekly run of 2026-10-09. The controller then found the PR #32 evidence above, which it had not read before it asked, and proposed the reversal. Second ruling, which supersedes the first: design the fix now, as batch 30, before batch 29. PR #48 stays untouched and is the proof."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 30,
+      "see": [
+        "HR-098",
+        "HR-092"
+      ]
     }
   ]
 }

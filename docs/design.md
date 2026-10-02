@@ -1249,6 +1249,22 @@ Each item records the ruling with its date, or stays marked open.
     finishing-a-feature skill, and the entry is not seeded;
     issue 35 stays open, because its checker rule did not ship
     (HR-141). Source: owner, 2026-10-02, the batch-28 checkpoint.
+89. **Batch 28 accepted; the rollout rulings - ruled 2026-10-02.**
+    The owner reviewed and merged PR #46 and released 1.2.0.
+    Four rulings followed at the rollout. (1) The controller
+    edits the 1.2.0 release note with the text the owner
+    approved: the `check-knowledge` red first, then the install
+    step of the release tag. (2) The controller runs the
+    seeded-repository proof on the owner's account; the run
+    closes HR-154. (3) PR #48 shows the HR-098 repair working
+    and still waiting, because it fell behind main: observe
+    Dependabot's weekly run of 2026-10-09. (4) Ruling 3 is
+    superseded the same day, on evidence the controller found
+    after it asked: two weekly runs left PR #32 behind main
+    untouched. The fix for a Dependabot PR that falls behind
+    (HR-156) is designed now, as batch 30, before batch 29;
+    PR #48 stays untouched and is its proof. Source: owner,
+    2026-10-02, the batch-28 rollout.
 90. **Batch 31 directed: process cost - ruled 2026-10-09.** Users
     report that houserules prolongs feature work. The analysis of
     2026-10-09 measured three causes over 26 batch workspaces:

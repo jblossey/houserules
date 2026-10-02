@@ -2138,6 +2138,23 @@
         "HR-160",
         "HR-154"
       ]
+    },
+    {
+      "id": "HR-154",
+      "type": "fix",
+      "title": "The seeded CI installs the latest binary: a release that tightens a gate reddens every install before it updates",
+      "body": [
+        "Found in the batch-28 branch review. template/.github/workflows/knowledge.yml installs houserules from releases/latest, while the kit files in an adopter's tree stay at the version of its last `houserules update`. A release that adds a check to check-knowledge or check-backlog therefore runs the new check over old kit files. It has happened before. Derived from the source at the release tags, not run: the 1.1.0 binary requires AGENTS.md, and the kit files of 0.3.0 and 1.0.0 hold none, so release 1.1.0 failed check-knowledge in every earlier install until `update` backfilled the file. Batch 28 does the same through the citation lint: the finishing-a-feature skill of 0.3.0, 1.0.0, and 1.1.0 cites knowledge-base.cite-durable-refs, an id the kit never seeded, and the new citation lint fails on it until `houserules update` runs and its result is committed.",
+        "Ruled by the owner on 2026-10-02 (design.md 5.88): the seeded workflow installs the version `.houserules.json` records, and batch 28 builds it. The lint ships as built; the release note states the red first. The workflow is a seed-once file, so the change reaches new installs; an existing install edits its own workflow, and the release note says how.",
+        "Status after batch 28: partial. Built: the seeded workflow reads the top-level `version` line of `.houserules.json` with a POSIX tool and installs the installer of that release; a stamp with no such line falls back to the latest release with a notice; a version that is no release version is rejected before any download; a failed download prints a named error. The step's own script ran for real against the published releases with the home directory at a scratch directory. Two duties stay open and are due at the first release that carries the step (docs/runbook.md, the release procedure): (1) the owner-attended seeded-repository run of houserules.seeded-repo-live-proof, which is the only real Actions run of the step; (2) the release note prints the changed install step for installs that keep their seed-once workflow, and states first that check-knowledge fails in every existing install until `houserules update` runs. The item closes with the run of (1).",
+        "Closed 2026-10-02 at release 1.2.0, the first release that carries the step (design.md 5.89). (1) The seeded-repository run: the controller ran it on the owner's ruling, in the private throwaway repository jblossey/houserules-seed-proof-1-2-0, seeded by `houserules init` from the released 1.2.0 archive. Pull request 1 (stamp 1.2.0, run 36987840103): the step printed `downloading houserules 1.2.0`, and check-knowledge, check-backlog, and audit passed. Pull request 2 (the stamp edited to 1.1.0 while 1.2.0 was the latest release, run 36987907702): the step printed `downloading houserules 1.1.0`, and every step passed. The second run separates the stamped release from the latest one; the first run alone cannot. Captures: .superpowers/sdd/2026-10-01-batch-28/hr154-evidence/. (2) The 1.2.0 release note states the check-knowledge red first and prints the install step of the v1.2.0 tag; the owner approved the text. The owner deletes the throwaway repository."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 28,
+      "see": [
+        "HR-146"
+      ]
     }
   ]
 }
