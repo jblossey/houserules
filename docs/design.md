@@ -1214,3 +1214,38 @@ Each item records the ruling with its date, or stays marked open.
     the correct install path for a toolchain-neutral binary; the
     move carries a migration story for existing `~/.cargo/bin`
     installs. Source: owner, 2026-09-15, the batch-27 direction.
+87. **Batch 28 directed: the issue batch, with the HR-098 repair
+    folded in - ruled 2026-10-01.** The owner directed the open
+    GitHub issues 35 to 40 into the backlog (HR-141 to HR-146)
+    and their fixes into one batch; each fix starts with its own
+    brainstorm. HR-098's live proof read negative (an enabled
+    auto-merge waits for the approval ruleset; the admin bypass
+    does not apply to it), and its repair rides the same batch.
+    The repair is ruled: the auto-merge workflow approves a minor
+    or patch Dependabot PR with the owner's token before it
+    enables the merge, and a Dependabot group moves the
+    `github/codeql-action` pair in one PR. Issue 41 (HR-147, the
+    kit installs into a subdirectory) arrived mid-brainstorm and
+    is ruled: batch 28 corrects the refusal text only; the
+    subdirectory install stays open for its own spec. Issue 38
+    (HR-144, the design-phase review gate) is ruled out of batch
+    28: it forms batch 29 with HR-140, so review coverage and
+    review cost get one design, with the surface ruling for the
+    new deliverable kind taken there. The owner approved the
+    written batch-28 spec the same day; HR-129 (the
+    template-cluster riders) joins batch 29. Source: owner,
+    2026-10-01, the batch-28 brainstorm and spec gate.
+88. **Batch 28 checkpoint: the lint ships; the seeded CI installs
+    the stamped version - ruled 2026-10-02.** The new citation
+    lint of `check-knowledge` fails in every install of 0.3.0 to
+    1.1.0 until `houserules update` runs, because the seeded CI
+    installs the latest binary and those releases shipped a
+    citation of an id the kit never seeded. The owner ruled:
+    ship the lint as built, state the red first in the release
+    note, and change the seeded workflow in this batch so that it
+    installs the version `.houserules.json` records (HR-154).
+    Two more rulings at the same checkpoint: the citation of
+    `knowledge-base.cite-durable-refs` stays removed from the
+    finishing-a-feature skill, and the entry is not seeded;
+    issue 35 stays open, because its checker rule did not ship
+    (HR-141). Source: owner, 2026-10-02, the batch-28 checkpoint.

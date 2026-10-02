@@ -25,6 +25,21 @@
         "state": "planned",
         "text": "Done 2026-09-07: phase 4 wired whole under the two-step reality (spec section 7) - the cargo-dist pipeline pinned with the tag both matching and resolving, the crate version converged and lockstepped, every consumer flipped to the real channels with dated PENDING control runs, the pins wired via release-please, the seeded install step fallible, the release runbook with the owner-attended checklist. ALL FOUR ITEMS STAY OPEN by design: HR-049/063/064/070 close at the first release with assets (runbook step 6), behind HR-068 (the owner token decision) and HR-069 (the pr-run-mode revert). Step one proven; step two owner-attended."
       }
+    },
+    {
+      "number": 29,
+      "items": [
+        "HR-144",
+        "HR-140",
+        "HR-129",
+        "HR-153"
+      ],
+      "summary": "The design-phase review gate (issue 38), the balancing mechanism against over-bureaucratizing, and the template-cluster riders, designed as one review mechanism.",
+      "kickoff": "the owner's direction of 2026-10-01 (design.md 5.87)",
+      "status": {
+        "state": "planned",
+        "text": "Needs its own brainstorm and spec, with an owner ruling on the deliverables-schema surface and a delivery path for a seed-once schema change."
+      }
     }
   ]
 }
