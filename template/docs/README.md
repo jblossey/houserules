@@ -30,14 +30,34 @@ entry, and each governs its own case:
   eval scenario, a workflow, `AGENTS.md`, and the rest). Listing one
   silences every report for that file -- modified, deleted, or a
   missing file's backfill -- and `update` never writes, replaces, or
-  recreates it again, whatever the kit ships for it next.
+  recreates it again, whatever the kit ships for it next. A kit-owned
+  file listed here is also out of the citation check that "Entries
+  that kit-owned files cite" below describes.
 - A **knowledge-entry id** governs one entry inside a knowledge-topic
   file that is otherwise still reconciled normally: listing one
   silences that entry's own modified or deleted report, without
   touching any other entry in the same file. An entry `houserules
   archive` moves out of the active set looks deleted to `update`:
   list its id here after the sweep, or every later `update` reports
-  it once per run.
+  it once per run. Then run `houserules check-knowledge`. If a
+  kit-owned file cites the entry, the check reports that file: list
+  each reported file here too, or restore the entry.
 
 Delete a path or id from `overrides` to hand ownership back to the
 kit; the next `update` treats it as a plain, unowned divergence again.
+A kit-owned file that you delete from `overrides` is checked for
+citations again.
+
+## Entries that kit-owned files cite
+
+Kit-owned files cite entries of the knowledge topics that the kit
+seeds. `houserules check-knowledge` reports each cited entry that the
+knowledge base does not hold, and it names the citing file.
+
+A kit-owned file listed in `overrides` is not checked for the
+knowledge ids it cites.
+
+A seeded entry that a kit-owned file cites cannot be deleted or
+archived while that file is checked: restore the entry, or list each
+citing file in `overrides`. The report prints both ways. Listing the
+files keeps the deletion or the archive.

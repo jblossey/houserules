@@ -495,6 +495,477 @@ fn init_into_a_missing_git_repo_is_a_named_usage_error_exit_2() {
     assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
 }
 
+/// The refusal text for a target inside a repository but not at its top
+/// level, split around the two paths it names.
+const INSIDE_REPOSITORY_PREFIX: &str = " is inside the git repository at ";
+const INSIDE_REPOSITORY_SUFFIX: &str =
+    ", not its top level; houserules installs at the repository root\n";
+
+/// Splits the subdirectory refusal in `stderr` into the target and the top
+/// level it prints. The binary prints both in resolved form: the target
+/// with symlinks resolved (a spelling that may differ from the one given to
+/// `--dir`), and the top level as a prefix of that printed target.
+fn parse_subdirectory_refusal(stderr: &str) -> (&str, &str) {
+    stderr
+        .strip_suffix(INSIDE_REPOSITORY_SUFFIX)
+        .and_then(|named_paths| named_paths.split_once(INSIDE_REPOSITORY_PREFIX))
+        .unwrap_or_else(|| panic!("not the subdirectory refusal: {stderr:?}"))
+}
+
+/// Asserts `stderr` is the subdirectory refusal for `target`, naming
+/// `top_level` as the directory above it that holds `.git`. The printed
+/// target and top level are compared with `target` and `top_level`
+/// canonically, because the binary prints the resolved spelling and a temp
+/// path may resolve through a symlink (macOS). The printed top level must
+/// be a prefix of the printed target, so the line names a directory the
+/// target lies beneath.
+fn assert_subdirectory_refusal(stderr: &str, target: &Path, top_level: &Path) {
+    let (printed_target, printed_top_level) = parse_subdirectory_refusal(stderr);
+    assert_eq!(
+        Path::new(printed_target)
+            .canonicalize()
+            .expect("canonicalize the printed target"),
+        target.canonicalize().expect("canonicalize target"),
+        "the line names the target"
+    );
+    assert!(
+        Path::new(printed_target).starts_with(printed_top_level)
+            && printed_target != printed_top_level,
+        "the target lies beneath the printed top level: {stderr:?}"
+    );
+    assert_eq!(
+        Path::new(printed_top_level)
+            .canonicalize()
+            .expect("canonicalize the printed top level"),
+        top_level.canonicalize().expect("canonicalize top level"),
+        "the line names the directory that holds .git"
+    );
+}
+
+#[test]
+fn init_refuses_a_subdirectory_naming_the_top_level() {
+    let repo = scratch_git_repo();
+    let sub = repo.path().join("sub");
+    fs::create_dir(&sub).expect("create subdirectory");
+    let output = houserules()
+        .args(["init", "--dir"])
+        .arg(&sub)
+        .output()
+        .expect("run init");
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    assert_subdirectory_refusal(
+        &String::from_utf8(output.stderr).expect("utf8 stderr"),
+        &sub,
+        repo.path(),
+    );
+    // Nothing was written into the rejected target.
+    assert_eq!(fs::read_dir(&sub).unwrap().count(), 0);
+}
+
+#[test]
+fn init_refuses_a_nested_subdirectory_naming_the_top_level() {
+    let repo = scratch_git_repo();
+    let nested = repo.path().join("a").join("b");
+    fs::create_dir_all(&nested).expect("create nested subdirectory");
+    let output = houserules()
+        .args(["init", "--dir"])
+        .arg(&nested)
+        .output()
+        .expect("run init");
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    assert_subdirectory_refusal(
+        &String::from_utf8(output.stderr).expect("utf8 stderr"),
+        &nested,
+        repo.path(),
+    );
+}
+
+/// Runs `init --dir <target>` with `envs` set in the child, and asserts
+/// the refusal that names `top_level` as the directory that holds `.git`
+/// above `target`. The line prints the resolved target and the resolved
+/// `top_level`, a prefix of it, so no environment variable or git setting
+/// changes the directories it names.
+fn assert_init_refuses_naming(top_level: &Path, target: &Path, envs: &[(&str, &Path)]) {
+    let mut command = houserules();
+    command.args(["init", "--dir"]).arg(target);
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+    let output = command.output().expect("run init");
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    assert_subdirectory_refusal(
+        &String::from_utf8(output.stderr).expect("utf8 stderr"),
+        target,
+        top_level,
+    );
+    // Nothing was written into the rejected target.
+    assert_eq!(fs::read_dir(target).unwrap().count(), 0);
+}
+
+/// With `GIT_WORK_TREE` at a directory that does not contain the target,
+/// git answers with that directory as the top level (`GIT_WORK_TREE=<other>
+/// git rev-parse --show-toplevel` run in `<repo>/sub` prints `<other>`); the
+/// refusal still names the directory above the target that holds `.git`.
+#[test]
+fn init_names_the_ancestor_that_holds_git_under_a_foreign_git_work_tree() {
+    let repo = scratch_git_repo();
+    let sub = repo.path().join("sub");
+    fs::create_dir(&sub).expect("create subdirectory");
+    let foreign = tempfile::tempdir().expect("tempdir");
+    assert_init_refuses_naming(repo.path(), &sub, &[("GIT_WORK_TREE", foreign.path())]);
+}
+
+/// With `GIT_DIR` set, git answers with the directory it runs in as the
+/// top level (`GIT_DIR=<repo>/.git git rev-parse --show-toplevel` run in
+/// `<repo>/sub` prints `<repo>/sub`).
+#[test]
+fn init_names_the_ancestor_that_holds_git_under_git_dir() {
+    let repo = scratch_git_repo();
+    let sub = repo.path().join("sub");
+    fs::create_dir(&sub).expect("create subdirectory");
+    assert_init_refuses_naming(repo.path(), &sub, &[("GIT_DIR", &repo.path().join(".git"))]);
+}
+
+/// With `GIT_WORK_TREE` at the target itself, git answers with the target
+/// as its own top level (`GIT_WORK_TREE=<repo>/sub git rev-parse
+/// --show-toplevel` run in `<repo>/sub` prints `<repo>/sub`).
+#[test]
+fn init_names_the_ancestor_that_holds_git_when_git_work_tree_is_the_target() {
+    let repo = scratch_git_repo();
+    let sub = repo.path().join("sub");
+    fs::create_dir(&sub).expect("create subdirectory");
+    assert_init_refuses_naming(repo.path(), &sub, &[("GIT_WORK_TREE", &sub)]);
+}
+
+/// With `core.worktree` in the repository's config naming the target, git
+/// answers with the target as its own top level (`git rev-parse
+/// --show-toplevel` run in `<repo>/sub` prints `<repo>/sub`).
+#[test]
+fn init_names_the_ancestor_that_holds_git_under_core_worktree() {
+    let repo = scratch_git_repo();
+    let sub = repo.path().join("sub");
+    fs::create_dir(&sub).expect("create subdirectory");
+    let status = Command::new("git")
+        .args(["config", "core.worktree"])
+        .arg(&sub)
+        .current_dir(repo.path())
+        .status()
+        .expect("run git config");
+    assert!(status.success(), "git config core.worktree failed");
+    assert_init_refuses_naming(repo.path(), &sub, &[]);
+}
+
+#[test]
+fn init_keeps_the_git_init_advice_outside_any_repository() {
+    let outside = tempfile::tempdir().expect("tempdir");
+    let nested = outside.path().join("a").join("b");
+    fs::create_dir_all(&nested).expect("create nested directory");
+    let output = houserules()
+        .args(["init", "--dir"])
+        .arg(&nested)
+        .output()
+        .expect("run init");
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    assert_eq!(
+        String::from_utf8(output.stderr).unwrap(),
+        format!(
+            "{} is not a git repository (run git init first)\n",
+            nested.display()
+        )
+    );
+}
+
+/// A scratch repository with one commit and a linked worktree `wt` in it,
+/// whose root holds `.git` as a file, not a directory. Returns the main
+/// repository and the worktree path.
+fn repository_with_a_linked_worktree() -> (tempfile::TempDir, PathBuf) {
+    let main = scratch_git_repo();
+    let git = |args: &[&str]| {
+        let status = Command::new("git")
+            .args([
+                "-c",
+                "user.name=test",
+                "-c",
+                "user.email=test@example.invalid",
+            ])
+            .args(["-c", "commit.gpgsign=false"])
+            .args(args)
+            .current_dir(main.path())
+            .status()
+            .expect("run git");
+        assert!(status.success(), "git {args:?} failed");
+    };
+    git(&["commit", "-q", "--allow-empty", "-m", "initial"]);
+    let worktree = main.path().join("wt");
+    git(&[
+        "worktree",
+        "add",
+        "-q",
+        "--detach",
+        worktree.to_str().expect("utf8 path"),
+    ]);
+    assert!(
+        worktree.join(".git").is_file(),
+        "a linked worktree's .git is a file"
+    );
+    (main, worktree)
+}
+
+/// A linked worktree's root holds `.git` as a file, not a directory; it
+/// is a top level and installs.
+#[test]
+fn init_accepts_a_linked_worktree_root() {
+    let (_main, worktree) = repository_with_a_linked_worktree();
+
+    let output = houserules()
+        .args(["init", "--dir"])
+        .arg(&worktree)
+        .output()
+        .expect("run init");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(worktree.join("knowledge/schema.json").is_file());
+}
+
+/// A subdirectory of a linked worktree names the worktree root, the
+/// nearest directory that holds a `.git` entry, not the main repository.
+#[test]
+fn init_refuses_a_subdirectory_of_a_linked_worktree_naming_the_worktree_root() {
+    let (_main, worktree) = repository_with_a_linked_worktree();
+    let sub = worktree.join("sub");
+    fs::create_dir(&sub).expect("create subdirectory");
+    assert_init_refuses_naming(&worktree, &sub, &[]);
+}
+
+/// `--dir` and the working directory resolve to an absolute target before
+/// the refusal is built, so a relative `--dir sub`, `--dir .`, and no
+/// `--dir` at all each name the repository root.
+#[test]
+fn init_resolves_a_relative_target_before_naming_the_top_level() {
+    let repo = scratch_git_repo();
+    let sub = repo.path().join("sub");
+    fs::create_dir(&sub).expect("create subdirectory");
+    for (cwd, args) in [
+        (repo.path(), &["init", "--dir", "sub"][..]),
+        (&sub, &["init", "--dir", "."][..]),
+        (&sub, &["init"][..]),
+    ] {
+        let output = houserules()
+            .args(args)
+            .current_dir(cwd)
+            .output()
+            .expect("run init");
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+        let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+        let (printed_target, printed_top_level) = parse_subdirectory_refusal(&stderr);
+        assert_eq!(
+            Path::new(printed_target)
+                .canonicalize()
+                .expect("canonicalize target"),
+            sub.canonicalize().expect("canonicalize subdirectory"),
+            "{args:?}: the target is absolute"
+        );
+        assert!(
+            Path::new(printed_target).starts_with(printed_top_level),
+            "{args:?}: {stderr:?}"
+        );
+        assert_eq!(
+            Path::new(printed_top_level)
+                .canonicalize()
+                .expect("canonicalize top level"),
+            repo.path().canonicalize().expect("canonicalize repository"),
+            "{args:?}"
+        );
+    }
+}
+
+/// Creates `link`, a symlink to `original`.
+#[cfg(unix)]
+fn symlink(original: &Path, link: &Path) {
+    std::os::unix::fs::symlink(original, link).expect("create symlink");
+}
+
+/// Runs `init --dir <target>` with no extra environment and asserts the
+/// refusal that names `top_level`, printed in resolved form: the printed
+/// target is not the spelling given in `target`.
+#[cfg(unix)]
+fn assert_init_refuses_a_symlinked_target(top_level: &Path, target: &Path) {
+    let output = houserules()
+        .args(["init", "--dir"])
+        .arg(target)
+        .output()
+        .expect("run init");
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert_subdirectory_refusal(&stderr, target, top_level);
+    let (printed_target, _) = parse_subdirectory_refusal(&stderr);
+    assert_ne!(
+        printed_target,
+        target.display().to_string(),
+        "the line prints the resolved spelling, not the symlink"
+    );
+}
+
+/// A symlink to a repository subdirectory is inside the repository: git
+/// itself answers with the repository root for it (`git rev-parse
+/// --show-toplevel` run from the link prints `<repo>`). The refusal names
+/// that root, never the `git init` advice, which would create a nested
+/// repository.
+#[cfg(unix)]
+#[test]
+fn init_names_the_repository_for_a_symlinked_subdirectory_target() {
+    let repo = scratch_git_repo();
+    let sub = repo.path().join("sub");
+    fs::create_dir(&sub).expect("create subdirectory");
+    let links = tempfile::tempdir().expect("tempdir");
+    let link = links.path().join("link");
+    symlink(&sub, &link);
+    assert_init_refuses_a_symlinked_target(repo.path(), &link);
+    // Nothing was written into the rejected target.
+    assert_eq!(fs::read_dir(&sub).unwrap().count(), 0);
+}
+
+/// The same for a symlink to a nested subdirectory.
+#[cfg(unix)]
+#[test]
+fn init_names_the_repository_for_a_symlinked_nested_subdirectory_target() {
+    let repo = scratch_git_repo();
+    let nested = repo.path().join("a").join("b");
+    fs::create_dir_all(&nested).expect("create nested subdirectory");
+    let links = tempfile::tempdir().expect("tempdir");
+    let link = links.path().join("link");
+    symlink(&nested, &link);
+    assert_init_refuses_a_symlinked_target(repo.path(), &link);
+}
+
+/// A subdirectory reached through a symlinked directory above the
+/// repository names the repository root in resolved form.
+#[cfg(unix)]
+#[test]
+fn init_names_the_repository_for_a_subdirectory_below_a_symlinked_parent() {
+    let outer = tempfile::tempdir().expect("tempdir");
+    let repo = outer.path().join("repo");
+    let status = Command::new("git")
+        .args(["init", "-q"])
+        .arg(&repo)
+        .status()
+        .expect("run git init");
+    assert!(status.success(), "git init failed");
+    let sub = repo.join("sub");
+    fs::create_dir(&sub).expect("create subdirectory");
+    let links = tempfile::tempdir().expect("tempdir");
+    let parent_link = links.path().join("parent-link");
+    symlink(outer.path(), &parent_link);
+    assert_init_refuses_a_symlinked_target(&repo, &parent_link.join("repo").join("sub"));
+}
+
+/// A symlink to a repository root holds `.git` through the link, so it is
+/// a top level and installs into the repository.
+#[cfg(unix)]
+#[test]
+fn init_accepts_a_symlink_to_the_repository_root() {
+    let repo = scratch_git_repo();
+    let links = tempfile::tempdir().expect("tempdir");
+    let link = links.path().join("link");
+    symlink(repo.path(), &link);
+    let output = houserules()
+        .args(["init", "--dir"])
+        .arg(&link)
+        .output()
+        .expect("run init");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(repo.path().join("knowledge/schema.json").is_file());
+}
+
+/// The repository root reached through a symlinked parent directory
+/// installs.
+#[cfg(unix)]
+#[test]
+fn init_accepts_the_repository_root_below_a_symlinked_parent() {
+    let outer = tempfile::tempdir().expect("tempdir");
+    let repo = outer.path().join("repo");
+    let status = Command::new("git")
+        .args(["init", "-q"])
+        .arg(&repo)
+        .status()
+        .expect("run git init");
+    assert!(status.success(), "git init failed");
+    let links = tempfile::tempdir().expect("tempdir");
+    let parent_link = links.path().join("parent-link");
+    symlink(outer.path(), &parent_link);
+    let output = houserules()
+        .args(["init", "--dir"])
+        .arg(parent_link.join("repo"))
+        .output()
+        .expect("run init");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(repo.join("knowledge/schema.json").is_file());
+}
+
+/// A target that is a file, not a directory, keeps the `git init` advice
+/// even inside a repository, and the advice prints the target as passed.
+#[test]
+fn init_keeps_the_git_init_advice_for_a_target_that_is_a_file() {
+    let repo = scratch_git_repo();
+    let file = repo.path().join("f");
+    fs::write(&file, "").expect("create file");
+    let output = houserules()
+        .args(["init", "--dir"])
+        .arg(&file)
+        .output()
+        .expect("run init");
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    assert_eq!(
+        String::from_utf8(output.stderr).unwrap(),
+        format!(
+            "{} is not a git repository (run git init first)\n",
+            file.display()
+        )
+    );
+}
+
+/// A target that does not exist yet keeps the `git init` advice, even
+/// inside a repository: the directory is not there to be inside anything.
+#[test]
+fn init_keeps_the_git_init_advice_for_a_target_that_does_not_exist_yet() {
+    let repo = scratch_git_repo();
+    let outside = tempfile::tempdir().expect("tempdir");
+    for absent in [repo.path().join("absent"), outside.path().join("absent")] {
+        let output = houserules()
+            .args(["init", "--dir"])
+            .arg(&absent)
+            .output()
+            .expect("run init");
+        assert_eq!(output.status.code(), Some(2));
+        assert_eq!(output.stdout, b"");
+        assert_eq!(
+            String::from_utf8(output.stderr).unwrap(),
+            format!(
+                "{} is not a git repository (run git init first)\n",
+                absent.display()
+            )
+        );
+        assert!(!absent.exists(), "nothing was created");
+    }
+}
+
 #[test]
 fn init_rejects_a_malformed_id_prefix_flag_exit_2() {
     let dir = scratch_git_repo();

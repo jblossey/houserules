@@ -12,7 +12,32 @@ jobs:
         with:
           fetch-depth: 0
       - shell: bash
-        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jblossey/houserules/releases/latest/download/houserules-installer.sh | sh
+        run: |
+          version=
+          reason='does not exist'
+          if [ -e .houserules.json ]; then
+            # houserules writes the stamp pretty-printed (crates/houserules/src/emit.rs in jblossey/houserules): the top-level version is the one line that starts with two spaces.
+            version=$(sed -n 's/^  "version": "\([^"]*\)".*/\1/p' .houserules.json)
+            reason='has no line that starts with two spaces and "version": "<non-empty text>", the layout houserules writes'
+          fi
+          release_version='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [ -z "$version" ]; then
+            echo "::notice::.houserules.json $reason, so this run installs the latest houserules release. Run houserules update to write the version. If it reports an error in the file, fix the file first."
+            url=https://github.com/jblossey/houserules/releases/latest/download/houserules-installer.sh
+            hint='GitHub was unreachable or has no latest release. Re-run the job.'
+          elif [[ $version =~ $release_version ]]; then
+            url=https://github.com/jblossey/houserules/releases/download/v$version/houserules-installer.sh
+            hint="Release v$version does not exist, has no installer, or GitHub was unreachable. Wait for the release, run houserules update on a released binary, or re-run the job."
+          else
+            shown=${version//[^0-9A-Za-z.+-]/?}
+            echo "::error::.houserules.json records version '${shown:0:40}', which is not a release version such as MAJOR.MINOR.PATCH. Fix the version, or run houserules update to restamp it."
+            exit 1
+          fi
+          installer=$(curl --proto '=https' --tlsv1.2 -LsSf "$url") || {
+            echo "::error::Cannot download $url (curl exit $?). $hint"
+            exit 1
+          }
+          printf '%s\n' "$installer" | sh
       - run: houserules check-knowledge
       - run: houserules check-backlog
       - if: github.event_name == 'pull_request'

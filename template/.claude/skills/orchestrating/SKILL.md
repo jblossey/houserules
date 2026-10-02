@@ -69,6 +69,7 @@ Dispatch agent work sequentially by default. A project may rule its own parallel
 - A change to `.claude/agents/implementer.md`, `.claude/agents/task-reviewer.md`, or `.claude/evals/*.json` needs a run of every scenario in `.claude/evals/` before the branch review (`process.evals-rerun`); the audit fails until `.claude/evals/record.json` changes with them.
 - Run each scenario in a detached scratch worktree at the branch head: implementer scenarios through `implementer` (sonnet) with the scenario's `query` as the brief file and its `knowledge` as the `Knowledge:` line; `seeded-violations` through `task-reviewer` (opus) on a fixture built from its `setup`. Workspace artifacts carry the `eval-` prefix; keep nothing from a worktree.
 - Judge every `expected_behavior` line from the report or review. Append one run set to `.claude/evals/record.json`: `date`, `templates` (`git rev-parse HEAD:<path>` for both templates), `runs` (`scenario`, `agent`, `model`, `pass`, `of`, `notes`).
+- An empty `.claude/evals/record.json` is the state of a fresh install. The first run set you append is the baseline; it is due at the first batch that changes one of the two templates or a scenario, a `houserules update` that brings new templates included.
 
 ## Rulings
 

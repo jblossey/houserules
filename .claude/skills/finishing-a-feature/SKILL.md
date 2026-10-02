@@ -70,8 +70,7 @@ and lint first.
 4b. **Sweep interim SHAs.** Grep the aggregated diff for commit-SHA
    citations (`git diff main...HEAD | grep -oE '\b[0-9a-f]{7,40}\b'`,
    judged in context): a SHA that will not survive the aggregation
-   restates to a durable locator or to the aggregated commit
-   (`knowledge-base.cite-durable-refs`).
+   restates to a durable locator or to the aggregated commit.
 
 5. **Push and open a PR.**
    ```sh

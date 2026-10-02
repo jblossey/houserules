@@ -27,10 +27,11 @@ use std::process::ExitCode;
 use crate::rules::repo_root_from_cwd;
 
 /// Resolves `dir`, falling back to the enclosing git repository's top
-/// level. A resolution failure (no enclosing repository, for instance)
-/// prints one named stderr line and yields exit 2 -- the CLI-failure-path
-/// convention every command in this binary follows
-/// (`houserules.crash-paths-are-named`).
+/// level. A resolution failure prints one named stderr line and yields
+/// exit 2 -- the CLI-failure-path convention every command in this binary
+/// follows (`houserules.crash-paths-are-named`). With no enclosing
+/// repository the line is `<cwd> is not inside a git repository; pass
+/// --dir <repository root>`; the working directory is never a fallback.
 pub(crate) fn resolve_root(dir: Option<PathBuf>) -> Result<PathBuf, ExitCode> {
     match dir {
         Some(path) => Ok(path),

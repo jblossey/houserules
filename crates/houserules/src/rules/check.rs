@@ -18,6 +18,7 @@ use regress::Regex;
 use serde_json::Value;
 
 use super::glob::compile;
+use super::kit_citations::{KitScope, kit_citation_findings};
 use super::model::{Base, load_base};
 use super::render::{RULE_KINDS, SKILL_PATH, render_all};
 
@@ -1010,11 +1011,17 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
 /// Runs the `check-knowledge` subcommand: loads the knowledge base at
 /// `root` (resolving the enclosing git repository's top level when `root`
 /// is `None`, exactly like `cmd_render`), then runs `check_base` against
-/// it. A load failure (missing knowledge dir, missing `schema.json`, a
-/// malformed area glob) prints one named line and exits 2 -- distinct
-/// from a clean load whose check findings print as stderr lines and exit
-/// 1.
-pub(crate) fn cmd_check_knowledge(root: Option<PathBuf>) -> ExitCode {
+/// it. It then runs the kit-owned citation lint (`kit_citations`), with the
+/// scope `kit_scope` builds for the resolved root: the crate root passes
+/// `install::kit_citation_scope`, because `rules` never imports `install`.
+/// A `kit_scope` failure is one finding that names the failure and says no
+/// citation was checked. A load failure prints one named line and exits 2
+/// -- distinct from a clean load whose check findings print as stderr
+/// lines and exit 1.
+pub(crate) fn cmd_check_knowledge(
+    root: Option<PathBuf>,
+    kit_scope: fn(&Path) -> Result<KitScope, String>,
+) -> ExitCode {
     let root = match crate::root::resolve_root(root) {
         Ok(root) => root,
         Err(code) => return code,
@@ -1026,7 +1033,11 @@ pub(crate) fn cmd_check_knowledge(root: Option<PathBuf>) -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let errors = check_base(&base);
+    let mut errors = check_base(&base);
+    match kit_scope(&root) {
+        Ok(scope) => errors.extend(kit_citation_findings(&base, &scope)),
+        Err(message) => errors.push(format!("{message}; kit-owned citations not checked")),
+    }
     if !errors.is_empty() {
         for error in &errors {
             eprintln!("{error}");
