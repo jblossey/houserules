@@ -125,11 +125,12 @@
         "Owner ruling 2026-09-11: only the owner merges to main without an approval; every other contributor's PR needs the owner's approving review. Applied as a second ruleset `approval` on the default branch (one approving review, code-owner review required, stale reviews dismissed on push, threads resolved) whose only bypass actor is the repository admin role. The first ruleset `main` (the eight required checks incl. CodeQL, linear history, no force-push, PR required) keeps no bypass and binds the owner too. GitHub cannot exempt one rule inside a ruleset, hence the split.",
         "Consequence and the ruled fix: GitHub refuses the Actions app as a bypass actor on a user-owned repository, so a merge enabled with GITHUB_TOKEN now waits for an approval and the HR-092 auto-merge stalls. The owner chose the token route: .github/workflows/dependabot-auto-merge.yml enables auto-merge with a fine-grained personal access token of the owner (Contents and Pull requests read/write on this repository only), stored as the Dependabot secret DEPENDABOT_AUTOMERGE_TOKEN (a Dependabot-triggered workflow reads that store, not Actions secrets). A merge performed as the owner also starts the push workflows on main, which lifts HR-092's GITHUB_TOKEN limit for these merges.",
         "PENDING proof: the next minor or patch Dependabot PR merging on its own with the workflow green. Flip to done with that PR's number. HR-068 (a token for the release flow) stays a separate ruling: release-please edits a workflow file, which needs the `workflows` permission this token does not carry.",
-        "Proof run, read 2026-10-01: negative. PR #31 (clap 4.6.6 to 4.6.7, a patch) got auto-merge enabled by the owner's token eleven seconds after it opened on 2026-09-18, then waited: it merged on 2026-09-21, seconds after the owner's own approving review. The token enables auto-merge; it does not satisfy the approval ruleset, because an enabled auto-merge waits for every requirement and the admin bypass does not apply to it. PRs #33 and #34 (github/codeql-action analyze and init, 4.38.0 to 4.38.1, opened 2026-09-25) stand blocked on two counts: the approving review is still required, and both CodeQL `analyze` jobs fail with `Loaded a configuration file for version '4.38.0', but running version '4.38.1'` - Dependabot bumps the two actions in separate PRs, and they must share one version. PR #32 (dependabot/fetch-metadata 2.5.0 to 3.1.0, a major) is approved, carries no auto-merge by design, and is behind main. OWNER RULING NEEDED on the repair."
+        "Proof run, read 2026-10-01: negative. PR #31 (clap 4.6.6 to 4.6.7, a patch) got auto-merge enabled by the owner's token eleven seconds after it opened on 2026-09-18, then waited: it merged on 2026-09-21, seconds after the owner's own approving review. The token enables auto-merge; it does not satisfy the approval ruleset, because an enabled auto-merge waits for every requirement and the admin bypass does not apply to it. PRs #33 and #34 (github/codeql-action analyze and init, 4.38.0 to 4.38.1, opened 2026-09-25) stand blocked on two counts: the approving review is still required, and both CodeQL `analyze` jobs fail on each PR - Dependabot bumps the two actions in separate PRs, and they must share one version. PR #33 (analyze at 4.38.1) prints `Loaded a configuration file for version '4.38.0', but running version '4.38.1'`; PR #34 (init at 4.38.1) prints the same line with the two versions exchanged. PR #32 (dependabot/fetch-metadata 2.5.0 to 3.1.0, a major) is approved, carries no auto-merge by design, and is behind main.",
+        "Repair ruled 2026-10-01 (design.md 5.87): the workflow approves a minor or patch Dependabot PR with the owner's token before it enables auto-merge, and a Dependabot group moves the `github/codeql-action` pair in one PR. The item closes on the first minor or patch Dependabot PR that merges with no owner action."
       ],
       "milestone": null,
       "status": "partial",
-      "batch": 25,
+      "batch": 28,
       "see": [
         "HR-092",
         "HR-068",
@@ -229,7 +230,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 29,
       "see": []
     },
     {
@@ -255,22 +256,6 @@
       "status": "open",
       "batch": null,
       "see": []
-    },
-    {
-      "id": "HR-137",
-      "type": "risk",
-      "title": "Confirm aws-lc-sys builds clean on every rust-job OS and every release leg",
-      "body": [
-        "HR-133's axoupdater dependency pulled in aws-lc-sys (rustls' crypto provider) transitively. Walked on paper at batch 27 T2 fix round 1: prebuilt-nasm is already active for aws-lc-sys in this tree (rustls and rustls-webpki's own \"aws-lc-rs\" features each request \"aws-lc-rs/prebuilt-nasm\", confirmed by `cargo tree -e features -p aws-lc-sys` and a verbose `x86_64-pc-windows-gnu` build passing `--cfg feature=\"prebuilt-nasm\"` to rustc), so no leg needs a real NASM install. Every platform's own native C toolchain should cover the rest: macOS (Xcode CLT), Windows (MSVC, both ci.yml's windows-latest `rust`-job leg and release.yml's windows-msvc leg, both on GitHub-hosted images that ship it), and the two musl release legs (`dist plan --output-format=json`'s own artifacts_matrix runs them un-containerized on ubuntu-22.04(-arm) with `packages_install: apt-get install musl-tools`, already dist's own provisioning, not ci.yml's).",
-        "None of this is proven by an actual build: only the ubuntu `checks` job's windows-gnu cross-check has really compiled aws-lc-sys in this task, and even that ran with a substitute llvm-mingw toolchain (no root available to install the real gcc-mingw-w64-x86-64 package in the sandbox). The `rust` job's macos-latest and windows-latest legs, and release.yml's five target legs, have not run since this dependency landed. Confirm all of them green at the first real PR and the first real release cut after this change; if any leg fails, the fix is almost certainly a dist-workspace.toml packages/build-environment addition (never a hand edit of the generated release.yml) or the missing system package on ci.yml's own runner.",
-        "Proven live 2026-09-15, both halves. PR #30 (batch 27): the `rust` job passed on ubuntu-latest, macos-latest, and windows-latest. The v1.1.0 release run: all five `build-local-artifacts` legs passed (x86_64-apple-darwin, aarch64-apple-darwin, x86_64-pc-windows-msvc, x86_64-unknown-linux-musl, aarch64-unknown-linux-musl), then `build-global-artifacts`, `host`, and `announce`."
-      ],
-      "milestone": null,
-      "status": "done",
-      "batch": 27,
-      "see": [
-        "HR-133"
-      ]
     },
     {
       "id": "HR-138",
@@ -307,7 +292,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 29,
       "see": [
         "HR-138",
         "HR-139"
@@ -320,46 +305,16 @@
       "body": [
         "GitHub issue #35 (owner, 2026-09-30). The issue reports from the adopter project orrery, batch 1: process.claims-match-artifacts failed in 7 of 13 tasks, and every failure was drift - a line number, a timestamp, a command string, or a count carried from a draft into the final report. Each failure cost a review round.",
         "Request, two parts. (1) The closing act of the implementer template lists every file-and-line citation in the report after the last edit and re-opens each cited line at HEAD; it copies every command field from the shell history and never retypes a command. (2) check-report-claims resolves each <file>:<line> citation against the tree at HEAD and reports a line whose text differs from the fragment the report quotes.",
-        "Triage 2026-10-01: check-report-claims already resolves a citation's file and fails a line number past the end of the file (crates/houserules/src/report_claims.rs); it does not compare the cited line's text with a quoted fragment. Part 2 extends that check. Part 1 changes .claude/agents/implementer.md, so process.evals-rerun applies."
+        "Triage 2026-10-01: check-report-claims already resolves a citation's file and fails a line number past the end of the file (crates/houserules/src/report_claims.rs); it does not compare the cited line's text with a quoted fragment. Part 2 extends that check. Part 1 changes .claude/agents/implementer.md, so process.evals-rerun applies.",
+        "Batch 28 result (2026-10-01): part 1 shipped; part 2 did not. The owner ruled the checker rule heuristic and corpus-gated, with a bar of zero false positives (design.md 5.87, the batch-28 spec). The rule as specified (a backticked fragment of the citing sentence must occur in the cited line or range) was measured over the 166 retained deliverables of kind task-report. Hits, classified aged / true / false: as specified 52 = 12 / 2 / 38; fired only on drift evidence (a fragment occurs elsewhere in the cited file) 19 = 9 / 2 / 8; also limited to identifier-shaped fragments 12 = 5 / 2 / 5. At that narrowest trigger the fix-round finding and fix fields give 11 hits = 4 / 2 / 5 and the implemented and self_review fields give 1 hit = 1 / 0 / 0, so a field restriction reaches zero false hits only with zero true hits. Three of the twelve rows at the narrowest trigger are judgment calls, each marked with its alternative class in the classification: one counted true whose alternative is false, one counted false whose alternative is aged, and one counted false whose alternative is true. Taken the other way, they move the false count at that trigger between 3 and 6. The classification counts a hit aged only when the rule passes at a commit the report lists. Under that definition three false hits remain in every variant: a fragment that sits on an adjacent line, fragments that belong to sibling citations in the same sentence, and a fragment that names another job in the cited file. Under the wider definition (a hit is aged whenever the cited file changed after the report), the first of the three counts as aged and the other two remain. Typical false hits: a `grep -c` count such as `read_parity.rs:3` read as a line citation, and a sentence whose backticked token names a command or a neighbor, not code on the cited line. The rule is not wired. Open for a later spec: a trigger with better precision, or an owner ruling that accepts false hits. The module and its tests, unwired, are in the batch-28 workspace on the controller's machine (t5-evidence/wip/); the workspace is not tracked.",
+        "Notes for that later spec, from the batch-28 task: (a) a sentence boundary of `.`, `!`, or `?` plus whitespace splits wrongly at `...` inside a backtick span; (b) the classification rests on pre-aggregation commit states, most of them reachable from no ref, so a `git gc` can remove them and the corpus run must be repeated on states that still exist; (c) the tests of the two narrowed variants in the unwired module still expect the finding text of the unnarrowed rule.",
+        "Status after batch 28: partial. The template step shipped (with its failure branch) and the range fix of the existing check shipped; the checker rule stays open, as the paragraph above records."
       ],
       "milestone": null,
-      "status": "open",
-      "batch": null,
+      "status": "partial",
+      "batch": 28,
       "see": [
         "HR-128"
-      ]
-    },
-    {
-      "id": "HR-142",
-      "type": "feat",
-      "title": "The tdd mode label is proven with the capture and commit timestamps",
-      "body": [
-        "GitHub issue #36 (owner, 2026-09-30). The issue reports from the adopter project orrery, batch 1: process.tdd failed in 3 of 13 tasks, all three label failures - a RED capture taken after the commit was filed as `natural`. The task-reviewer template checks the label by hand, so each failure cost a review round.",
-        "Request. Before the implementer writes a `tdd` entry, the template has it run `stat -c %y <red capture>` and `git log -1 --format=%cI <commit>`, label the entry `natural` only when the capture predates the commit and `reconstructed` otherwise, and paste both timestamps in the entry. Optional deterministic arm: check-report-claims compares the capture's mtime with the commit time for every entry labeled `natural`.",
-        "Triage 2026-10-01: the template half changes .claude/agents/implementer.md, so process.evals-rerun applies. The deterministic arm needs a design answer first: a file mtime does not survive a copy or a checkout, so the check holds only inside the session that made the capture."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": null,
-      "see": [
-        "HR-141"
-      ]
-    },
-    {
-      "id": "HR-143",
-      "type": "feat",
-      "title": "A script that builds a report validates its own output",
-      "body": [
-        "GitHub issue #37 (owner, 2026-09-30). The issue reports from the adopter project orrery, batch 1: one task report failed `houserules validate` in a fix round (process.deliverables-json). The implementer built the report with a script; the template tells the implementer to validate a temporary copy before the move into place, and the builder script skipped that step.",
-        "Request. One line in .claude/agents/implementer.md: a script that builds a report runs `houserules validate` on its output and exits non-zero on failure.",
-        "Triage 2026-10-01: a template-only change; process.evals-rerun applies."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": null,
-      "see": [
-        "HR-141",
-        "HR-142"
       ]
     },
     {
@@ -369,49 +324,156 @@
       "body": [
         "GitHub issue #38 (owner, 2026-09-30). The batch lifecycle reviews code three times (implementer self-review, task reviewer, branch reviewer) and reviews design zero times: the Design row of the orchestrating skill asks only for a spec and the owner's approval, so the owner is the first and only adversarial check on a design decision. The issue reports from the adopter project orrery: in one batch and one spec draft, four design decisions were overturned, each refuted by a cheap check. Named causes: the controller argued before it tested, did not state the rejected option's best case, and inherited concepts unexamined.",
         "Request, three parts. (1) A design-phase gate in the lifecycle table and the orchestrating skill: before the owner sees a spec, a fresh-context reviewer on the strongest model attacks its decisions and reruns its probes, and its findings are fixed. (2) A `spec-reviewer` agent template beside `task-reviewer` and `branch-reviewer`, and a `spec-review` deliverable kind in .claude/schemas/deliverables.json, so `houserules validate` and `houserules stats` cover it. (3) Seed rules for the design phase: a decision that rejects a library or departs from the source research or an approved spec carries a captured probe, the rejected option's best case, and a reversal condition; each supporting claim is labelled run, read, or assumed, and an assumed claim is never the sole reason for a rejection; a spec lists every concept it takes from its sources, with the source's own status and a check against the goal; every decision the owner or a reviewer overturns is a `Reversal:` ledger line, and the batch retrospective counts reversals beside rule violations.",
-        "Triage 2026-10-01: part 2 adds a deliverable kind to both parity-pinned copies of the deliverables schema, a frozen surface (houserules.1-0-surface-is-frozen): it needs an owner ruling on whether the addition is a breaking change. The gate adds a review round to the lifecycle, so its design must be weighed against HR-140 (the balancing mechanism against over-bureaucratizing). A new kit-owned template changes KIT_OWNED (houserules.readme-mirrors-kit-owned)."
+        "Triage 2026-10-01: part 2 adds a deliverable kind to both parity-pinned copies of the deliverables schema, a frozen surface (houserules.1-0-surface-is-frozen): it needs an owner ruling on whether the addition is a breaking change. The gate adds a review round to the lifecycle, so its design must be weighed against HR-140 (the balancing mechanism against over-bureaucratizing). A new kit-owned template changes KIT_OWNED (houserules.readme-mirrors-kit-owned).",
+        "Ruled 2026-10-01 (design.md 5.87): the item leaves batch 28 and forms batch 29 with HR-140; the surface ruling for the `spec-review` kind and the delivery path for a seed-once schema change are decided in that batch's spec."
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 29,
       "see": [
         "HR-140"
       ]
     },
     {
-      "id": "HR-145",
-      "type": "fix",
-      "title": "stats aborts on a non-JSON deliverable; a draft report's first audit fails; the gates need git",
+      "id": "HR-147",
+      "type": "feat",
+      "title": "The kit installs into a subdirectory of a repository",
       "body": [
-        "GitHub issue #39 (owner, 2026-09-30): three tooling defects and one note, all seen in one batch of the adopter project orrery.",
-        "(1) `houserules stats <workspace>` exits 2 for the whole workspace on one unreadable file. Request: report unreadable files in a `skipped` field and continue; the task-reviewer template says that probe outputs go to `.txt` files. Triage 2026-10-01, reproduced: a non-JSON file named `task-*-audit*.json`, `task-*-review*.json`, or `task-*-report.json` makes stats exit 2 with `invalid JSON`; a non-JSON `.json` file with another name is ignored. The abort is tested behavior (crates/houserules/src/rules/stats.rs), and quality.gates-derive-their-scope requires a gate to fail loudly on unreadable input, so the request needs a ruling.",
-        "(2) The first audit of a draft report fails process.deliverables-json. The retrieval protocol has the implementer write the report with `self_audit: null` and then audit it with `--report`; the issue reports that this first audit fails the report-field check (`report lacks a value for self_audit`) and that stats later counts the draft as a violation. Request: skip the `self_audit` presence check when `--report` is given and the field is null, or let stats ignore `*-draft.json`. Triage 2026-10-01: not reproduced yet; the template line (`self_audit` is `null` until the next step) is confirmed.",
-        "(3) check-knowledge and check-backlog need a git top level. Request: a `--dir` fallback that resolves the root without git, or a sentence in the reviewer templates. Triage 2026-10-01, reproduced: in a `git archive | tar` copy both gates exit 2 with git's own `fatal: not a git repository`; both pass there with `--dir .`. The flag exists; the gap is the unnamed error and the missing template sentence.",
-        "(4) Note: .claude/evals/record.json is seeded as `[]`, and the branch-reviewer template asks for a comparison against it that cannot run until a baseline exists. Request: a seeded baseline or a documented first-run step."
+        "GitHub issue #41 (external reporter, 2026-10-01). The reporter could not use houserules in one subdirectory of a large legacy monorepo: an install at the repository root required moving files that belong to other domains. Request: remove the repository-root requirement. The issue names no version, no command, and no output.",
+        "Triage 2026-10-01, reproduced with the 1.1.0 tree: in a subdirectory of a git repository, `houserules init` and `houserules init --dir .` both refuse with `<dir> is not a git repository (run git init first)`. The message is wrong for this case: the directory is inside a repository, and `git init` there would create a nested one.",
+        "Scope for the spec: every read command resolves the enclosing git top level as its root; `init` requires the target to be one; the seeded hooks, the CI workflow, and the `.claude/` directory assume the repository root. A subdirectory install changes that contract across the CLI, so it needs its own spec and an owner ruling under houserules.1-0-surface-is-frozen. The error text can be corrected on its own.",
+        "Ruled 2026-10-01 (design.md 5.87): batch 28 corrects the refusal text; the subdirectory install stays open here for its own spec.",
+        "Status after batch 28: partial. The refusal text shipped: a target inside a repository gets `<target> is inside the git repository at <top level>, not its top level; houserules installs at the repository root`, derived from the nearest ancestor that holds `.git`. The subdirectory install itself stays open for its own spec."
+      ],
+      "milestone": null,
+      "status": "partial",
+      "batch": 28,
+      "see": [
+        "HR-145"
+      ]
+    },
+    {
+      "id": "HR-148",
+      "type": "fix",
+      "title": "check-report-claims: a comma-list citation's later line numbers are never checked",
+      "body": [
+        "Found in batch 28 task 5 (HR-141). `check_citation_lines` reads a citation such as `file.rs:23,24,41` for its first number only; the later numbers are not compared with the file's line count. Batch 28 ruled the invariant for a single line and for a range: every line number a citation names fits the file it names. The comma-list form is outside that fix, and only a Limits bullet in the module doc of crates/houserules/src/report_claims.rs names the gap.",
+        "Scope for the fix: parse each number of a comma list, compare each with the file's line count, and keep the existing finding shape. Measure the retained task reports first for how often the form occurs."
       ],
       "milestone": null,
       "status": "open",
       "batch": null,
       "see": [
-        "HR-138",
+        "HR-141",
+        "HR-128"
+      ]
+    },
+    {
+      "id": "HR-149",
+      "type": "fix",
+      "title": "vacuous-exception-gate looks for the binary under target/debug and panics under CARGO_TARGET_DIR",
+      "body": [
+        "Found by both implementer scenarios of the batch-28 eval rerun. crates/houserules/src/bin/vacuous-exception-gate.rs builds the path of the houserules binary as `<root>/target/debug/<name>`. With `CARGO_TARGET_DIR` set to a directory outside the repository, the gate panics on the missing path. Both agents worked around it with a temporary `target` symlink.",
+        "Scope for the fix: resolve the binary through the build's own target directory (cargo's `CARGO_TARGET_DIR`, or the path of the running gate binary), with a named error when the binary is absent. `mise run lint` runs this gate, so the fix needs a test with the variable set."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": []
+    },
+    {
+      "id": "HR-150",
+      "type": "fix",
+      "title": "Implementer template: the closing check-report-claims run must not redirect into its own capture",
+      "body": [
+        "Found by the batch-28 eval rerun (docs-edit) and by the batch-28 task-4 implementer. The closing act tells the implementer to run `houserules check-report-claims <REPORT_FILE>` and paste its clean run as the final `tests` entry. The `tests` contract asks for a redirect to a capture file. A re-run of that entry with the same redirect truncates the capture before the checker reads it, and the checker then fails the entry on a byte mismatch. The implementers worked around it: one left the closing entry without a redirect, one re-checked into a second file.",
+        "Scope for the fix: one sentence in the closing act of template/.claude/agents/implementer.md that states the form of the final entry (no redirect, or a capture file no earlier entry names). The change needs the eval rerun (process.evals-rerun).",
+        "Added by the batch-28 branch review: the same closing sequence has a second gap. The closing act says 'Not clean: fix the report and re-run'. That fix can edit a cited sentence after the citation step ran, and no step sends the implementer back. Add one sentence: after a fix to the report, repeat the citation step, then the closing run. Both edits share one eval rerun."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-143"
+      ]
+    },
+    {
+      "id": "HR-151",
+      "type": "fix",
+      "title": "Citation remedy side effects: an id active and archived at once; update without a stamp resets the id prefix",
+      "body": [
+        "Found in the batch-28 branch review and its fix wave (HR-146). (1) An adopter who archived a seeded entry that a kit-owned file cites, and then follows the restore remedy of check-knowledge, gets the entry back as active while knowledge/archive/ keeps the retired copy. No gate reports the id held twice. (2) `houserules update` on an install with no `.houserules.json` stamps `idPrefix` from `--id-prefix` or `WI`; the restore remedy says 'run houserules update', so a project with its own prefix and no stamp gets `WI` unless it passes the flag. (3) For a whole deleted seeded topic file, the `overrides` way out clears the citation findings but leaves dangling `see` links, and check-knowledge stays red on those.",
+        "(4) On an install with no stamp, the `overrides` way out does not keep the entry deleted past the next `update`: no baseline records the deletion, so `update` completes the stamp and writes the entry back as active. Points 1 to 3 are stated in the doc of the lint and pinned by a test in batch 28; point 4 was measured in the scoped re-review of the branch fix wave and has neither. None is changed there. Scope for a spec: decide whether check-knowledge reports an id that is both active and archived; whether the remedy names the `--id-prefix` flag for an unstamped install; whether the deleted-topic case gets its own remedy text."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
         "HR-146"
       ]
     },
     {
-      "id": "HR-146",
+      "id": "HR-152",
       "type": "fix",
-      "title": "Kit-owned files cite a seeded knowledge entry an adopter can delete; no gate flags the dangling id",
+      "title": "stats counts a sanctioned interim fail as a violation",
       "body": [
-        "GitHub issue #40 (owner, 2026-10-01). The issue reports that kit 1.1.0 does not ship process.evals-rerun although .claude/skills/orchestrating/SKILL.md (section Template evaluation) and .claude/agents/branch-reviewer.md cite it: in the adopter project orrery `houserules get process.evals-rerun` answered `unknown id`, two agent-template changes shipped with .claude/evals/record.json still `[]`, and no audit failed. Request: ship the entry as a standing rule with a deterministic co-change check, or remove the two sentences and the evals directory from the install.",
-        "Triage 2026-10-01: the premise does not hold. template/knowledge/process.json carries process.evals-rerun with its co-change check, and a fresh `init` from the 1.1.0 tree seeds it (`get` prints it). The adopter project deleted the entry in its own knowledge ruling after the install, with other seeded process entries, and restored it later.",
-        "The defect that remains, reproduced in a scratch install: with the entry deleted, `houserules check-knowledge` still passes while the kit-owned orchestrating skill and branch-reviewer template keep citing the id. Seeded knowledge is the adopter's to edit; kit-owned files are not. Candidate fixes for the spec: a check-knowledge lint that fails when a kit-owned file cites a knowledge id that does not resolve; a sentence in the migrating-knowledge skill that names the seeded entries the kit-owned files depend on."
+        "Found in the batch-28 branch review. `houserules stats` lists a fail row that the audit carries as sanctioned (`--sanctioned <rule>=<ref>`) as a violation: crates/houserules/src/rules/stats.rs reads neither the summary's `sanctioned_fail` nor the `(sanctioned: <ref>)` mark of the row. In batch 28 the id with the highest count, process.evals-rerun with 4, is the one interim fail the spec booked, so the retrospective input over-reports.",
+        "Scope for the fix: stats reports sanctioned rows in a list of their own. That changes the output shape of a frozen command, so the item needs an owner ruling under houserules.1-0-surface-is-frozen before it is scheduled."
       ],
       "milestone": null,
       "status": "open",
       "batch": null,
       "see": [
-        "HR-145",
-        "HR-130"
+        "HR-145"
+      ]
+    },
+    {
+      "id": "HR-153",
+      "type": "process",
+      "title": "Template and rule riders from the batch-28 branch review",
+      "body": [
+        "Deferred from batch 28 into batch 29, which redesigns the review mechanism and these same templates (HR-144, HR-140, HR-129). Template defects, each with the reviewer's fix: (1) orchestrating skill: a task that adds or tightens a check in check-knowledge, check-backlog, or audit carries a paper walk in its brief (a fresh install, an install on each released kit under the new binary, an install with kept or overridden kit-owned files), and the report states each accepted red. (2) orchestrating skill, the rule that a brief's claims are measured: a brief that dictates a message reads it once for each state that prints it; a brief that dictates an enumeration derives it from the subject, never from a file name; a brief that dictates a mechanism a reviewer proposed has run it against the reviewer's own counter-example first (eight of the 31 task-review findings of batch 28 were plan-mandated). (3) branch-reviewer template: compare BASE with the remote default branch through a read-only call; list the commits in BASE..HEAD that no task report lists and review each. (4) finishing-a-feature skill, the aggregation step: fetch first; if main moved, rebuild the branch on it before the soft reset.",
+        "Clauses the review proposes for standing entries; only the owner rules these: process.claims-match-artifacts (a fix round that re-runs or re-pins an earlier round's evidence says so; a line citation into a generated evidence file is re-derived after each regeneration); process.closure-claims-carry-enumeration (a corpus of deliverables is selected by content, never by file name; an exception list is a closure with its own script); process.gates-cover-generated-commits (a check added to a shipped gate is walked through the installed populations, and the new predicate runs over the template at each release tag); process.rulings-to-file (a brief amendment that adds or drops a test, a file, or a gate against the plan is a ruling for the spec's outcomes section); writing-style.code-comments (a comment on measured or third-party behavior names an openable source; the controller files the knowledge entry before the dispatch); writing-style.doc-comments (a new caller re-opens the callee's doc comment); process.tdd (a RED against a stub of an implementation already drafted is a `mutation` entry)."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 29,
+      "see": [
+        "HR-129",
+        "HR-140",
+        "HR-144"
+      ]
+    },
+    {
+      "id": "HR-154",
+      "type": "fix",
+      "title": "The seeded CI installs the latest binary: a release that tightens a gate reddens every install before it updates",
+      "body": [
+        "Found in the batch-28 branch review. template/.github/workflows/knowledge.yml installs houserules from releases/latest, while the kit files in an adopter's tree stay at the version of its last `houserules update`. A release that adds a check to check-knowledge or check-backlog therefore runs the new check over old kit files. It has happened before. Derived from the source at the release tags, not run: the 1.1.0 binary requires AGENTS.md, and the kit files of 0.3.0 and 1.0.0 hold none, so release 1.1.0 failed check-knowledge in every earlier install until `update` backfilled the file. Batch 28 does the same through the citation lint: the finishing-a-feature skill of 0.3.0, 1.0.0, and 1.1.0 cites knowledge-base.cite-durable-refs, an id the kit never seeded, and the new citation lint fails on it until `houserules update` runs and its result is committed.",
+        "Ruled by the owner on 2026-10-02 (design.md 5.88): the seeded workflow installs the version `.houserules.json` records, and batch 28 builds it. The lint ships as built; the release note states the red first. The workflow is a seed-once file, so the change reaches new installs; an existing install edits its own workflow, and the release note says how.",
+        "Status after batch 28: partial. Built: the seeded workflow reads the top-level `version` line of `.houserules.json` with a POSIX tool and installs the installer of that release; a stamp with no such line falls back to the latest release with a notice; a version that is no release version is rejected before any download; a failed download prints a named error. The step's own script ran for real against the published releases with the home directory at a scratch directory. Two duties stay open and are due at the first release that carries the step (docs/runbook.md, the release procedure): (1) the owner-attended seeded-repository run of houserules.seeded-repo-live-proof, which is the only real Actions run of the step; (2) the release note prints the changed install step for installs that keep their seed-once workflow, and states first that check-knowledge fails in every existing install until `houserules update` runs. The item closes with the run of (1)."
+      ],
+      "milestone": null,
+      "status": "partial",
+      "batch": 28,
+      "see": [
+        "HR-146"
+      ]
+    },
+    {
+      "id": "HR-155",
+      "type": "chore",
+      "title": "No lint covers a script embedded in a workflow",
+      "body": [
+        "Found in batch 28 task 7. `mise run lint` runs shellcheck over the shell files under tools/, template/tools/, and the commit-msg hooks. A `run:` block of a workflow is a shell script too, and no gate reads it: the seeded install step of template/.github/workflows/knowledge.yml (25 lines of bash) and the approve step of .github/workflows/dependabot-auto-merge.yml are proven only by tests that run them against stubs.",
+        "Scope for a spec: extract each `run:` block and pass it to shellcheck in the lint task, or adopt a workflow linter after a dependency vetting. The tests' shared reader (crates/houserules/tests/workflow_reader/) already extracts a step's script."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-154",
+        "HR-098"
       ]
     }
   ]

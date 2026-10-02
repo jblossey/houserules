@@ -1984,6 +1984,95 @@
         "HR-134",
         "HR-135"
       ]
+    },
+    {
+      "id": "HR-137",
+      "type": "risk",
+      "title": "Confirm aws-lc-sys builds clean on every rust-job OS and every release leg",
+      "body": [
+        "HR-133's axoupdater dependency pulled in aws-lc-sys (rustls' crypto provider) transitively. Walked on paper at batch 27 T2 fix round 1: prebuilt-nasm is already active for aws-lc-sys in this tree (rustls and rustls-webpki's own \"aws-lc-rs\" features each request \"aws-lc-rs/prebuilt-nasm\", confirmed by `cargo tree -e features -p aws-lc-sys` and a verbose `x86_64-pc-windows-gnu` build passing `--cfg feature=\"prebuilt-nasm\"` to rustc), so no leg needs a real NASM install. Every platform's own native C toolchain should cover the rest: macOS (Xcode CLT), Windows (MSVC, both ci.yml's windows-latest `rust`-job leg and release.yml's windows-msvc leg, both on GitHub-hosted images that ship it), and the two musl release legs (`dist plan --output-format=json`'s own artifacts_matrix runs them un-containerized on ubuntu-22.04(-arm) with `packages_install: apt-get install musl-tools`, already dist's own provisioning, not ci.yml's).",
+        "None of this is proven by an actual build: only the ubuntu `checks` job's windows-gnu cross-check has really compiled aws-lc-sys in this task, and even that ran with a substitute llvm-mingw toolchain (no root available to install the real gcc-mingw-w64-x86-64 package in the sandbox). The `rust` job's macos-latest and windows-latest legs, and release.yml's five target legs, have not run since this dependency landed. Confirm all of them green at the first real PR and the first real release cut after this change; if any leg fails, the fix is almost certainly a dist-workspace.toml packages/build-environment addition (never a hand edit of the generated release.yml) or the missing system package on ci.yml's own runner.",
+        "Proven live 2026-09-15, both halves. PR #30 (batch 27): the `rust` job passed on ubuntu-latest, macos-latest, and windows-latest. The v1.1.0 release run: all five `build-local-artifacts` legs passed (x86_64-apple-darwin, aarch64-apple-darwin, x86_64-pc-windows-msvc, x86_64-unknown-linux-musl, aarch64-unknown-linux-musl), then `build-global-artifacts`, `host`, and `announce`."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 27,
+      "see": [
+        "HR-133"
+      ]
+    },
+    {
+      "id": "HR-142",
+      "type": "feat",
+      "title": "The tdd mode label is proven with the capture and commit timestamps",
+      "body": [
+        "GitHub issue #36 (owner, 2026-09-30). The issue reports from the adopter project orrery, batch 1: process.tdd failed in 3 of 13 tasks, all three label failures - a RED capture taken after the commit was filed as `natural`. The task-reviewer template checks the label by hand, so each failure cost a review round.",
+        "Request. Before the implementer writes a `tdd` entry, the template has it run `stat -c %y <red capture>` and `git log -1 --format=%cI <commit>`, label the entry `natural` only when the capture predates the commit and `reconstructed` otherwise, and paste both timestamps in the entry. Optional deterministic arm: check-report-claims compares the capture's mtime with the commit time for every entry labeled `natural`.",
+        "Triage 2026-10-01: the template half changes .claude/agents/implementer.md, so process.evals-rerun applies. The deterministic arm needs a design answer first: a file mtime does not survive a copy or a checkout, so the check holds only inside the session that made the capture.",
+        "Delivered in batch 28. `check-report-claims` fails a `natural` entry whose RED capture file is newer than the newest commit the report lists; the finding reads `was modified <N> s after the newest listed commit <sha> (committed <T>)`. A tracked capture file is skipped. The corpus run over the 165 retained task reports compared 72 natural captures and flagged only a deliberate probe. The template's `tdd` bullet names the capture form. The deterministic arm holds only in the workspace that made the capture; the module doc's Limits list says so."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 28,
+      "see": [
+        "HR-141"
+      ]
+    },
+    {
+      "id": "HR-143",
+      "type": "feat",
+      "title": "A script that builds a report validates its own output",
+      "body": [
+        "GitHub issue #37 (owner, 2026-09-30). The issue reports from the adopter project orrery, batch 1: one task report failed `houserules validate` in a fix round (process.deliverables-json). The implementer built the report with a script; the template tells the implementer to validate a temporary copy before the move into place, and the builder script skipped that step.",
+        "Request. One line in .claude/agents/implementer.md: a script that builds a report runs `houserules validate` on its output and exits non-zero on failure.",
+        "Triage 2026-10-01: a template-only change; process.evals-rerun applies.",
+        "Delivered in batch 28, as two sentences in the edit rule of the implementer template: a script that builds or edits the report runs `houserules validate` on its output and exits non-zero when validation fails; while `self_audit` is still `null`, the only error it lets pass is `needs a non-null self_audit`. The second sentence refines the wording the owner approved."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 28,
+      "see": [
+        "HR-141",
+        "HR-142"
+      ]
+    },
+    {
+      "id": "HR-145",
+      "type": "fix",
+      "title": "stats aborts on a non-JSON deliverable; a draft report's first audit fails; the gates need git",
+      "body": [
+        "GitHub issue #39 (owner, 2026-09-30): three tooling defects and one note, all seen in one batch of the adopter project orrery.",
+        "(1) `houserules stats <workspace>` exits 2 for the whole workspace on one unreadable file. Request: report unreadable files in a `skipped` field and continue; the task-reviewer template says that probe outputs go to `.txt` files. Triage 2026-10-01, reproduced: a non-JSON file named `task-*-audit*.json`, `task-*-review*.json`, or `task-*-report.json` makes stats exit 2 with `invalid JSON`; a non-JSON `.json` file with another name is ignored. The abort is tested behavior (crates/houserules/src/rules/stats.rs), and quality.gates-derive-their-scope requires a gate to fail loudly on unreadable input, so the request needs a ruling.",
+        "(2) The first audit of a draft report fails process.deliverables-json. The retrieval protocol has the implementer write the report with `self_audit: null` and then audit it with `--report`; the issue reports that this first audit fails the report-field check (`report lacks a value for self_audit`) and that stats later counts the draft as a violation. Request: skip the `self_audit` presence check when `--report` is given and the field is null, or let stats ignore `*-draft.json`. Triage 2026-10-01: not reproduced yet; the template line (`self_audit` is `null` until the next step) is confirmed.",
+        "(3) check-knowledge and check-backlog need a git top level. Request: a `--dir` fallback that resolves the root without git, or a sentence in the reviewer templates. Triage 2026-10-01, reproduced: in a `git archive | tar` copy both gates exit 2 with git's own `fatal: not a git repository`; both pass there with `--dir .`. The flag exists; the gap is the unnamed error and the missing template sentence.",
+        "(4) Note: .claude/evals/record.json is seeded as `[]`, and the branch-reviewer template asks for a comparison against it that cannot run until a baseline exists. Request: a seeded baseline or a documented first-run step.",
+        "Delivered in batch 28. (1) The `stats` abort stays and its error names the remedy; the task-reviewer template sends probe output to `.txt` files. (2) A single-report audit passes a draft's null `self_audit` with the row text `report field self_audit is present`; a `--workspace` audit stays strict, and `validate` keeps rejecting a null `self_audit` at `DONE` and `DONE_WITH_CONCERNS`. (3) A command outside a git repository prints `<cwd> is not inside a git repository; pass --dir <repository root>`. (4) The empty eval record is a defined state in the branch-reviewer template and the orchestrating skill."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 28,
+      "see": [
+        "HR-138",
+        "HR-146"
+      ]
+    },
+    {
+      "id": "HR-146",
+      "type": "fix",
+      "title": "Kit-owned files cite a seeded knowledge entry an adopter can delete; no gate flags the dangling id",
+      "body": [
+        "GitHub issue #40 (owner, 2026-10-01). The issue reports that kit 1.1.0 does not ship process.evals-rerun although .claude/skills/orchestrating/SKILL.md (section Template evaluation) and .claude/agents/branch-reviewer.md cite it: in the adopter project orrery `houserules get process.evals-rerun` answered `unknown id`, two agent-template changes shipped with .claude/evals/record.json still `[]`, and no audit failed. Request: ship the entry as a standing rule with a deterministic co-change check, or remove the two sentences and the evals directory from the install.",
+        "Triage 2026-10-01: the premise does not hold. template/knowledge/process.json carries process.evals-rerun with its co-change check, and a fresh `init` from the 1.1.0 tree seeds it (`get` prints it). The adopter project deleted the entry in its own knowledge ruling after the install, with other seeded process entries, and restored it later.",
+        "The defect that remains, reproduced in a scratch install: with the entry deleted, `houserules check-knowledge` still passes while the kit-owned orchestrating skill and branch-reviewer template keep citing the id. Seeded knowledge is the adopter's to edit; kit-owned files are not. Candidate fixes for the spec: a check-knowledge lint that fails when a kit-owned file cites a knowledge id that does not resolve; a sentence in the migrating-knowledge skill that names the seeded entries the kit-owned files depend on.",
+        "Delivered in batch 28. `check-knowledge` fails when a kit-owned file cites, as a backticked id of a seeded topic, an entry the knowledge base does not hold. The finding names two ways out for a seeded id (restore the entry, or list the citing file in `overrides`) and the way out for an id the kit never seeded. The kit-side test found one such id in the shipped finishing-a-feature skill, `knowledge-base.cite-durable-refs`; the citation was removed. Every install of 0.3.0 to 1.1.0 fails the new lint until `houserules update` runs (HR-154). Side effects of the remedy are in HR-151."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 28,
+      "see": [
+        "HR-145",
+        "HR-130"
+      ]
     }
   ]
 }

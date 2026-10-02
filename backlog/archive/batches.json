@@ -405,6 +405,25 @@
         "text": "Done 2026-09-15: update self-updates the binary (axoupdater, receipt-gated, honest ReceiptElsewhere decline), the cached TTY-only update-available header, install-path moved to ~/.local/bin per 5.86, AGENTS.md canonical with CLAUDE.md as the endorsed pointer and check_base requiring/budgeting AGENTS.md. HR-137 stays open: the accepted-red risk item proving the new C-toolchain dependency's CI and release legs at the first real PR and cut."
       },
       "summary": "The install-and-update UX cluster (self-update, update-available header, the ~/.local/bin move) and the agent-agnostic kit (HR-136)."
+    },
+    {
+      "number": 28,
+      "items": [
+        "HR-098",
+        "HR-141",
+        "HR-142",
+        "HR-143",
+        "HR-145",
+        "HR-146",
+        "HR-147",
+        "HR-154"
+      ],
+      "summary": "The issue batch: the fixes for GitHub issues 35, 36, 37, 39, and 40, the refusal text of issue 41, and the HR-098 auto-merge repair.",
+      "kickoff": "docs/specs/2026-10-01-batch-28-issue-batch.md",
+      "status": {
+        "state": "done",
+        "text": "Built 2026-10-02 (spec section 7 holds the outcomes, section 8 the owner's checkpoint rulings): HR-142, HR-143, HR-145, and HR-146 delivered. HR-141 partial: the template step and a range fix shipped; the checker rule failed its corpus gate and stays open. HR-147 partial: the refusal text shipped; the subdirectory install stays open. HR-154 partial: the seeded workflow installs the stamped version; its seeded-repository run and its release-note text are due at the first release that carries it. HR-098 stays partial until the first minor or patch Dependabot PR merges with no owner action. Follow-ups filed: HR-148 to HR-153 and HR-155."
+      }
     }
   ]
 }
