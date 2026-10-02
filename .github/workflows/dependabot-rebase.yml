@@ -1,0 +1,116 @@
+name: dependabot-rebase
+# A push to main puts an open Dependabot PR behind main. The main ruleset requires an
+# up-to-date branch, and an enabled auto-merge waits for every ruleset requirement
+# (houserules.auto-merge-waits-for-every-ruleset-rule), so the behind PR waits. GitHub documents
+# an automatic Dependabot rebase for conflicts only.
+#
+# On every push to main, the step comments `@dependabot rebase` on one PR: the lowest-numbered
+# open PR that Dependabot authored, that has auto-merge enabled, that is behind main, and that has
+# no failed check at its current head. Dependabot rebases the branch. dependabot-auto-merge
+# approves the PR when it is not approved, and enables auto-merge again. The checks run, and the
+# PR merges. That merge is the next push to main, and it serves the next PR. A request to every
+# behind PR at once would put each of them behind again after each merge.
+#
+# The step lists open PRs with no filter flag. `gh pr list --app` and `--author` read GitHub's
+# search index, and a merged PR keeps its auto-merge request while its old head reads as behind.
+# `gh` prints `app/dependabot` as the author of a Dependabot PR, and the step selects on that value.
+# The step reads the checks of a PR only after the compare shows it behind. A PR with a failed
+# check gets one printed line and no request, so it cannot hold the line. Pending, skipped,
+# cancelled, and absent checks do not make a PR red.
+#
+# Two tokens. The workflow token (`github.token`) makes every read: the PR list, the compare call,
+# and the check state. Its scopes are the read scopes in `permissions`: contents for the compare,
+# pull-requests for the list, checks and statuses for the check state. The owner's token (the
+# secret DEPENDABOT_AUTOMERGE_TOKEN, held as REBASE_TOKEN) makes the one comment. GitHub's
+# reference lists `@dependabot rebase` and does not say whose comments Dependabot obeys; the
+# owner's comment is the case not in doubt. The owner's token is scoped to Contents and Pull
+# requests. Whether it can read check state is not documented, and an empty answer would read as
+# no checks, so no read rests on it.
+#
+# The secret store that a run reads follows the actor: a run that Dependabot starts reads
+# Dependabot secrets, and every other run reads Actions secrets
+# (https://docs.github.com/en/code-security/dependabot/troubleshooting-dependabot/troubleshooting-dependabot-on-github-actions).
+# The owner is the actor of a push to main, the merge of an auto-merged Dependabot PR included
+# (houserules.secret-store-follows-the-triggering-actor), so this workflow reads the Actions
+# store: `gh secret set DEPENDABOT_AUTOMERGE_TOKEN`.
+# An empty secret fails the step with a named error.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  statuses: read
+
+concurrency:
+  group: dependabot-rebase
+  cancel-in-progress: false
+
+jobs:
+  rebase:
+    if: github.repository == 'jblossey/houserules'
+    runs-on: ubuntu-latest
+    steps:
+      - shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REBASE_TOKEN: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
+        run: |
+          if [ -z "$REBASE_TOKEN" ]; then
+            echo "::error::The Actions secret DEPENDABOT_AUTOMERGE_TOKEN is empty or not set. Set it with: gh secret set DEPENDABOT_AUTOMERGE_TOKEN"
+            exit 1
+          fi
+          pulls=$(gh pr list --state open --limit 100 --json number,headRefOid,autoMergeRequest,author --jq '.[] | "\(.number) \(.headRefOid) \(.autoMergeRequest != null) \(.author.login)"')
+          sorted=$(sort -n <<< "$pulls")
+          while read -r number head auto author; do
+            [ "$author" = app/dependabot ] || continue
+            [ "$auto" = true ] || continue
+            behind=$(gh api "repos/$GH_REPO/compare/main...$head" --jq .behind_by)
+            case $behind in
+              '' | *[!0-9]*)
+                echo "::error::The compare API returned '$behind' as behind_by for pull request #$number. Expected a number."
+                exit 1
+                ;;
+            esac
+            [ "$behind" -gt 0 ] || continue
+            if ! buckets=$(gh pr checks "$number" --json bucket --jq '.[].bucket'); then
+              # gh exits 1 for a pull request with no checks and for a failed read alike.
+              # The number of entries in the check list tells them apart. A commit status has
+              # no name, so the entries are counted and not read by name.
+              entries=$(gh pr view "$number" --json statusCheckRollup --jq '.statusCheckRollup | length')
+              case $entries in
+                '' | *[!0-9]*)
+                  echo "::error::gh returned '$entries' as the number of checks of pull request #$number. Expected a number."
+                  exit 1
+                  ;;
+              esac
+              if [ "$entries" -gt 0 ]; then
+                echo "::error::gh could not read the checks of pull request #$number."
+                exit 1
+              fi
+              buckets=
+            fi
+            failed=no
+            for bucket in $buckets; do
+              case $bucket in
+                fail) failed=yes ;;
+                pass | pending | skipping | cancel) ;;
+                *)
+                  echo "::error::gh reported the check bucket '$bucket' for pull request #$number. Expected pass, fail, pending, skipping, or cancel."
+                  exit 1
+                  ;;
+              esac
+            done
+            if [ "$failed" = yes ]; then
+              echo "Skipped pull request #$number: a check of its current head failed."
+              continue
+            fi
+            GH_TOKEN="$REBASE_TOKEN" gh pr comment "$number" --body '@dependabot rebase'
+            echo "Asked Dependabot to rebase pull request #$number: $behind behind main."
+            exit 0
+          done <<< "$sorted"
+          echo "No Dependabot pull request with auto-merge is behind main and free of failed checks."

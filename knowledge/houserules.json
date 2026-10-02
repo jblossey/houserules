@@ -830,7 +830,8 @@
       "body": [
         "Observed live on PR #31 (a Dependabot patch update): the owner's token enabled auto-merge eleven seconds after the PR opened on 2026-09-18; the PR merged on 2026-09-21, seconds after the owner's own approving review. The `approval` ruleset's only bypass actor is the repository admin role, and the token is the admin's.",
         "Consequence: a workflow that wants an unattended merge must satisfy the requirement, not rely on the bypass. `.github/workflows/dependabot-auto-merge.yml` therefore approves a minor or patch Dependabot PR with the owner's token before it enables auto-merge (design.md 5.87, HR-098).",
-        "Observed live on PR #48 (2026-10-02): the workflow approved the PR and enabled auto-merge thirteen seconds after it opened, and every check passed. The PR still waited, because a push reached main first and the `main` ruleset requires an up-to-date branch. Dependabot's documentation promises a rebase only for conflicts, and two weekly runs left PR #32 behind main untouched (HR-156)."
+        "Observed live on PR #48 (2026-10-02): the workflow approved the PR and enabled auto-merge thirteen seconds after it opened, and every check passed. The PR still waited, because a push reached main first and the `main` ruleset requires an up-to-date branch. Dependabot's documentation promises a rebase only for conflicts, and two weekly runs left PR #32 behind main untouched (HR-156). Single observations of what Dependabot does on its own, none of them a rule: it rebased PRs #32 and #43 about two minutes after PR #48 of the same ecosystem merged, with no conflict involved; it left PR #32 behind after PR #31 of another ecosystem merged; it left PR #48 behind for almost two hours after the release commit; it rebased PRs #32 and #43 two minutes after the batch-28 push, which changed `.github/dependabot.yml`.",
+        "Repair for the up-to-date rule: `.github/workflows/dependabot-rebase.yml` runs on every push to main. It lists the open PRs with a plain `gh pr list`, which reads the repository's own list, because `gh pr list --app` and `--author` read GitHub's search index, and it selects the author `app/dependabot` in the shell. It comments `@dependabot rebase` on the lowest-numbered open Dependabot PR that has auto-merge on, is behind main, and has no failed check at its current head, one PR per push. It reads the checks only for a PR that is behind. A PR with a failed check gets one printed line and no comment; pending, skipped, cancelled, and absent checks do not count as failed. Dependabot rebases the branch, the auto-merge workflow approves again if the push dismissed the approval, and the merge is the next push to main, which serves the next PR. A request to every behind PR at once would put each of them behind again after each merge (docs/specs/2026-10-02-batch-30-dependabot-rebase.md, HR-156)."
       ],
       "tags": [
         "github",
@@ -841,7 +842,7 @@
       "source": {
         "date": "2026-10-01",
         "by": "controller",
-        "ref": "the PR #31 and PR #48 timelines; backlog HR-098 and HR-156; design.md 5.87 and 5.89"
+        "ref": "the PR #31 and PR #48 timelines; backlog HR-098 and HR-156; design.md 5.87 and 5.89; docs/specs/2026-10-02-batch-30-dependabot-rebase.md"
       }
     },
     {
@@ -887,6 +888,73 @@
       "see": [
         "writing-style.instructions-cover-the-state-space"
       ]
+    },
+    {
+      "id": "houserules.secret-store-follows-the-triggering-actor",
+      "kind": "gotcha",
+      "area": "tools",
+      "summary": "A run reads Dependabot secrets when Dependabot starts it, a push included, and Actions secrets when another actor does; a token both use lives in both stores.",
+      "body": [
+        "GitHub's troubleshooting page for Dependabot on GitHub Actions keys the secret store on the actor that triggers the run, not on the event. It says: \"By default, GitHub Actions workflow runs that are triggered by Dependabot from `push`, `pull_request`, `pull_request_review`, or `pull_request_review_comment` events are treated as if they were opened from a repository fork.\" It says: \"When a Dependabot event triggers a workflow, the only secrets available to the workflow are Dependabot secrets.\" And its example says: \"If another actor triggers the workflow, the actions secrets with those names are used.\" So a push that Dependabot starts reads Dependabot secrets, and a push that anyone else starts reads Actions secrets.",
+        "A push to main has the owner as actor, the merge of an auto-merged Dependabot PR included. PR #31 merged as commit 97e4f7d at 2026-09-21T10:21:57Z, merged by the owner. The three push runs that followed (ci, codeql, release-please) show the owner as actor in `gh api \"repos/jblossey/houserules/actions/runs?head_sha=$(git rev-parse 97e4f7d)\"`. So `.github/workflows/dependabot-rebase.yml`, which a push to main starts, reads the Actions store.",
+        "Consequence: `DEPENDABOT_AUTOMERGE_TOKEN` lives in both stores under one name. `.github/workflows/dependabot-auto-merge.yml` starts on a `pull_request` event that Dependabot creates and reads the Dependabot secret (`gh secret set DEPENDABOT_AUTOMERGE_TOKEN --app dependabot`). `.github/workflows/dependabot-rebase.yml` starts on a push to main with the owner as actor and reads the Actions secret (`gh secret set DEPENDABOT_AUTOMERGE_TOKEN`). It uses that secret for its one comment call; its reads use the workflow token."
+      ],
+      "tags": [
+        "github-actions",
+        "secrets",
+        "dependabot"
+      ],
+      "source": {
+        "date": "2026-10-02",
+        "by": "controller",
+        "ref": "https://docs.github.com/en/code-security/dependabot/troubleshooting-dependabot/troubleshooting-dependabot-on-github-actions; the Actions run list of commit 97e4f7d (PR #31); docs/specs/2026-10-02-batch-30-dependabot-rebase.md section 2.2"
+      },
+      "see": [
+        "houserules.auto-merge-waits-for-every-ruleset-rule"
+      ]
+    },
+    {
+      "id": "houserules.gh-filtered-lists-read-the-search-index",
+      "kind": "gotcha",
+      "area": "tools",
+      "summary": "`gh pr list` with `--app` or `--author` reads GitHub's search index, not the pull request list; a step that acts on a result lists with no filter flag.",
+      "body": [
+        "Measured 2026-10-02 with `GH_DEBUG=api` (gh 2.101.0): `gh pr list --app dependabot --state open` sends the GraphQL query `PullRequestSearch` with `state:open type:pr`; the same call without the filter sends `PullRequestList`.",
+        "A merged pull request keeps a non-null `autoMergeRequest` (PRs #48 and #31), and a rebase merge writes new commit ids, so the old head reads as behind main. A field of a search hit therefore cannot stand in for 'is open'.",
+        "Not measured: how long the index lists a merged pull request as open. A step that runs seconds after a merge must not depend on it. `.github/workflows/dependabot-rebase.yml` lists with no filter flag and selects the author in the shell."
+      ],
+      "tags": [
+        "github",
+        "gh",
+        "dependabot",
+        "search"
+      ],
+      "source": {
+        "date": "2026-10-02",
+        "by": "review",
+        "ref": "batch 30: the branch review's issue 2 and its run with GH_DEBUG=api; backlog HR-156"
+      }
+    },
+    {
+      "id": "houserules.commit-type-under-the-crate-path-decides-a-release",
+      "kind": "gotcha",
+      "area": "rust",
+      "summary": "A feat or fix commit that touches crates/houserules/** makes release-please propose a release; a CI change or its tests use ci, test, refactor, or chore.",
+      "body": [
+        "release-please-config.json has one package, crates/houserules, and release-please assigns commits to it by path. The tests of this repository's own workflows live under crates/houserules/tests/, so a workflow change touches that path.",
+        "Precedent: 4671309 `ci(dependabot)` in batch 28. Batch 30 wrote `feat(ci)` and `fix(ci)` on task commits; the branch review found it before the aggregation.",
+        "Check after aggregation: `git log --format='%h %s' main..HEAD -- crates/houserules` shows no feat or fix for a change that leaves crates/houserules/src and template/ alone."
+      ],
+      "tags": [
+        "release-please",
+        "commits",
+        "aggregation"
+      ],
+      "source": {
+        "date": "2026-10-02",
+        "by": "review",
+        "ref": "release-please-config.json; commit 4671309; batch 30: the branch review's issue 4"
+      }
     }
   ]
 }
