@@ -26,6 +26,7 @@ drifting into a wiki nobody reads.
 - [What it installs](#what-it-installs)
 - [Ownership model](#ownership-model)
 - [The agent workflow](#the-agent-workflow)
+- [Measure process cost](#measure-process-cost)
 - [CLI reference](#cli-reference)
 - [Stability](#stability)
 - [Contributing and support](#contributing-and-support)
@@ -314,6 +315,53 @@ dispatch, live run, finish, rollout. Every dispatched agent runs
 `houserules audit` against its own diff and records the result in its
 JSON report, so rule adherence is checked, not just asserted.
 
+## Measure process cost
+
+`houserules stats` reads the deliverables that agents write into a batch
+workspace and prints one JSON document. Give it one or more workspace
+directories:
+
+```sh
+houserules stats .superpowers/sdd/*/
+```
+
+With several workspaces, a task label reads `<workspace>/<task>`. The
+output keeps the keys `violations`, `unused_ids`, `audits`, and
+`reviews`. It adds these keys:
+
+- `workspaces`: one row per workspace with its tasks, reviews, fix
+  rounds, report bytes, and findings by severity and by target.
+- `cost`: the sums of those rows and the mean per task.
+- `rules`: one row per active knowledge entry. `workspaces` counts the
+  workspaces whose audit or review rated it, and `injected` the
+  workspaces whose audit injected it. `rows` counts the deterministic
+  audit rows and the judged review rows that rated it, and `fails`
+  those that failed. `findings` and `targets` count the findings that
+  cite it, by severity and by target. `cited` counts the reports that
+  cited it.
+- `proposals`: the changes the numbers support. Each row names an
+  `action`, the entry `id`, the `reason`, and the `evidence`. The five
+  actions are `demote`, `retire`, `mechanize`, `narrow`, and `budget`. A
+  row with `"owner_gate": true` is for the project's owner to decide.
+  `narrow` counts a finding as soft only when it is minor or hits a
+  deliverable, so a finding on Markdown, `docs/`, `knowledge/`, or
+  `backlog/` text counts as a contract finding. Tag an entry
+  `ruled-keep` when you decide to keep it, and `stats` stops proposing
+  `demote`, `retire`, `narrow`, or `mechanize` for it; the entry still
+  counts toward the standing budget.
+
+One `proposals` row, abbreviated:
+
+```json
+{
+  "action": "narrow",
+  "id": "process.claims-match-artifacts",
+  "owner_gate": true,
+  "reason": "4 of 4 findings are minor or hit a deliverable or prose. Narrow the rule to contract surfaces.",
+  "evidence": {"findings": 4, "soft_findings": 4}
+}
+```
+
 ## CLI reference
 
 Working with knowledge:
@@ -346,7 +394,7 @@ Gates:
 | `audit` | Builds a git range's rule package and runs every deterministic check |
 | `validate` | Validates deliverable JSON files against the schema |
 | `check-report-claims` | Cross-checks a report's claims against the artifacts it cites |
-| `stats` | Aggregates rule violations across a workspace's deliverables |
+| `stats <workspace>...` | Aggregates rule violations, process cost, and knowledge-base proposals across one or more workspaces |
 
 Installing:
 

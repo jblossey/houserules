@@ -233,11 +233,13 @@ enum Command {
         #[arg(long)]
         dir: Option<PathBuf>,
     },
-    /// Aggregates rule violations and unused injected ids across a
-    /// workspace directory's JSON deliverables.
+    /// Aggregates rule violations, unused injected ids, process cost, and
+    /// knowledge-base proposals across one or more workspace directories'
+    /// JSON deliverables.
     Stats {
-        /// The workspace directory to aggregate.
-        workspace: PathBuf,
+        /// One or more workspace directories to aggregate.
+        #[arg(required = true, value_name = "WORKSPACE")]
+        workspaces: Vec<PathBuf>,
         /// Repository root to check the knowledge base under; defaults to
         /// the enclosing git repository's top level, resolved from the
         /// current directory.
@@ -422,7 +424,7 @@ fn main() -> ExitCode {
             dir,
         }) => rules::cmd_audit(dir, base, head, ids, report, workspace, json, sanctioned),
         Some(Command::Validate { files, dir }) => rules::cmd_validate(dir, files),
-        Some(Command::Stats { workspace, dir }) => rules::cmd_stats(dir, workspace),
+        Some(Command::Stats { workspaces, dir }) => rules::cmd_stats(dir, workspaces),
         Some(Command::Index {
             area,
             topic,
