@@ -2,8 +2,10 @@
 # commit-msg hook: the trailer gate below always runs. `houserules
 # check-commit` runs only when a quiet `houserules check-commit --help`
 # probe succeeds (the binary is on PATH and understands the subcommand,
-# not merely present -- an older binary without it degrades here instead
-# of blocking every commit); nothing else executes.
+# not merely present). Without that, the hook skips the check, so it never
+# blocks a commit, and prints one stderr line that names the condition it
+# tested, never an inferred cause: a skipped gate must not look like a
+# passed one.
 set -eu
 
 msg_file="$1"
@@ -16,4 +18,10 @@ fi
 
 if houserules check-commit --help >/dev/null 2>&1; then
   exec houserules check-commit "$msg_file"
+fi
+
+if command -v houserules >/dev/null 2>&1; then
+  echo "commit-msg: houserules check-commit --help failed; check-commit skipped" >&2
+else
+  echo "commit-msg: houserules not on PATH; check-commit skipped" >&2
 fi

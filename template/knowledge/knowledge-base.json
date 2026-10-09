@@ -10,7 +10,9 @@
       "summary": "The `summary` states the rule in one sentence; `body` carries why, how, exceptions; examples in docs and skills model this split. No time-sensitive phrasing.",
       "body": [
         "Dates live in `source.date` and in `kind: history` entries linked by `see`.",
-        "The summary is the only text that renders into rule files and indexes."
+        "The summary is the only text that renders into rule files and indexes.",
+        "The `warn` check reads every changed file under `knowledge/` and `template/knowledge/` for time-sensitive wording and names the first hit with its line. The `pattern` field lists the wording: words for the present day, and a clause that waits on a release. Move the time to `source.date` or to a `kind: history` entry, and state the rule without it. The pattern spells each word with one bracketed letter, so the file that holds the pattern never matches it.",
+        "A kit update or archive commit that rewrites a topic file draws the warn for older text in that file, an adopter's own text included. Fix that text as the warn says."
       ],
       "tags": [
         "knowledge",
@@ -23,7 +25,15 @@
       },
       "verify": [
         "knowledge/schema.json"
-      ]
+      ],
+      "check": {
+        "type": "grep-absent",
+        "level": "warn",
+        "files": ["knowledge/**/*.json", "template/knowledge/**/*.json"],
+        "pattern": "\\b(toda[y]|curren[t]ly|for no[w]|at the mo[m]ent)\\b|\\bunti[l]\\b[^.;:]{0,40}\\b(ships?|lands?)\\b",
+        "flags": "i",
+        "scope": "changed"
+      }
     },
     {
       "id": "knowledge-base.state-only-the-source",
@@ -84,6 +94,7 @@
       "body": [
         "A non-standing entry in an area with empty globs other than global (`process` in the seed) never loads with a file. A global entry loads with every file through `houserules for` and joins every audit package, but renders into no rules file.",
         "After filing, run `houserules for <a file the rule governs>` and confirm the entry appears.",
+        "The kit's non-standing procedure rules in the glob-less `process` area load by citation instead: a kit-owned skill or agent template names the id, and its reader runs `houserules get <id>`. `check-knowledge` fails a cited id that the base does not hold. Such an entry never joins an audit package by area; name it in `--ids` to audit against it. `process.risk-tiers`, `process.severity-by-impact`, `process.bounded-review-loop`, `process.knowledge-earns-its-place`, and `process.parallel-on-disjoint-files` load this way.",
         "A `check` needs an audit loading path too: it joins the package when its entry is `standing`, sits in a touched or global area (any kind, not only rule and invariant), or is named in `--ids`."
       ],
       "tags": [

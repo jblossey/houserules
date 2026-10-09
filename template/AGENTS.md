@@ -20,7 +20,7 @@ Project knowledge — rules, invariants, gotchas, procedures, decisions, history
 - The backlog (`backlog/`) drives all work. Read it with `houserules list --open`, `get <id>`, `batch <n>`; tick with `set <id> status=done batch=<n>`.
 - A batch runs: brainstorm or spec, a decision gate from the project's owner or decider, plan, development, live run, a merge, rollout, acceptance.
 - Procedure docs live at `.claude/skills/*/SKILL.md` — plain markdown any agent can read; read `.claude/skills/finishing-a-feature/SKILL.md` before a merge.
-- If your harness can hand a task to another agent, do that sequentially by default — never start a second one before the last one closes — until the project rules its own parallelism discipline.
+- If your harness can hand a task to another agent, run handoffs in parallel only when the plan marks their file sets disjoint, each in its own worktree; run every other handoff sequentially. The orchestrating skill holds the procedure.
 
 ## Working with other harnesses
 

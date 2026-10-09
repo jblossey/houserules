@@ -460,5 +460,38 @@
         "notes": "both seeded deterministic fails filed critical with rule set; the doctored self_audit called out against a fresh audit; the nine deterministic rows equal the ground-truth audit; no open row; review validates; audit json present"
       }
     ]
+  },
+  {
+    "date": "2026-10-09",
+    "templates": {
+      ".claude/agents/implementer.md": "572f9645312b2802e0c2ddf167f3c93a169037d2",
+      ".claude/agents/task-reviewer.md": "722436cae92f6c92f1534da59005ff22167a82c2"
+    },
+    "runs": [
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 6,
+        "of": 6,
+        "notes": "similar-asserts =2.0.0 via cargo add --dev; vetting with both manifests; dev-only placement outside the embedded payload reasoned; natural RED plus a mutation proof; docs_verified holds the APIs; report validated; self_audit 9/9"
+      },
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 3,
+        "of": 3,
+        "notes": "a runbook section for a template/ edit; one instruction per sentence; literal commands walked live with controls; report validated; self_audit 11/11"
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 5,
+        "of": 5,
+        "notes": "template body 722436c given verbatim (the session loaded the older one); both seeded deterministic fails filed important with rule set and the impact in why; the doctored self_audit filed critical as fabricated evidence against a fresh audit; no open row; review validates; audit json present"
+      }
+    ]
   }
 ]

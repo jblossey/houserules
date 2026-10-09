@@ -70,7 +70,8 @@
       "summary": "Start each batch with a brainstorming session or a written spec; get approval from the project's owner or decider before implementing.",
       "body": [
         "Use the superpowers brainstorming and spec skills when the plugin is installed; otherwise write the spec by hand. Specs live in `docs/specs/`.",
-        "The order is strict: spec, then plan. A plan written before its approved spec is nil - deleted and the planning phase redone from the spec, never re-anchored."
+        "The order is strict: spec, then plan. A plan written before its approved spec is nil - deleted and the planning phase redone from the spec, never re-anchored.",
+        "A light-tier change (`process.risk-tiers`) has no plan. The body of its backlog item is the written spec, and the project's owner or decider approves it before implementation."
       ],
       "tags": [
         "batch",
@@ -208,6 +209,7 @@
       "body": [
         "Technical debt is a no-go. A finding a reviewer filed is fixed in the same fix round, whatever its severity.",
         "The only way to defer: a backlog item that states the reason and the follow-up; the finding names the item. A ledger line or a chat note is not a deferral.",
+        "Severity follows impact (`process.severity-by-impact`). A fix round that holds only Minor fixes closes without a re-review. At the re-review cap of `process.bounded-review-loop`, the open non-critical findings become one backlog item with the reason.",
         "No `TODO`, `FIXME`, or `HACK` marker in source files; the deterministic check fails the audit on a new one. Todos live in `backlog/`."
       ],
       "tags": [
@@ -260,7 +262,8 @@
         "Fold the fixes in as opportunistic refactoring: a step inside the task that touches the file, or a dedicated task when the cleanup is load-bearing. Where a cleanup makes the feature change easy, do it first.",
         "Scope bound: only code the batch touches or directly depends on. An improvement outside that scope becomes a backlog item, never plan scope creep.",
         "The scan's output is part of the plan: a Code health section naming the findings, what the plan fixes, and what goes to the backlog and why. A clean scan states what was checked.",
-        "This rule never justifies over-engineering: no abstraction for one caller, no configurability without a second use, no rewrite of working code the batch does not touch. Speculative generality is itself a smell."
+        "This rule never justifies over-engineering: no abstraction for one caller, no configurability without a second use, no rewrite of working code the batch does not touch. Speculative generality is itself a smell.",
+        "In the light tier (`process.risk-tiers`), the scan is one line in the dispatch brief: it names the smells found in the touched files, or states what was checked."
       ],
       "tags": [
         "planning",
@@ -319,8 +322,8 @@
       "summary": "Re-run every `.claude/evals/` scenario when the implementer or task-reviewer template or a scenario changes; append the run to `.claude/evals/record.json`.",
       "body": [
         "The scenarios are the regression suite for the agent templates. The check is a `co-change`: a change to `.claude/agents/implementer.md`, `.claude/agents/task-reviewer.md`, or `.claude/evals/*.json` without a change to `.claude/evals/record.json` fails the audit. The entry routes through the `docs` area (`.claude/**`), so every audit that touches the templates carries it without `--ids`; the `process` area has no paths.",
-        "Run every scenario in a detached scratch worktree at the branch head before the branch review; the orchestrating skill holds the procedure. Keep nothing from a worktree; workspace artifacts carry the `eval-` prefix.",
-        "A run set in the record names `date`, `templates` (the git blob id of each template under test from `git rev-parse HEAD:<path>`; blob ids survive commit aggregation, commit SHAs do not), and one row per scenario: `scenario`, `agent`, `model`, `pass`, `of`, `notes`. The branch reviewer compares the latest blob ids with `HEAD`.",
+        "Run every scenario in a detached scratch worktree at the branch head before the branch review, or before Finish in a batch without one; the orchestrating skill holds the procedure. Keep nothing from a worktree; workspace artifacts carry the `eval-` prefix.",
+        "A run set in the record names `date`, `templates` (the git blob id of each template under test from `git rev-parse HEAD:<path>`; blob ids survive commit aggregation, commit SHAs do not), and one row per scenario: `scenario`, `agent`, `model`, `pass`, `of`, `notes`. The branch reviewer compares the latest blob ids with `HEAD`; in a batch without a branch review, the controller compares them before Finish.",
         "No scenario covers `branch-reviewer` or the orchestrating skill; a change there needs no run. The `houserules render` command's own retrieval-protocol text shapes the generated skill the implementer loads; run the scenarios after a change there too — the check cannot see it.",
         "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns; the branch does not merge before the record commit lands, and the branch-range audit is the row that must pass.",
         "A template-touching batch may book ONE shared rerun at the final template state instead of a rerun per task (the ledgered economy); each interim task audit's deterministic fail is then recorded plan-mandated, citing the spec section that books the rerun, and the branch-range audit after the record commit is the row that must pass."
@@ -650,6 +653,7 @@
       "summary": "A fix round closes only with a written verification record: a re-review deliverable, or a controller note naming each finding and the artifact proving its fix.",
       "body": [
         "A re-review deliverable in the workspace is the default for rounds with executable changes or any critical finding. A controller verification note suffices for report-only or prose rounds when it names finding-by-finding evidence.",
+        "A round that holds only Minor fixes always closes with a controller verification note, whatever the kind of change (`process.bounded-review-loop`).",
         "A fix round can close on a ledger note alone even when the verifications are real and reproducible, if nothing pins where such a record must live or what it must name - that gap is exactly what this rule closes."
       ],
       "tags": [
@@ -790,6 +794,152 @@
         "date": "2026-08-30",
         "by": "docs",
         "ref": "houserules seed"
+      }
+    },
+    {
+      "id": "process.risk-tiers",
+      "kind": "rule",
+      "area": "process",
+      "standing": false,
+      "summary": "Pick the tier (light, standard, or full) from the change's risk at plan time; the plan records the tier and the criterion that selected it.",
+      "body": [
+        "The tier sets the pipeline's depth. Light: one task; docs, comments, config values, or a dependency bump only; no executable behavior change; no entry tagged `full-tier` applies. The backlog item's body is the spec, and the project's owner or decider still approves it. The pipeline is an implementer, one task review, and the controller's live run. It has no plan document and no branch review.",
+        "Standard: every change that is neither light nor full. The pipeline is a short spec with the decision gate, a plan, an implementer, one task review, at most one re-review, and the controller's live run. A branch review runs only for a batch of two or more tasks.",
+        "Full: `houserules for --full <planned files>` returns an entry tagged `full-tier`, or the change alters a public contract, a schema, authentication or security code, or a data migration. The pipeline is the whole lifecycle of the orchestrating skill, with at most two re-reviews per task.",
+        "A lighter tier drops only what its pipeline names: the light tier drops the plan document and the branch review, and the standard tier drops the branch review for a one-task batch. Every tier runs Select items, the live run, Finish, and Rollout and acceptance.",
+        "A change that meets a full criterion runs the full tier, whatever else it meets. One tier covers the batch: the highest tier that any of its changes needs.",
+        "Mark a high-risk area with an area entry tagged `full-tier`. A tag is a free string of the knowledge schema: no schema change, no new command.",
+        "The plan records the tier and the criterion that selected it. For a light change, the dispatch brief records them. The task reviewer checks the tier, and a wrong tier is a finding.",
+        "A tier moves up during a batch, never down. `process.bounded-review-loop` states the one automatic move."
+      ],
+      "tags": [
+        "tiers",
+        "planning",
+        "review"
+      ],
+      "source": {
+        "date": "2026-10-09",
+        "by": "user",
+        "ref": "owner ruling, batch 31"
+      },
+      "see": [
+        "process.bounded-review-loop",
+        "process.severity-by-impact"
+      ]
+    },
+    {
+      "id": "process.severity-by-impact",
+      "kind": "rule",
+      "area": "process",
+      "standing": false,
+      "summary": "Set a finding's severity from its impact (critical, important, or minor), never from the class of the rule it cites.",
+      "body": [
+        "A finding's severity follows its impact. The rule's class (standing, area, or warn) does not set it. The finding keeps its `rule` id.",
+        "Critical: wrong behavior on a shipped contract (CLI, schema, user-facing text, a gate); a security exposure; data loss; a gate that passes when it must fail; fabricated evidence (a run that did not happen, output that is not real).",
+        "Important: a missed requirement; incorrect or fragile behavior; maintainability damage you would block a merge over; a misstated claim the merge decision relies on (a test result, a gate outcome, a behavior).",
+        "Minor: everything else: narrative report prose, comment and doc wording, report fields that no decision relies on, polish.",
+        "The core of `process.no-tech-debt` stays: every finding is fixed, or deferred as a backlog item with a reason."
+      ],
+      "tags": [
+        "review",
+        "severity"
+      ],
+      "source": {
+        "date": "2026-10-09",
+        "by": "user",
+        "ref": "owner ruling, batch 31"
+      },
+      "see": [
+        "process.no-tech-debt",
+        "process.bounded-review-loop"
+      ]
+    },
+    {
+      "id": "process.bounded-review-loop",
+      "kind": "rule",
+      "area": "process",
+      "standing": false,
+      "summary": "Bound the review loop: a re-review reads the fix diff only, a Minor-only fix round skips it, and each tier caps its re-reviews.",
+      "body": [
+        "A fix round that holds only Minor fixes closes with a controller verification note (`process.fix-round-verification-record`), never with a re-review.",
+        "A re-review reads the fix diff and the original findings only. It files new findings at their impact (`process.severity-by-impact`). Only a new Critical or Important finding opens a further round. A new Minor finding joins a Minor-only round.",
+        "Re-reviews per task: light 0, standard 1, full 2. A branch-review fix wave has the same cap as the batch's tier.",
+        "At the cap, the open non-critical findings become one backlog item with the reason (a deferral under `process.no-tech-debt`). An open Critical finding goes to the project's owner or decider.",
+        "A light task with an Important or Critical finding moves up to the standard tier and gets its one re-review."
+      ],
+      "tags": [
+        "review",
+        "fix-round",
+        "loop"
+      ],
+      "source": {
+        "date": "2026-10-09",
+        "by": "user",
+        "ref": "owner ruling, batch 31"
+      },
+      "see": [
+        "process.severity-by-impact",
+        "process.fix-round-verification-record",
+        "process.no-tech-debt",
+        "process.risk-tiers"
+      ]
+    },
+    {
+      "id": "process.knowledge-earns-its-place",
+      "kind": "rule",
+      "area": "process",
+      "standing": false,
+      "summary": "At every batch close, run `houserules stats` over recent workspaces and act on `proposals`: apply the ungated rows, report the owner-gated rows.",
+      "body": [
+        "A rule earns its place by catching defects. At every batch close the controller runs `houserules stats <WORKSPACE>...` over the five most recent batch workspaces, or over every workspace when fewer than five exist, and saves the output in the batch workspace as `stats.json`. Once a backlog item cites a stats file, never overwrite that file: a later run in the same batch gets a name that states its window, `stats-batches-<a>-<b>.json`.",
+        "The branch reviewer (a standard or full batch with a branch review) or the controller (every other batch) reads `proposals` beside the retrospective.",
+        "A proposal with `owner_gate: false` is applied in the batch's `docs(knowledge)` commit. The controller makes that commit after the branch review closes, or before Finish in a batch without one, so a row that only the batch-close run draws is applied too. `retire` sets `status: retired` and runs `houserules archive`. `demote` drops `standing` and gives the entry an area whose globs match the files it governs. `narrow` rewrites the entry's scope. `mechanize` files a backlog item for the check.",
+        "A proposal with `owner_gate: true` goes to the project's owner or decider in the batch report. A `budget` proposal always has `owner_gate: true`.",
+        "When the project's owner or decider rules to keep an entry that a proposal names, add the tag `ruled-keep` to the entry. A `ruled-keep` entry gets no `demote`, `retire`, `narrow`, or `mechanize` proposal, so the loop stops proposing it. It still counts toward the budget, and a `budget` row leaves it out of `candidates`.",
+        "A kit-shipped entry that the project retires, demotes, rewrites, or tags `ruled-keep` goes into `.houserules.json` `overrides`, so `houserules update` stays silent about it.",
+        "A new retrospective entry defaults to a non-standing area entry. A new standing entry names the standing entry it replaces, or the budget headroom from the latest `stats` run. The budget is 25 standing entries. The headroom is 25 minus the `rules` rows with `standing: true`.",
+        "Limit: a rule that prevents violations by its presence also shows zero fails. That is why every standing demotion is owner-gated."
+      ],
+      "tags": [
+        "knowledge",
+        "stats",
+        "batch-close"
+      ],
+      "source": {
+        "date": "2026-10-09",
+        "by": "user",
+        "ref": "owner ruling, batch 31"
+      },
+      "see": [
+        "knowledge-base.rules-need-a-loading-path",
+        "process.keep-knowledge-current"
+      ]
+    },
+    {
+      "id": "process.parallel-on-disjoint-files",
+      "kind": "rule",
+      "area": "process",
+      "standing": false,
+      "summary": "Run agents in parallel only on tasks whose planned file sets are disjoint, each in its own worktree; run every other handoff sequentially.",
+      "body": [
+        "The plan marks tasks parallel when their declared file sets are disjoint and no task needs another's output. Outside the cases in this entry, run handoffs sequentially: never start a second agent before the last one closes.",
+        "Files that many tasks regenerate belong to the controller: the generated rule files and skill that `houserules render` writes, `backlog/`, lockfiles, and any other file that a build or sync step regenerates. A parallel task does not touch them. The controller regenerates them at integration.",
+        "Each parallel implementer works in its own git worktree, on its own branch from the same `BASE`.",
+        "Every agent of one session gets the same scratchpad path, and two agents that write one file name there overwrite each other without an error. The dispatch of a parallel agent names its scratch root, `<scratchpad>/task-<N>/`, and the agent writes scratch files nowhere else.",
+        "The controller integrates a finished task onto the batch branch one at a time (cherry-pick), runs the gates after each, and writes the old-to-new commit map to the ledger. A conflict or a red gate at integration is a fix round for the later task.",
+        "A parallel task's fix round commits in the task's own worktree on its `FIX_BASE`, because a worktree-isolated agent cannot run git against the shared checkout. The controller cherry-picks that commit, runs the gates, and extends the commit map in the ledger.",
+        "Reviews of different tasks may run at the same time: reviewers do not write to the tree. The review of a task starts after its implementer closes.",
+        "At most three agents run at once unless the plan sets a lower limit. The ledger records each dispatch's start and close."
+      ],
+      "tags": [
+        "dispatch",
+        "parallel",
+        "worktree"
+      ],
+      "source": {
+        "date": "2026-10-09",
+        "by": "user",
+        "ref": "owner ruling, batch 31"
       }
     }
   ]

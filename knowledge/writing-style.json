@@ -35,9 +35,10 @@
       "standing": true,
       "summary": "Write a code comment only for a current constraint the code cannot show. Never narrate history in code; git, the specs, and the knowledge base hold it.",
       "body": [
-        "A comment asserting measured or cross-engine behavior is a claim: run the measurement before committing the sentence, and state where it was verified (batch 17 task 3: three false comments shipped, one licensing a real defect, and the fix introduced a fourth).",
+        "A comment asserting measured or cross-engine behavior is a claim: run the measurement before committing the sentence, and state where it was verified. A false comment can ship silently, license a real defect, or survive its own fix - each is a reason to verify before writing it.",
         "History narration belongs in git, the specs, and the knowledge base, not in the code itself.",
         "A knowledge id naming a rule the code enforces is a current contract, not history; it may stay in a comment.",
+        "A reference to a durable doc, spec, or design record that states the current contract is likewise a contract pointer, not history; it may stay in a comment.",
         "Fixture data inside a test body (an id, a date, a path) is data, not narration; leave it as written.",
         "A comment stating a constraint plus its history keeps the constraint only; drop the history.",
         "A history-sweep's verification derives its marker classes from the survey's own hit list and re-widens after every fix round; a zero from a pattern that never tested a spelling the sweep removed elsewhere is vacuous."
