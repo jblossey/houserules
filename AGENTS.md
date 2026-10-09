@@ -20,7 +20,7 @@ Project knowledge — rules, invariants, gotchas, procedures, decisions, history
 - The backlog (`backlog/`) drives all work. Read it with `houserules list --open`, `get <id>`, `batch <n>`; tick with `set <id> status=done batch=<n>`.
 - A batch runs: brainstorm or spec, a user gate, plan, development, live run, a merge, rollout, acceptance.
 - Procedure docs live at `.claude/skills/*/SKILL.md` — plain markdown any agent can read; read `.claude/skills/finishing-a-feature/SKILL.md` before a merge.
-- Dispatch subagents only through the templates in `.claude/agents/`: `implementer`, `task-reviewer`, `branch-reviewer`. Every dispatch carries `Knowledge:` ids and `BASE:`. All agent work in this repository runs strictly sequentially (`process.sequential-agents`): never start a second one before the last one closes.
+- Dispatch subagents only through the templates in `.claude/agents/`: `implementer`, `task-reviewer`, `branch-reviewer`. Every dispatch carries `Knowledge:` ids and `BASE:`. Agent handoffs run in parallel only when the plan marks their file sets disjoint, each in its own worktree; every other handoff runs sequentially, so never start a second one before the last one closes (`process.parallel-on-disjoint-files`).
 
 ## Working with other harnesses
 

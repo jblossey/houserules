@@ -20,8 +20,12 @@ install --path crates/houserules --bin houserules` so the binary is on
 `PATH`. The commit-msg hook's
 conventional-commit arm (`houserules check-commit`) runs only when that
 probe succeeds; without it, the hook degrades to the trailer check alone
-and the `check-commit` CI job is the backstop that still catches a bad
-subject or body before merge.
+and prints one stderr line that names the reason, for example
+`commit-msg: houserules not on PATH; check-commit skipped`. Treat that line
+as a skipped gate, not a passed one: run `houserules check-commit --from
+<base>` with your build of the binary before you push. The `check-commit`
+CI job is the backstop that still catches a bad subject or body before
+merge.
 
 ## The batch process
 
@@ -31,8 +35,9 @@ starts from the backlog, never from an ad hoc idea:
 1. A change gets a backlog item (`backlog/`) and, for anything beyond a
    trivial fix, a written spec (`docs/specs/`) that the owner approves
    before implementation starts.
-2. An implementer agent does the work, one task at a time. Agents never
-   run two at a time; every step in a batch is strictly sequential.
+2. An implementer agent does the work. Tasks run in parallel only when the
+   plan marks their file sets disjoint, each in its own worktree; every
+   other step in a batch is sequential (`process.parallel-on-disjoint-files`).
 3. A task-reviewer agent reviews every task's diff on a stronger model
    than the one that implemented it. Every finding gets fixed, or gets a
    reasoned deferral filed as its own backlog item — never a `TODO` left

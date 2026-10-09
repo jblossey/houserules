@@ -1,11 +1,14 @@
 //! Integration test for `template/.githooks/commit-msg`. The hook's own
 //! doc comment states its contract: `houserules check-commit` runs only
 //! after a quiet `houserules check-commit --help` probe succeeds, so an
-//! older or absent binary is a no-op instead of blocking every commit.
-//! The hook carries no attribution-trailer gate of its own (T2 review
-//! ruling 5.81: attribution is fully project-ruled) -- a project that
-//! wants one files its own `commits`-type knowledge check and `check-commit`
-//! picks it up the same way it picks up `process.conventional-commits`.
+//! older or absent binary never blocks a commit. The hook then skips the
+//! check and says so on stderr in one line that names the condition it
+//! tested: no `houserules` on `PATH`, or a `houserules` whose
+//! `check-commit --help` probe failed. The hook carries no
+//! attribution-trailer gate of its own (T2 review ruling 5.81: attribution
+//! is fully project-ruled) -- a project that wants one files its own
+//! `commits`-type knowledge check and `check-commit` picks it up the same
+//! way it picks up `process.conventional-commits`.
 //! Every case here spawns the real POSIX-shell hook against a scratch
 //! temp directory, on a hermetic `PATH` (any directory already carrying a
 //! `houserules` executable removed) with, where the case needs one, a
@@ -152,25 +155,33 @@ fn fake_houserules_rejecting_check_commit() -> tempfile::TempDir {
     dir
 }
 
+/// The one stderr line the hook prints when no `houserules` is on `PATH`.
+const SKIPPED_NO_BINARY: &str = "commit-msg: houserules not on PATH; check-commit skipped\n";
+
+/// The one stderr line the hook prints when a `houserules` is on `PATH` and its
+/// `check-commit --help` probe fails.
+const SKIPPED_PROBE_FAILED: &str =
+    "commit-msg: houserules check-commit --help failed; check-commit skipped\n";
+
 #[test]
-fn accepts_a_trailer_free_message_with_no_output_when_houserules_is_absent_from_path() {
+fn accepts_a_trailer_free_message_and_says_it_skipped_when_houserules_is_absent_from_path() {
     let (code, stderr) = run_hook("feat: a clean subject\n", None);
     assert_eq!(code, Some(0));
-    assert_eq!(stderr, "");
+    assert_eq!(stderr, SKIPPED_NO_BINARY);
 }
 
 #[test]
-fn accepts_a_co_authored_by_trailer_with_no_output_when_houserules_is_absent_from_path() {
+fn accepts_a_co_authored_by_trailer_and_says_it_skipped_when_houserules_is_absent_from_path() {
     let (code, stderr) = run_hook("feat: x\n\nCo-Authored-By: Someone <a@b.com>\n", None);
     assert_eq!(code, Some(0));
-    assert_eq!(stderr, "");
+    assert_eq!(stderr, SKIPPED_NO_BINARY);
 }
 
 #[test]
-fn accepts_a_claude_session_trailer_with_no_output_when_houserules_is_absent_from_path() {
+fn accepts_a_claude_session_trailer_and_says_it_skipped_when_houserules_is_absent_from_path() {
     let (code, stderr) = run_hook("feat: x\n\nClaude-Session: https://example.test/s\n", None);
     assert_eq!(code, Some(0));
-    assert_eq!(stderr, "");
+    assert_eq!(stderr, SKIPPED_NO_BINARY);
 }
 
 #[test]
@@ -198,16 +209,16 @@ fn passes_check_commit_and_the_message_files_own_path_as_argv() {
 }
 
 #[test]
-fn is_a_no_op_when_houserules_is_absent_from_path() {
+fn skips_check_commit_and_says_so_when_houserules_is_absent_from_path() {
     let (code, stderr) = run_hook("bad subject\n", None);
     assert_eq!(code, Some(0));
-    assert_eq!(stderr, "");
+    assert_eq!(stderr, SKIPPED_NO_BINARY);
 }
 
 #[test]
-fn is_a_no_op_when_an_on_path_houserules_rejects_the_check_commit_subcommand() {
+fn skips_check_commit_and_says_so_when_an_on_path_houserules_rejects_the_subcommand() {
     let path_dir = fake_houserules_rejecting_check_commit();
     let (code, stderr) = run_hook("bad subject\n", Some(path_dir.path()));
     assert_eq!(code, Some(0));
-    assert_eq!(stderr, "");
+    assert_eq!(stderr, SKIPPED_PROBE_FAILED);
 }

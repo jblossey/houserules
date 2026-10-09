@@ -8,6 +8,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 ## Rules
 
+- [houserules.template-changes-run-full-tier] A change under template/** runs the full tier: the payload is what every adopter receives through `init` and `update`.
 - [writing-style.instructions-cover-the-state-space] An instruction keyed to one value of an enumerated field names the value it displaces; test the sentence against every other value before shipping.
 
 ## Invariants

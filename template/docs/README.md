@@ -48,6 +48,20 @@ kit; the next `update` treats it as a plain, unowned divergence again.
 A kit-owned file that you delete from `overrides` is checked for
 citations again.
 
+## Pruning the knowledge base at batch close
+
+At every batch close, `houserules stats <WORKSPACE>...` over the five most
+recent batch workspaces prints a `proposals` key. Each row proposes to
+`demote`, `retire`, `mechanize`, or `narrow` an entry, or names the budget
+of the standing set. The `orchestrating` skill applies the rows with
+`owner_gate: false` and sends the other rows to the project's owner or
+decider. When the owner or decider rules to keep an entry that a row
+names, tag the entry `ruled-keep`: it then gets no `demote`, `retire`,
+`narrow`, or `mechanize` row, and it still counts toward the budget. List
+a kit-shipped entry that the project retires, demotes, rewrites, or tags
+in `overrides` (see above), so `houserules update` stays silent about
+it.
+
 ## Entries that kit-owned files cite
 
 Kit-owned files cite entries of the knowledge topics that the kit

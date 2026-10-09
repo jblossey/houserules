@@ -280,7 +280,7 @@ fn retired_paths_are_absent_from_both_root_and_template() {
 /// tests inject their own list directly and cover the stamping mechanism's own
 /// behavior.
 ///
-/// `overrides` IS pinned exactly, because these three paths are load-
+/// `overrides` IS pinned exactly. Its path entries are load-
 /// bearing: without them, `update --dir .` here would backfill each one.
 /// `backlog/items/general.json` is absent because this repository's own
 /// backlog items live at `backlog/items/kit.json` instead. `.github/
@@ -288,7 +288,11 @@ fn retired_paths_are_absent_from_both_root_and_template() {
 /// own workflow set (`ci.yml` and the rest), not the generic seeded gate.
 /// `docs/README.md` is absent because this directory already holds this
 /// repository's real specs, plans, and design notes in place of the
-/// generic starter file.
+/// generic starter file. `.githooks/commit-msg` keeps this repository's
+/// trailer gate. Its entry ids are the kit-shipped entries this repository
+/// words in its own, fuller body. The test
+/// `update_keeps_no_knowledge_entry_of_this_repository` proves that `update`
+/// neither keeps nor rewrites any other kit-shipped entry.
 #[test]
 fn houserules_json_stamps_the_installed_version_and_the_hr_id_prefix() {
     let root = repo_root();
@@ -308,22 +312,40 @@ fn houserules_json_stamps_the_installed_version_and_the_hr_id_prefix() {
             "backlog/items/general.json",
             ".github/workflows/knowledge.yml",
             "docs/README.md",
+            "knowledge-base.ids-are-permanent",
+            "knowledge-base.rules-need-a-loading-path",
+            "knowledge-base.state-only-the-source",
             "process.ask-when-missing",
+            "process.brainstorm-first",
             "process.brief-carries-the-spec",
+            "process.claims-match-artifacts",
+            "process.closure-claims-carry-enumeration",
             "process.contract-refresh-sweep",
             "process.eval-fixture-procedure",
             "process.evals-rerun",
             "process.evidence-outlives-the-session",
+            "process.fix-proofs-extend-the-reviewers-run",
             "process.fix-round-verification-record",
             "process.gate-shell-chains",
             "process.main-wins-backlog-collisions",
+            "process.model-policy",
             "process.owner-content-mid-batch",
+            "process.owner-rulings-need-owner-supersession",
             "process.review-findings-are-claims-too",
             "process.rulings-to-file",
             "process.skills-for-procedures",
+            "process.suggestions-are-unverified",
             "process.tdd",
+            "process.verify-in-persisted-state",
+            "process.wiring-checks-run-the-resolution",
+            "quality.gates-derive-their-scope",
             "quality.no-compat-softening",
+            "quality.pin-copies-byte-exact",
             "quality.principles",
+            "quality.well-maintained-libraries",
+            "security-hygiene.exact-pins",
+            "writing-style.doc-comments",
+            "writing-style.instructions-cover-the-state-space",
             ".githooks/commit-msg",
         ]),
         "got {stamp}"
@@ -405,5 +427,91 @@ fn generated_files_are_fresh_relative_to_knowledge() {
     assert_eq!(
         String::from_utf8(output.stdout).expect("utf8 stdout"),
         "render: up to date\n"
+    );
+}
+
+/// `houserules update` over this repository's stamp and knowledge files keeps no
+/// kit-shipped entry as `kept (locally modified)` and rewrites none (no
+/// `updated knowledge/` line). An entry this repository words in its own body is
+/// listed in `overrides`, so `update` stays silent about it
+/// (`process.knowledge-earns-its-place`). Every other kit-shipped entry equals
+/// the kit's text: a kept line means a rewritten entry that is missing from
+/// `overrides`, and an updated line means an entry that lags the kit.
+#[test]
+fn update_keeps_no_knowledge_entry_of_this_repository() {
+    let root = repo_root();
+    let scratch = tempfile::tempdir().expect("tempdir");
+    let init = Command::new("git")
+        .args(["init", "-q", "-b", "main"])
+        .current_dir(scratch.path())
+        .output()
+        .expect("run git init");
+    assert!(init.status.success());
+    fs::copy(
+        root.join(".houserules.json"),
+        scratch.path().join(".houserules.json"),
+    )
+    .expect("copy .houserules.json");
+    fs::create_dir(scratch.path().join("knowledge")).expect("create knowledge/");
+    for entry in fs::read_dir(root.join("knowledge")).expect("read knowledge/") {
+        let path = entry.expect("read directory entry").path();
+        if path
+            .extension()
+            .is_some_and(|extension| extension == "json")
+        {
+            fs::copy(
+                &path,
+                scratch
+                    .path()
+                    .join("knowledge")
+                    .join(path.file_name().unwrap()),
+            )
+            .expect("copy a knowledge topic file");
+        }
+    }
+
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(scratch.path())
+        .output()
+        .expect("run update");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    let kept: Vec<&str> = stdout
+        .lines()
+        .filter(|line| line.starts_with("kept "))
+        .collect();
+    assert!(kept.is_empty(), "update kept: {kept:?}");
+    let rewritten: Vec<&str> = stdout
+        .lines()
+        .filter(|line| line.starts_with("updated knowledge/"))
+        .collect();
+    assert!(rewritten.is_empty(), "update rewrote: {rewritten:?}");
+}
+
+/// An install seeded before 1.3.0 keeps its old `AGENTS.md` parallel-dispatch
+/// line, because `AGENTS.md` is `SEED_ONCE` and `update` never rewrites it. The
+/// orchestrating skill is the kit-owned file that `update` does rewrite, so it
+/// carries the replacement line. The two copies of that line stay equal
+/// byte for byte (`quality.pin-copies-byte-exact`).
+#[test]
+fn orchestrating_skill_carries_the_agents_md_parallel_line_verbatim() {
+    let template = repo_root().join("template");
+    let agents = fs::read_to_string(template.join("AGENTS.md")).expect("read template AGENTS.md");
+    let line = agents
+        .lines()
+        .find(|line| line.starts_with("- If your harness can hand a task to another agent"))
+        .expect("template AGENTS.md carries the parallel-dispatch line")
+        .trim_start_matches("- ");
+    let skill = fs::read_to_string(template.join(".claude/skills/orchestrating/SKILL.md"))
+        .expect("read the template orchestrating skill");
+    assert!(
+        skill.contains(line),
+        "the orchestrating skill does not carry the template AGENTS.md line verbatim: {line}"
     );
 }

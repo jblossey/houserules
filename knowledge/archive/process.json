@@ -1,0 +1,30 @@
+{
+  "$schema": "./schema.json",
+  "topic": "process",
+  "title": "How work runs: batches, dispatch, reviews, rulings",
+  "entries": [
+    {
+      "id": "process.sequential-agents",
+      "kind": "rule",
+      "area": "process",
+      "standing": true,
+      "summary": "SUPERSEDED at batch 31: agents run in parallel on tasks with disjoint file sets, each in its own worktree; every other handoff stays sequential.",
+      "body": [
+        "Parallel dispatches conflict in the working tree and hide which run produced a change.",
+        "Superseded by `process.parallel-on-disjoint-files` (owner direction, batch 31, spec 2.6). Kept per knowledge-base.ids-are-permanent."
+      ],
+      "tags": [
+        "dispatch"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
+      "status": "superseded",
+      "see": [
+        "process.parallel-on-disjoint-files"
+      ]
+    }
+  ]
+}

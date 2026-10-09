@@ -34,7 +34,6 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [process.owner-rulings-need-owner-supersession] Only the owner supersedes an owner ruling: a controller with latitude proposes the reversal at the next checkpoint and builds nothing on it until ruled.
 - [process.review-findings-are-claims-too] A review finding stating a measurement, a reproduction, or a proposed fix's behavior is verified by running it before filing; restated claims are re-derived.
 - [process.rulings-to-file] Every ruling goes to its home file in the same turn — a deferral’s backlog item included. A ledger and the chat are not home files; neither survives compaction.
-- [process.sequential-agents] Run all agent work strictly sequentially. Never dispatch two implementers or two reviewers at the same time.
 - [process.suggestions-are-unverified] Another agent's suggested wording, pin, or count is a draft, not evidence: re-derive every number, quote, and reference from the tree before transcribing it.
 - [process.tdd] Test-driven development for every executable change: the failing test first, or a disclosed-mutation proof for already-correct behavior; verbatim RED and GREEN.
 - [quality.no-compat-softening] Never soften a design for backward compatibility. Make the correct change and migrate everything it breaks; the codebase is not built on compromises.
@@ -57,9 +56,9 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 ## Topics
 
-houserules  36  Working in the houserules kit repository
+houserules  39  Working in the houserules kit repository
 knowledge-base  5  Authoring knowledge entries
-process  37  How work runs: batches, dispatch, reviews, rulings
+process  41  How work runs: batches, dispatch, reviews, rulings
 quality  9  Quality principles
 security-hygiene  5  Dependency, commit, and test hygiene
 writing-style  5  Writing style for docs, comments, commits, reports

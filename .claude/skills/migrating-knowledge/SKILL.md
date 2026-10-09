@@ -197,14 +197,16 @@ names the project's own ruling:
   attribution gate of your own.
 - **Agent parallelism** - may more than one agent dispatch run at once, or
   does every dispatch wait for the last one to close? Record it as a
-  `process.*` rule; the `orchestrating` skill defaults to sequential
-  dispatch until this entry rules otherwise.
+  `process.*` rule; the `orchestrating` skill defaults to parallel
+  dispatch on tasks the plan marks as disjoint file sets, each in its own
+  worktree, and to sequential dispatch otherwise, until this entry rules
+  otherwise.
 
 Answer all three before the first real batch. A project that never rules
 them is choosing the shipped defaults (ff-only CLI merges, no attribution
-trailers, sequential dispatch) by omission, not by decision - ruling them
-explicitly, even to keep the default, is what lets a later reader tell the
-two apart.
+trailers, parallel dispatch on disjoint file sets and sequential dispatch
+otherwise) by omission, not by decision - ruling them explicitly, even to
+keep the default, is what lets a later reader tell the two apart.
 
 ## Generate your own CI gate
 

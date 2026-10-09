@@ -111,7 +111,7 @@
       "body": [
         "The orchestrator researches candidate libraries or packages AT SPEC TIME with maintenance evidence, and presents them for the owner's ruling - never delegated to implementers, never deferred to plan time. The choice is ultimately the owner's.",
         "Wherever the codebase is touched, existing custom code that a well-maintained library should replace is refactored in that batch: the refactor folds into the spec and plan. Deferring the rewrite is not an option.",
-        "The mandatory whole-codebase sweep ran at batch 20 T4 with the phase-5 repository sweep (docs/design.md 5.24). It named one candidate - the recursive directory walker duplicated across the dev-only gate bins, against the walkdir crate - and adopted none, spec section 8 having forbidden adoption in that batch; the owner ruled adoption at the batch 20 report (docs/design.md 5.47): walkdir enters exact-pinned in a future batch and replaces the copies (HR-079).",
+        "A whole-codebase sweep can conclude 'named but not adopted this batch': record the candidate and the reason adoption waits (a competing spec priority, a not-yet-ruled owner decision), rather than silently dropping the finding. The next batch that touches the same code re-reads the record before repeating the search.",
         "quality.principles carries the underlying preference (also present in tag-pilot); security-hygiene.dependency-vetting and exact-pins govern each adoption."
       ],
       "tags": [

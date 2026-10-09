@@ -57,7 +57,7 @@
       "summary": "Live-run every CLI change in a scratch `git init` repo: `init --dir <scratch>`, both checks inside; each gate its own `live_run` entry with `exit`.",
       "body": [
         "Scratch repositories live under the session scratchpad, never inside this repository and never in tag-pilot. Run `houserules check-knowledge` and `houserules check-backlog` there and record each command's verbatim output as its own report `live_run` entry (batch 3 task 3 recorded only one of a chained pair).",
-        "Batch 18 T6 flips the binary this recipe runs (docs/specs/2026-09-05-batch-18-phase3.md §4): until HR-048 ships a distribution channel, exercise the compiled binary directly — `cargo build --release` once, then `target/release/houserules <command>` (or `cargo run --quiet --release --bin houserules -- <command>`) against the scratch repository. The npm-era HR-001 pair (`pnpm dlx`'s published path, the symlinked `node_modules` path) no longer applies, and neither does the frozen file itself: `bin/houserules.mjs` retired outright at batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2) along with the rest of the JS toolchain — it only ever implemented `init`/`update`/`files`, and this recipe's compiled-binary form already covered the same surface.",
+        "This recipe runs the compiled binary of the tree (docs/specs/2026-09-05-batch-18-phase3.md §4), never an installed release, because the change under test is not in a release: `cargo build --release` once, then `target/release/houserules <command>` (or `cargo run --quiet --release --bin houserules -- <command>`) against the scratch repository. The npm-era HR-001 pair (`pnpm dlx`'s published path, the symlinked `node_modules` path) no longer applies, and neither does the frozen file itself: `bin/houserules.mjs` retired outright at batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2) along with the rest of the JS toolchain — it only ever implemented `init`/`update`/`files`, and this recipe's compiled-binary form already covered the same surface.",
         "For a change to `update`, run `init` and then `update` in the same scratch repository and confirm that only kit-owned files changed.",
         "The report names the scratch path (a `cd` entry or the path in the command) and records the init and both check gates as their own `live_run` entries; a live run without them fails the recipe.",
         "A fix round that changes no CLI behavior (test-only, report-only, evidence wording) may stand on the task's original live run when the report discloses the scoping for the re-reviewer to judge (batch 6).",
@@ -512,8 +512,8 @@
       "standing": false,
       "summary": "A task-end gate run includes every check CI runs on push or pull request; a local gate list that omits a CI check is stale.",
       "body": [
-        "The list today: a mingw-w64 C compiler installed first (`gcc-mingw-w64-x86-64`, needed once a `-sys` crate landed, houserules.c-toolchain-crates-need-ci-mingw), cargo fmt --check, the full suite, clippy, the cross-target check, the lint chain (shellcheck, cargo deny, both knowledge gates, render --check, the residue gate, the vacuous-exception gate, the payload-stamp gate, the dist-generate-check gate), and -- pull-request only -- a check-commit range pass (`houserules check-commit --from $(git merge-base main HEAD) --to HEAD`, ci.yml's own check-commit job) and a knowledge-base audit of the diff (`mise run audit -- --base <PR base> --head <PR head>`).",
-        "Derive the list from .github/workflows and mise.toml, not from memory; when CI gains a check, the task-end list gains it in the same change.",
+        "The contract surface is the gate list that CI runs: the jobs in `.github/workflows/ci.yml` and the `lint` and `test` tasks in `mise.toml`. A task-end gate run covers every check on it: a mingw-w64 C compiler installed first (`gcc-mingw-w64-x86-64`, needed once a `-sys` crate landed, houserules.c-toolchain-crates-need-ci-mingw), cargo fmt --check, the full suite, clippy, the cross-target check, the lint chain (shellcheck, cargo deny, both knowledge gates, render --check, the residue gate, the vacuous-exception gate, the payload-stamp gate, the dist-generate-check gate), and -- pull-request only -- a check-commit range pass (`houserules check-commit --from $(git merge-base main HEAD) --to HEAD`, ci.yml's own check-commit job) and a knowledge-base audit of the diff (`mise run audit -- --base <PR base> --head <PR head>`).",
+        "Derive the list from .github/workflows and mise.toml, not from memory and not from an earlier report's account of the gates; when CI gains a check, the task-end list gains it in the same change. How a report narrates the gates it ran is a deliverable matter outside this rule: judge it under process.claims-match-artifacts.",
         "The check-commit range pass matters most for a per-commit knowledge check: it judges every commit back to the real merge base with main, never only a fix round's own diff, so an omission here is exactly how a per-commit check ships unrun against the range CI actually judges (batch 24 T1 fix round 6: a per-commit co-change check went unrun at CI's own --from until this entry named the job).",
         "Origin: batch 22 T1 - three review rounds closed with cargo fmt --check red at HEAD because no round's gate list named it; CI would have failed the first push."
       ],
@@ -715,6 +715,7 @@
         "The frozen CLI surface: the 20 `Command` variants `crates/houserules/src/main.rs` defines, enumerated by the `no_subcommand_carries_a_long_about_beyond_its_short_one` test (`cargo test --bin houserules no_subcommand_carries_a_long_about_beyond_its_short_one`, asserts the count) and captured verbatim by `cargo run --release --quiet --bin houserules -- --help`.",
         "The frozen schema surface: `knowledge/schema.json`, `template/knowledge/schema.json`, `backlog/schema.json`, `template/backlog/schema.json`, `.claude/schemas/deliverables.json`, and `template/.claude/schemas/deliverables.json` -- their constraints, not a prose restatement of them. `git rev-parse HEAD:<path>` pins each copy to its blob id at the freeze; design.md 5.82 carries the six ids.",
         "Adding, removing, or renaming a subcommand or flag, or tightening or loosening a required field, an enum, a textList floor, or an id-shape pattern in any of the six schema files needs an owner ruling and a major-version bump, never a patch or minor release.",
+        "Widening a positional argument's arity (one value to one or more) adds, removes, and renames no subcommand or flag and leaves every existing call unchanged: it is not a surface change (design.md 5.91, owner 2026-10-09).",
         "Neither surface is gated mechanically by this entry; design.md 5.82 is the durable record an owner supersession amends (process.owner-rulings-need-owner-supersession)."
       ],
       "tags": [
@@ -794,7 +795,7 @@
       "body": [
         "Batch 27 T4 (HR-136): `template/AGENTS.md` carries the canonical project instructions -- the substance CLAUDE.md alone used to carry, rephrased for 'your agent'/'the agent' rather than 'Claude'. `template/CLAUDE.md` is exactly `@AGENTS.md`, the one-line import Claude Code's own docs endorse (code.claude.com/docs/en/memory.md, verified 2026-09-15). Both join `SEED_ONCE`: `init` writes each once, `update` never overwrites an existing copy of either, and backfills whichever one a later kit release adds to an install an older release already seeded.",
         "Every seeded text -- the three template skills, template knowledge entries, template docs -- names 'your agent'/'the agent', never 'Claude', as the addressee (writing-style.instructions-cover-the-state-space: an instruction that assumes Claude Code's skills auto-load or its subagents exist stops holding for every other harness). `.claude/rules/*`, `.claude/agents/*`, and the SessionStart hook (`tools/claude-session-start.sh`) stay genuinely Claude-Code-specific mechanisms; AGENTS.md's own 'Working with other harnesses' section names them as optional accelerations a harness with none of the three still fully covers by reading AGENTS.md and running the `houserules` commands it names.",
-        "This repository adopts its own design: root `AGENTS.md` carries this repository's own instructions, not the generic template's (its batch lifecycle names a user gate and this repository's own `process.sequential-agents` ruling), and root `CLAUDE.md` is the same one-line pointer -- both edited directly, since neither is `KIT_OWNED`: `houserules.template-is-the-source`'s byte-identity pin (`crates/houserules/tests/dogfood.rs`) never covers a `SEED_ONCE` path.",
+        "This repository adopts its own design: root `AGENTS.md` carries this repository's own instructions, not the generic template's (its batch lifecycle names a user gate and the `process.parallel-on-disjoint-files` default in this repository's own words), and root `CLAUDE.md` is the same one-line pointer -- both edited directly, since neither is `KIT_OWNED`: `houserules.template-is-the-source`'s byte-identity pin (`crates/houserules/tests/dogfood.rs`) never covers a `SEED_ONCE` path.",
         "The kit's own gate carries the same design, not only the seeded texts: `check_base` (crates/houserules/src/rules/check.rs) requires AGENTS.md to exist and spends the 200-line/12288-byte instruction budget on it; it tolerates an absent CLAUDE.md entirely (no finding), budgeting it only when present, at the same limits. No `knowledge/areas.json` area glob may name `CLAUDE.md`: an adopter who deletes the now-optional pointer would leave that glob matching nothing, and the dead-glob gate fails the whole base for it -- this is why the docs area's own glob list carries `AGENTS.md` but never `CLAUDE.md`, in this repository's own `knowledge/areas.json` and in `template/knowledge/areas.json` alike. Batch 27 T4 fix round 1 shipped the design in code before this clause existed to say so; fix round 2 added this clause after the gap between code and entry was itself filed as a finding."
       ],
       "tags": [
@@ -885,6 +886,77 @@
       "see": [
         "writing-style.instructions-cover-the-state-space"
       ]
+    },
+    {
+      "id": "houserules.cli-changes-run-full-tier",
+      "kind": "rule",
+      "area": "cli",
+      "standing": false,
+      "summary": "A change under crates/houserules/src/** runs the full tier: the binary's commands, flags, and output are a contract that every adopter runs.",
+      "body": [
+        "This entry carries the tag `full-tier`, so `houserules for --full crates/houserules/src/<file>` returns it and selects the full tier of `process.risk-tiers`: the whole lifecycle of the orchestrating skill, with at most two re-reviews per task.",
+        "Every adopter runs the binary, and past 1.0 its CLI surface is frozen (`houserules.1-0-surface-is-frozen`). A defect here reaches every adopter's gates.",
+        "A schema file outside `crates/houserules/src/**` selects the full tier by the criterion that the change alters a schema."
+      ],
+      "tags": [
+        "full-tier",
+        "tiers"
+      ],
+      "source": {
+        "date": "2026-10-09",
+        "by": "user",
+        "ref": "owner ruling, batch 31 spec 2.1"
+      },
+      "see": [
+        "process.risk-tiers",
+        "houserules.1-0-surface-is-frozen"
+      ]
+    },
+    {
+      "id": "houserules.template-changes-run-full-tier",
+      "kind": "rule",
+      "area": "template",
+      "standing": false,
+      "summary": "A change under template/** runs the full tier: the payload is what every adopter receives through `init` and `update`.",
+      "body": [
+        "This entry carries the tag `full-tier`, so `houserules for --full template/<file>` returns it and selects the full tier of `process.risk-tiers`: the whole lifecycle of the orchestrating skill, with at most two re-reviews per task.",
+        "`template/` is embedded into the shipped binary (`houserules.payload-embeds-checkout-bytes`), and `init` and `update` write it into every adopter's repository. A defect here changes the process of every adopter."
+      ],
+      "tags": [
+        "full-tier",
+        "tiers"
+      ],
+      "source": {
+        "date": "2026-10-09",
+        "by": "user",
+        "ref": "owner ruling, batch 31 spec 2.1"
+      },
+      "see": [
+        "process.risk-tiers",
+        "houserules.payload-embeds-checkout-bytes"
+      ]
+    },
+    {
+      "id": "houserules.plan-semantics-run-on-the-corpus",
+      "kind": "rule",
+      "area": "docs",
+      "standing": false,
+      "summary": "A classifier, threshold, or matching rule that a plan fixes in words runs over the real corpus before the plan is approved; the plan cites the run.",
+      "body": [
+        "A plan's Semantics block is a contract that the implementer builds to the letter. A rule stated in words ('contains commit') carries the author's examples only; the corpus holds the counterexamples.",
+        "Before approval, run the rule as a scratch script over the data it will classify (this repository: every finding in the batch workspaces). Keep the output in the batch workspace. The plan names the file and the counts it gave.",
+        "Correct a rule that the corpus contradicts in the plan, not in a review round. Batch 31 Task 1 built the target classifier to the plan's rule 'contains commit': 29 of the 852 findings that name a string file counted as prose only because of that substring, and 20 of those 29 name code (check_commit.rs, the commit-msg hook). That cost one Important finding and a fix round; a probe over the workspaces found it (`.superpowers/sdd/2026-10-09-batch-31/review-t1-commit-substring-probe.txt`)."
+      ],
+      "tags": [
+        "planning",
+        "classifier",
+        "corpus"
+      ],
+      "source": {
+        "date": "2026-10-09",
+        "by": "review",
+        "ref": "batch 31 branch review, retrospective; task 1 round 0, Important finding 1"
+      }
     }
   ]
 }
