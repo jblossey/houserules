@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/jblossey/houserules/compare/v1.2.0...v1.3.0) (2026-10-09)
+
+
+### Features
+
+* **cli:** stats reads several workspaces and proposes knowledge changes from measured cost ([0d423d6](https://github.com/jblossey/houserules/commit/0d423d68cf2b03d48c7c18f2ac9d867a8ce87455))
+* **template:** risk tiers, severity by impact, a bounded review loop, and a knowledge loop ([e848916](https://github.com/jblossey/houserules/commit/e848916b9cbdbc2fef8d7b4820f63ff3c42714ea))
+
 ## [1.2.0](https://github.com/jblossey/houserules/compare/v1.1.0...v1.2.0) (2026-10-02)
 
 
