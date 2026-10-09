@@ -35,11 +35,13 @@
 //!   `houserules validate`, with each slice's own absolute fixture path
 //!   redacted to a `<fixtures>/...` placeholder (`redact_fixture_path`'s
 //!   own doc explains why validate alone needs this).
-//! - `tests/goldens/stats/{batch14-workspace,stats-workspace}.json` and
-//!   `tests/goldens/audit/{validate-terminal-report,
-//!   knowledge-retrospective}.json` -- byte parity for `houserules
-//!   stats`/`audit`; neither command's own output embeds an absolute
-//!   path, so neither needs redaction.
+//! - `tests/goldens/stats/{batch14-workspace,stats-workspace}.json` --
+//!   byte parity for `houserules stats`, with the workspace's own absolute
+//!   path (the `path` of its `workspaces` row) redacted to a
+//!   `<fixtures>/...` placeholder.
+//! - `tests/goldens/audit/{validate-terminal-report,
+//!   knowledge-retrospective}.json` -- byte parity for `houserules audit`;
+//!   its output embeds no absolute path, so it needs no redaction.
 //!
 //! Rebuilds `houserules` itself first (`cargo build --bin houserules`): the
 //! whole point of this command is to capture what the CURRENT source
@@ -433,10 +435,10 @@ fn validate_and_freeze(
 }
 
 /// Runs `houserules stats <workspace>` with `worktree` as the working
-/// directory and freezes the capture at `tests/goldens/stats/<slice>.json`
-/// -- unlike `validate`, `stats`' own output never embeds an absolute
-/// path (it reports counts and ids, not file locations), so no redaction
-/// applies here.
+/// directory and freezes the capture at `tests/goldens/stats/<slice>.json`.
+/// Like `validate`, `stats` echoes the caller's path -- the `path` of the
+/// workspace's row under `workspaces` -- so `workspace`'s absolute path
+/// is redacted to `workspace_label` in the frozen stdout.
 fn stats_and_freeze(
     bin: &Path,
     worktree: &Path,
@@ -454,7 +456,11 @@ fn stats_and_freeze(
     let capture = json!({
         "command": format!("houserules stats {workspace_label}"),
         "cwd": "<frozen-worktree>",
-        "stdout": String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "stdout": redact_fixture_path(
+            &String::from_utf8(output.stdout).expect("utf8 stdout"),
+            workspace,
+            workspace_label,
+        ),
         "stderr": String::from_utf8(output.stderr).expect("utf8 stderr"),
         "exit": output.status.code().unwrap_or(-1),
     });

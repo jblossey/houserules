@@ -13,6 +13,11 @@
 //! reads (see `deliverable.rs`'s and `validate_deliverable.rs`'s own
 //! module docs for the data-layer reasoning). `check_shape::CheckDef`
 //! wires into `model::Entry.check` and the audit engine (`audit`).
+//! `stats` composes two more modules: `cost` (the measurements of one
+//! workspace and the `workspaces` and `cost` keys) and `proposals` (the
+//! `rules` and `proposals` keys, rated against the loaded knowledge base).
+//! `test_support` (test builds only) holds the knowledge-base fixtures
+//! those two modules' tests share.
 //!
 //! `check::validate`, the generic JSON-Schema-subset engine `check_base`
 //! already relies on, is re-exported as this module's own `validate`:
@@ -59,14 +64,18 @@ mod audit;
 mod check;
 mod check_commit;
 mod check_shape;
+mod cost;
 mod deliverable;
 mod durable_sha;
 mod glob;
 mod kit_citations;
 mod model;
+mod proposals;
 mod read;
 mod render;
 mod stats;
+#[cfg(test)]
+mod test_support;
 mod validate_deliverable;
 
 pub(crate) use audit::cmd_audit;

@@ -318,7 +318,16 @@ fn validate_matches_the_frozen_skipped_report_slice() {
 
 // ---- stats: byte parity, both corpus slices -----------------------------------------
 
-fn assert_stats_matches_corpus(worktree: &Path, workspace: &Path, corpus_slice: &str) {
+/// Runs `houserules stats` over `workspace` and compares its output with
+/// the golden. `stats` echoes the workspace's absolute path in the `path`
+/// of its `workspaces` row, so stdout is redacted to `placeholder` before
+/// the comparison, the way `validate`'s is.
+fn assert_stats_matches_corpus(
+    worktree: &Path,
+    workspace: &Path,
+    corpus_slice: &str,
+    placeholder: &str,
+) {
     let output = houserules()
         .args(["stats"])
         .arg(workspace)
@@ -327,7 +336,11 @@ fn assert_stats_matches_corpus(worktree: &Path, workspace: &Path, corpus_slice: 
         .expect("run stats");
     let expected = corpus_capture(&format!("tests/goldens/stats/{corpus_slice}"));
     assert_eq!(
-        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        redact(
+            &String::from_utf8(output.stdout).expect("utf8 stdout"),
+            workspace,
+            placeholder
+        ),
         expected.stdout,
         "{corpus_slice}: stdout diverged"
     );
@@ -350,7 +363,12 @@ fn assert_stats_matches_corpus(worktree: &Path, workspace: &Path, corpus_slice: 
 fn stats_matches_the_frozen_batch14_workspace_slice() {
     let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     let fixtures = repo_root().join("tests/fixtures/batch14-workspace");
-    assert_stats_matches_corpus(&worktree.path, &fixtures, "batch14-workspace.json");
+    assert_stats_matches_corpus(
+        &worktree.path,
+        &fixtures,
+        "batch14-workspace.json",
+        "<fixtures>/batch14-workspace",
+    );
 }
 
 /// `stats-workspace`, which carries one `task-1-audit.json` (two
@@ -362,7 +380,12 @@ fn stats_matches_the_frozen_batch14_workspace_slice() {
 fn stats_matches_the_frozen_stats_workspace_slice() {
     let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     let fixtures = repo_root().join("tests/fixtures/stats-workspace");
-    assert_stats_matches_corpus(&worktree.path, &fixtures, "stats-workspace.json");
+    assert_stats_matches_corpus(
+        &worktree.path,
+        &fixtures,
+        "stats-workspace.json",
+        "<fixtures>/stats-workspace",
+    );
 }
 
 // ---- audit: field-identical JSON, both frozen audit slices --------------------------
@@ -1331,13 +1354,12 @@ fn stats_with_zero_positional_arguments_exits_2() {
 }
 
 /// `stats a b` (two positionals): JS's own `positional.length !== 1`
-/// guard also rejects this, exit 2 with the same "stats needs one
-/// workspace directory" message as zero positionals; the binary's clap
-/// surface takes a single positional, so a second one is an unexpected
-/// argument, also exit 2 but with different wording -- pinned for the
-/// same reason as the zero-positional case above.
+/// guard rejected this, exit 2. The binary reads several workspaces
+/// (design.md 5.91), so clap accepts both and the run ends at the first
+/// path, which does not exist in the frozen worktree: exit 2 with the
+/// named error for `a`, never clap's "unexpected argument".
 #[test]
-fn stats_with_two_positional_arguments_exits_2() {
+fn stats_with_two_positional_arguments_reads_both_and_names_the_first_missing_one() {
     let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
     let output = houserules()
         .args(["stats", "a", "b"])
@@ -1346,10 +1368,8 @@ fn stats_with_two_positional_arguments_exits_2() {
         .expect("run stats a b");
     assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
-    assert!(
-        stderr.starts_with("error: unexpected argument"),
-        "got: {stderr:?}"
-    );
+    assert!(stderr.starts_with("a: "), "got: {stderr:?}");
+    assert!(!stderr.contains("unexpected argument"), "got: {stderr:?}");
 }
 
 // ---- `--workspace` and `--json`'s own bare-flag and duplicate-flag
