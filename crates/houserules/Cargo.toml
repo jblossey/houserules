@@ -33,7 +33,7 @@ walkdir = "=2.5.0"
 tempfile = "=3.27.0"
 
 [target."cfg(unix)".dev-dependencies]
-libc = "=0.2.189"
+libc = "=0.2.190"
 
 # dist ships every archive with the whole crate's binaries otherwise (the four
 # dev tools under src/bin/ alongside houserules itself). Restrict every dist
