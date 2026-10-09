@@ -284,21 +284,6 @@
       "see": []
     },
     {
-      "id": "HR-140",
-      "type": "process",
-      "title": "A balancing mechanism against micro-management and over-bureaucratizing in review rounds",
-      "body": [
-        "Owner (2026-09-15): 'i observe that fix and review rounds have become longer due to menial defects that are more adhering to a protocol than actually producing valuable output. We need to introduce a balancing mechanism against micro-management and over-bureaucratizing.' Observed in batch 27: T2 took five review rounds and T4 three; several late rounds turned on prose wording, comment phrasing, and report-narrative fidelity rather than shipped behavior. Candidate mechanisms for the spec discussion: a severity floor below which a reviewer records a note instead of a blocking finding; a fix-round budget per task with overflow deferred as batch-report items; letting Minor-only rounds close controller-verified without a re-review dispatch; distinguishing contract surfaces (code, user-facing text, gates) from narrative surfaces (report prose) in the rules' blast radius. Needs an owner-gated spec: the mechanism must not soften process.no-tech-debt's core (real defects still get fixed) - it targets the cost of the loop, not the standard."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 29,
-      "see": [
-        "HR-138",
-        "HR-139"
-      ]
-    },
-    {
       "id": "HR-141",
       "type": "feat",
       "title": "Reports re-open every file:line citation at HEAD; check-report-claims compares the cited line",
@@ -474,6 +459,104 @@
       "see": [
         "HR-154",
         "HR-098"
+      ]
+    },
+    {
+      "id": "HR-158",
+      "type": "feat",
+      "title": "Task reports carry generated facts, not prose claims; evidence lives in files the report links",
+      "body": [
+        "Owner (2026-10-09, design.md 5.90): filed as a backlog item, not built in batch 31. The cost analysis of 2026-10-09 measured task reports growing from about 55 KB (batch 2) to 316-635 KB (batches 28 and 30). About half of all 633 review findings across 26 batch workspaces target reports, evidence files, or prose, and the three rules cited most in findings are claim rules (knowledge-base.state-only-the-source 50, process.claims-match-artifacts 35, process.closure-claims-carry-enumeration 21).",
+        "Shape for a spec: `houserules` generates the fact fields of a task report (commits, test commands with exit codes, audit rows) instead of the implementer assembling them by hand; command output goes to capture files the report cites by path and hash instead of being pasted verbatim; the free-prose fields shrink to what a reviewer needs. Fewer prose claims leave less for claim rules to check.",
+        "Surface: the change edits `.claude/schemas/deliverables.json` and its template copy, a frozen surface (houserules.1-0-surface-is-frozen): a major-version bump and an adopter migration path for existing workspaces."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-057",
+        "HR-140",
+        "HR-160"
+      ]
+    },
+    {
+      "id": "HR-162",
+      "type": "chore",
+      "title": "Seeded topic files ship in the form emit writes, so a first update rewrites nothing",
+      "body": [
+        "Found in batch 31 task 2 (live run of the adopter update path). `update` re-emits every seeded knowledge topic file through `emit`; template/knowledge/quality.json and template/knowledge/security-hygiene.json are stored compact, so the first `update` of a fresh install reformats them (76 and 96 lines of whitespace). main's 1.2.0 binary updating a fresh 1.2.0 install produces the same diff, so the noise predates batch 31.",
+        "Fix: store every seeded topic file in emit's form, and add a test that `update` right after `init` leaves the knowledge files byte-identical. This lowers the friction of every adopter update (HR-161's constraint)."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-161"
+      ]
+    },
+    {
+      "id": "HR-163",
+      "type": "chore",
+      "title": "Deterministic checks for six judged rules the batch-31 stats run flagged",
+      "body": [
+        "Filed by the batch-31 batch-close loop (process.knowledge-earns-its-place): `houserules stats` over the five most recent workspaces (batches 24 to 30; .superpowers/sdd/2026-10-09-batch-31/stats-t4-batches-24-30.json) proposes `mechanize` without an owner gate for houserules.crash-paths-are-named (2 workspaces), houserules.task-gates-mirror-ci (2), knowledge-base.state-only-the-source (4), process.wiring-checks-run-the-resolution (3), quality.user-facing-text-is-contract (2), and writing-style.instructions-cover-the-state-space (4).",
+        "For each entry a spec decides one of two outcomes: a deterministic `check` that catches the class the findings show (task-gates-mirror-ci: compare the report's gate list with .github/workflows and mise.toml; crash-paths-are-named: a lint for unwrap/expect on the named input paths), or the owner tags the entry `ruled-keep` because the rule is judged by design, so the loop stops proposing it."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-160"
+      ]
+    },
+    {
+      "id": "HR-164",
+      "type": "fix",
+      "title": "stats: the budget reason covers a kept set over the budget; two text fixes",
+      "body": [
+        "Deferred at the re-review cap of batch 31 task 1 (process.bounded-review-loop: re-review 2 of 2 on a full-tier task; task-1-review-r2.json in the batch-31 workspace). Reason for deferral: the cap, not a judgment that the findings are wrong.",
+        "1 (Important): the `budget` reason always ends 'Demote the others that catch the least.' With every standing entry tagged `ruled-keep` it says so while `candidates` is empty, and with more kept entries than the budget no demotion of the candidates reaches the budget (reproduced in rr2-t1-budget-reason-states.txt). Fix: when `ruled_keep` exceeds the budget, the reason says the kept entries alone exceed it and that lifting a tag is the remedy; tests pin the reason in each state.",
+        "2 (Minor): README's sample `narrow` row still prints 'minor or hit a deliverable or prose'; the binary prints 'minor or hit a deliverable'.",
+        "3 (Minor): the doc comment of `is_soft` (crates/houserules/src/rules/cost.rs) conditions the prose rule on 'a repository whose docs are its product'; the code applies it everywhere."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-161",
+        "HR-160"
+      ]
+    },
+    {
+      "id": "HR-165",
+      "type": "chore",
+      "title": "Batch-31 retrospective proposals that change code or the two eval-covered templates",
+      "body": [
+        "From the batch-31 branch review retrospective (.superpowers/sdd/2026-10-09-batch-31/branch-review.json, violated_rules). Deferred out of batch 31 because each changes executable code or the implementer or task-reviewer template, which re-opens the eval run (process.evals-rerun) for a batch already past it.",
+        "1. Generate README's sample `stats` output as a frozen slice and assert the README block equals it (quality.user-facing-text-is-contract). 2. Enable rustdoc missing_docs for the crate's public items (writing-style.doc-comments). 3. check-report-claims reads backlog items and specs: a cited workspace path exists, and a cited stats run names the file that holds its window (process.claims-match-artifacts). 4. Implementer template, TDD step: a pin of existing behavior runs at BASE first and records the passing exit beside its disclosed mutation (process.tdd). 5. Task-reviewer template: a closure probe derives from the claim's subject, and an instruction keyed to a tier, count, or version is read once per value of that field (process.closure-claims-carry-enumeration, writing-style.instructions-cover-the-state-space). 6. The finishing-a-feature skill's Finish step runs `houserules check-commit --from <merge base>` with the tree binary when the batch changes the binary, since the commit-msg hook skips the check when no houserules is on PATH (batch-31 branch review, template defect 4, second half)."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-160",
+        "HR-158"
+      ]
+    },
+    {
+      "id": "HR-166",
+      "type": "fix",
+      "title": "Four Minor findings left at the batch-31 fix-wave cap: the until clause, two texts, one report citation",
+      "body": [
+        "Deferred at the re-review cap of batch 31's branch fix wave (process.bounded-review-loop; branch-fix-1-review-r2.json in the batch-31 workspace). Reason: the cap, not a judgment that the findings are wrong.",
+        "1. The summary-is-the-rule check's until clause stops at any period, so 'until 1.3.0 ships' escapes it; use (?:[^.;:]|\\.\\d){0,40} in both copies and add the phrase to the test's PHRASES. 2. The entry body and the test module doc say each word carries a bracketed letter; each branch of the pattern does. 3. The orchestrating skill tells a 1.0.0 install to delete the whole old CLAUDE.md line, which also carries the dispatch-template and Knowledge/BASE instructions; name only the sequential sentence, or point CLAUDE.md at AGENTS.md; the doc comment of orchestrating_skill_carries_the_agents_md_parallel_line_verbatim names only the AGENTS.md population. 4. The wave report's author-class walk cites a check-knowledge capture for 'init writes clean kit text'; cite r2-probe-widened-after-fix.txt."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-160",
+        "HR-164"
       ]
     }
   ]

@@ -30,7 +30,6 @@
       "number": 29,
       "items": [
         "HR-144",
-        "HR-140",
         "HR-129",
         "HR-153"
       ],
@@ -38,7 +37,22 @@
       "kickoff": "the owner's direction of 2026-10-01 (design.md 5.87)",
       "status": {
         "state": "planned",
-        "text": "Needs its own brainstorm and spec, with an owner ruling on the deliverables-schema surface and a delivery path for a seed-once schema change."
+        "text": "Needs its own brainstorm and spec, with an owner ruling on the deliverables-schema surface and a delivery path for a seed-once schema change. HR-140 moved to batch 31 (design.md 5.90)."
+      }
+    },
+    {
+      "number": 31,
+      "items": [
+        "HR-159",
+        "HR-140",
+        "HR-160",
+        "HR-161"
+      ],
+      "summary": "Process cost: a risk-tiered pipeline, review severity by impact and a bounded review loop, a self-optimizing knowledge base, and the cost analysis shipped to adopters.",
+      "kickoff": "docs/specs/2026-10-09-batch-31-process-cost.md",
+      "status": {
+        "state": "in-progress",
+        "text": "Built 2026-10-09: risk tiers, severity by impact, the bounded review loop, parallel agents on disjoint files, the self-optimizing knowledge loop, and stats over several workspaces (design.md 5.90-5.93). HR-164 (Task 1's findings at its cap) and HR-166 (the fix wave's findings at its cap) are deferred; HR-158, HR-162, HR-163, HR-165 are filed. Merge, release 1.3.0, and acceptance pending the owner."
       }
     }
   ]

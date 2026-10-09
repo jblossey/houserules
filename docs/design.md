@@ -1249,3 +1249,45 @@ Each item records the ruling with its date, or stays marked open.
     finishing-a-feature skill, and the entry is not seeded;
     issue 35 stays open, because its checker rule did not ship
     (HR-141). Source: owner, 2026-10-02, the batch-28 checkpoint.
+90. **Batch 31 directed: process cost - ruled 2026-10-09.** Users
+    report that houserules prolongs feature work. The analysis of
+    2026-10-09 measured three causes over 26 batch workspaces:
+    review effort lands on the process's own deliverables, the
+    knowledge base only grows, and one pipeline serves every
+    change. The owner directed batch 31 to build a risk-tiered
+    pipeline (HR-159), severity by impact and a bounded review
+    loop (HR-140, out of batch 29), and a mechanism that makes
+    the knowledge base self-optimizing (HR-160), and to ship the
+    cost analysis to adopters so that their setups self-optimize
+    too (HR-161). An adopter updates after the release with as
+    little friction as possible. Generated report facts (HR-158)
+    are filed, not built. Numbered 90: item 89 rides the
+    unmerged batch-30 branch. Source: owner, 2026-10-09.
+91. **Batch 31: `stats` reads several workspaces; the release is a
+    minor - ruled 2026-10-09.** `houserules stats` takes one or
+    more workspace positionals (`<WORKSPACE>...`). The owner ruled
+    that widening a positional's arity is not a surface change
+    under 5.82: no subcommand or flag is added, removed, or
+    renamed, and every existing call behaves the same. Batch 31
+    ships as 1.3.0. Source: owner, 2026-10-09, the batch-31
+    brainstorm.
+92. **Batch 31: agents run in parallel on disjoint files - ruled
+    2026-10-09.** At the spec gate the owner directed the parallel
+    dispatch the cost analysis proposed into batch 31: tasks whose
+    file sets are disjoint run at the same time, each in its own
+    worktree, and the controller integrates them one at a time.
+    The ruling supersedes `process.sequential-agents` (owner seed,
+    2026-08-30) and the kit's sequential default. Source: owner,
+    2026-10-09, the batch-31 spec gate.
+93. **Batch 31: two loop defects from the first live run - ruled
+    2026-10-09.** The first `stats` run over this repository's five
+    most recent workspaces gave four `narrow` proposals whose
+    findings sit on shipped README, runbook, skill, and knowledge
+    text: in a repository whose docs are its product, prose is a
+    contract surface. The owner ruled: `narrow` counts a finding as
+    soft only when it is Minor or targets a deliverable. The run
+    also re-proposes every standing demotion at every batch close.
+    The owner ruled: an entry tagged `ruled-keep` gets no `demote`,
+    `retire`, `narrow`, or `mechanize` proposal; it still counts
+    toward the standing budget. Source: owner, 2026-10-09, the
+    batch-31 live run.

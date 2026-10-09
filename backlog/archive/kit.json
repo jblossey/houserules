@@ -2073,6 +2073,71 @@
         "HR-145",
         "HR-130"
       ]
+    },
+    {
+      "id": "HR-140",
+      "type": "process",
+      "title": "A balancing mechanism against micro-management and over-bureaucratizing in review rounds",
+      "body": [
+        "Owner (2026-09-15): 'i observe that fix and review rounds have become longer due to menial defects that are more adhering to a protocol than actually producing valuable output. We need to introduce a balancing mechanism against micro-management and over-bureaucratizing.' Observed in batch 27: T2 took five review rounds and T4 three; several late rounds turned on prose wording, comment phrasing, and report-narrative fidelity rather than shipped behavior. Candidate mechanisms for the spec discussion: a severity floor below which a reviewer records a note instead of a blocking finding; a fix-round budget per task with overflow deferred as batch-report items; letting Minor-only rounds close controller-verified without a re-review dispatch; distinguishing contract surfaces (code, user-facing text, gates) from narrative surfaces (report prose) in the rules' blast radius. Needs an owner-gated spec: the mechanism must not soften process.no-tech-debt's core (real defects still get fixed) - it targets the cost of the loop, not the standard.",
+        "Ruled 2026-10-09 (design.md 5.90): the item leaves batch 29 and is built in batch 31 with HR-159, HR-160, and HR-161. The owner directed two mechanisms: a finding's severity follows its impact, not its rule's class, and the review loop is bounded - a re-review reads the fix diff against the original findings, files new findings at their impact, and only a new Critical or Important finding opens a further round."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 31,
+      "see": [
+        "HR-138",
+        "HR-139"
+      ]
+    },
+    {
+      "id": "HR-159",
+      "type": "process",
+      "title": "A risk-tiered batch pipeline: the change's risk picks the review depth",
+      "body": [
+        "Owner (2026-10-09, design.md 5.90): build in batch 31. Every change runs the same pipeline today: spec, owner gate, plan, code-health scan, implementer, task review on a mightier model, branch review, live run. Batch 30 shipped a 116-line workflow through 7 agent dispatches, a 353-line spec, and a 142-line plan.",
+        "Requirement: deterministic criteria (touched areas, the frozen surfaces, security-relevant paths, diff size) pick a tier at plan time; a light tier runs the gates and one review, a standard tier one review and at most one re-review, a full tier today's pipeline. The kit ships the mechanism to adopters through `houserules update`."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 31,
+      "see": [
+        "HR-140",
+        "HR-160"
+      ]
+    },
+    {
+      "id": "HR-160",
+      "type": "feat",
+      "title": "A self-optimizing knowledge base: rules earn their place with measured catches, and a budget caps the standing set",
+      "body": [
+        "Owner (2026-10-09, design.md 5.90): build in batch 31. Knowledge only grows today: 41 entries and 26 standing at 2026-09-02, 102 and 39 at 2026-10-09; audit rows per review grew from 30 (batch 2) to 62 (batch 30). Every rule costs on every task; most catch nothing.",
+        "Requirement: a mechanism that runs at every batch close and proposes, from measured data, to retire or demote rules that caught nothing over a window, to convert a prose rule into a deterministic check, and to keep the standing set under a budget; a retrospective proposal defaults to a non-standing area entry. Owner-gated changes (standing entries, owner rulings) go to the owner as proposals; the rest apply in the batch's knowledge commit."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 31,
+      "see": [
+        "HR-159",
+        "HR-161",
+        "HR-140"
+      ]
+    },
+    {
+      "id": "HR-161",
+      "type": "feat",
+      "title": "Adopters get the cost analysis: the shipped binary measures a workspace's process cost per rule",
+      "body": [
+        "Owner (2026-10-09, design.md 5.90): build in batch 31. The analysis of 2026-10-09 ran as session scripts over this repository's workspaces. Adopters need the same measurement so that their own houserules setup self-optimizes (HR-160): reviews and fix rounds per task, findings by severity and by target (code, deliverable, prose), report size, and per rule its injections, audit rows, catches, and the findings it caused.",
+        "Constraint from the same ruling: an adopter updates after the release with as little friction as possible - no manual migration step, and no gate that reddens an existing install."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 31,
+      "see": [
+        "HR-160",
+        "HR-154"
+      ]
     }
   ]
 }
