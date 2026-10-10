@@ -92,10 +92,12 @@
       "standing": false,
       "summary": "Give every rule, invariant, or checked entry a loading path: `standing: true`, or an area whose globs match the files it governs.",
       "body": [
-        "A non-standing entry in an area with empty globs other than global (`process` in the seed) never loads with a file. A global entry loads with every file through `houserules for` and joins every audit package, but renders into no rules file.",
+        "A non-standing entry in an area with empty globs other than global (`process` in the seed) never loads with a file. A global entry loads with every file through `houserules for` and joins every audit package (a task audit leaves out an entry tagged `controller` unless `--ids` names it), but renders into no rules file.",
         "After filing, run `houserules for <a file the rule governs>` and confirm the entry appears.",
         "The kit's non-standing procedure rules in the glob-less `process` area load by citation instead: a kit-owned skill or agent template names the id, and its reader runs `houserules get <id>`. `check-knowledge` fails a cited id that the base does not hold. Such an entry never joins an audit package by area; name it in `--ids` to audit against it. `process.risk-tiers`, `process.severity-by-impact`, `process.bounded-review-loop`, `process.knowledge-earns-its-place`, and `process.parallel-on-disjoint-files` load this way.",
-        "A `check` needs an audit loading path too: it joins the package when its entry is `standing`, sits in a touched or global area (any kind, not only rule and invariant), or is named in `--ids`."
+        "A non-standing `process` entry also loads through two paths. The controller reads its summary at the session ritual's `houserules index --area process`. An agent receives its id on the `Knowledge:` line of a dispatch.",
+        "Make a process rule standing only when every session must carry it. Give the `controller` tag to a rule that only the controller can break: a task audit leaves the entry out of its package unless `--ids` names it (`knowledge-base.controller-rules-are-tagged`).",
+        "A `check` needs an audit loading path too: it joins the package when its entry is `standing`, sits in a touched or global area (any kind, not only rule and invariant), or is named in `--ids`. A task audit leaves out the check of an entry tagged `controller` unless `--ids` names that entry."
       ],
       "tags": [
         "knowledge",
@@ -107,6 +109,33 @@
         "by": "docs",
         "ref": "houserules seed"
       }
+    },
+    {
+      "id": "knowledge-base.controller-rules-are-tagged",
+      "kind": "rule",
+      "area": "docs",
+      "standing": false,
+      "summary": "Tag an entry `controller` when only the controller's acts can break it; a task audit leaves it out, the branch audit judges it.",
+      "body": [
+        "A controller act is a step that the controller takes: a spec, a plan, a dispatch, a ruling, a merge, a release. A task diff cannot break a rule that governs only these acts.",
+        "A task audit is `houserules audit` with `--report`. It leaves an entry tagged `controller` out of its package. This holds for a standing entry, an entry in a touched area, a global entry, and an entry with a check. `--ids` brings the entry back.",
+        "The branch audit (`--workspace`) and a plain audit (neither flag) keep the entry. The branch reviewer judges its rows. In a batch without a branch review, the controller runs `houserules audit --base <merge base> --workspace <WORKSPACE>` before Finish and judges the `controller` rows in the ledger.",
+        "A rule that task reviews catch stays untagged. `process.rulings-to-file`, `process.tdd`, and `process.claims-match-artifacts` are examples.",
+        "The tag is the exact string `controller`. A tag is a free string: the knowledge schema does not change."
+      ],
+      "tags": [
+        "knowledge",
+        "authoring",
+        "audit"
+      ],
+      "source": {
+        "date": "2026-10-10",
+        "by": "controller",
+        "ref": "batch 32 spec 3.1"
+      },
+      "verify": [
+        ".claude/skills/orchestrating/SKILL.md"
+      ]
     }
   ]
 }

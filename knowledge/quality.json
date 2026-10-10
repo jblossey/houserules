@@ -117,7 +117,8 @@
       "tags": [
         "libraries",
         "dependencies",
-        "process"
+        "process",
+        "controller"
       ],
       "source": {
         "date": "2026-09-05",
@@ -180,7 +181,8 @@
         "Enumerate the surfaces mechanically: grep the user-visible strings for the changed concept (the old flag, shape, or step) rather than recalling where it is mentioned.",
         "A documented procedure is verified by executing its printed steps in order, on the environment it targets or the closest disclosed proxy; a paraphrase check misses preconditions the source text carries.",
         "Batch-27 retrospective: the surface list for a CLI change includes --help for every touched subcommand and every printed receipt line; run the command and read its own output as a user before closing the task. Both batch-27 instances were surfaces the implementer never re-read after the behavior moved (update's about text; a receipt line update never prints).",
-        "When a configuration key gains a second consumer, sweep the texts that define the key, not only the texts of the command that changed (batch 28: `overrides` also decides which kit-owned files check-knowledge reads, and the seeded docs/README.md that defines the key was outside the sweep)."
+        "When a configuration key gains a second consumer, sweep the texts that define the key, not only the texts of the command that changed (batch 28: `overrides` also decides which kit-owned files check-knowledge reads, and the seeded docs/README.md that defines the key was outside the sweep).",
+        "When a change alters which inputs reach an existing error path, re-read every message on that path with the new inputs and name each case. A message that misstates the cause for a newly reachable input is a contract defect, even when the refusal is right (batch 32 task 1: `unknown id` for a known controller entry)."
       ],
       "tags": [
         "cli",

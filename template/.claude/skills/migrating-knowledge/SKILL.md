@@ -135,6 +135,15 @@ instead of only when a matching file is read. `houserules check-knowledge` allow
 it only for kind `rule` or `invariant` in area `global` or `process` —
 leave everything else area-scoped so it loads with its files.
 
+Keep a migrated process rule non-standing unless every session needs it.
+A non-standing `process` entry still loads: the controller reads it at
+`houserules index --area process`, and an agent receives its id on the
+`Knowledge:` line of a dispatch
+(`knowledge-base.rules-need-a-loading-path`). Tag a rule that only the
+controller's acts can break `controller`: a task audit leaves it out of
+its package, and the branch audit judges it
+(`knowledge-base.controller-rules-are-tagged`).
+
 ## Migrate topic by topic
 
 Work one `knowledge/<topic>.json` at a time:
@@ -250,7 +259,7 @@ After, in `knowledge/process.json`:
     "That code moves money, and the linter can't catch a sign error in a fee calculation.",
     "Ping #payments-oncall if no review lands within a day."
   ],
-  "tags": ["payments", "review"],
+  "tags": ["payments", "review", "controller"],
   "source": { "date": "2026-09-02", "by": "docs", "ref": "AGENTS.md, migrated" },
   "verify": ["src/payments/"]
 }
@@ -259,6 +268,10 @@ After, in `knowledge/process.json`:
 One paragraph, one entry: the summary states the rule alone, the body
 carries both reasons the source gave plus the fallback, and `verify`
 points at the code the rule protects. The entry is `standing: true`: a
-review-before-merge rule is a non-negotiable, and area `process` carries
-no file globs, so only `standing` gives the entry a loading path. Delete
-the AGENTS.md paragraph once `houserules render` and both checks pass.
+review-before-merge rule is a non-negotiable that every session needs,
+and area `process` carries no file globs, so a non-standing entry would
+reach only the controller's process index and a dispatch that names its
+id. The entry also carries the tag `controller`: a merge is a controller
+act, so a task diff cannot break the rule, and a task audit leaves it
+out. Delete the AGENTS.md paragraph once `houserules render` and both
+checks pass.

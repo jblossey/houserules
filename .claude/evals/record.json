@@ -493,5 +493,38 @@
         "notes": "template body 722436c given verbatim (the session loaded the older one); both seeded deterministic fails filed important with rule set and the impact in why; the doctored self_audit filed critical as fabricated evidence against a fresh audit; no open row; review validates; audit json present"
       }
     ]
+  },
+  {
+    "date": "2026-10-10",
+    "templates": {
+      ".claude/agents/implementer.md": "3eac71c9abdc268ab92698e726e327d144f73650",
+      ".claude/agents/task-reviewer.md": "fcf6b6218b7da3f5b23c4ed4318b6b316ebddd5c"
+    },
+    "runs": [
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 6,
+        "of": 6,
+        "notes": "template body 3eac71c given verbatim; similar =3.2.0 via cargo add --dev -p houserules; vetting with both manifests (pretty_assertions rejected as stale); dev-only placement reasoned in concerns; natural RED and GREEN; docs_verified names the APIs; report validated; self_audit 9/9 with exact-pins and dependency-vetting pass"
+      },
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 3,
+        "of": 3,
+        "notes": "template body 3eac71c given verbatim; a runbook section for a template/ edit; one instruction per step; every command walked live on a throwaway edit; report validated; self_audit 12/12; no stray task-* file"
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 6,
+        "of": 6,
+        "notes": "template body fcf6b62 given verbatim; exact-pins and dependency-vetting fails filed important with rule set and impact; the doctored self_audit filed important as a report-vs-audit discrepancy; the history comment filed minor under writing-style.code-comments with a check that prints nothing; 32 rows, none open; review validates; audit json present; task audit judged 23 rows, 9 fewer than batch 31's run of the same fixture (the controller rows)"
+      }
+    ]
   }
 ]

@@ -16,6 +16,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [houserules.plan-semantics-run-on-the-corpus] A classifier, threshold, or matching rule that a plan fixes in words runs over the real corpus before the plan is approved; the plan cites the run.
 - [houserules.readme-mirrors-kit-owned] When `KIT_OWNED` gains or loses a path, update README's agent-layer bullet and ownership table in the same commit.
 - [knowledge-base.cite-durable-refs] Cite a commit in a permanent file only if it is or will be reachable from main; name in-branch events by batch/task/round; restate interim SHAs at aggregation.
+- [knowledge-base.controller-rules-are-tagged] Tag an entry `controller` when only the controller's acts can break it; a task audit leaves it out, the branch audit judges it.
 - [knowledge-base.ids-are-permanent] Never rename a merged entry id. Add a new entry and link the old one with `see`.
 - [knowledge-base.rules-need-a-loading-path] Give every rule, invariant, or checked entry a loading path: `standing: true`, or an area whose globs match the files it governs.
 - [knowledge-base.state-only-the-source] State only what the source states; verify polarity, counts, and mechanisms against the code before filing an entry or shipping teaching prose.

@@ -97,7 +97,8 @@
         "A procedure's state space includes the states its own automation creates: walk every generated commit and bot-authored PR through the gates the procedure depends on (batch 24: the release PR's own commit was the uncovered state, three gates deep).",
         "Instructions that branch on host or environment enumerate every branch as shipped text, and the reviewer walks each arm live (batch 25: the non-GitHub origin and the hook-vs-attribution arms).",
         "Batch-27 retrospective: a seed-once file's instruction set is keyed to an enumerated field with three values - absent, present-generic, present-with-own-content; an instruction written for one names what holds for the other two. The batch-27 instance was the untested third state (own CLAUDE.md content, no AGENTS.md, reached by update's backfill).",
-        "A printed remedy is an instruction: list the states that reach the finding and follow the line as printed in each; a state the line cannot clear gets its own arm or a named limit (batch 28: the task review found one such state of the citation lint's remedy, an unseeded id in a kept file; the branch review found two more, an archived entry the adopter wants retired and an adopter topic name)."
+        "A printed remedy is an instruction: list the states that reach the finding and follow the line as printed in each; a state the line cannot clear gets its own arm or a named limit (batch 28: the task review found one such state of the citation lint's remedy, an unseeded id in a kept file; the branch review found two more, an archived entry the adopter wants retired and an adopter topic name).",
+        "A ruling with a named set of outcomes states the count in every text that lists them ('one of three ways'), so a grep for the count finds a text that lists fewer (batch 32 task 2: a contested finding had three outcomes, and two texts named two)."
       ],
       "tags": [
         "templates",

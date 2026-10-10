@@ -31,7 +31,8 @@
         "The backlog lives in `backlog/` (JSON). Read it with `houserules list --open`, `get <id>`, `batch <n>`; tick items with `set <id> status=done batch=<n>`."
       ],
       "tags": [
-        "backlog"
+        "backlog",
+        "controller"
       ],
       "source": {
         "date": "2026-08-30",
@@ -75,7 +76,8 @@
       ],
       "tags": [
         "batch",
-        "design"
+        "design",
+        "controller"
       ],
       "source": {
         "date": "2026-08-30",
@@ -192,7 +194,8 @@
       ],
       "tags": [
         "dispatch",
-        "models"
+        "models",
+        "controller"
       ],
       "source": {
         "date": "2026-08-30",
@@ -209,6 +212,7 @@
       "body": [
         "Technical debt is a no-go. A finding a reviewer filed is fixed in the same fix round, whatever its severity.",
         "The only way to defer: a backlog item that states the reason and the follow-up; the finding names the item. A ledger line or a chat note is not a deferral.",
+        "A finding whose `fix` adds a capability that no caller needs may be contested: the implementer names the finding and the missing caller in `concerns`. The controller rules in one of three ways. The contest holds: drop the finding and record the reason in the ledger. Defer: file a backlog item that the finding names. The contest fails: the finding stands, and the implementer fixes it in the next round.",
         "Severity follows impact (`process.severity-by-impact`). A fix round that holds only Minor fixes closes without a re-review. At the re-review cap of `process.bounded-review-loop`, the open non-critical findings become one backlog item with the reason.",
         "No `TODO`, `FIXME`, or `HACK` marker in source files; the deterministic check fails the audit on a new one. Todos live in `backlog/`."
       ],
@@ -268,7 +272,8 @@
       "tags": [
         "planning",
         "refactoring",
-        "code-health"
+        "code-health",
+        "controller"
       ],
       "source": {
         "date": "2026-08-30",
@@ -368,7 +373,8 @@
       ],
       "tags": [
         "live-run",
-        "ci"
+        "ci",
+        "controller"
       ],
       "source": {
         "date": "2026-08-30",
@@ -653,7 +659,7 @@
       "summary": "A fix round closes only with a written verification record: a re-review deliverable, or a controller note naming each finding and the artifact proving its fix.",
       "body": [
         "A re-review deliverable in the workspace is the default for rounds with executable changes or any critical finding. A controller verification note suffices for report-only or prose rounds when it names finding-by-finding evidence.",
-        "A round that holds only Minor fixes always closes with a controller verification note, whatever the kind of change (`process.bounded-review-loop`).",
+        "A round that holds only Minor fixes always closes with a controller verification note, whatever the kind of change (`process.bounded-review-loop`). The note runs the check that each Minor finding names (a command and its expected result) and cites the result. When a finding names no check, the controller names one.",
         "A fix round can close on a ledger note alone even when the verifications are real and reproducible, if nothing pins where such a record must live or what it must name - that gap is exactly what this rule closes."
       ],
       "tags": [
@@ -702,7 +708,8 @@
       ],
       "tags": [
         "rulings",
-        "owner"
+        "owner",
+        "controller"
       ],
       "source": {
         "date": "2026-08-30",
@@ -861,7 +868,7 @@
       "standing": false,
       "summary": "Bound the review loop: a re-review reads the fix diff only, a Minor-only fix round skips it, and each tier caps its re-reviews.",
       "body": [
-        "A fix round that holds only Minor fixes closes with a controller verification note (`process.fix-round-verification-record`), never with a re-review.",
+        "A fix round that holds only Minor fixes closes with a controller verification note (`process.fix-round-verification-record`), never with a re-review. The controller runs the check that each Minor finding names and cites its result in the note.",
         "A re-review reads the fix diff and the original findings only. It files new findings at their impact (`process.severity-by-impact`). Only a new Critical or Important finding opens a further round. A new Minor finding joins a Minor-only round.",
         "Re-reviews per task: light 0, standard 1, full 2. A branch-review fix wave has the same cap as the batch's tier.",
         "At the cap, the open non-critical findings become one backlog item with the reason (a deferral under `process.no-tech-debt`). An open Critical finding goes to the project's owner or decider.",

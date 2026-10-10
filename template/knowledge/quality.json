@@ -51,7 +51,7 @@
         "A whole-codebase sweep can conclude 'named but not adopted this batch': record the candidate and the reason adoption waits (a competing spec priority, a not-yet-ruled owner decision), rather than silently dropping the finding. The next batch that touches the same code re-reads the record before repeating the search.",
         "quality.principles carries the underlying preference; security-hygiene.dependency-vetting and exact-pins govern each adoption."
       ],
-      "tags": ["libraries", "dependencies", "process"],
+      "tags": ["libraries", "dependencies", "process", "controller"],
       "source": { "date": "2026-09-05", "by": "user", "ref": "owner ruling" }
     },
     {

@@ -95,7 +95,8 @@
         "A gate is an instruction too: when a check is added to a tool, the surrounding protocol's own intermediate artifact states are part of the conditioned state space - a hardened validator that rejects the protocol's own in-progress draft (a terminal status alongside a still-null field the protocol fills in later) is fixed by migrating the flow, not by special-casing the draft.",
         "A shipped instruction that names a repo-local resource states what every other population does instead: a closing act's false-positive arm that names a resource only one population (the source-carrying one) has, branches explicitly on source-present vs. installed-binary populations rather than assuming the resource exists everywhere.",
         "An instruction naming the populations it governs enumerates all of them: test the sentence against each population the code path actually handles, not just the two most common ones.",
-        "A procedure's state space includes the states its own automation creates: walk every generated commit and bot-authored change through the gates the procedure depends on - an automated PR's own commit is as much a state to cover as a human one."
+        "A procedure's state space includes the states its own automation creates: walk every generated commit and bot-authored change through the gates the procedure depends on - an automated PR's own commit is as much a state to cover as a human one.",
+        "A ruling with a named set of outcomes states the count in every text that lists them ('one of three ways'), so a grep for the count finds a text that lists fewer (batch 32 task 2: a contested finding had three outcomes, and two texts named two)."
       ],
       "tags": [
         "instructions",

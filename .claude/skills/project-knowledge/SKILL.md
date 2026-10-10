@@ -57,7 +57,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 ## Topics
 
 houserules  39  Working in the houserules kit repository
-knowledge-base  5  Authoring knowledge entries
+knowledge-base  6  Authoring knowledge entries
 process  41  How work runs: batches, dispatch, reviews, rulings
 quality  9  Quality principles
 security-hygiene  5  Dependency, commit, and test hygiene
