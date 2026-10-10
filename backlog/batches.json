@@ -51,8 +51,39 @@
       "summary": "Process cost: a risk-tiered pipeline, review severity by impact and a bounded review loop, a self-optimizing knowledge base, and the cost analysis shipped to adopters.",
       "kickoff": "docs/specs/2026-10-09-batch-31-process-cost.md",
       "status": {
-        "state": "in-progress",
-        "text": "Built 2026-10-09: risk tiers, severity by impact, the bounded review loop, parallel agents on disjoint files, the self-optimizing knowledge loop, and stats over several workspaces (design.md 5.90-5.93). HR-164 (Task 1's findings at its cap) and HR-166 (the fix wave's findings at its cap) are deferred; HR-158, HR-162, HR-163, HR-165 are filed. Merge, release 1.3.0, and acceptance pending the owner."
+        "state": "done",
+        "text": "Built 2026-10-09: risk tiers, severity by impact, the bounded review loop, parallel agents on disjoint files, the self-optimizing knowledge loop, and stats over several workspaces (design.md 5.90-5.93). HR-164 (Task 1's findings at its cap) and HR-166 (the fix wave's findings at its cap) are deferred; HR-158, HR-162, HR-163, HR-165 are filed. Merged 2026-10-09 as PR #54 and released as 1.3.0; acceptance pending the owner."
+      }
+    },
+    {
+      "number": 32,
+      "items": [
+        "HR-167",
+        "HR-168",
+        "HR-169",
+        "HR-170"
+      ],
+      "summary": "The adopter lead-time audit, minor-release half: template defects and several workspaces, controller rules out of task audits, a loading path for non-standing process rules, and findings that name their caller and their check.",
+      "kickoff": "docs/specs/2026-10-10-batch-32-audit-follow-ups.md",
+      "status": {
+        "state": "done",
+        "text": "Built 2026-10-10 as release 1.4.0 (design.md 5.94): template defects and several workspaces (HR-167), controller rules out of task audits through the `controller` tag (HR-168; the mechanism replaced the proposal's area-pattern test after the corpus run, spec 3.1 and 6), loading paths for non-standing process rules (HR-169), and findings that name their caller and their check (HR-170). Evals 15 of 15. Filed from the retrospective: HR-174, HR-175 (batch 33), HR-176. Merge, release, and acceptance pending the owner."
+      }
+    },
+    {
+      "number": 33,
+      "items": [
+        "HR-171",
+        "HR-057",
+        "HR-158",
+        "HR-173",
+        "HR-175"
+      ],
+      "summary": "The 2.0.0 major release: every backlog item and GitHub issue that needs a major version, with a proper upgrade path for adopters; from the adopter lead-time audit, evidence by reference and a check type that runs a project linter.",
+      "kickoff": "the owner's rulings of 2026-10-10 (design.md 5.94, 5.95)",
+      "status": {
+        "state": "planned",
+        "text": "Starts after 1.4.0 ships. Its brainstorm collects the major-version items from the backlog and the GitHub issues; its spec designs the upgrade path."
       }
     }
   ]

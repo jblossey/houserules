@@ -69,7 +69,8 @@
         "process"
       ],
       "milestone": null,
-      "status": "open"
+      "status": "open",
+      "batch": 33
     },
     {
       "id": "HR-058",
@@ -472,7 +473,7 @@
       ],
       "milestone": null,
       "status": "open",
-      "batch": null,
+      "batch": 33,
       "see": [
         "HR-057",
         "HR-140",
@@ -500,7 +501,8 @@
       "title": "Deterministic checks for six judged rules the batch-31 stats run flagged",
       "body": [
         "Filed by the batch-31 batch-close loop (process.knowledge-earns-its-place): `houserules stats` over the five most recent workspaces (batches 24 to 30; .superpowers/sdd/2026-10-09-batch-31/stats-t4-batches-24-30.json) proposes `mechanize` without an owner gate for houserules.crash-paths-are-named (2 workspaces), houserules.task-gates-mirror-ci (2), knowledge-base.state-only-the-source (4), process.wiring-checks-run-the-resolution (3), quality.user-facing-text-is-contract (2), and writing-style.instructions-cover-the-state-space (4).",
-        "For each entry a spec decides one of two outcomes: a deterministic `check` that catches the class the findings show (task-gates-mirror-ci: compare the report's gate list with .github/workflows and mise.toml; crash-paths-are-named: a lint for unwrap/expect on the named input paths), or the owner tags the entry `ruled-keep` because the rule is judged by design, so the loop stops proposing it."
+        "For each entry a spec decides one of two outcomes: a deterministic `check` that catches the class the findings show (task-gates-mirror-ci: compare the report's gate list with .github/workflows and mise.toml; crash-paths-are-named: a lint for unwrap/expect on the named input paths), or the owner tags the entry `ruled-keep` because the rule is judged by design, so the loop stops proposing it.",
+        "The batch-32 batch-close run (.superpowers/sdd/2026-10-10-batch-32/stats.json, batches 27 to 32) proposed `mechanize` without an owner gate again for knowledge-base.state-only-the-source, process.wiring-checks-run-the-resolution, quality.user-facing-text-is-contract, and writing-style.instructions-cover-the-state-space; this item covers them, so no new item was filed."
       ],
       "milestone": null,
       "status": "open",
@@ -533,7 +535,8 @@
       "title": "Batch-31 retrospective proposals that change code or the two eval-covered templates",
       "body": [
         "From the batch-31 branch review retrospective (.superpowers/sdd/2026-10-09-batch-31/branch-review.json, violated_rules). Deferred out of batch 31 because each changes executable code or the implementer or task-reviewer template, which re-opens the eval run (process.evals-rerun) for a batch already past it.",
-        "1. Generate README's sample `stats` output as a frozen slice and assert the README block equals it (quality.user-facing-text-is-contract). 2. Enable rustdoc missing_docs for the crate's public items (writing-style.doc-comments). 3. check-report-claims reads backlog items and specs: a cited workspace path exists, and a cited stats run names the file that holds its window (process.claims-match-artifacts). 4. Implementer template, TDD step: a pin of existing behavior runs at BASE first and records the passing exit beside its disclosed mutation (process.tdd). 5. Task-reviewer template: a closure probe derives from the claim's subject, and an instruction keyed to a tier, count, or version is read once per value of that field (process.closure-claims-carry-enumeration, writing-style.instructions-cover-the-state-space). 6. The finishing-a-feature skill's Finish step runs `houserules check-commit --from <merge base>` with the tree binary when the batch changes the binary, since the commit-msg hook skips the check when no houserules is on PATH (batch-31 branch review, template defect 4, second half)."
+        "1. Generate README's sample `stats` output as a frozen slice and assert the README block equals it (quality.user-facing-text-is-contract). 2. Enable rustdoc missing_docs for the crate's public items (writing-style.doc-comments). 3. check-report-claims reads backlog items and specs: a cited workspace path exists, and a cited stats run names the file that holds its window (process.claims-match-artifacts). 4. Implementer template, TDD step: a pin of existing behavior runs at BASE first and records the passing exit beside its disclosed mutation (process.tdd). 5. Task-reviewer template: a closure probe derives from the claim's subject, and an instruction keyed to a tier, count, or version is read once per value of that field (process.closure-claims-carry-enumeration, writing-style.instructions-cover-the-state-space). 6. The finishing-a-feature skill's Finish step runs `houserules check-commit --from <merge base>` with the tree binary when the batch changes the binary, since the commit-msg hook skips the check when no houserules is on PATH (batch-31 branch review, template defect 4, second half).",
+        "7. From the batch-32 branch review retrospective (process.tdd): the implementer template's fix-round contract gains one sentence. A test the fix round adds that passes before the fix gets a `mutation` tdd row in that round, with the mutation diff captured. The re-reviewer checks that every such test has one."
       ],
       "milestone": null,
       "status": "open",
@@ -558,6 +561,165 @@
         "HR-160",
         "HR-164"
       ]
+    },
+    {
+      "id": "HR-167",
+      "type": "fix",
+      "title": "Template defects: the implementer's self-audit file, the exit-code form, and several workspaces per batch",
+      "body": [
+        "Source: an adopter's lead-time audit of its batch 3 under houserules 1.2.0 (2026-10-10; design.md 5.94). Issues 5 and 10.",
+        "1. implementer.md names no file for the implementer's own audit run. The adopter's implementer wrote it to task-7-audit.json, the reviewer's AUDIT_JSON, and later to the re-review's path; `houserules stats` reads every task-*-audit*.json, so the batch record changed. The template states that the self-audit lives only in the report's self_audit and that the implementer writes no task-* file other than REPORT_FILE, as task-reviewer.md already states for the reviewer.",
+        "2. implementer.md forbids `;` and `|` in a captured command. An adopter rule prescribed `<command>; echo \"EXIT=$?\"`. The template states that the entry's `exit` field carries the exit status and that a command never appends an echo of it.",
+        "3. branch-reviewer.md assumes one workspace per batch. A batch that adds a second spec part-way has two. The dispatch names every workspace of the batch; the branch reviewer runs the workspace audit once per workspace and reads all of them, as `houserules stats` already does."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 32,
+      "see": [
+        "HR-165"
+      ]
+    },
+    {
+      "id": "HR-168",
+      "type": "feat",
+      "title": "Standing rules that govern only the controller's acts stay out of task audits",
+      "body": [
+        "Source: an adopter's lead-time audit of its batch 3 under houserules 1.2.0 (2026-10-10; design.md 5.94). Issue 6.",
+        "Measured over this repository's 266 task reviews (7,806 judged rows): six kit standing rules whose subject is an act only the controller performs (process.brainstorm-first, process.backlog-drives-work, process.code-health-scan, process.model-policy, process.live-run-before-ci, process.owner-rulings-need-owner-supersession) and quality.well-maintained-libraries were judged 1,745 times in task reviews with 0 fails. Every standing rule sits in a glob-less area (global or process), so a file-pattern engagement test would remove no row.",
+        "Change: an entry tagged `controller` governs the controller's acts. A task audit (`houserules audit` with `--report`) leaves an entry tagged `controller` out of its package unless `--ids` names it, standing or not; the branch audit (`--workspace`) and a plain audit keep it. The kit tags its controller rules. In a batch without a branch review, the controller judges the controller rows of the branch-range audit before Finish. A tag is a free string of the knowledge schema: no schema change, no new flag."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 32,
+      "see": [
+        "HR-160"
+      ]
+    },
+    {
+      "id": "HR-169",
+      "type": "feat",
+      "title": "A loading path for non-standing process rules",
+      "body": [
+        "Source: an adopter's lead-time audit of its batch 3 under houserules 1.2.0 (2026-10-10; design.md 5.94). Issue 7.",
+        "The seed gives the `process` area no file patterns, and knowledge-base.rules-need-a-loading-path names standing as the only other loading path, so an adopter's process rule ends up standing: judged in every audit and loaded in every session. 1.3.0 added citation loading, but only kit-owned skills and templates cite ids, and `update` overwrites them.",
+        "Change: name the loading paths a non-standing process rule already has. The controller reads every process entry's summary at each session start (the orchestrating skill's ritual, `houserules index --area process`); an agent receives the ids the controller puts on its `Knowledge:` line. The entry body, the orchestrating skill, and the migrating-knowledge skill state these paths and say that a process rule is standing only when every session must carry it; a rule only the controller can break also gets the `controller` tag."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 32,
+      "see": [
+        "HR-130"
+      ]
+    },
+    {
+      "id": "HR-170",
+      "type": "feat",
+      "title": "Review findings name the caller their fix serves and the check that closes a Minor",
+      "body": [
+        "Source: an adopter's lead-time audit of its batch 3 under houserules 1.2.0 (2026-10-10; design.md 5.94). Issue 2, the part 1.3.0 left open.",
+        "A Minor asked for a hashable type that no caller hashes; its fix broke asdict and deepcopy and needed a second fix round. 1.3.0 closes a Minor-only round on a controller note, but the note's check is the controller's choice and no later step reads the closures.",
+        "Change: a finding whose fix adds a capability names the caller that needs it; without one, the implementer may contest it and the controller drops it or files it. Each Minor finding states the check that proves its fix (a command and its expected result); the controller runs that check for its verification note. The branch reviewer re-runs a sample of the controller notes. A seeded-violations expectation pins that a standing-rule slip of Minor impact is filed Minor."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 32,
+      "see": [
+        "HR-140"
+      ]
+    },
+    {
+      "id": "HR-171",
+      "type": "feat",
+      "title": "Evidence by reference: a capture command, inline-output caps, and a checker that reads capture headers",
+      "body": [
+        "Source: an adopter's lead-time audit of its batch 3 under houserules 1.2.0 (2026-10-10; design.md 5.94). Issues 3 and 4.",
+        "Reports reached 821 KB; one live_run output held 437,126 characters. 25 findings (13 critical) concerned evidence form: retyped commands, a capture in the Windows ANSI code page, re-encoded and re-dated captures. Agents bent captures to pass check-report-claims, and reviewers filed that as fabricated evidence.",
+        "Change: `houserules capture --out <file> -- <command...>` runs the command and writes a header (the verbatim command, cwd, ISO start and end times, exit code, HEAD, a dirty flag) above UTF-8 output. Report entries cite the capture path, its hash, and a short excerpt; the deliverables schema caps inline output; check-report-claims verifies headers and hashes instead of parsing shell strings, which retires the cwd, output-filter, and encoding gaps rather than patching each. The audit's checker gaps need the adopter's minimal repros before they are filed separately. The schema cap is a constraint change: 2.0.0 under houserules.1-0-surface-is-frozen, with an adopter migration path. Absorbs HR-057 and HR-158."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 33,
+      "see": [
+        "HR-057",
+        "HR-158",
+        "HR-072",
+        "HR-141",
+        "HR-148",
+        "HR-150"
+      ]
+    },
+    {
+      "id": "HR-172",
+      "type": "feat",
+      "title": "Narrow process.rulings-to-file: a decision inside the spec's intent goes to the brief, not a spec amendment",
+      "body": [
+        "Source: an adopter's lead-time audit of its batch 3 under houserules 1.2.0 (2026-10-10; design.md 5.94). Root cause 9.",
+        "process.rulings-to-file counts every dispatch deviation from the spec as a ruling to amend in the same turn. The adopter's controller made nine plan-sync docs commits for decisions such as a status code or a tuple type.",
+        "Proposal: only a decision that changes what the spec states amends the spec; a decision inside the spec's intent is recorded in the task brief or the task report, and the branch review reads it there. The entry is standing and owner-seeded: it needs the owner's ruling before any build (process.owner-rulings-need-owner-supersession)."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": []
+    },
+    {
+      "id": "HR-173",
+      "type": "feat",
+      "title": "A check type that runs a project linter, so lint-backed rules leave the judged set",
+      "body": [
+        "Source: an adopter's lead-time audit of its batch 3 under houserules 1.2.0 (2026-10-10; design.md 5.94). Issue 6, second half.",
+        "writing-style.doc-comments was judged 264 times in this repository's task reviews; the adopter's five doc-comment criticals are what a linter catches (rustdoc missing_docs, ruff D, eslint jsdoc). No check type runs a command, so a lint-backed rule stays a judged row.",
+        "Change: a knowledge check type that runs a named project command over the changed files and reads its exit status, plus recipes in the migrating-knowledge skill. A new check type changes the knowledge schema: batch 33, 2.0.0. Continues the mechanize proposals of HR-163."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 33,
+      "see": [
+        "HR-163"
+      ]
+    },
+    {
+      "id": "HR-174",
+      "type": "feat",
+      "title": "check-report-claims flags evidence cited at a session scratchpad or /tmp path",
+      "body": [
+        "From the batch-32 branch review retrospective (.superpowers/sdd/2026-10-10-batch-32/branch-review.json). process.evidence-outlives-the-session failed twice in batch 32 (task 2 round 0: a docs_verified source with no capture; the ledger: a scratchpad path).",
+        "Change: a report `source`, `output`, or evidence string that names a path under the session scratchpad or /tmp is a claim mismatch unless a workspace capture is cited beside it. A knowledge check cannot read report strings today; the checker can (crates/houserules/src/report_claims.rs)."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-165"
+      ]
+    },
+    {
+      "id": "HR-175",
+      "type": "feat",
+      "title": "report-field checks test content, not presence: non-empty fields and knowledge_used against --ids",
+      "body": [
+        "From the batch-32 branch review retrospective (.superpowers/sdd/2026-10-10-batch-32/branch-review.json). Template defect 1, seen first by the batch-32 seeded-violations eval reviewer.",
+        "process.knowledge-first and security-hygiene.verify-current-docs pass on a field's presence: knowledge_used with one id and docs_verified: [] both pass (audit.rs report-field arm tests the field's presence only). Change: a report-field option `non_empty: true`, and for knowledge_used a comparison with the audit's --ids (every dispatch id present). Both add to the check schema: batch 33 (2.0.0)."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 33,
+      "see": [
+        "HR-173"
+      ]
+    },
+    {
+      "id": "HR-176",
+      "type": "fix",
+      "title": "report-field evidence names triggered and read report counts",
+      "body": [
+        "From the batch-32 branch review retrospective (.superpowers/sdd/2026-10-10-batch-32/branch-review.json). Template defect 2.",
+        "A report-field row's evidence reads 'report field <f> is set in N reports', where N counts the reports the check's `if` globs triggered, not the reports read. branch-reviewer.md tells the reviewer to compare that count with the workspace's task-*-report.json listing, so a check with a file-typed `if` (verify-current-docs: 'set in 1 reports' with two reports) reads as a mismatch when it is not. Change: the evidence says 'set in <triggered> of <read> reports', and the template sentence compares the second number. No schema change."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": []
     }
   ]
 }

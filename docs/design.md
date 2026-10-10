@@ -1291,3 +1291,27 @@ Each item records the ruling with its date, or stays marked open.
     `retire`, `narrow`, or `mechanize` proposal; it still counts
     toward the standing budget. Source: owner, 2026-10-09, the
     batch-31 live run.
+94. **The adopter lead-time audit: six proposals, two batches -
+    ruled 2026-10-10.** An adopter's audit of its batch 3 under
+    houserules 1.2.0 measured 95 review findings, 30 of them
+    critical, and 31% of 2,680 judged audit rows as boilerplate.
+    Release 1.3.0 already covers severity by impact, the bounded
+    review loop, risk tiers, and parallel agents. The owner ruled
+    the rest into backlog items with this split. Batch 32 ships as
+    a minor release now: template defects and several workspaces
+    (HR-167), controller rules out of task audits (HR-168), a
+    loading path for non-standing process rules (HR-169), and
+    findings that name their caller and their check (HR-170).
+    Batch 33 ships as 2.0.0: evidence by reference with a capture
+    command and inline-output caps (HR-171, with HR-057 and
+    HR-158), and a check type that runs a project linter
+    (HR-173). The plan-sync narrowing of
+    `process.rulings-to-file` (HR-172) waits for its own owner
+    ruling. Source: owner, 2026-10-10.
+95. **One major release after 1.4.0 - ruled 2026-10-10.** After
+    batch 32 ships as 1.4.0, every backlog item and GitHub issue
+    that needs a major version goes into one release, 2.0.0, with
+    a proper upgrade path for adopters. Batch 33 is that release:
+    its brainstorm collects the major-version items from the
+    backlog and the GitHub issues, and its spec designs the
+    upgrade path. Source: owner, 2026-10-10.
