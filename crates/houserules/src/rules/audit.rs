@@ -37,6 +37,16 @@
 //!   that DOES get a real, direct consumer here (the bullet above) and
 //!   stays.
 //!
+//! ## The rule package
+//!
+//! The package is every standing entry, every rule-kind entry (or entry
+//! with a check) whose area the range touches, and every entry `--ids`
+//! names. A task audit (`--report`) leaves out an entry tagged
+//! `controller`: only the controller's acts (specs, plans, dispatch,
+//! rulings, merges, releases) can break it, so a task diff never does.
+//! `--ids` brings such an entry back. The branch audit (`--workspace`)
+//! and a plain audit keep it.
+//!
 //! ## The crash-path extension this file adds
 //!
 //! A malformed check `pattern`/`subject`/`body_absent` regex, or a
@@ -67,7 +77,7 @@ use crate::emit::emit;
 use super::check_shape::{CheckDef, CheckType, Glob, Scope};
 use super::deliverable::{read_deliverable_value, workspace_files};
 use super::glob::{area_files, glob_match};
-use super::model::{Base, Entry, load_base};
+use super::model::{Base, Entry, load_base, raw_entry_has_tag};
 use super::render::RULE_KINDS;
 
 // ---- git plumbing ------------------------------------------------------------------
@@ -873,9 +883,36 @@ fn is_deterministic(row: &Value) -> bool {
     row.get("mode").and_then(Value::as_str) == Some("deterministic")
 }
 
+/// The tag of an entry only the controller's acts can break.
+const CONTROLLER_TAG: &str = "controller";
+
+/// `true` when the raw entry `id` carries the tag `controller`.
+fn is_controller_entry(base: &Base, id: &str) -> bool {
+    raw_entry_has_tag(base, id, CONTROLLER_TAG)
+}
+
+/// The named error for a `--sanctioned` rule that is no row of the
+/// package. `unknown id` is for an id the knowledge base lacks, as for
+/// `--ids`. A known id is outside this audit's package, and `--ids` brings
+/// it in; the message says so, and for an entry tagged `controller` in a
+/// task audit it names the tag.
+fn sanctioned_outside_package_error(base: &Base, rule: &str, is_task_audit: bool) -> String {
+    if !base.entries.contains_key(rule) {
+        format!("unknown id \"{rule}\" for --sanctioned")
+    } else if is_task_audit && is_controller_entry(base, rule) {
+        format!(
+            "--sanctioned \"{rule}\" is tagged controller, so a task audit leaves it out of \
+             its package; add it to --ids"
+        )
+    } else {
+        format!("--sanctioned \"{rule}\" is not in this audit's package; add it to --ids")
+    }
+}
+
 /// Builds the rule package for a git range and runs every member's
-/// deterministic check. See this module's doc for why the result is a
-/// raw `Value`.
+/// deterministic check. A task audit (`opts.report` is set) leaves out an
+/// entry tagged `controller` unless `opts.ids` names it. See this
+/// module's doc for why the result is a raw `Value`.
 pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, String> {
     let Some(base_ref) = opts.base_ref else {
         return Err("audit needs --base <ref>".to_string());
@@ -893,8 +930,12 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
     let mut areas: Vec<String> = area_file_map.keys().cloned().collect();
     areas.sort();
 
+    let is_task_audit = opts.report.is_some();
     let mut package: HashMap<String, &Entry> = HashMap::new();
     for entry in base.entries.values() {
+        if is_task_audit && is_controller_entry(base, &entry.id) {
+            continue;
+        }
         let in_touched_area = areas.contains(&entry.area);
         // `!matches!(entry.check, CheckField::Absent)` joins the package
         // whether or not the check is valid: a `Malformed` check still
@@ -976,9 +1017,10 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
     // `auditRow`'s schema shape (id/kind/mode/level/result/evidence,
     // unchanged) needs no change at all. `parse_sanctioned` already ruled
     // out an empty reference and a repeated rule id, so every remaining
-    // case names a real row: absent from the package entirely (a typo
-    // `--ids` itself would reject) is this function's own named error,
-    // the same "unknown id" shape `--ids` already uses one flag over;
+    // case is a row or a named error: a rule that is no row of the
+    // package is `sanctioned_outside_package_error` (an id the knowledge
+    // base lacks is the same "unknown id" shape `--ids` already uses one
+    // flag over; a known id outside the package names that cause);
     // present but not `result: "fail"` is a stale booking, reported in
     // `stale_sanctions` and folded into `failed`, never a silent no-op --
     // distinguishing the two matters because reading "did not fail" for a
@@ -991,7 +1033,7 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
             .iter_mut()
             .find(|row| row.get("id").and_then(Value::as_str) == Some(rule.as_str()))
         else {
-            return Err(format!("unknown id \"{rule}\" for --sanctioned"));
+            return Err(sanctioned_outside_package_error(base, rule, is_task_audit));
         };
         let result = row
             .get("result")
@@ -2891,6 +2933,240 @@ mod tests {
         assert!(!error.is_empty());
     }
 
+    // ---- the `controller` tag ----
+
+    /// Which flag a `controller` tag test gives the audit: `--report` (a
+    /// task audit), `--workspace` (the branch audit), or neither.
+    #[derive(Clone, Copy)]
+    enum AuditKind {
+        Task,
+        Branch,
+        Plain,
+    }
+
+    /// Four entries tagged `controller` (standing, non-standing in
+    /// `global`, non-standing in the touched `rust` area, and the same
+    /// area with a check), plus three entries a task audit keeps: a
+    /// standing one, a touched-area one, and a standing one whose tags
+    /// only resemble `controller`. A fifth `controller` entry sits in the
+    /// untouched `webview` area: it joins no package and serves the
+    /// `--sanctioned` tests.
+    fn controller_entries() -> Vec<Value> {
+        vec![
+            entry(json!({
+                "id": "process.controller-standing", "tags": ["dispatch", "controller"],
+                "summary": "A standing rule only the controller breaks.",
+            })),
+            entry(json!({
+                "id": "process.controller-global", "area": "global", "standing": false,
+                "tags": ["controller"], "summary": "A global rule only the controller breaks.",
+            })),
+            entry(json!({
+                "id": "rust.controller-touched", "area": "rust", "standing": false,
+                "tags": ["controller"], "summary": "An area rule only the controller breaks.",
+            })),
+            entry(json!({
+                "id": "rust.controller-checked", "area": "rust", "standing": false,
+                "tags": ["controller"], "summary": "A checked rule only the controller breaks.",
+                "check": {
+                    "type": "grep-absent", "level": "warn", "files": "**/*.md",
+                    "pattern": "FORBIDDEN", "scope": "changed",
+                },
+            })),
+            entry(json!({
+                "id": "process.plain-standing", "summary": "A standing rule a task diff breaks.",
+            })),
+            entry(json!({
+                "id": "rust.plain-touched", "area": "rust", "standing": false,
+                "summary": "An area rule a task diff breaks.",
+            })),
+            entry(json!({
+                "id": "process.lookalike-tags", "tags": ["controllers", "Controller", "control"],
+                "summary": "A standing rule whose tags only resemble the controller tag.",
+            })),
+            entry(json!({
+                "id": "webview.controller-untouched", "area": "webview", "standing": false,
+                "tags": ["controller"],
+                "summary": "An untouched-area rule only the controller breaks.",
+            })),
+        ]
+    }
+
+    /// The result of an audit of `controller_entries()` over a range that
+    /// changes `crates/lib.rs`, run as `kind` with `ids` on `--ids` and
+    /// `sanctioned` rule ids on `--sanctioned`.
+    fn controller_audit(
+        kind: AuditKind,
+        ids: &[&str],
+        sanctioned: &[&str],
+    ) -> Result<AuditOutcome, String> {
+        let dir = make_repo_with_files(&controller_entries(), &[("crates/lib.rs", "x\n")]);
+        let root = dir.path();
+        let base_sha = commit(root, "chore: base", None);
+        write_file(root, "crates/lib.rs", "y\n");
+        commit(root, "feat: change", None);
+        let scratch = tempfile::tempdir().expect("tempdir");
+        let mut opts = audit_opts(&base_sha);
+        opts.ids = ids.iter().map(|id| id.to_string()).collect();
+        opts.sanctioned = sanctioned
+            .iter()
+            .map(|rule| (rule.to_string(), "spec 3.1".to_string()))
+            .collect();
+        match kind {
+            AuditKind::Task => {
+                let report = scratch.path().join("report.json");
+                std::fs::write(&report, "{}").unwrap();
+                opts.report = Some(report);
+            }
+            AuditKind::Branch => opts.workspace = Some(scratch.path().to_path_buf()),
+            AuditKind::Plain => {}
+        }
+        audit(&load_base(root).unwrap(), opts)
+    }
+
+    /// The sorted ids of the audit package that `controller_entries()`
+    /// gives, run as `kind` with `ids` on `--ids`.
+    fn controller_package(kind: AuditKind, ids: &[&str]) -> Vec<String> {
+        let outcome = controller_audit(kind, ids, &[]).expect("audit");
+        let mut package: Vec<String> = outcome.result["rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["id"].as_str().unwrap().to_string())
+            .collect();
+        package.sort();
+        package
+    }
+
+    /// Every id of `controller_entries()` a task audit keeps.
+    const TASK_PACKAGE: [&str; 3] = [
+        "process.lookalike-tags",
+        "process.plain-standing",
+        "rust.plain-touched",
+    ];
+
+    /// The four `controller` ids of `controller_entries()`.
+    const CONTROLLER_IDS: [&str; 4] = [
+        "process.controller-global",
+        "process.controller-standing",
+        "rust.controller-checked",
+        "rust.controller-touched",
+    ];
+
+    fn sorted_ids(groups: &[&[&str]]) -> Vec<String> {
+        let mut ids: Vec<String> = groups
+            .iter()
+            .flat_map(|group| group.iter().map(|id| id.to_string()))
+            .collect();
+        ids.sort();
+        ids
+    }
+
+    #[test]
+    fn a_task_audit_leaves_a_standing_controller_entry_out_of_its_package() {
+        let package = controller_package(AuditKind::Task, &[]);
+        assert!(
+            !package.contains(&"process.controller-standing".to_string()),
+            "{package:?}"
+        );
+        assert_eq!(package, sorted_ids(&[&TASK_PACKAGE]));
+    }
+
+    #[test]
+    fn a_task_audit_leaves_a_global_controller_entry_out() {
+        let package = controller_package(AuditKind::Task, &[]);
+        assert!(
+            !package.contains(&"process.controller-global".to_string()),
+            "{package:?}"
+        );
+    }
+
+    #[test]
+    fn a_task_audit_leaves_touched_area_and_checked_controller_entries_out() {
+        let package = controller_package(AuditKind::Task, &[]);
+        for id in ["rust.controller-touched", "rust.controller-checked"] {
+            assert!(!package.contains(&id.to_string()), "{id} in {package:?}");
+        }
+    }
+
+    #[test]
+    fn a_task_audit_keeps_a_controller_entry_that_ids_names() {
+        let package = controller_package(
+            AuditKind::Task,
+            &["process.controller-standing", "rust.controller-checked"],
+        );
+        assert_eq!(
+            package,
+            sorted_ids(&[
+                &TASK_PACKAGE,
+                &["process.controller-standing", "rust.controller-checked"]
+            ])
+        );
+    }
+
+    #[test]
+    fn a_task_audit_keeps_lookalike_tags_that_are_not_controller_entries() {
+        let package = controller_package(AuditKind::Task, &[]);
+        assert!(
+            package.contains(&"process.lookalike-tags".to_string()),
+            "{package:?}"
+        );
+    }
+
+    #[test]
+    fn a_branch_audit_keeps_controller_entries() {
+        assert_eq!(
+            controller_package(AuditKind::Branch, &[]),
+            sorted_ids(&[&TASK_PACKAGE, &CONTROLLER_IDS])
+        );
+    }
+
+    #[test]
+    fn a_plain_audit_keeps_controller_entries() {
+        assert_eq!(
+            controller_package(AuditKind::Plain, &[]),
+            sorted_ids(&[&TASK_PACKAGE, &CONTROLLER_IDS])
+        );
+    }
+
+    #[test]
+    fn a_task_audit_names_a_sanctioned_controller_id_as_left_out_and_points_to_ids() {
+        let error =
+            controller_audit(AuditKind::Task, &[], &["process.controller-standing"]).unwrap_err();
+        assert_eq!(
+            error,
+            "--sanctioned \"process.controller-standing\" is tagged controller, so a task audit \
+             leaves it out of its package; add it to --ids"
+        );
+    }
+
+    #[test]
+    fn a_task_audit_accepts_a_sanctioned_controller_id_that_ids_names() {
+        let outcome = controller_audit(
+            AuditKind::Task,
+            &["rust.controller-checked"],
+            &["rust.controller-checked"],
+        )
+        .expect("audit");
+        assert_eq!(
+            outcome.result["stale_sanctions"],
+            json!([
+                "--sanctioned rust.controller-checked=spec 3.1: row result is \"pass\", not fail"
+            ])
+        );
+    }
+
+    #[test]
+    fn a_branch_audit_names_a_sanctioned_controller_id_outside_the_package_without_the_tag() {
+        let error = controller_audit(AuditKind::Branch, &[], &["webview.controller-untouched"])
+            .unwrap_err();
+        assert_eq!(
+            error,
+            "--sanctioned \"webview.controller-untouched\" is not in this audit's package; \
+             add it to --ids"
+        );
+    }
+
     // ---- the sanctioned-fail annotation ----
 
     /// A commit whose subject violates `process.commits`' pattern, with no
@@ -2963,11 +3239,10 @@ mod tests {
         assert!(outcome.failed, "a stale booking still fails the run");
     }
 
-    /// A rule id absent from this audit's package (never a row at all,
-    /// typically a typo) is this function's own named error -- the same
-    /// "unknown id" shape `--ids` already uses one flag over -- never
-    /// folded into `stale_sanctions` alongside a rule that genuinely ran
-    /// and passed.
+    /// A rule id the knowledge base lacks (typically a typo) is this
+    /// function's own named error -- the same "unknown id" shape `--ids`
+    /// already uses one flag over -- never folded into `stale_sanctions`
+    /// alongside a rule that genuinely ran and passed.
     #[test]
     fn reports_an_unknown_sanctioned_id_as_a_named_error_not_a_stale_booking() {
         let (dir, base_sha) = make_repo_with_one_bad_commit_subject();
@@ -2987,6 +3262,31 @@ mod tests {
         assert_eq!(
             error,
             "unknown id \"process.totally-made-up\" for --sanctioned"
+        );
+    }
+
+    /// A rule id the knowledge base holds, but this audit's package does
+    /// not carry (`webview.unrelated`: its area is untouched), is no
+    /// "unknown id": the error names the cause and the way in.
+    #[test]
+    fn reports_a_known_sanctioned_id_outside_the_package_without_calling_it_unknown() {
+        let (dir, base_sha) = make_repo_with_one_bad_commit_subject();
+        let base = load_base(dir.path()).unwrap();
+        let error = audit(
+            &base,
+            AuditOptions {
+                base_ref: Some(base_sha),
+                sanctioned: vec![(
+                    "webview.unrelated".to_string(),
+                    "spec section 6".to_string(),
+                )],
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            "--sanctioned \"webview.unrelated\" is not in this audit's package; add it to --ids"
         );
     }
 

@@ -125,6 +125,17 @@ pub(crate) struct Base {
     pub topic_files: Vec<(String, String, Value)>,
 }
 
+/// `true` when the raw entry `id` carries `tag` in its `tags` array. Only
+/// an exact tag counts; an unknown `id`, or a `tags` field that is no
+/// array, counts as no tags.
+pub(crate) fn raw_entry_has_tag(base: &Base, id: &str, tag: &str) -> bool {
+    base.raw_entries
+        .get(id)
+        .and_then(|raw| raw.get("tags"))
+        .and_then(Value::as_array)
+        .is_some_and(|tags| tags.iter().any(|candidate| candidate.as_str() == Some(tag)))
+}
+
 /// A failure while loading the knowledge base from disk: an unreadable
 /// file, JSON that failed to parse, or an area glob that failed to
 /// compile, named with the offending path (and, for `Glob`, the offending

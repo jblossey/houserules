@@ -391,7 +391,7 @@ Gates:
 | `check-knowledge` | Validates the knowledge base, generated-file freshness, and that kit-owned files cite only entries it holds |
 | `check-backlog` | Validates the backlog |
 | `check-commit` | Runs commit-message checks against a message file or git range |
-| `audit` | Builds a git range's rule package and runs every deterministic check |
+| `audit` | Builds a git range's rule package and runs every deterministic check; a task audit (`--report`) leaves out an entry tagged `controller` unless `--ids` names it |
 | `validate` | Validates deliverable JSON files against the schema |
 | `check-report-claims` | Cross-checks a report's claims against the artifacts it cites |
 | `stats <workspace>...` | Aggregates rule violations, process cost, and knowledge-base proposals across one or more workspaces |

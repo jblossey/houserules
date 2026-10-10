@@ -201,6 +201,8 @@ enum Command {
         #[arg(long)]
         ids: Option<String>,
         /// A single JSON deliverable a `report-field` check reads directly.
+        /// With `--report` (a task audit), an entry tagged `controller`
+        /// joins the package only when `--ids` names it.
         #[arg(long)]
         report: Option<PathBuf>,
         /// A directory of `task-*-report.json` files a `report-field`
@@ -214,7 +216,8 @@ enum Command {
         /// The rule's row keeps its true `fail` result and gains
         /// `(sanctioned: <ref>)` in its evidence; the summary's
         /// `sanctioned_fail` counts it. A rule named here that did not fail
-        /// is reported in `stale_sanctions`, not silently accepted.
+        /// is reported in `stale_sanctions`, not silently accepted. A rule
+        /// outside the audit's package is an error: add it to `--ids`.
         #[arg(long)]
         sanctioned: Vec<String>,
         /// Repository root to audit; defaults to the enclosing git

@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::{Value, json};
 
 use super::cost::{SeverityCounts, TargetCounts, Workspace};
-use super::model::{Base, CheckField};
+use super::model::{Base, CheckField, raw_entry_has_tag};
 
 /// A standing entry audited in this many workspaces or more, with no
 /// fail and no finding, earns a `demote` proposal.
@@ -182,16 +182,6 @@ fn is_user_sourced(base: &Base, id: &str) -> bool {
         == Some("user")
 }
 
-/// `true` when the raw entry `id` carries the tag `ruled-keep`. Only an
-/// exact tag counts; a `tags` field that is no array counts as no tags.
-fn is_ruled_keep(base: &Base, id: &str) -> bool {
-    base.raw_entries
-        .get(id)
-        .and_then(|raw| raw.get("tags"))
-        .and_then(Value::as_array)
-        .is_some_and(|tags| tags.iter().any(|tag| tag.as_str() == Some(RULED_KEEP_TAG)))
-}
-
 /// One row per active entry of `base`, sorted by id, with its usage
 /// across `workspaces`.
 pub(super) fn rule_rows(workspaces: &[Workspace], base: &Base) -> Vec<RuleRow> {
@@ -203,7 +193,7 @@ pub(super) fn rule_rows(workspaces: &[Workspace], base: &Base) -> Vec<RuleRow> {
         .map(|entry| RuleRow {
             id: entry.id.clone(),
             standing: entry.standing,
-            ruled_keep: is_ruled_keep(base, &entry.id),
+            ruled_keep: raw_entry_has_tag(base, &entry.id, RULED_KEEP_TAG),
             mode: match entry.check {
                 CheckField::Valid(_) => Mode::Deterministic,
                 CheckField::Absent | CheckField::Malformed => Mode::Judged,
