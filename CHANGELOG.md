@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/jblossey/houserules/compare/v1.3.0...v1.4.0) (2026-10-10)
+
+
+### Features
+
+* **cli:** a task audit leaves entries tagged controller out of its package ([c05353c](https://github.com/jblossey/houserules/commit/c05353ccfed286c41f52c44fbced6fbba4e1f401))
+* **template:** controller rules leave task audits; findings name their caller and their check ([f5db783](https://github.com/jblossey/houserules/commit/f5db7833ac6bcaf7346c8636f71b1bcbe644d394))
+
 ## [1.3.0](https://github.com/jblossey/houserules/compare/v1.2.0...v1.3.0) (2026-10-09)
 
 
