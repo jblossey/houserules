@@ -8,6 +8,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 ## Rules
 
+- [houserules.controller-gates-use-the-tree-binary] While the branch changes generated output, run controller gates and update/render through the tree binary, never the installed houserules.
 - [quality.absence-is-designed] Render an absent value in user-facing output as a designed token; never let a raw undefined, null, or empty slot reach the user.
 
 ## Invariants

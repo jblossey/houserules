@@ -7,7 +7,6 @@
       "id": "process.ff-only-merges",
       "kind": "rule",
       "area": "process",
-      "standing": true,
       "summary": "Merge fast-forward only, from the CLI, after aggregating the branch into clean logical commits. No merge commits, no GitHub squash merges.",
       "body": [
         "Aggregate with `git reset --soft $(git merge-base main HEAD)` and recommit in one to five Conventional Commits when interactive rebase is not available.",

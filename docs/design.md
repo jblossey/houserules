@@ -2546,3 +2546,39 @@ Each item records the ruling with its date, or stays marked open.
     to the owner with the merge request. The owner, verbatim: "You may
     merge, file the two calls". Both calls stand as built. Source:
     owner, 2026-10-20.
+177. **The batch-33 stats proposals - ruled 2026-10-20.** The controller
+    put the 43 owner-gated proposals of the batch-33 close run
+    (`.superpowers/sdd/2026-10-10-batch-33/stats.json`) to the owner on a
+    review page, one card each with the controller's call. The owner
+    ruled every card; the rulings are copied in the batch ledger.
+    (1) Demote 13 standing entries: `houserules.controller-gates-use-the-tree-binary`
+    (area cli), `houserules.pnpm-only` (area rust),
+    `process.backlog-drives-work`, `process.brainstorm-first`,
+    `process.code-health-scan`, `process.ff-only-merges`,
+    `process.keep-knowledge-current`, `process.live-run-before-ci`,
+    `process.model-policy`, `process.owner-rulings-need-owner-supersession`
+    (area process), `process.deliverables-json`, `process.knowledge-first`
+    (area global, so that their report-field checks still join every
+    audit package), and `security-hygiene.no-focused-tests` (area tests).
+    The owner approved `process.code-health-scan` on a condition,
+    verbatim: "Can only be demoted if the writing plans step is in the
+    repo and not only part of the superpowers plugin we still use." The
+    condition holds: the Plan row of the lifecycle table in
+    `.claude/skills/orchestrating/SKILL.md` (and its `template/` source)
+    names the scan and its id. Standing drops from 38 to 25, the budget.
+    (2) The other 14 demotions are refused: the entries stay standing.
+    (3) No entry gets the `ruled-keep` tag yet. The owner, verbatim: "do
+    not put in the ruled-keep tag yet. I want to see how the changes
+    develop over the next implementation rounds. Just apply the
+    changes." (4) Mechanize nine judged rules (HR-204), with the
+    controller's proposed checks; for `writing-style.code-comments` the
+    owner, verbatim: "approved but do not weaken the rule or replace it
+    by the deterministic check. the rule is broader than what a
+    deterministic check alone can offer." (5) No rule is narrowed. For
+    `process.claims-match-artifacts`,
+    `process.closure-claims-carry-enumeration`, and
+    `writing-style.doc-comments`, the owner, verbatim: "propose
+    mechanization solution instead of narrowing"; HR-204 items 1, 2, and
+    9 are those solutions. The narrowing of `process.evidence-outlives-the-session`,
+    `process.tdd`, and `quality.principles` is refused. Source: owner,
+    2026-10-20.

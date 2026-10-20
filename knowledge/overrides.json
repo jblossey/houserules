@@ -97,6 +97,12 @@
       }
     },
     {
+      "id": "process.backlog-drives-work",
+      "fields": {
+        "standing": null
+      }
+    },
+    {
       "id": "process.brainstorm-first",
       "fields": {
         "summary": "Start each batch with a brainstorming session or a written spec; get the user's approval before implementing.",
@@ -104,7 +110,8 @@
           "Use the superpowers brainstorming and spec skills when the plugin is installed; otherwise write the spec by hand. Specs live in `docs/specs/`.",
           "The order is strict: spec, then plan. A plan written before its approved spec is nil - deleted and the planning phase redone from the spec, never re-anchored (owner ruling, batch 18, 2026-09-05).",
           "A light-tier change (`process.risk-tiers`) has no plan. The body of its backlog item is the written spec, and the owner approves it before implementation."
-        ]
+        ],
+        "standing": null
       }
     },
     {
@@ -163,6 +170,12 @@
       }
     },
     {
+      "id": "process.code-health-scan",
+      "fields": {
+        "standing": null
+      }
+    },
+    {
       "id": "process.contract-refresh-sweep",
       "fields": {
         "kind": "procedure",
@@ -179,6 +192,13 @@
           "ref": "batch 7 branch review, retrospective"
         },
         "standing": null
+      }
+    },
+    {
+      "id": "process.deliverables-json",
+      "fields": {
+        "standing": null,
+        "area": "global"
       }
     },
     {
@@ -286,6 +306,25 @@
       }
     },
     {
+      "id": "process.keep-knowledge-current",
+      "fields": {
+        "standing": null
+      }
+    },
+    {
+      "id": "process.knowledge-first",
+      "fields": {
+        "standing": null,
+        "area": "global"
+      }
+    },
+    {
+      "id": "process.live-run-before-ci",
+      "fields": {
+        "standing": null
+      }
+    },
+    {
       "id": "process.main-wins-backlog-collisions",
       "fields": {
         "body": [
@@ -310,7 +349,8 @@
           "Scoped re-reviews follow the same bar as first reviews: the fix diff's size never lowers the reviewer's tier.",
           "Name the model on every dispatch; an omitted model inherits the session's most expensive one.",
           "Effort pins (owner-ruled 2026-09-12): the controller session runs at effort high (settings.json effortLevel), task and branch reviews at high, implementers at xhigh - set in the agent templates' frontmatter; a dispatch that deviates names the deviation."
-        ]
+        ],
+        "standing": null
       }
     },
     {
@@ -345,7 +385,8 @@
           "date": "2026-09-13",
           "by": "user",
           "ref": "batch 24 branch review retrospective; design.md 5.71/5.72; adopted standing at the batch-24 report (design.md 5.75)"
-        }
+        },
+        "standing": null
       }
     },
     {
@@ -564,6 +605,13 @@
           "The deterministic check covers `package.json` and `Cargo.toml`; ranges inside the `engines` object are floors, not dependency pins, and are exempt. Other ecosystems are judged by the reviewer under the same rule.",
           "A bare Cargo range (\"2.14\", an implicit caret) is invisible to the pattern without false-positiving the [package] version line; it stays judged material (batch 17: a Cargo dependency landed while the check read zero files)."
         ]
+      }
+    },
+    {
+      "id": "security-hygiene.no-focused-tests",
+      "fields": {
+        "standing": null,
+        "area": "tests"
       }
     },
     {

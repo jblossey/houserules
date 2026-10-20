@@ -1252,6 +1252,29 @@
       "see": [
         "HR-181"
       ]
+    },
+    {
+      "id": "HR-204",
+      "type": "feat",
+      "title": "Deterministic checks for nine judged rules that keep failing (design.md 177)",
+      "body": [
+        "Batch-33 close (stats.json over batches 28 and 30-33, owner-gated mechanize proposals, ruled in design.md 177). Each check supplements its judged rule: no rule is weakened, and a reviewer still judges the whole rule.",
+        "1. process.claims-match-artifacts: check-report-claims fails a self_review item that states a closed set or a pinned behavior and names no artifact path or test that exists, and a live_run or tdd row whose recorded exit is not in its output.",
+        "2. process.closure-claims-carry-enumeration: a self_review item that says every, all, or no remaining carries an enumeration field (command and output path); check-report-claims fails the item without one.",
+        "3. process.evidence-outlives-the-session: check-report-claims fails a cited path under /tmp or a session scratchpad.",
+        "4. process.fix-proofs-extend-the-reviewers-run: a fix-round row names the reviewer probe file it re-ran; check-report-claims fails a path that is not in the workspace.",
+        "5. process.rulings-to-file: a batch-close warn: every ledger line that says 'for the owner' has a spec section 12 or 13 entry.",
+        "6. process.tdd: check-report-claims fails a tdd row whose RED output holds no FAILED or panicked line and no disclosed-mutation label.",
+        "7. quality.principles: a lint test that only rules::git_paths and rules::render::location run git ls-files (the recurring DRY slip).",
+        "8. writing-style.code-comments: a warn grep-absent check over changed Rust files for history narration (batch N, task N review, fix round N). The rule stays judged as a whole; the check does not replace it.",
+        "9. writing-style.doc-comments: rustc's missing_docs lint where the crate exposes a library surface, and the history-narration check of item 8 over doc comments."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-202"
+      ]
     }
   ]
 }

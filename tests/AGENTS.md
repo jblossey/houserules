@@ -7,6 +7,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 - [houserules.tests-clean-scratch-dirs] Every test that mints a scratch directory registers its removal at the mkdtemp site: `tempfile::TempDir`'s own Drop, or an equivalent Drop-owning guard.
 - [quality.pin-copies-byte-exact] Pin a hand-synced copy byte-exact modulo its one designed difference, expressed as the production transform; never normalize by deleting the differing field.
+- [security-hygiene.no-focused-tests] Never commit a focused test (`.only(`).
 
 ### Gotchas
 
