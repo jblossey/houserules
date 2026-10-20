@@ -11,6 +11,8 @@
 //! joins neither `argv_closure.rs`'s `COMMANDS` list nor any
 //! `_parity.rs` file.
 
+mod install_shape;
+
 use std::path::Path;
 use std::process::Command;
 
@@ -48,6 +50,7 @@ fn git(root: &Path, args: &[&str]) -> String {
 fn init_scratch_repo() -> (tempfile::TempDir, String) {
     let dir = tempfile::tempdir().expect("tempdir");
     git(dir.path(), &["init", "-q", "-b", "main"]);
+    install_shape::mark_2_0(dir.path());
     git(
         dir.path(),
         &[
@@ -137,6 +140,7 @@ fn a_clean_report_prints_no_claim_mismatches_and_exits_0() {
 fn a_report_with_a_mismatch_prints_one_line_and_exits_1() {
     let dir = tempfile::tempdir().expect("tempdir");
     git(dir.path(), &["init", "-q", "-b", "main"]);
+    install_shape::mark_2_0(dir.path());
     git(
         dir.path(),
         &[
@@ -235,7 +239,7 @@ fn dir_resolves_the_root_independently_of_the_report_paths_own_location() {
 }
 
 /// No `--dir` and no enclosing git repository: `crate::root::resolve_root`
-/// falls back to `repo_root_from_cwd`, fails the same way every other
+/// falls back to `git_location_from_cwd`, fails the same way every other
 /// flat-surface command's own git-resolution leg does (`check_parity.rs`'s
 /// `check_knowledge_outside_a_git_repository_prints_a_named_error_and_exits_2`,
 /// mirrored here) -- one named, non-empty stderr line, exit 2. The exact

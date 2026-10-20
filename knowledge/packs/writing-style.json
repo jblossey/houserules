@@ -1,0 +1,153 @@
+{
+  "name": "writing-style",
+  "version": "1.0.0",
+  "schema": "houserules/pack@1.0.0",
+  "topics": {
+    "writing-style": {
+      "title": "Writing style for docs, comments, commits, reports"
+    }
+  },
+  "areas": {
+    "global": {
+      "paths": []
+    },
+    "docs": {
+      "paths": [
+        "docs/**",
+        "AGENTS.md",
+        "knowledge/**",
+        "backlog/**",
+        ".claude/**"
+      ]
+    }
+  },
+  "entries": [
+    {
+      "id": "writing-style.principles",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Write docs, comments, commit messages, and reports in ASD-STE100 style: short sentences, active voice, one instruction per sentence, concise.",
+      "body": [
+        "Sources: Williams, *Style*; Gopen & Swan, \"The Science of Scientific Writing\". They apply on top of ASD-STE100.",
+        "Make the main character the subject and its action the verb.",
+        "Unpack nominalizations into verbs: \"perform validation of\" becomes \"validate\".",
+        "Delete expletives (\"there is\", \"it is\"), filler (\"in order to\", \"the fact that\", \"note that\"), and hedges that carry no information.",
+        "Put old information in the topic position, new information in the stress position.",
+        "Keep subject and verb adjacent.",
+        "End on the emphasis."
+      ],
+      "tags": [
+        "docs",
+        "style"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
+    },
+    {
+      "id": "writing-style.code-comments",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Write a code comment only for a current constraint the code cannot show. Never narrate history in code; git, the specs, and the knowledge base hold it.",
+      "body": [
+        "A comment asserting measured or cross-engine behavior is a claim: run the measurement before committing the sentence, and state where it was verified. A false comment can ship silently, license a real defect, or survive its own fix - each is a reason to verify before writing it.",
+        "History narration belongs in git, the specs, and the knowledge base, not in the code itself.",
+        "A knowledge id naming a rule the code enforces is a current contract, not history; it may stay in a comment.",
+        "A reference to a durable doc, spec, or design record that states the current contract is likewise a contract pointer, not history; it may stay in a comment.",
+        "Fixture data inside a test body (an id, a date, a path) is data, not narration; leave it as written.",
+        "A comment stating a constraint plus its history keeps the constraint only; drop the history.",
+        "A history-sweep's verification derives its marker classes from the survey's own hit list and re-widens after every fix round; a zero from a pattern that never tested a spelling the sweep removed elsewhere is vacuous."
+      ],
+      "tags": [
+        "comments"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
+    },
+    {
+      "id": "writing-style.doc-comments",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Document every exported symbol with the language's doc-comment convention: the current contract. Name things so the code reads without comments.",
+      "body": [
+        "A doc comment states what the item is for, its invariants, and what it returns or raises when the signature does not say so. It never restates the signature.",
+        "Conventions: TSDoc in TypeScript, JSDoc in JavaScript, rustdoc in Rust, docstrings in Python — the language's standard form.",
+        "Self-documenting code first: full words, verbs for functions, `is`/`has` for booleans, no abbreviation a newcomer must decode, one meaning per name. A comment that explains a name means the name is wrong.",
+        "Comments inside a body still follow writing-style.code-comments: only for a constraint the code cannot show.",
+        "A doc comment stating a behavior ('returns tracked files', 'exits 0 on clean') is a claim under process.claims-match-artifacts - re-read it against the symbol at HEAD in the same pass that edits the symbol.",
+        "A rewrite re-resolves, in the same commit, every cross-reference to a section, file, or symbol it deletes or renames; the dangling-cross-reference class recurs whenever a rewrite skips this step."
+      ],
+      "tags": [
+        "docs",
+        "comments",
+        "naming"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      },
+      "see": [
+        "writing-style.code-comments",
+        "writing-style.principles"
+      ]
+    },
+    {
+      "id": "writing-style.instructions-cover-the-state-space",
+      "kind": "rule",
+      "area": "docs",
+      "standing": false,
+      "summary": "An instruction keyed to one value of an enumerated field names the value it displaces; test the sentence against every other value before shipping.",
+      "body": [
+        "A sentence such as 'set status to DONE_WITH_CONCERNS whenever concerns is non-empty' can silently also capture other enum values that legitimately carry concerns (a BLOCKED or NEEDS_CONTEXT report, say); the fix is naming the value it displaces - 'instead of DONE'.",
+        "Before shipping a conditional instruction into a template or skill, enumerate the conditioned field's full value set and read the sentence once per value it must not change.",
+        "After enumerating the conditioned field's values, enumerate each population's hidden environmental state too, and treat a command's output as itself a conditioned field: read the sentence once per output the command can print in each population.",
+        "An installed copy older than a just-merged declaration can make a drift-comparison line read equal, misleading in exactly the fired-trigger case; a comparison instruction names which side is the stamped one and which is the running one.",
+        "A gate is an instruction too: when a check is added to a tool, the surrounding protocol's own intermediate artifact states are part of the conditioned state space - a hardened validator that rejects the protocol's own in-progress draft (a terminal status alongside a still-null field the protocol fills in later) is fixed by migrating the flow, not by special-casing the draft.",
+        "A shipped instruction that names a repo-local resource states what every other population does instead: a closing act's false-positive arm that names a resource only one population (the source-carrying one) has, branches explicitly on source-present vs. installed-binary populations rather than assuming the resource exists everywhere.",
+        "An instruction naming the populations it governs enumerates all of them: test the sentence against each population the code path actually handles, not just the two most common ones.",
+        "A procedure's state space includes the states its own automation creates: walk every generated commit and bot-authored change through the gates the procedure depends on - an automated PR's own commit is as much a state to cover as a human one.",
+        "A ruling with a named set of outcomes states the count in every text that lists them ('one of three ways'), so a grep for the count finds a text that lists fewer (batch 32 task 2: a contested finding had three outcomes, and two texts named two)."
+      ],
+      "tags": [
+        "instructions",
+        "templates",
+        "enums"
+      ],
+      "source": {
+        "date": "2026-08-30",
+        "by": "docs",
+        "ref": "houserules seed"
+      }
+    },
+    {
+      "id": "writing-style.readme-is-an-adopter-funnel",
+      "kind": "rule",
+      "area": "docs",
+      "standing": false,
+      "summary": "A README is an adopter funnel: value, install, runnable usage, then depth; keep out process history, provenance narration, and claims that rot with releases.",
+      "body": [
+        "Order the file as a funnel (an evaluator can stop early, a user finds install and usage fast, a contributor reads to the end): title; a few meaningful badges; a one-liner under 120 characters matching the repository description; a short what/who/why description; a table of contents once the file passes 100 lines; install, with updating as a subsection; usage whose commands run exactly as written, with real output shown; deeper concepts; a reference section or a link to one; contributing (where to ask questions, whether pull requests are accepted); license last.",
+        "Keep out: maintainer evidence and verification narration, internal ids and ruling citations, changelog prose, marketing claims, and version-bound statements that go stale at the next release. State current facts plainly and keep provenance in the project's own records; link out for depth instead of inlining it.",
+        "Derived from standard-readme's specification, The Art of README's cognitive funneling, and makeareadme.com; re-check current guidance before a large rewrite."
+      ],
+      "tags": [
+        "docs",
+        "readme"
+      ],
+      "source": {
+        "date": "2026-09-15",
+        "by": "user",
+        "ref": "owner direction at the batch-26 README rework"
+      }
+    }
+  ]
+}

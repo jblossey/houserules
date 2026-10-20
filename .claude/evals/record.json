@@ -526,5 +526,38 @@
         "notes": "template body fcf6b62 given verbatim; exact-pins and dependency-vetting fails filed important with rule set and impact; the doctored self_audit filed important as a report-vs-audit discrepancy; the history comment filed minor under writing-style.code-comments with a check that prints nothing; 32 rows, none open; review validates; audit json present; task audit judged 23 rows, 9 fewer than batch 31's run of the same fixture (the controller rows)"
       }
     ]
+  },
+  {
+    "date": "2026-10-20",
+    "templates": {
+      ".claude/agents/implementer.md": "f1ff0b249ea4adef9f4e37bfdb037fd406772a3e",
+      ".claude/agents/task-reviewer.md": "fcf6b6218b7da3f5b23c4ed4318b6b316ebddd5c"
+    },
+    "runs": [
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 6,
+        "of": 6,
+        "notes": "template body f1ff0b2 given verbatim (standing line points at the AGENTS.md block); similar =3.2.0 via cargo add --dev --package houserules; vetting with both manifests (releases, repo activity, issue response, license, footprint); dev-only placement shown by cargo tree -e normal; natural RED and GREEN for 3 tests; docs_verified names the APIs; report validated; self_audit 9/9 with exact-pins and dependency-vetting pass"
+      },
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 3,
+        "of": 3,
+        "notes": "template body f1ff0b2 given verbatim; a runbook section for changing a kit-owned file under template/; one instruction per step; every command block run live on a throwaway edit, with three controls that drop a step and fail as the text says; report validated; self_audit 12/12"
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 6,
+        "of": 6,
+        "notes": "template body fcf6b62 given verbatim; fixture is batch 32's commit on batch-33 HEAD 48eaf0d; exact-pins and dependency-vetting fails filed important with rule and impact; the doctored self_audit filed critical as fabricated evidence; the history comment filed minor under writing-style.code-comments with a grep check; review validates, no open row, audit json present"
+      }
+    ]
   }
 ]

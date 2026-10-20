@@ -1,0 +1,105 @@
+{
+  "$schema": "./schema.json",
+  "topic": "houserules",
+  "title": "Working in the houserules kit repository",
+  "entries": [
+    {
+      "id": "houserules.node-under-mise",
+      "kind": "gotcha",
+      "area": "global",
+      "status": "retired",
+      "summary": "RETIRED at batch 20 T3 (HR-047): node and pnpm left mise.toml entirely once the JS toolchain retired; this PATH trap no longer applies to either tool.",
+      "body": [
+        "Historical account, kept per knowledge-base.ids-are-permanent. Through batch 20 T2, `node` and `pnpm` were on PATH only under `mise exec --`/`mise run` (`mise exec -- pnpm test`); a scratch-directory run needed `mise x node@24.18.1 pnpm@11.18.0 rust@1.98.1 -- <command>`, since mise strips an inactive tool's paths and a plain PATH export does not survive `mise x`.",
+        "`tools/kb.sh` and `tools/backlog.sh` retired at batch 18 T5 (docs/specs/2026-09-05-batch-18-phase3.md §§1,3): they were the shipped wrappers that used `node` from PATH and fell back to `mise exec node` on their own. The `houserules` binary that replaced them (`houserules.payload-runs-on-builtins`) needed neither node nor a fallback.",
+        "Batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2) removed `node`/`pnpm` from `mise.toml`'s `[tools]` table along with the JS layer they served (package.json, pnpm-lock.yaml, vitest, tools/make-corpus.mjs, and the payload engines kb.mjs/backlog.mjs/lib); `rust` is the only pin left. `houserules.live-run-recipe` already moved off `mise x`-wrapped tool invocations at batch 18 T6 (it runs the compiled binary directly), so nothing in the current live-run procedure needs this gotcha's own workaround any more."
+      ],
+      "tags": [
+        "mise",
+        "node",
+        "environment"
+      ],
+      "source": {
+        "date": "2026-08-31",
+        "by": "controller",
+        "ref": "session of 2026-08-31: mise could not exec npm in a scratch directory; probe of 2026-09-01"
+      }
+    },
+    {
+      "id": "houserules.vitest-restore-mocks-scope",
+      "kind": "gotcha",
+      "area": "tests",
+      "status": "retired",
+      "summary": "RETIRED at batch 20 T3 (HR-047): vitest left the repository entirely, and with it every `vi.mock`/`vi.spyOn` call site this gotcha governed.",
+      "body": [
+        "Historical account, kept per knowledge-base.ids-are-permanent. `restoreMocks` restored `vi.spyOn` spies only; resetting a `vi.mock` factory's `vi.fn` needed an explicit `afterEach` with `mockReset()`. `mockReset()` on a mock made with `vi.fn(impl)` also restored `impl` and dropped queued `mockImplementationOnce` entries, so the wrapped real function came back (verified against the Vitest 4 docs in the batch 3 task 1 fix round).",
+        "`tests/init.test.mjs` (the `vi.mock` factory for node:child_process and its `afterEach`) was the in-repo example; it retired with the rest of the vitest layer at batch 20 T3 (docs/specs/2026-09-07-batch-20-phase5.md §2). Cargo's tests spawn the compiled binary as a real subprocess (`std::process::Command`) and mock nothing, so this gotcha's own class of bug has no cargo-side equivalent to guard against."
+      ],
+      "tags": [
+        "vitest",
+        "mocks",
+        "tests"
+      ],
+      "source": {
+        "date": "2026-09-01",
+        "by": "review",
+        "ref": "batch 3 task 1 review, critical 2; task-1-report.json docs_verified"
+      }
+    },
+    {
+      "id": "houserules.glob-union-matcher",
+      "kind": "gotcha",
+      "area": "rust",
+      "status": "retired",
+      "summary": "RETIRED at batch 20 T3: tools/kb.mjs's own globMatch union is gone; crates/houserules/src/rules/glob.rs's globset engine is the only matcher left.",
+      "body": [
+        "node:path matchesGlob excludes a path segment that starts with `.` under `**` (undocumented; verified live on Node 24.18.1). globToRegExp restores dot-segments but translates only `**` and `*`, escaping every other metacharacter as a literal.",
+        "Write area and check globs with `**`, `*`, and literals only. Extend globToRegExp first if a glob ever needs `?`, `[ ]`, or `{ }` to cross a dot-segment; a mismatch is silent — the file simply drops out of the audit package.",
+        "When replacing a matching engine, pin the old engine's full vocabulary with counterexample tests before switching call sites (batch 6 task 1 round 1).",
+        "Ruled 2026-09-04 (design.md §5.25): the Rust port's engine is the globset crate; divergences from the union are pinned by counterexample tests, malformed globs are named errors, and extglob leaves the vocabulary.",
+        "Pinning a review's named divergence instances does not close an engine swap. Closure is a full cross-engine matrix over every declared glob plus the vocabulary cases, with the cell count and result in the fix-round report (batch 16 T3: named instances left 2 of 7 divergences unpinned; the reviewer's 1853-cell matrix found them).",
+        "tools/kb.mjs itself retired at batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2), along with the rest of the JS toolchain; crates/houserules/src/rules/glob.rs (the globset engine this gotcha's own body already names) is the only matcher left."
+      ],
+      "tags": [
+        "globs",
+        "audit",
+        "areas"
+      ],
+      "source": {
+        "date": "2026-09-02",
+        "by": "review",
+        "ref": "batch 6 branch review; task 1 review round 0"
+      },
+      "verify": [
+        "crates/houserules/src/rules/glob.rs"
+      ]
+    },
+    {
+      "id": "houserules.vitest-coverage-floor-tracks-the-rust-port",
+      "kind": "gotcha",
+      "area": "tests",
+      "status": "retired",
+      "summary": "RETIRED at batch 20 T3: the vitest ratchet ended with vitest itself; cargo's suites are the ongoing gate, with no coverage threshold of their own.",
+      "body": [
+        "HR-054 task 4 ported checkBase/checkShape/checkBudget to Rust; kb.mjs itself is unchanged, but its measured branch coverage fell from 99.36% to 67.08% (no vitest caller left for that code). The first fix round's answer -- one global branches drop, 99 to 80 -- was rejected in review: a single global number also weakens the gate over bin/houserules.mjs, backlog.mjs, json-store.mjs, and cli.mjs, none of which this task touched (task-4-review.json, fix round 1, finding 4).",
+        "The held mechanism instead: vitest.config.mts keeps the pre-port global floor (branches 99, lines 80) over the four still-fully-JS-owned files; kb.mjs is excluded from that run's coverage.include and measured in its own second run, vitest.kb-coverage.config.mts, ratcheted at its measured post-removal numbers (branches 67, lines 72) so it cannot slide further without a gate firing. `package.json`'s `test` script runs both. A single config cannot hold both floors: vitest counts every included file, glob-keyed threshold or not, into the same global aggregate (verified live; vitest.dev/config/coverage: 'Vitest counts all files, including those covered by glob-patterns, into the global coverage thresholds. This is different from Jest behavior') -- kb.mjs's low number drags the aggregate below 99% regardless of its own override sitting beside it.",
+        "tests/kb.test.mjs also gained a live behavioral gate (describe('the live check command over the frozen corpus')): the shipped template/tools/kb.mjs, not a frozen-sha worktree copy, driven over the corpus check fixtures, so a future regression in the still-shipped check path fails a real test, not only the corpus-regeneration self-consistency check.",
+        "Each later Tier-2 phase (audit/validate/stats/backlog, then init/update/files) gets the same treatment on porting: its own excluded, separately-ratcheted coverage run and its own live behavioral gate, never a lowered global floor. The JS path retires fully at spec phase 5; every per-file coverage config, the shared vitest.shared.mts, and the live behavioral gates retire with it.",
+        "Batch 17 T2 (backlog.mjs) narrowed this further after a fix round: when a ported file's whole command surface leaves in one task, its post-removal coverage can measure 0%/0% (nothing left in-process exercises it; the live behavioral gate only spawns the CLI as a subprocess, which v8's coverage instrumentation cannot see). A ratchet run gated at a 0 floor can never fail, so it is not minted -- the exclusion from the main run's coverage.include plus the live spawn gate is the whole mechanism in that case, and package.json's test script stays at two vitest invocations, not three (task-2-review.json, fix round 1, issue 6). A ratchet run is minted only when the post-removal number is high enough to still regress.",
+        "Batch 18 T6 hit a THIRD near-0 shape for bin/houserules.mjs itself, once its own init/update/files surface had fully ported (T3/T4, this same batch): tests/init.test.mjs still calls its `main`, but only through a detached worktree's own dynamically-imported module instance (a different absolute path v8 cannot attribute back to this file) or a real subprocess spawn -- so its measured coverage read 8.79%/1.49% (statements/branches), module-load side effects only, not 0%/0%, but too low to mean anything and impossible to close without touching the frozen file. Excluded from vitest.config.mts's coverage.include with no ratchet minted, same call as backlog.mjs's exact 0%/0%: tests/init.test.mjs and tests/dogfood.test.mjs are this surface's live behavioral gate now.",
+        "The ending this gotcha's own third paragraph predicted: the JS path retired fully at batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2). vitest.config.mts, vitest.kb-coverage.config.mts, vitest.shared.mts, package.json, and pnpm-lock.yaml are gone, and with them every per-file coverage config and live-behavioral-gate mechanism this record describes. Cargo's own suites (`cargo test`, `crates/houserules/tests/**`) are the ongoing gate; no coverage ratchet replaces this one -- `cargo test` carries no coverage threshold of its own, and this repository mints none."
+      ],
+      "tags": [
+        "vitest",
+        "coverage",
+        "tier2",
+        "rust"
+      ],
+      "source": {
+        "date": "2026-09-04",
+        "by": "docs",
+        "ref": "HR-054 task 4 fix round 1 (batch 16); task-4-review.json finding 4; mise exec -- pnpm test measured before and after"
+      }
+    }
+  ]
+}

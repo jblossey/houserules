@@ -1,11 +1,13 @@
-//! The `rules` and `proposals` keys of `stats`: how each knowledge entry
-//! fared across the workspaces, and which entries the numbers say to
-//! change.
+//! The `rules`, `packs`, and `proposals` keys of `stats`: how each
+//! knowledge entry fared across the workspaces, what each source of
+//! entries costs, and which entries the numbers say to change.
 //!
 //! A `RuleRow` exists for every entry of the knowledge base whose raw
-//! `status` is absent or `active`. An id that a deliverable names but the
+//! `status` is active (`archive::is_inactive_status`: any status but
+//! `retired` and `superseded`). An id that a deliverable names but the
 //! base does not hold gets no row and no proposal; it still counts in
-//! `violations` and `unused_ids`. The thresholds below are fixed. A
+//! `violations` and `unused_ids`. The `packs` key sums the rows per
+//! source, `local` or a pack. The thresholds below are fixed. A
 //! rule that prevents violations by its presence also shows zero fails,
 //! so every proposal that touches a standing entry carries
 //! `owner_gate: true`.
@@ -15,8 +17,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
 
+use crate::archive::is_inactive_status;
+
 use super::cost::{SeverityCounts, TargetCounts, Workspace};
-use super::model::{Base, CheckField, raw_entry_has_tag};
+use super::model::{Base, CheckField, Source, raw_entry_has_tag};
 
 /// A standing entry audited in this many workspaces or more, with no
 /// fail and no finding, earns a `demote` proposal.
@@ -104,6 +108,8 @@ const RULED_KEEP_TAG: &str = "ruled-keep";
 #[derive(Clone, Debug)]
 pub(super) struct RuleRow {
     pub id: String,
+    /// The source whose entry the base keeps for the id.
+    pub source: Source,
     pub standing: bool,
     /// `true` when the entry's `tags` hold `ruled-keep`. Such an entry gets
     /// only the `budget` row's count: it counts toward the standing
@@ -164,12 +170,15 @@ fn tally(workspaces: &[Workspace]) -> BTreeMap<&str, Usage> {
     usage
 }
 
-/// `true` when the raw entry `id` has no `status`, or `status: active`.
+/// `true` when the raw entry `id` has an active status: the same test as
+/// `archive::is_inactive_status`, which `archive` and the merged base use.
 fn is_active(base: &Base, id: &str) -> bool {
-    match base.raw_entries.get(id).and_then(|raw| raw.get("status")) {
-        None | Some(Value::Null) => true,
-        Some(status) => status.as_str() == Some("active"),
-    }
+    !is_inactive_status(
+        base.raw_entries
+            .get(id)
+            .and_then(|raw| raw.get("status"))
+            .and_then(Value::as_str),
+    )
 }
 
 /// `true` when the raw entry `id` names `user` in `source.by`.
@@ -192,6 +201,7 @@ pub(super) fn rule_rows(workspaces: &[Workspace], base: &Base) -> Vec<RuleRow> {
         .filter(|entry| is_active(base, &entry.id))
         .map(|entry| RuleRow {
             id: entry.id.clone(),
+            source: entry.source.clone(),
             standing: entry.standing,
             ruled_keep: raw_entry_has_tag(base, &entry.id, RULED_KEEP_TAG),
             mode: match entry.check {
@@ -213,6 +223,7 @@ pub(super) fn rules_json(rows: &[RuleRow]) -> Value {
             .map(|row| {
                 json!({
                     "id": row.id,
+                    "source": row.source.name(),
                     "standing": row.standing,
                     "mode": row.mode.as_str(),
                     "workspaces": row.usage.workspaces,
@@ -222,6 +233,57 @@ pub(super) fn rules_json(rows: &[RuleRow]) -> Value {
                     "findings": row.usage.findings.to_json(),
                     "targets": row.usage.targets.to_json(),
                     "cited": row.usage.cited,
+                })
+            })
+            .collect(),
+    )
+}
+
+/// The `packs` key: one object for `local` and one for each pack of the
+/// base, in that order, each holding the sums of its source:
+///
+/// - `entries`: the active entries (the rows) of the source;
+/// - `standing`: how many of them are standing;
+/// - `judged_rows`: the counted rows of its judged entries, which are the
+///   judged review rows that reviewers rate;
+/// - `violations`: the tasks of the top-level `violations` rows whose id
+///   the source ships. An id that no source ships adds nothing.
+///
+/// A source with no active entry keeps its object, with zeros.
+pub(super) fn packs_json(
+    base: &Base,
+    rows: &[RuleRow],
+    violations: &BTreeMap<String, BTreeSet<String>>,
+) -> Value {
+    let sources = std::iter::once(Source::Local).chain(
+        base.packs
+            .iter()
+            .map(|pack| Source::Pack(pack.name.clone())),
+    );
+    Value::Array(
+        sources
+            .map(|source| {
+                let own: Vec<&RuleRow> = rows.iter().filter(|row| row.source == source).collect();
+                let judged_rows: usize = own
+                    .iter()
+                    .filter(|row| row.mode == Mode::Judged)
+                    .map(|row| row.usage.rows)
+                    .sum();
+                let violating_tasks: usize = violations
+                    .iter()
+                    .filter(|(id, _)| {
+                        base.entries
+                            .get(id.as_str())
+                            .is_some_and(|entry| entry.source == source)
+                    })
+                    .map(|(_, tasks)| tasks.len())
+                    .sum();
+                json!({
+                    "source": source.name(),
+                    "entries": own.len(),
+                    "standing": own.iter().filter(|row| row.standing).count(),
+                    "judged_rows": judged_rows,
+                    "violations": violating_tasks,
                 })
             })
             .collect(),
@@ -443,7 +505,7 @@ mod tests {
 
     use super::*;
     use crate::rules::cost::{AdherenceRow, Finding, Severity, Target, Workspace};
-    use crate::rules::test_support::{base_with, entry, valid_check};
+    use crate::rules::test_support::{base_with, base_with_packs, entry, valid_check};
 
     fn adherence(id: &str, failed: bool) -> AdherenceRow {
         AdherenceRow {
@@ -469,10 +531,12 @@ mod tests {
         }
     }
 
-    /// A rule row with no use at all: judged, not standing, not gated.
+    /// A rule row with no use at all: local, judged, not standing, not
+    /// gated.
     fn blank(id: &str) -> RuleRow {
         RuleRow {
             id: id.to_string(),
+            source: Source::Local,
             standing: false,
             ruled_keep: false,
             mode: Mode::Judged,
@@ -582,6 +646,41 @@ mod tests {
         assert_eq!(ids, ["a.one", "b.two", "d.live"]);
     }
 
+    /// The row filter is `archive::is_inactive_status`, the one predicate
+    /// that `archive` and the merged base share: an absent, `null`,
+    /// `active`, or unknown status is active, `retired` and `superseded`
+    /// are not.
+    #[test]
+    fn rule_rows_filter_with_the_status_predicate_that_archive_uses() {
+        let statuses = [
+            ("a.absent", None),
+            ("b.null", Some(Value::Null)),
+            ("c.active", Some(json!("active"))),
+            ("d.retired", Some(json!("retired"))),
+            ("e.superseded", Some(json!("superseded"))),
+            ("f.unknown", Some(json!("paused"))),
+        ];
+        let entries: Vec<Value> = statuses
+            .iter()
+            .map(|(id, status)| match status {
+                Some(status) => entry(id, json!({"status": status})),
+                None => entry(id, json!({})),
+            })
+            .collect();
+        let (_guard, base) = base_with(&entries);
+        let expected: Vec<&str> = statuses
+            .iter()
+            .filter(|(_, status)| {
+                !crate::archive::is_inactive_status(status.as_ref().and_then(Value::as_str))
+            })
+            .map(|(id, _)| *id)
+            .collect();
+        let rows = rule_rows(&[], &base);
+        let ids: Vec<&str> = rows.iter().map(|row| row.id.as_str()).collect();
+        assert_eq!(ids, expected);
+        assert_eq!(ids, ["a.absent", "b.null", "c.active", "f.unknown"]);
+    }
+
     /// The mode follows the check: a valid check is deterministic, none is
     /// judged. The standing flag follows the entry.
     #[test]
@@ -656,7 +755,7 @@ mod tests {
         assert_eq!(
             json[0],
             json!({
-                "id": "a.one", "standing": false, "mode": "judged",
+                "id": "a.one", "source": "local", "standing": false, "mode": "judged",
                 "workspaces": 2, "injected": 2, "rows": 3, "fails": 0,
                 "findings": {"critical": 1, "important": 1, "minor": 1, "other": 0},
                 "targets": {"code": 1, "deliverable": 1, "prose": 1, "other": 0},
@@ -673,6 +772,7 @@ mod tests {
             keys,
             [
                 "id",
+                "source",
                 "standing",
                 "mode",
                 "workspaces",
@@ -683,6 +783,106 @@ mod tests {
                 "targets",
                 "cited"
             ]
+        );
+    }
+
+    /// Each row names the source of its entry: `local` for a local entry,
+    /// the pack name for a pack entry. An excluded pack entry has no row.
+    #[test]
+    fn rule_rows_carry_the_source_of_each_entry() {
+        let (_guard, base) = base_with_packs(
+            &[entry("test.one", json!({}))],
+            &[(
+                "alpha",
+                &[
+                    entry("alpha.one", json!({})),
+                    entry("alpha.gone", json!({})),
+                ],
+            )],
+            &["alpha.gone"],
+        );
+        let rows = rule_rows(&[], &base);
+        let sources: Vec<(&str, &str)> = rows
+            .iter()
+            .map(|row| (row.id.as_str(), row.source.name()))
+            .collect();
+        assert_eq!(sources, [("alpha.one", "alpha"), ("test.one", "local")]);
+    }
+
+    /// The `packs` key: one row for `local` and one for each installed
+    /// pack, in that order. `entries` counts the active entries of the
+    /// source and `standing` the standing ones. `judged_rows` sums the
+    /// counted rows of its judged entries: a deterministic entry adds
+    /// none. `violations` sums the tasks of the top-level `violations`
+    /// rows whose id the source ships; an id that no source ships adds
+    /// nothing. A pack whose every entry is excluded keeps its row at zero.
+    #[test]
+    fn packs_json_sums_entries_standing_judged_rows_and_violations_per_source() {
+        let (_guard, base) = base_with_packs(
+            &[
+                entry("test.one", json!({})),
+                entry(
+                    "test.two",
+                    json!({"standing": true, "check": valid_check()}),
+                ),
+            ],
+            &[
+                (
+                    "alpha",
+                    &[
+                        entry("alpha.one", json!({"standing": true})),
+                        entry("alpha.two", json!({})),
+                    ],
+                ),
+                ("beta", &[entry("beta.one", json!({}))]),
+            ],
+            &["beta.one"],
+        );
+        let workspace = Workspace {
+            path: "ws1".to_string(),
+            rows: vec![
+                adherence("test.one", false),
+                adherence("test.two", false),
+                adherence("alpha.one", true),
+                adherence("alpha.two", false),
+                adherence("alpha.two", false),
+            ],
+            ..Workspace::default()
+        };
+        let rows = rule_rows(&[workspace], &base);
+        let violations: BTreeMap<String, BTreeSet<String>> = [
+            ("alpha.one", vec!["1"]),
+            ("test.two", vec!["1", "2"]),
+            ("ghost.id", vec!["1"]),
+        ]
+        .into_iter()
+        .map(|(id, tasks)| {
+            (
+                id.to_string(),
+                tasks.into_iter().map(String::from).collect(),
+            )
+        })
+        .collect();
+
+        assert_eq!(
+            packs_json(&base, &rows, &violations),
+            json!([
+                {"source": "local", "entries": 2, "standing": 1, "judged_rows": 1, "violations": 2},
+                {"source": "alpha", "entries": 2, "standing": 1, "judged_rows": 3, "violations": 1},
+                {"source": "beta", "entries": 0, "standing": 0, "judged_rows": 0, "violations": 0},
+            ])
+        );
+    }
+
+    /// A tree with no pack still reports one row, for `local`.
+    #[test]
+    fn packs_json_reports_the_local_row_for_a_tree_without_packs() {
+        let (_guard, base) = base_with(&[entry("test.one", json!({"standing": true}))]);
+        let rows = rule_rows(&[], &base);
+
+        assert_eq!(
+            packs_json(&base, &rows, &BTreeMap::new()),
+            json!([{"source": "local", "entries": 1, "standing": 1, "judged_rows": 0, "violations": 0}])
         );
     }
 

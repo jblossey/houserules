@@ -19,6 +19,7 @@ pub(crate) use crate::emit::emit;
 
 use super::load::{LoadedBacklog, read_json_value};
 use super::model::ItemStatus;
+use crate::rules::marker_findings;
 
 /// One backlog command's usage or runtime failure: printed as a single
 /// stderr line, exit 2. Three arms, all rendering identically: (1) a
@@ -137,10 +138,11 @@ fn round_trip_remedy(relative: &str) -> &'static str {
 /// carry that policy). A finding names its file by the repository-
 /// relative path this function already computes, on every platform:
 /// `read_json_as` takes that name directly rather than deriving one from
-/// the path it reads. This is a SCHEMA check plus id collection only, the
-/// same scope `rules::check`'s own `check_archive` keeps for
-/// `knowledge/archive/`: an archived item's other cross-file invariants (a
-/// duplicate id, a batch membership) are not judged here.
+/// the path it reads. This is a SCHEMA check, a compression-marker scan
+/// (`rules::marker_findings`), plus id collection only, the same scope
+/// `rules::check`'s own `check_archive` keeps for `knowledge/archive/`: an
+/// archived item's other cross-file invariants (a duplicate id, a batch
+/// membership) are not judged here.
 fn check_archive(b: &LoadedBacklog, errors: &mut Vec<String>) -> HashSet<String> {
     let mut ids = HashSet::new();
     let dir = b.root.join("backlog/archive");
@@ -162,6 +164,7 @@ fn check_archive(b: &LoadedBacklog, errors: &mut Vec<String>) -> HashSet<String>
                     "itemsFile"
                 };
                 check_ref(&content, def, &relative, b, errors);
+                errors.extend(marker_findings(&content, &relative));
                 if name != "batches.json" {
                     for item in content
                         .get("items")
@@ -191,6 +194,7 @@ pub(crate) fn check_backlog(b: &LoadedBacklog) -> (Vec<String>, Vec<String>) {
 
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
+    let mut marker_errors = Vec::new();
 
     for (relative, value) in [
         ("backlog/schema.json", &b.schema),
@@ -200,9 +204,11 @@ pub(crate) fn check_backlog(b: &LoadedBacklog) -> (Vec<String>, Vec<String>) {
         ("backlog/parked.json", &b.parked),
     ] {
         check_emitter_round_trip(&b.root, relative, value, &mut errors);
+        marker_errors.extend(marker_findings(value, relative));
     }
     for section in &b.sections {
         check_emitter_round_trip(&b.root, &section.file, &section.content, &mut errors);
+        marker_errors.extend(marker_findings(&section.content, &section.file));
     }
 
     check_ref(
@@ -248,6 +254,7 @@ pub(crate) fn check_backlog(b: &LoadedBacklog) -> (Vec<String>, Vec<String>) {
         }
     }
     if !errors.is_empty() {
+        errors.extend(marker_errors);
         errors.extend(archive_errors);
         return (errors, warnings);
     }
@@ -393,6 +400,7 @@ pub(crate) fn check_backlog(b: &LoadedBacklog) -> (Vec<String>, Vec<String>) {
         ));
     }
 
+    errors.extend(marker_errors);
     errors.extend(archive_errors);
     (errors, warnings)
 }
@@ -1027,6 +1035,88 @@ mod tests {
                 "backlog/batches.json: duplicate batch 2",
                 "backlog/batches.json: 2 batches in progress (at most one)",
             ]
+        );
+    }
+
+    /// A compression marker, built here so that no tracked file holds one.
+    fn marker_text() -> String {
+        format!("{}x{}", "<<ccr:", ">>")
+    }
+
+    /// The whole finding for the field at `at`.
+    fn marker_finding(at: &str) -> String {
+        format!(
+            "{at}: holds a compression marker (headroom ccr); a context proxy changed this \
+             text, so restore the original"
+        )
+    }
+
+    /// The marker gate covers every backlog file: an items file, the four
+    /// record files, and an archive file. Each finding names its file and
+    /// field, and a marker does not hide the cross-file checks of stage two
+    /// (here a dangling `see`).
+    #[test]
+    fn check_backlog_rejects_a_compression_marker_in_every_backlog_file() {
+        let dir = make_repo(vec![
+            item(json!({"body": [marker_text()]})),
+            item(json!({"id": "WI-003", "see": ["WI-999"]})),
+        ]);
+        let root = dir.path();
+        write(
+            root,
+            "backlog/amendments.json",
+            &json!({"heading": "A. Amendments", "amendments": [
+                {"id": "A-01", "type": "constraint", "status": "done", "text": [marker_text()]},
+            ]}),
+        );
+        write(
+            root,
+            "backlog/decisions.json",
+            &json!({"preamble": "# Backlog", "decisions": [], "notes": [marker_text()]}),
+        );
+        write(
+            root,
+            "backlog/parked.json",
+            &json!({"groups": [{"batch": 29, "intro": "i", "items": [
+                {"id": "PP-29-01", "text": marker_text()},
+            ]}]}),
+        );
+        write(
+            root,
+            "backlog/batches.json",
+            &json!({"heading": "h", "intro": [marker_text()], "table_header": [], "batches": []}),
+        );
+        write(
+            root,
+            "backlog/archive/E02.json",
+            &json!({"section": "E02", "heading": "h", "title": "t", "spec": "", "items": [
+                item(json!({"id": "WI-050", "body": [marker_text()]})),
+            ]}),
+        );
+        let b = load_backlog(root).expect("loads");
+        let (errors, _warnings) = check_backlog(&b);
+        for at in [
+            "backlog/amendments.json.amendments[0].text[0]",
+            "backlog/batches.json.intro[0]",
+            "backlog/decisions.json.notes[0]",
+            "backlog/parked.json.groups[0].items[0].text",
+            "backlog/items/E01.json.items[0].body[0]",
+            "backlog/archive/E02.json.items[0].body[0]",
+        ] {
+            assert!(
+                errors.contains(&marker_finding(at)),
+                "missing the finding for {at} in {errors:#?}"
+            );
+        }
+        assert!(
+            errors.contains(
+                &"backlog/items/E01.json WI-003: see \"WI-999\" does not exist".to_string()
+            ),
+            "a marker hid the cross-file checks: {errors:#?}"
+        );
+        assert!(
+            errors.iter().all(|line| !line.contains(&marker_text())),
+            "a finding prints the marker: {errors:#?}"
         );
     }
 

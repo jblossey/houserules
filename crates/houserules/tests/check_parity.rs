@@ -10,19 +10,14 @@
 //! cannot produce.
 
 mod common;
+mod install_shape;
 
 use std::fs;
 
-use common::{FrozenWorktree, copy_dir_recursive, houserules, repo_root};
-
-/// The stub `AGENTS.md` content written into the frozen worktree the
-/// `root` slice checks out -- `gen-goldens.rs`'s own copy of this
-/// constant, duplicated here for the reason that file's own doc gives
-/// (a `src/bin/*.rs` target cannot depend on `tests/*.rs` code, so
-/// neither side can import the other's). Content is never asserted,
-/// only existence and budget, so any short text under the 200-line/
-/// 12288-byte instruction budget is equally valid on both sides.
-const ROOT_WORKTREE_AGENTS_MD_STUB: &str = "# AGENTS.md stub\n\nWritten by the check-parity harness: the frozen sha this worktree checks out predates AGENTS.md joining SEED_ONCE. A real adopter's own checkout already has one.\n";
+use common::{
+    FrozenWorktree, ROOT_WORKTREE_AGENTS_MD_STUB, ROOT_WORKTREE_CLAUDE_MD_STUB, copy_dir_recursive,
+    houserules, repo_root,
+};
 
 /// One frozen `tests/goldens/check/<slice>.json` capture: `stdout`,
 /// `stderr`, and `exit`, read directly from the corpus file rather than
@@ -123,8 +118,10 @@ fn check_knowledge_matches_the_frozen_mini_stale_corpus() {
 /// now requires unconditionally. Without it this slice would report
 /// `AGENTS.md: missing` and lose the one property it exists to pin -- a
 /// real, larger knowledge base passing end to end -- the same way a real
-/// adopter's own checkout already has the file. `gen-goldens.rs` writes
-/// the identical stub before capturing this golden.
+/// adopter's own checkout already has the file. It also replaces the
+/// checkout's `CLAUDE.md` with the one-line import that `check_base` now
+/// requires of any `CLAUDE.md`. `gen-goldens.rs` writes the identical
+/// stubs before capturing this golden.
 #[test]
 fn check_knowledge_matches_the_frozen_root_corpus() {
     let worktree = FrozenWorktree::checkout(&repo_root(), common::FROZEN_SHA);
@@ -133,6 +130,11 @@ fn check_knowledge_matches_the_frozen_root_corpus() {
         ROOT_WORKTREE_AGENTS_MD_STUB,
     )
     .expect("write AGENTS.md stub into the frozen worktree");
+    fs::write(
+        worktree.path.join("CLAUDE.md"),
+        ROOT_WORKTREE_CLAUDE_MD_STUB,
+    )
+    .expect("write CLAUDE.md stub into the frozen worktree");
     let render_output = houserules()
         .args(["render", "--dir"])
         .arg(&worktree.path)
@@ -187,6 +189,7 @@ fn check_knowledge_fails_on_a_malformed_area_glob_with_a_named_error() {
 #[test]
 fn check_knowledge_missing_knowledge_directory_prints_a_named_error_and_exits_2() {
     let dir = tempfile::tempdir().expect("tempdir");
+    install_shape::mark_2_0(dir.path());
 
     let output = houserules()
         .args(["check-knowledge", "--dir"])
@@ -206,7 +209,7 @@ fn check_knowledge_missing_knowledge_directory_prints_a_named_error_and_exits_2(
 
 /// Load-failure error arm, git-resolution leg: `check-knowledge` with
 /// `--dir` omitted outside any git repository falls back to
-/// `repo_root_from_cwd` (shared with `render`), fails the same way.
+/// `git_location_from_cwd` (shared with `render`), fails the same way.
 #[test]
 fn check_knowledge_outside_a_git_repository_prints_a_named_error_and_exits_2() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -248,17 +251,22 @@ const ROOT_RESOLVING_COMMANDS: &[&[&str]] = &[
     &["check-commit", "--from", "HEAD"],
     &["check-report-claims", "r.json"],
     &["archive"],
+    &["pack", "list"],
+    &["pack", "add", "x"],
+    &["pack", "remove", "x"],
+    &["pack", "upgrade", "x"],
 ];
 
 /// The subcommands `ROOT_RESOLVING_COMMANDS` leaves out: `files` reads no
 /// repository, `init` and `update` resolve `--dir` like Node's
-/// `path.resolve` and never an enclosing repository (`install.rs`'s own
+/// `path.resolve` and never an enclosing repository (`install/mod.rs`'s own
 /// module doc), and `help` is clap's own.
 const NOT_ROOT_RESOLVING: &[&str] = &["files", "init", "update", "help"];
 
 /// `ROOT_RESOLVING_COMMANDS` names every subcommand `--help` lists except
 /// `NOT_ROOT_RESOLVING`, so a new subcommand fails here until it is
-/// covered.
+/// covered. A subcommand with subcommands of its own (`pack`) has one entry
+/// for each of them, since each resolves the root on its own.
 #[test]
 fn root_resolving_commands_cover_every_subcommand() {
     let output = houserules().arg("--help").output().expect("run --help");
@@ -274,6 +282,7 @@ fn root_resolving_commands_cover_every_subcommand() {
     let mut covered: Vec<&str> = ROOT_RESOLVING_COMMANDS.iter().map(|args| args[0]).collect();
     listed.sort_unstable();
     covered.sort_unstable();
+    covered.dedup();
     assert_eq!(covered, listed);
 }
 
@@ -285,7 +294,7 @@ fn root_resolving_commands_cover_every_subcommand() {
 /// (Windows) before the binary reads it back as its working directory.
 #[test]
 fn resolve_root_names_the_dir_remedy_outside_a_repository() {
-    const REMEDY: &str = " is not inside a git repository; pass --dir <repository root>\n";
+    const REMEDY: &str = " is not inside a git repository; pass --dir <install root>\n";
     let dir = tempfile::tempdir().expect("tempdir");
     let expected = dir.path().canonicalize().expect("canonicalize tempdir");
 
@@ -318,8 +327,8 @@ fn resolve_root_names_the_dir_remedy_outside_a_repository() {
 /// translated git (`LC_ALL=de_DE.UTF-8 git rev-parse --show-toplevel`
 /// outside a repository prints `Schwerwiegend: Kein Git-Repository ...`
 /// there); elsewhere git prints English and the test passes alone. The
-/// unit test `git_show_toplevel_runs_git_with_lc_all_c` in `render.rs`
-/// pins the override itself on every host.
+/// unit test `git_rev_parse_location_runs_git_with_lc_all_c` in
+/// `rules/render/location.rs` pins the override itself on every host.
 #[test]
 fn resolve_root_names_the_dir_remedy_under_a_translated_git_locale() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -333,7 +342,7 @@ fn resolve_root_names_the_dir_remedy_under_a_translated_git_locale() {
     assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
     assert!(
-        stderr.ends_with(" is not inside a git repository; pass --dir <repository root>\n"),
+        stderr.ends_with(" is not inside a git repository; pass --dir <install root>\n"),
         "{stderr:?}"
     );
 }
@@ -442,7 +451,7 @@ fn resolve_root_names_the_dir_remedy_for_gits_other_search_wording() {
     assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
     assert!(
-        stderr.ends_with(" is not inside a git repository; pass --dir <repository root>\n"),
+        stderr.ends_with(" is not inside a git repository; pass --dir <install root>\n"),
         "{stderr:?}"
     );
 }
@@ -508,7 +517,7 @@ fn render_check_exits_1_while_stale_render_writes_check_reports_and_passes() {
     assert_eq!(output.status.code(), Some(1), "render --check while stale");
     let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
     assert!(
-        stderr.contains(".claude/rules/standing-rules.md: would change\n"),
+        stderr.contains(".claude/rules/tools.md: would change\n"),
         "got: {stderr:?}"
     );
 
@@ -532,7 +541,7 @@ fn render_check_exits_1_while_stale_render_writes_check_reports_and_passes() {
     assert_eq!(output.status.code(), Some(0), "render writes");
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
     assert!(
-        stdout.contains(".claude/rules/standing-rules.md: written\n"),
+        stdout.contains(".claude/rules/tools.md: written\n"),
         "got: {stdout:?}"
     );
 

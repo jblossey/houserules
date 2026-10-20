@@ -39,22 +39,48 @@ fn scratch_git_repo() -> tempfile::TempDir {
     dir
 }
 
-/// Seeds `dir` with the real kit payload via `houserules init`, exactly
-/// `houserules.live-run-recipe`'s own scratch-repo procedure -- every test
-/// here starts from a real `init`ed repository, then edits specific files
-/// to build its own scenario, rather than a hand-built fixture that could
-/// drift from what `init` actually ships.
-fn seed(dir: &Path) {
+/// Runs `houserules <args> --dir <dir>`, asserting success.
+fn run_ok(dir: &Path, args: &[&str]) {
     let output = houserules()
-        .args(["init", "--dir"])
+        .args(args)
+        .arg("--dir")
         .arg(dir)
         .output()
-        .expect("run init");
+        .expect("run houserules");
     assert!(
         output.status.success(),
-        "init failed: {}",
+        "houserules {args:?} failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+/// Installs the kit into `dir` with `init` (a 2.0 install), then makes the
+/// topic `process` a local topic file `knowledge/process.json` that holds the
+/// entries of the pack, and removes the pack. Every test here starts from such
+/// a repository, then edits specific files to build its own scenario, rather
+/// than a hand-built fixture that could drift from what the kit ships. The
+/// sweep moves local entries only, so each scenario needs a local topic file.
+fn seed_install(dir: &Path, init_args: &[&str]) {
+    let mut init = vec!["init"];
+    init.extend(init_args);
+    run_ok(dir, &init);
+    let copy = read_json(dir, "knowledge/packs/process.json");
+    write_json(
+        dir,
+        "knowledge/process.json",
+        &json!({
+            "topic": "process",
+            "title": copy["topics"]["process"]["title"],
+            "entries": copy["entries"],
+        }),
+    );
+    run_ok(dir, &["pack", "remove", "process"]);
+    render(dir);
+}
+
+/// Seeds `dir` with `seed_install`.
+fn seed(dir: &Path) {
+    seed_install(dir, &[]);
 }
 
 /// Seeds `dir` the same way `seed` does, but with `--id-prefix HR` --
@@ -62,17 +88,7 @@ fn seed(dir: &Path) {
 /// every item id to match the stamped prefix (`init`'s own default, `WI`,
 /// otherwise).
 fn seed_with_hr_prefix(dir: &Path) {
-    let output = houserules()
-        .args(["init", "--dir"])
-        .arg(dir)
-        .args(["--id-prefix", "HR"])
-        .output()
-        .expect("run init");
-    assert!(
-        output.status.success(),
-        "init failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    seed_install(dir, &["--id-prefix", "HR"]);
 }
 
 /// Runs `houserules render` against `dir`, asserting success -- needed
@@ -295,6 +311,64 @@ fn archives_done_dropped_items_done_batches_and_retired_knowledge_entries() {
     assert_eq!(decisions_before, decisions_after);
 }
 
+/// A local knowledge entry with `status: superseded` moves like a `retired`
+/// one: the sweep and the merged base read one status predicate. An entry
+/// with `status: active` stays.
+#[test]
+fn archives_a_superseded_knowledge_entry_and_keeps_an_active_one() {
+    let dir = scratch_git_repo();
+    seed(dir.path());
+    let mut process = read_json(dir.path(), "knowledge/process.json");
+    let mut entries = process["entries"].as_array().cloned().unwrap_or_default();
+    entries.push(knowledge_entry(
+        "process.fixture-active",
+        "process",
+        json!({"status": "active"}),
+    ));
+    entries.push(knowledge_entry(
+        "process.fixture-superseded",
+        "process",
+        json!({"status": "superseded"}),
+    ));
+    process["entries"] = Value::Array(entries);
+    write_json(dir.path(), "knowledge/process.json", &process);
+
+    let output = houserules()
+        .args(["archive", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run archive");
+
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .collect::<Vec<_>>(),
+        vec![
+            "archived process.fixture-superseded -> knowledge/archive/process.json",
+            "archive: 1 moved",
+        ],
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let active = read_json(dir.path(), "knowledge/process.json");
+    let active_ids: Vec<&str> = active["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["id"].as_str().unwrap())
+        .collect();
+    assert!(active_ids.contains(&"process.fixture-active"));
+    assert!(!active_ids.contains(&"process.fixture-superseded"));
+    let archived = read_json(dir.path(), "knowledge/archive/process.json");
+    let archived_ids: Vec<&str> = archived["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(archived_ids, vec!["process.fixture-superseded"]);
+}
+
 /// A second sweep, with nothing new to move, moves nothing and reports it.
 #[test]
 fn archive_is_idempotent_a_second_run_moves_nothing() {
@@ -484,15 +558,6 @@ fn checks_schema_validate_the_archive_directories() {
 fn archiving_an_areas_only_entry_never_edits_areas_json_and_the_dead_glob_gate_still_fires() {
     let dir = scratch_git_repo();
     seed(dir.path());
-
-    let mut schema = read_json(dir.path(), "knowledge/schema.json");
-    let mut area_enum = schema["$defs"]["area"]["enum"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default();
-    area_enum.push(json!("example"));
-    schema["$defs"]["area"]["enum"] = Value::Array(area_enum);
-    write_json(dir.path(), "knowledge/schema.json", &schema);
 
     let mut areas = read_json(dir.path(), "knowledge/areas.json");
     areas["example"] = json!({"paths": ["does-not-exist/**"]});

@@ -1,5 +1,5 @@
 //! CLI wrappers for the backlog command surface: resolves `--dir` or the
-//! enclosing git repository the same way `render` and `check-knowledge`
+//! nearest install root the same way `render` and `check-knowledge`
 //! do, loads the backlog, and dispatches to `commands` -- the same
 //! `cmd_*`-returns-`ExitCode` split `rules::render`'s `cmd_render` and
 //! `rules::check`'s `cmd_check_knowledge` already use.

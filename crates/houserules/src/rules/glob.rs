@@ -146,6 +146,7 @@ mod tests {
                     name.to_string(),
                     AreaDef {
                         paths: paths.iter().map(|p| p.to_string()).collect(),
+                        agents_md: true,
                     },
                 )
             })

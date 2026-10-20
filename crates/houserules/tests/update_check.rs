@@ -2,8 +2,8 @@
 //! `update_check.rs`'s own module doc has the full account): stdout is a
 //! JSON consumer's contract surface, and this header must never land on
 //! it. Follows `check_commit.rs`'s structural pattern (a real subprocess
-//! against this checkout's own repository, this file's own small copy of
-//! the shared helpers) for the same reason that file's doc gives.
+//! against a scratch install, this file's own small copy of the shared
+//! helpers) for the same reason that file's doc gives.
 //!
 //! Two tests split the contract because no single run can carry both
 //! halves. `the_update_header_never_reaches_stdout_for_a_json_command`
@@ -28,7 +28,6 @@
 //! file's own second `tdd` entry: RED, the header appears on the piped
 //! stdout instead of the pty; reverted, GREEN.
 
-use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// A `Command` for the compiled `houserules` binary under test --
@@ -46,11 +45,30 @@ fn houserules() -> Command {
     command
 }
 
-/// This checkout's repository root -- `check_commit.rs`'s own copy.
-fn repo_root() -> PathBuf {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    root.canonicalize()
-        .unwrap_or_else(|error| panic!("canonicalize {}: {error}", root.display()))
+/// A scratch repository that `houserules init` installed: a 2.0 install,
+/// which D4 lets `get` read (this checkout is no such install while it
+/// still holds the 1.x layout). The id `process.tdd` is in the kit's
+/// `process` pack.
+fn scratch_install() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let init = Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(dir.path())
+        .status()
+        .expect("run git init");
+    assert!(init.success(), "git init failed");
+    let output = houserules()
+        .arg("init")
+        .arg("--dir")
+        .arg(dir.path())
+        .output()
+        .expect("run houserules init");
+    assert!(
+        output.status.success(),
+        "init failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    dir
 }
 
 /// A cache directory seeded so the header WOULD announce an update if the
@@ -109,11 +127,12 @@ fn scratch_cache_claiming_a_newer_release() -> tempfile::TempDir {
 #[test]
 fn the_update_header_never_reaches_stdout_for_a_json_command() {
     let cache = scratch_cache_claiming_a_newer_release();
+    let install = scratch_install();
 
     let output = houserules()
         .arg("get")
-        .arg("houserules.pnpm-only")
-        .current_dir(repo_root())
+        .arg("process.tdd")
+        .current_dir(install.path())
         .env("XDG_CACHE_HOME", cache.path())
         .env("HOME", cache.path())
         .output()
@@ -260,6 +279,7 @@ fn the_update_header_prints_only_on_a_real_stderr_terminal() {
     use std::process::Stdio;
 
     let cache = scratch_cache_claiming_a_newer_release();
+    let install = scratch_install();
     let pty = pty::open();
     let slave = std::fs::OpenOptions::new()
         .read(true)
@@ -270,8 +290,8 @@ fn the_update_header_prints_only_on_a_real_stderr_terminal() {
     let mut command = houserules();
     command
         .arg("get")
-        .arg("houserules.pnpm-only")
-        .current_dir(repo_root())
+        .arg("process.tdd")
+        .current_dir(install.path())
         .env("XDG_CACHE_HOME", cache.path())
         .env("HOME", cache.path())
         .stdout(Stdio::piped())

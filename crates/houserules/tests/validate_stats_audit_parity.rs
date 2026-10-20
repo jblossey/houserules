@@ -460,8 +460,8 @@ fn audit_matches_the_frozen_knowledge_retrospective_slice() {
 // deliverable-facing commands' own contract --------------------------
 
 /// `validate`/`stats`/`audit` all resolve their repository root the same
-/// way `render`/`check-knowledge` do (`--dir`, or the enclosing git
-/// repository's top level via `repo_root_from_cwd`), and load the
+/// way `render`/`check-knowledge` do (`--dir`, or the nearest install
+/// root via `git_location_from_cwd`), and load the
 /// knowledge base there before dispatching -- see `rules::stats::cmd_stats`'s
 /// own doc for why this replicates `tools/kb.mjs`'s own unconditional
 /// `loadBase` call. A missing `knowledge/` directory is therefore the same
@@ -898,7 +898,7 @@ fn audit_trims_the_values_in_ids_and_writes_the_json_file() {
 }
 
 /// `--dir` is unset, so the repository root resolves from
-/// `--base`/`--head` alone via `repo_root_from_cwd`; `--report`/`--json`'s
+/// `--base`/`--head` alone via `git_location_from_cwd`; `--report`/`--json`'s
 /// relative paths must instead resolve against the process's actual
 /// working directory, a `sub` directory of the worktree, not its root.
 #[test]

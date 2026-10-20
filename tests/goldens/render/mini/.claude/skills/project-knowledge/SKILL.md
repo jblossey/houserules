@@ -7,11 +7,9 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 # Project knowledge
 
-## Standing rules
-
-- [mini.standing-example] Always run the mini fixture's own regeneration before trusting its output.
-
 ## Retrieval protocol
+
+Save the output of every `houserules` command to a file, then read the file with your file-read tool.
 
 1. Resolve every id under `Knowledge:` in your task: `houserules get <ids>` (JSON).
 2. Before editing, run `houserules for <every file you will change>` and `get` any rule you are unsure about.

@@ -20,6 +20,7 @@ use crate::emit::emit;
 use crate::node_path::resolve_like_node;
 
 use super::deliverable::read_deliverable_value;
+use super::markers::marker_findings;
 use super::model::load_base;
 
 /// Path, relative to the repo root, of the agent-deliverables JSON Schema.
@@ -147,7 +148,8 @@ fn check_fix_round_audits(value: &Value, path: &str, errors: &mut Vec<String>) {
 
 /// Validates one deliverable file at `path` against the definition its
 /// `kind` names in `root`'s `DELIVERABLES_SCHEMA`, plus
-/// `check_task_report_audit` for a `task-report`. `path` is used verbatim
+/// `check_task_report_audit` for a `task-report`, plus the
+/// compression-marker gate (`markers`) for every kind. `path` is used verbatim
 /// as the returned `file` and as every error message's location prefix --
 /// callers resolve it to an absolute path first (`cmd_validate` does,
 /// against `cwd`).
@@ -181,6 +183,7 @@ fn validate_deliverable(root: &Path, path: &Path) -> Result<ValidatedDeliverable
     if def == "taskReport" {
         check_task_report_audit(&value, &path_display, &mut errors);
     }
+    errors.extend(marker_findings(&value, &path_display));
     Ok(ValidatedDeliverable {
         file: path.to_path_buf(),
         kind: kind_str
@@ -191,7 +194,7 @@ fn validate_deliverable(root: &Path, path: &Path) -> Result<ValidatedDeliverable
 }
 
 /// Runs the `validate` subcommand: resolves `root` (`--dir`, or the
-/// enclosing git repository's top level) and loads the knowledge base
+/// nearest install root) and loads the knowledge base
 /// there before dispatching -- see `stats::cmd_stats`'s doc for why this
 /// runs even though `validate_deliverable` needs only `root`'s path, not
 /// the loaded base's contents. Validates every file in `files` (each
@@ -326,6 +329,55 @@ mod tests {
         let result = validate_deliverable(root.path(), &file).unwrap();
         assert_eq!(result.kind, "task-report");
         assert_eq!(result.errors, Vec::<String>::new());
+    }
+
+    /// A compression marker, built here so that no tracked file holds one.
+    fn marker_text() -> String {
+        format!("{}x{}", "<<ccr:", ">>")
+    }
+
+    /// The whole finding for the field at `at`.
+    fn marker_finding(at: &str) -> String {
+        format!(
+            "{at}: holds a compression marker (headroom ccr); a context proxy changed this \
+             text, so restore the original"
+        )
+    }
+
+    /// A marker in a string value fails `validate` with the file and the
+    /// field path, and the schema findings still come first.
+    #[test]
+    fn rejects_a_compression_marker_in_a_deliverable_field() {
+        let root = schema_root();
+        let mut report = report_sample();
+        report["tests"][0]["output"] = json!(marker_text());
+        let file = write_report(root.path(), &report);
+        let result = validate_deliverable(root.path(), &file).unwrap();
+        assert_eq!(
+            result.errors,
+            vec![marker_finding(&format!(
+                "{}.tests[0].output",
+                file.display()
+            ))]
+        );
+    }
+
+    /// The marker gate runs for each of the four deliverable kinds, beside
+    /// the schema findings that a bare document brings.
+    #[test]
+    fn rejects_a_compression_marker_in_every_deliverable_kind() {
+        for (kind, _) in DELIVERABLE_KINDS {
+            let root = schema_root();
+            let file = write_report(root.path(), &json!({"kind": kind, "note": marker_text()}));
+            let result = validate_deliverable(root.path(), &file).unwrap();
+            assert!(
+                result
+                    .errors
+                    .contains(&marker_finding(&format!("{}.note", file.display()))),
+                "{kind}: {:#?}",
+                result.errors
+            );
+        }
     }
 
     /// Rejects a DONE report with a null self_audit.

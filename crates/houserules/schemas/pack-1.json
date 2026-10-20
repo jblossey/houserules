@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "houserules pack, schema major 1",
+  "description": "One knowledge pack: a named, versioned set of entries with the topics and areas they use. An entry's topic is the first part of its id. A copy that declares a newer minor of this major is read with this schema, and its unnamed keys are set aside; at a minor this schema knows, an unnamed key is refused.",
+  "type": "object",
+  "required": [
+    "name",
+    "version",
+    "schema",
+    "topics",
+    "areas",
+    "entries"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "description": "The name \"local\" is reserved for the project's own entries.",
+      "type": "string",
+      "pattern": "^(?!local$)[a-z0-9-]+$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "schema": {
+      "type": "string",
+      "pattern": "^houserules/pack@1\\.\\d+\\.\\d+$"
+    },
+    "topics": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/topic"
+      }
+    },
+    "areas": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/area"
+      }
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "$defs": {
+    "topic": {
+      "type": "object",
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        }
+      }
+    },
+    "area": {
+      "type": "object",
+      "required": [
+        "paths"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "kind": {
+      "enum": [
+        "rule",
+        "invariant",
+        "gotcha",
+        "procedure",
+        "decision",
+        "history"
+      ]
+    },
+    "glob": {
+      "type": [
+        "string",
+        "array"
+      ],
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "check": {
+      "type": "object",
+      "required": [
+        "type",
+        "level"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "grep-absent",
+            "commits",
+            "co-change",
+            "diff-append-only",
+            "report-field",
+            "durable-sha"
+          ]
+        },
+        "level": {
+          "enum": [
+            "fail",
+            "warn"
+          ]
+        },
+        "files": {
+          "$ref": "#/$defs/glob"
+        },
+        "pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "flags": {
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "changed",
+            "tree"
+          ]
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1
+        },
+        "body_absent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "body_line_max": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "if": {
+          "$ref": "#/$defs/glob"
+        },
+        "then": {
+          "$ref": "#/$defs/glob"
+        },
+        "per_commit": {
+          "type": "boolean"
+        },
+        "field": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$"
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "area",
+        "summary",
+        "body",
+        "tags",
+        "source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+$"
+        },
+        "kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "area": {
+          "type": "string",
+          "minLength": 1
+        },
+        "standing": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "superseded",
+            "retired"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "body": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "uniqueItems": true
+        },
+        "source": {
+          "type": "object",
+          "required": [
+            "date",
+            "by"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "by": {
+              "enum": [
+                "user",
+                "review",
+                "controller",
+                "docs"
+              ]
+            },
+            "ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "see": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "verify": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "check": {
+          "$ref": "#/$defs/check"
+        }
+      }
+    }
+  }
+}

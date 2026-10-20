@@ -28,4 +28,81 @@ Every instruction above holds for any agent or harness reading this file, the di
 
 One directory gives Claude Code a genuinely optional acceleration of the same rules, never a requirement:
 
-- `.claude/rules/*.md` loads automatically into Claude Code's context: standing rules every session, area rules when you read a matching file. Other harnesses get the identical rules by reading this file and running the `houserules` commands above.
+- `.claude/rules/*.md` loads into Claude Code's context when you read a matching file: the rules of one area. The standing rules reach every harness through the houserules block of this file; Claude Code reads it through `CLAUDE.md`. Other harnesses get the rules of an area from the `AGENTS.md` of its directory or from `houserules for <path>`.
+
+<!-- houserules:begin -->
+Generated from knowledge/ by houserules render. Do not edit.
+
+## Standing rules
+
+- [houserules.1-0-surface-is-frozen] Past 1.0, a CLI command/flag change or a schema constraint change is a breaking change: get an owner ruling and bump the major version.
+- [houserules.controller-gates-use-the-tree-binary] While the branch changes generated output, run controller gates and update/render through the tree binary, never the installed houserules.
+- [houserules.pnpm-only] Use cargo for every package operation in this repository (`cargo add <crate>@=<version>`); pnpm, npm, and npx left the toolchain at batch 20 T3.
+- [houserules.tag-pilot-is-read-only] Treat the tag-pilot checkout outside this repository as read-only: never modify it, commit there, run its agents, or run `init` or `update` against it.
+- [houserules.template-is-the-source] Edit the kit in `template/`, then run `houserules update --dir .`; never hand-edit the root copies or the generated rules and skill.
+- [process.ask-when-missing] Ask the user when information is missing. Do not assume.
+- [process.backlog-drives-work] The backlog drives all work. Select backlog items before you start; every requirement traces to an item.
+- [process.brainstorm-first] Start each batch with a brainstorming session or a written spec; get the user's approval before implementing.
+- [process.claims-match-artifacts] Before submitting a report, re-open every artifact a claim cites and confirm the artifact shows what the sentence says.
+- [process.closure-claims-carry-enumeration] A claim that a set is closed ('every', 'all', 'no remaining') names the bounded, rerunnable enumeration that produced it; without the artifact, no claim.
+- [process.code-health-scan] Every plan carries a code-health scan of the files the batch touches: name the smells and antipatterns found, and fold targeted fixes into the tasks.
+- [process.conventional-commits] Commits use Conventional Commits (feat, fix, chore, test, ci, docs, refactor). Header at most 100 characters, body lines at most 100.
+- [process.deliverables-json] Task reports, reviews, and branch reviews are JSON files that pass `houserules validate` against `.claude/schemas/deliverables.json`.
+- [process.evidence-outlives-the-session] Cite evidence only at paths that outlive the session: the batch workspace or the tracked tree, never a session scratchpad.
+- [process.ff-only-merges] Merge fast-forward only, from the CLI, after aggregating the branch into clean logical commits. No merge commits, no GitHub squash merges.
+- [process.fix-proofs-extend-the-reviewers-run] A fix round's proof re-runs the review's own reproduction, extended to cover the fix -- never a fresh, narrower proof.
+- [process.gates-cover-generated-commits] Before a new gate or pipeline step ships, walk every commit author class and every generated resource it touches through it on paper; state each accepted red.
+- [process.keep-knowledge-current] Add knowledge future sessions need to `knowledge/`; session memory is not portable, repo files are.
+- [process.knowledge-first] Before you change a file, read its knowledge: the ids in your task and `houserules for <path>`. Cite the ids you relied on in your report.
+- [process.live-run-before-ci] Verify a change live (run the app, service, or tool for real; capture evidence) before any PR, merge, or deploy spend.
+- [process.model-policy] Every review runs on a mightier model than the implementer it reviews. Implementers use the cheapest model that fits the task.
+- [process.no-tech-debt] Fix every review finding, Minor included. Defer a fix only for a stated reason, as a backlog item; never as a TODO in code.
+- [process.owner-rulings-need-owner-supersession] Only the owner supersedes an owner ruling: a controller with latitude proposes the reversal at the next checkpoint and builds nothing on it until ruled.
+- [process.review-findings-are-claims-too] A review finding stating a measurement, a reproduction, or a proposed fix's behavior is verified by running it before filing; restated claims are re-derived.
+- [process.rulings-to-file] Every ruling goes to its home file in the same turn — a deferral’s backlog item included. A ledger and the chat are not home files; neither survives compaction.
+- [process.suggestions-are-unverified] Another agent's suggested wording, pin, or count is a draft, not evidence: re-derive every number, quote, and reference from the tree before transcribing it.
+- [process.tdd] Test-driven development for every executable change: the failing test first, or a disclosed-mutation proof for already-correct behavior; verbatim RED and GREEN.
+- [quality.no-compat-softening] Never soften a design for backward compatibility. Make the correct change and migrate everything it breaks; the codebase is not built on compromises.
+- [quality.principles] YAGNI, KISS, DRY; prefer a well-maintained library to custom code; one responsibility per unit; tests assert behavior; a11y and i18n are part of done.
+- [quality.well-maintained-libraries] Use well-maintained libraries over custom code. The orchestrator researches candidates at spec time; the owner rules the choice; refactors fold into specs.
+- [security-hygiene.dependency-vetting] Verify every new dependency is well-maintained before adding it. Record the check in the task report's `dependency_vetting` field.
+- [security-hygiene.exact-pins] Pin exact versions. Install only with a CLI (`cargo add <crate>@=<version>`, `pnpm add --save-exact`). Never write a version number by hand.
+- [security-hygiene.no-coauthor] Never add a co-author, session, or tool-attribution line to any commit or pull request description.
+- [security-hygiene.no-focused-tests] Never commit a focused test (`.only(`).
+- [security-hygiene.verify-current-docs] Verify every library, tool, and framework API against current docs before use. Internal knowledge is stale.
+- [writing-style.code-comments] Write a code comment only for a current constraint the code cannot show. Never narrate history in code; git, the specs, and the knowledge base hold it.
+- [writing-style.doc-comments] Document every exported symbol with the language's doc-comment convention: the current contract. Name things so the code reads without comments.
+- [writing-style.principles] Write docs, comments, commit messages, and reports in ASD-STE100 style: short sentences, active voice, one instruction per sentence, concise.
+
+## Area rules
+
+### docs
+
+Globs: `docs/**`, `README.md`, `AGENTS.md`, `knowledge/**`, `backlog/**`, `.claude/**`
+Run `houserules for <path>` before you change a file that matches.
+
+### tools
+
+Globs: `tools/**`, `.github/**`, `mise.toml`
+Run `houserules for <path>` before you change a file that matches.
+
+### cli
+
+Globs: `crates/houserules/src/**`
+Run `houserules for <path>` before you change a file that matches.
+
+### template
+
+Globs: `template/**`
+Run `houserules for <path>` before you change a file that matches.
+
+### tests
+
+Globs: `tests/**`
+Run `houserules for <path>` before you change a file that matches.
+
+### rust
+
+Globs: `crates/**`, `Cargo.toml`, `Cargo.lock`
+Run `houserules for <path>` before you change a file that matches.
+<!-- houserules:end -->

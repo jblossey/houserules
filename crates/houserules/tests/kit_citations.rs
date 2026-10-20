@@ -1,9 +1,14 @@
 //! `check-knowledge`'s kit-owned citation lint, end to end through the
-//! compiled binary: a fresh install passes, a deleted or archived seeded
-//! entry that kit-owned files cite fails with the whole finding line, an
-//! override skips a file, each way the line prints clears the finding, a
-//! topic the adopter adds never turns kit text into a finding, and the
-//! seeded `docs/README.md` states the contract that two flows follow.
+//! compiled binary: a fresh install passes, a deleted entry, an excluded
+//! entry, and an entry that an override retires fail with the whole finding
+//! line, an owned file is skipped, each way the excluded line and the
+//! override-status line print clears the finding, an id that no kit pack
+//! ships prints the update-or-edit line, an upstream pack that carries the
+//! name of a kit pack and a kit copy that does not ship a cited id as an
+//! active entry print their own lines, a pin file that cannot give its pins
+//! prints its defect once, a topic the adopter adds never turns kit text
+//! into a finding, and the seeded `docs/README.md` states the contract that a
+//! flow follows.
 //! Follows `update.rs`'s pattern (a real subprocess against a real scratch
 //! git repository, its own small copy of the helpers) for the reason that
 //! file's module doc gives. The lint's own cases (what counts as an id,
@@ -26,9 +31,6 @@ const DELETED_ID: &str = "process.evals-rerun";
 /// The topic file that holds `DELETED_ID` in a seeded install.
 const ACTIVE_TOPIC_FILE: &str = "knowledge/process.json";
 
-/// Where `houserules archive` moves `DELETED_ID` once it is retired.
-const ARCHIVE_TOPIC_FILE: &str = "knowledge/archive/process.json";
-
 /// The kit-owned files that cite `DELETED_ID`, in the order of the
 /// `KIT_OWNED` list.
 const CITING_FILES: [&str; 2] = [
@@ -45,8 +47,19 @@ fn houserules() -> Command {
     command
 }
 
-/// A scratch git repository already seeded by `houserules init`.
-/// `tempfile`'s `TempDir` removes itself on drop.
+/// The kit's five packs.
+const KIT_PACKS: [&str; 5] = [
+    "knowledge-base",
+    "process",
+    "quality",
+    "security-hygiene",
+    "writing-style",
+];
+
+/// A scratch git repository that `houserules init --target claude` installed,
+/// and whose kit packs then became local topic files: each topic file holds
+/// the entries of its pack, and the install holds no pack, so each case below
+/// builds its own pack state.
 fn seeded_repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let status = Command::new("git")
@@ -55,16 +68,38 @@ fn seeded_repo() -> tempfile::TempDir {
         .status()
         .expect("run git init");
     assert!(status.success(), "git init failed");
-    let output = houserules()
-        .args(["init", "--dir"])
+    let init = houserules()
+        .args(["init", "--target", "claude", "--dir"])
         .arg(dir.path())
         .output()
         .expect("run init");
     assert!(
-        output.status.success(),
+        init.status.success(),
         "init failed: {}",
-        String::from_utf8_lossy(&output.stderr)
+        String::from_utf8_lossy(&init.stderr)
     );
+    for pack in KIT_PACKS {
+        let copy = read_json(&dir.path().join(format!("knowledge/packs/{pack}.json")));
+        write_json(
+            &dir.path().join(format!("knowledge/{pack}.json")),
+            &json!({
+                "topic": pack,
+                "title": copy["topics"][pack]["title"],
+                "entries": copy["entries"],
+            }),
+        );
+        let removed = houserules()
+            .args(["pack", "remove", pack, "--dir"])
+            .arg(dir.path())
+            .output()
+            .expect("run pack remove");
+        assert!(
+            removed.status.success(),
+            "pack remove {pack} failed: {}",
+            String::from_utf8_lossy(&removed.stderr)
+        );
+    }
+    render(dir.path());
     dir
 }
 
@@ -117,55 +152,12 @@ fn render(root: &Path) {
     );
 }
 
-/// Retires the entry `id` and sweeps it into `knowledge/archive/process.json`
-/// with `houserules archive`, as an adopter retiring the entry does. Then
-/// renders, so the generated files stay fresh and the lint is the only
-/// finding.
-fn archive_entry(root: &Path, id: &str) {
-    let path = root.join(ACTIVE_TOPIC_FILE);
-    let mut topic = read_json(&path);
-    for entry in topic["entries"].as_array_mut().expect("entries array") {
-        if entry["id"] == id {
-            entry["status"] = json!("retired");
-        }
-    }
-    write_json(&path, &topic);
-    let output = run(root, "archive");
-    assert!(
-        output.status.success(),
-        "archive failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    render(root);
-}
-
-/// Runs `houserules get <id> --dir <root>`.
-fn run_get(root: &Path, id: &str) -> Output {
-    houserules()
-        .args(["get", id, "--dir"])
-        .arg(root)
-        .output()
-        .expect("run get")
-}
-
-/// Whether `file` of `root` holds an entry with `DELETED_ID`.
-fn holds_the_entry(root: &Path, file: &str) -> bool {
-    read_json(&root.join(file))["entries"]
-        .as_array()
-        .expect("entries array")
-        .iter()
-        .any(|entry| entry["id"] == DELETED_ID)
-}
-
-/// The whole finding line for a file that cites `DELETED_ID`: the way that
-/// restores the entry, then the way that keeps it deleted or archived.
+/// The whole finding line for a file that cites `DELETED_ID` when the
+/// install holds no copy of the pack that ships it.
 fn finding_for(file: &str) -> String {
     format!(
-        "{file}: cites \"process.evals-rerun\", which is not in the knowledge base; restore it: \
-         in .houserules.json, delete \"process.evals-rerun\" from \"baselines\" and, if listed, \
-         \"process.evals-rerun\" and \"knowledge/process.json\" from \"overrides\", then run \
-         houserules update; or, to keep the entry deleted or archived, list \"{file}\" in \
-         \"overrides\" in .houserules.json\n"
+        "{file}: cites \"process.evals-rerun\" from the pack \"process\", which is not \
+         installed; run houserules pack add process\n"
     )
 }
 
@@ -181,77 +173,6 @@ fn edit_stamp(root: &Path, edit: impl FnOnce(&mut Value)) {
     let mut stamp = read_json(&path);
     edit(&mut stamp);
     write_json(&path, &stamp);
-}
-
-/// Follows the first way the printed line names: delete the id from
-/// `baselines`, delete the id and the topic file from `overrides`, then run
-/// `houserules update`. An install with no stamp has nothing to delete.
-fn follow_the_remedy(root: &Path) {
-    if root.join(".houserules.json").exists() {
-        edit_stamp(root, |stamp| {
-            stamp["baselines"]
-                .as_object_mut()
-                .expect("baselines object")
-                .remove(DELETED_ID);
-            if let Some(overrides) = stamp.get_mut("overrides").and_then(Value::as_array_mut) {
-                overrides.retain(|item| item != DELETED_ID && item != "knowledge/process.json");
-            }
-        });
-    }
-    let output = run(root, "update");
-    assert!(
-        output.status.success(),
-        "update failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-}
-
-/// The files the second way names: the quoted file of each `list "<file>" in
-/// "overrides"` clause in the `cites` findings that `check-knowledge` prints,
-/// in print order, once each.
-fn files_the_findings_say_to_list(root: &Path) -> Vec<String> {
-    let output = run(root, "check-knowledge");
-    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-    let mut files: Vec<String> = Vec::new();
-    for line in stderr.lines().filter(|line| line.contains(": cites \"")) {
-        let (_, after) = line
-            .rsplit_once("list \"")
-            .unwrap_or_else(|| panic!("the finding names no file to list: {line}"));
-        let (file, _) = after
-            .split_once('"')
-            .unwrap_or_else(|| panic!("the finding's listed file is not closed: {line}"));
-        if !files.iter().any(|seen| seen == file) {
-            files.push(file.to_string());
-        }
-    }
-    files
-}
-
-/// Follows the second way the printed line names: list each file the
-/// findings name in `overrides` of `.houserules.json`, and return them. An
-/// install with no stamp gets a stamp that holds nothing but the list.
-fn list_the_files_the_findings_name(root: &Path) -> Vec<String> {
-    let files = files_the_findings_say_to_list(root);
-    let path = root.join(".houserules.json");
-    let mut stamp = if path.exists() {
-        read_json(&path)
-    } else {
-        json!({})
-    };
-    let overrides = stamp
-        .as_object_mut()
-        .expect("the stamp is an object")
-        .entry("overrides")
-        .or_insert_with(|| json!([]))
-        .as_array_mut()
-        .expect("overrides is an array");
-    for file in &files {
-        if !overrides.iter().any(|item| item == file.as_str()) {
-            overrides.push(json!(file));
-        }
-    }
-    write_json(&path, &stamp);
-    files
 }
 
 /// The precondition of every remedy and override case: `check-knowledge`
@@ -310,65 +231,62 @@ fn an_overridden_kit_owned_file_is_skipped() {
     delete_the_entry(dir.path());
     assert_fails_with_both_findings(dir.path());
     edit_stamp(dir.path(), |stamp| {
-        stamp["overrides"] = json!(CITING_FILES);
+        stamp["ownedPaths"] = json!(CITING_FILES);
     });
-    assert_passes(dir.path());
-}
-
-#[test]
-fn the_printed_remedy_restores_a_deleted_entry() {
-    let dir = seeded_repo();
-    delete_the_entry(dir.path());
-    assert_fails_with_both_findings(dir.path());
-    follow_the_remedy(dir.path());
-    assert_passes(dir.path());
-}
-
-/// With the id also listed in `overrides`, `update` leaves the entry
-/// deleted. The printed remedy names that state, so following it restores
-/// the entry.
-#[test]
-fn the_printed_remedy_restores_an_entry_the_stamp_overrides() {
-    let dir = seeded_repo();
-    delete_the_entry(dir.path());
-    edit_stamp(dir.path(), |stamp| {
-        stamp["overrides"] = json!([DELETED_ID]);
-    });
-    assert_fails_with_both_findings(dir.path());
-    follow_the_remedy(dir.path());
-    assert_passes(dir.path());
-}
-
-/// With the whole topic file deleted and its path listed in `overrides`,
-/// `update` leaves the file absent. The printed remedy names that state too.
-#[test]
-fn the_printed_remedy_restores_a_deleted_topic_file_the_stamp_overrides() {
-    let dir = seeded_repo();
-    fs::remove_file(dir.path().join("knowledge/process.json")).expect("delete the topic file");
-    edit_stamp(dir.path(), |stamp| {
-        stamp["overrides"] = json!(["knowledge/process.json"]);
-    });
-    assert_fails_with_both_findings(dir.path());
-    follow_the_remedy(dir.path());
     assert_passes(dir.path());
 }
 
 /// A stamp that `update` rejects is a finding too: the lint cannot read the
-/// overrides, so it names the stamp and says no citation was checked.
+/// owned paths, so it names the stamp by its relative name, as every finding
+/// of `check-knowledge` names its file, and says no citation was checked.
 #[test]
 fn a_malformed_stamp_is_a_named_finding() {
     let dir = seeded_repo();
     edit_stamp(dir.path(), |stamp| {
-        stamp["overrides"] = json!("process.tdd");
+        stamp["ownedPaths"] = json!("process.tdd");
     });
     let output = run(dir.path(), "check-knowledge");
     assert_eq!(String::from_utf8_lossy(&output.stdout), "");
     assert_eq!(
         String::from_utf8_lossy(&output.stderr),
-        format!(
-            "{}: overrides must be an array of strings; kit-owned citations not checked\n",
-            dir.path().join(".houserules.json").display()
-        )
+        ".houserules.json: ownedPaths must be an array of strings; kit-owned citations not checked\n"
+    );
+    assert_eq!(output.status.code(), Some(1));
+}
+
+/// A `renderers` value that is no array of strings is a finding of the render
+/// check and of the lint. Both lines name the stamp by its relative name.
+#[test]
+fn an_invalid_renderers_value_names_the_stamp_by_its_relative_name() {
+    let dir = seeded_repo();
+    edit_stamp(dir.path(), |stamp| {
+        stamp["renderers"] = json!(5);
+    });
+    let output = run(dir.path(), "check-knowledge");
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        ".houserules.json: renderers must be an array of strings\n\
+         .houserules.json: renderers must be an array of strings; kit-owned citations not checked\n"
+    );
+    assert_eq!(output.status.code(), Some(1));
+}
+
+/// A pin file that cannot give its pins prints its defect once, from the
+/// pin check. The lint says only that it checked no citation, so the same
+/// text never appears twice.
+#[test]
+fn a_pin_file_that_cannot_give_its_pins_prints_its_defect_once() {
+    let dir = seeded_repo();
+    edit_stamp(dir.path(), |stamp| {
+        stamp["packs"] = json!({"process": {"sha256": "abc"}});
+    });
+    let output = run(dir.path(), "check-knowledge");
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        ".houserules.json: packs.process: missing \"version\"\n\
+         .houserules.json: the pins cannot be read, so kit-owned citations are not checked\n"
     );
     assert_eq!(output.status.code(), Some(1));
 }
@@ -418,7 +336,7 @@ fn unseeded_finding() -> String {
         "{FINISHING_SKILL}: cites \"{UNSEEDED_ID}\", which is not in the knowledge base; the kit \
          does not seed it, so no entry can be restored: run houserules update, and if update \
          prints \"kept {FINISHING_SKILL} (locally modified)\", remove the citation from \
-         {FINISHING_SKILL} or list \"{FINISHING_SKILL}\" in \"overrides\" in .houserules.json\n"
+         {FINISHING_SKILL} or list \"{FINISHING_SKILL}\" in \"ownedPaths\" in .houserules.json\n"
     )
 }
 
@@ -480,32 +398,23 @@ fn the_printed_remedy_clears_an_unseeded_citation_in_a_kept_file_by_editing_it_o
     assert_passes(dir.path());
 }
 
-/// State two again, the other way out the printed line names: list the kept
-/// file in `overrides`.
+/// The third way the unseeded line names, for a file the adopter changed:
+/// list the file in `ownedPaths`. The file is then the adopter's own and no
+/// subject of the lint, so the install passes.
 #[test]
-fn the_printed_remedy_clears_an_unseeded_citation_in_a_kept_file_by_listing_it_in_overrides() {
+fn the_printed_remedy_clears_an_unseeded_citation_in_a_kept_file_by_listing_it_in_owned_paths() {
     let dir = seeded_repo();
     install_older_kit_skill(dir.path(), true);
     assert_fails_with_the_unseeded_finding(dir.path());
-    update_output(dir.path());
+    let printed = update_output(dir.path());
+    assert!(
+        printed.contains(&format!("kept {FINISHING_SKILL} (locally modified)")),
+        "update did not keep the skill: {printed}"
+    );
+    assert_fails_with_the_unseeded_finding(dir.path());
     edit_stamp(dir.path(), |stamp| {
-        stamp["overrides"] = json!([FINISHING_SKILL]);
+        stamp["ownedPaths"] = json!([FINISHING_SKILL]);
     });
-    assert_passes(dir.path());
-}
-
-/// The seeded arm against a kit-owned file the adopter changed: `update`
-/// keeps the file, and restoring the entry still clears both findings.
-#[test]
-fn the_printed_remedy_restores_a_deleted_entry_cited_by_a_locally_modified_file() {
-    let dir = seeded_repo();
-    let path = dir.path().join(CITING_FILES[0]);
-    let mut text = fs::read_to_string(&path).expect("read the citing file");
-    text.push_str("A line the adopter added.\n");
-    fs::write(&path, text).expect("write the modified file");
-    delete_the_entry(dir.path());
-    assert_fails_with_both_findings(dir.path());
-    follow_the_remedy(dir.path());
     assert_passes(dir.path());
 }
 
@@ -515,20 +424,20 @@ fn template_dir() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../template")
 }
 
-/// The topics the kit seeds: one for each topic file under
-/// `template/knowledge/`, other than the schema and the areas.
+/// The topics the kit seeds: the topics that a pack file under
+/// `template/packs/` serves.
 fn seeded_topics() -> BTreeSet<String> {
-    fs::read_dir(template_dir().join("knowledge"))
-        .expect("read template/knowledge")
-        .map(|entry| {
-            entry
-                .expect("read a directory entry")
-                .file_name()
-                .into_string()
-                .expect("a UTF-8 file name")
+    fs::read_dir(template_dir().join("packs"))
+        .expect("read template/packs")
+        .flat_map(|entry| {
+            let pack = read_json(&entry.expect("read a directory entry").path());
+            pack["topics"]
+                .as_object()
+                .expect("the topics of a pack")
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>()
         })
-        .filter(|name| name != "schema.json" && name != "areas.json")
-        .filter_map(|name| name.strip_suffix(".json").map(str::to_string))
         .collect()
 }
 
@@ -627,11 +536,11 @@ fn an_adopter_topic_never_makes_kit_text_a_finding() {
 }
 
 /// A seeded entry that no kit-owned file under `template/` cites: the first
-/// entry of `template/knowledge/process.json` whose id no kit-owned text
-/// holds, in any form.
+/// entry of `template/packs/process.json` whose id no kit-owned text holds,
+/// in any form.
 fn uncited_seeded_entry() -> String {
     let texts = kit_owned_template_texts();
-    read_json(&template_dir().join("knowledge/process.json"))["entries"]
+    read_json(&template_dir().join("packs/process.json"))["entries"]
         .as_array()
         .expect("entries array")
         .iter()
@@ -640,192 +549,21 @@ fn uncited_seeded_entry() -> String {
         .expect("the seed holds a process entry that no kit-owned file cites")
 }
 
-/// The way that keeps the entry deleted: list each citing file. The files
-/// leave the lint, the entry stays out of its topic file, and `update`, which
-/// leaves a listed file as found and respects the deletion, keeps both true.
-#[test]
-fn listing_the_citing_files_keeps_a_deleted_entry_deleted() {
-    let dir = seeded_repo();
-    delete_the_entry(dir.path());
-    assert_fails_with_both_findings(dir.path());
-    assert_eq!(list_the_files_the_findings_name(dir.path()), CITING_FILES);
-    assert_passes(dir.path());
-    assert!(!holds_the_entry(dir.path(), ACTIVE_TOPIC_FILE));
-    update_output(dir.path());
-    assert_passes(dir.path());
-    assert!(!holds_the_entry(dir.path(), ACTIVE_TOPIC_FILE));
-}
-
-/// The archived state of the first way: the entry is active again, and it
-/// stays in the archive file too. Neither `check-knowledge` nor a later
-/// `archive` sweep reports the second copy.
-#[test]
-fn the_printed_remedy_restores_an_archived_entry_and_leaves_its_archive_copy() {
-    let dir = seeded_repo();
-    archive_entry(dir.path(), DELETED_ID);
-    assert!(!holds_the_entry(dir.path(), ACTIVE_TOPIC_FILE));
-    assert!(holds_the_entry(dir.path(), ARCHIVE_TOPIC_FILE));
-    assert_fails_with_both_findings(dir.path());
-    follow_the_remedy(dir.path());
-    assert_passes(dir.path());
-    assert!(holds_the_entry(dir.path(), ACTIVE_TOPIC_FILE));
-    assert!(holds_the_entry(dir.path(), ARCHIVE_TOPIC_FILE));
-    // A later sweep moves nothing: the restored entry is not retired.
-    let sweep = run(dir.path(), "archive");
-    assert_eq!(String::from_utf8_lossy(&sweep.stdout), "archive: 0 moved\n");
-    assert_eq!(sweep.status.code(), Some(0));
-    // `get` resolves the active entry first, so it carries no `archived`
-    // label.
-    let output = run_get(dir.path(), DELETED_ID);
-    assert!(output.status.success(), "get failed");
-    let records: Value = serde_json::from_slice(&output.stdout).expect("get prints JSON");
-    assert_eq!(records.as_array().map(Vec::len), Some(1));
-    assert!(records[0].get("archived").is_none(), "got {records}");
-}
-
-/// The archived state of the second way: the entry stays archived.
-#[test]
-fn listing_the_citing_files_keeps_an_archived_entry_archived() {
-    let dir = seeded_repo();
-    archive_entry(dir.path(), DELETED_ID);
-    assert_fails_with_both_findings(dir.path());
-    assert_eq!(list_the_files_the_findings_name(dir.path()), CITING_FILES);
-    assert_passes(dir.path());
-    assert!(!holds_the_entry(dir.path(), ACTIVE_TOPIC_FILE));
-    update_output(dir.path());
-    assert_passes(dir.path());
-    assert!(!holds_the_entry(dir.path(), ACTIVE_TOPIC_FILE));
-    assert!(holds_the_entry(dir.path(), ARCHIVE_TOPIC_FILE));
-}
-
-/// An install with no stamp has no baseline to delete. The first way then
-/// reduces to `houserules update`, which writes the entry back and the stamp.
-#[test]
-fn the_printed_remedy_restores_a_deleted_entry_when_the_install_has_no_stamp() {
-    let dir = seeded_repo();
-    delete_the_entry(dir.path());
-    fs::remove_file(dir.path().join(".houserules.json")).expect("delete the stamp");
-    assert_fails_with_both_findings(dir.path());
-    follow_the_remedy(dir.path());
-    assert_passes(dir.path());
-    assert!(holds_the_entry(dir.path(), ACTIVE_TOPIC_FILE));
-    assert!(dir.path().join(".houserules.json").is_file());
-}
-
-/// An install with no stamp has no `overrides` to edit. The second way then
-/// creates `.houserules.json` with the list, and the lint reads it.
-#[test]
-fn listing_the_citing_files_clears_a_deleted_entry_when_the_install_has_no_stamp() {
-    let dir = seeded_repo();
-    delete_the_entry(dir.path());
-    fs::remove_file(dir.path().join(".houserules.json")).expect("delete the stamp");
-    assert_fails_with_both_findings(dir.path());
-    assert_eq!(list_the_files_the_findings_name(dir.path()), CITING_FILES);
-    assert_passes(dir.path());
-    assert!(!holds_the_entry(dir.path(), ACTIVE_TOPIC_FILE));
-}
-
-/// The second way, for a deleted entry whose id the stamp also lists in
-/// `overrides`: listing the citing files clears the finding, and the entry
-/// stays deleted.
-#[test]
-fn listing_the_citing_files_clears_a_deleted_entry_the_stamp_overrides() {
-    let dir = seeded_repo();
-    delete_the_entry(dir.path());
-    edit_stamp(dir.path(), |stamp| {
-        stamp["overrides"] = json!([DELETED_ID]);
-    });
-    assert_fails_with_both_findings(dir.path());
-    assert_eq!(list_the_files_the_findings_name(dir.path()), CITING_FILES);
-    assert_passes(dir.path());
-    assert!(!holds_the_entry(dir.path(), ACTIVE_TOPIC_FILE));
-}
-
-/// The second way, for a whole topic file that is deleted and listed in
-/// `overrides`: the kit text cites more ids of that topic than the one entry
-/// the other tests delete, so the findings name more files. Listing each of
-/// them clears every citation finding. The deleted topic still leaves the
-/// `see` links of other topics dangling, which `check-knowledge` reports
-/// apart from the citation lint and listing files does not clear. The first
-/// way, which restores the topic file, clears both
-/// (`the_printed_remedy_restores_a_deleted_topic_file_the_stamp_overrides`).
-#[test]
-fn listing_the_files_the_findings_name_clears_the_citations_of_a_deleted_topic_file_only() {
-    let dir = seeded_repo();
-    fs::remove_file(dir.path().join(ACTIVE_TOPIC_FILE)).expect("delete the topic file");
-    edit_stamp(dir.path(), |stamp| {
-        stamp["overrides"] = json!([ACTIVE_TOPIC_FILE]);
-    });
-    assert_fails_with_both_findings(dir.path());
-    let listed = list_the_files_the_findings_name(dir.path());
-    assert!(
-        listed.len() > CITING_FILES.len(),
-        "the deleted topic is cited by more files than the two of one entry: {listed:?}"
-    );
-    for file in CITING_FILES {
-        assert!(listed.iter().any(|name| name == file), "{file} not listed");
-    }
-    let output = run(dir.path(), "check-knowledge");
-    assert_eq!(output.status.code(), Some(1));
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        !stderr.contains("cites"),
-        "a citation finding is left: {stderr}"
-    );
-    for line in stderr.lines() {
-        assert!(
-            line.contains(": see \"") && line.ends_with("does not exist"),
-            "a line other than a dangling `see` is left: {line}"
-        );
-    }
-}
-
-/// The second way, for a citing file the adopter changed: the lint skips a
-/// listed file whatever its text.
-#[test]
-fn listing_the_citing_files_clears_a_deleted_entry_cited_by_a_locally_modified_file() {
-    let dir = seeded_repo();
-    let path = dir.path().join(CITING_FILES[0]);
-    let mut text = fs::read_to_string(&path).expect("read the citing file");
-    text.push_str("A line the adopter added.\n");
-    fs::write(&path, text).expect("write the modified file");
-    delete_the_entry(dir.path());
-    assert_fails_with_both_findings(dir.path());
-    assert_eq!(list_the_files_the_findings_name(dir.path()), CITING_FILES);
-    assert_passes(dir.path());
-}
-
-/// The first way, for an archived entry whose id the stamp lists in
-/// `overrides`, the state the archive instruction of the seeded
-/// `docs/README.md` leaves: the printed line names the id, and following it
-/// restores the entry.
-#[test]
-fn the_printed_remedy_restores_an_archived_entry_the_stamp_overrides() {
-    let dir = seeded_repo();
-    archive_entry(dir.path(), DELETED_ID);
-    edit_stamp(dir.path(), |stamp| {
-        stamp["overrides"] = json!([DELETED_ID]);
-    });
-    assert_fails_with_both_findings(dir.path());
-    follow_the_remedy(dir.path());
-    assert_passes(dir.path());
-    assert!(holds_the_entry(dir.path(), ACTIVE_TOPIC_FILE));
-}
-
-/// The seeded `docs/README.md` states the contract and the archive
-/// instruction that the two tests below follow. The text is whitespace
-/// normalized, because the file wraps its lines.
+/// The seeded `docs/README.md` states the contract and the remedies that the
+/// cases above and below follow. The text is whitespace normalized, because
+/// the file wraps its lines.
 #[test]
 fn the_seeded_readme_states_the_citation_contract() {
     let readme = fs::read_to_string(template_dir().join("docs/README.md"))
         .expect("read template/docs/README.md");
     let flat = readme.split_whitespace().collect::<Vec<_>>().join(" ");
     for sentence in [
-        "A kit-owned file listed in `overrides` is not checked for the knowledge ids it cites.",
-        "A seeded entry that a kit-owned file cites cannot be deleted or archived while that file \
-         is checked: restore the entry, or list each citing file in `overrides`.",
-        "list its id here after the sweep",
-        "list each reported file here too, or restore the entry",
+        "A kit-owned file listed in `ownedPaths` is not checked for the knowledge ids it cites.",
+        "A pack entry that a kit-owned file cites cannot stay excluded or retired while that file \
+         is checked: restore the entry, or list each citing file in `ownedPaths`.",
+        "To retire a pack entry, override its `status` with `retired`.",
+        "The pack is not installed: run `houserules pack add <pack>`.",
+        "The installed pack does not ship the entry as an active entry: run `houserules update`.",
     ] {
         assert!(
             flat.contains(sentence),
@@ -834,43 +572,411 @@ fn the_seeded_readme_states_the_citation_contract() {
     }
 }
 
-/// Follows the archive instruction of the seeded `docs/README.md` for an
-/// entry that kit-owned files cite: archive it, list its id in `overrides`,
-/// run `check-knowledge`, and list each file it reports. The run ends green.
+/// A kit entry that no kit-owned file cites can be retired: an override of
+/// its pack sets `status: retired`, the install passes, and `update` has
+/// nothing to say about it.
 #[test]
-fn following_the_readme_archive_instruction_for_a_cited_entry_ends_green() {
+fn retiring_an_uncited_kit_entry_with_an_override_ends_green() {
     let dir = seeded_repo();
-    archive_entry(dir.path(), DELETED_ID);
-    edit_stamp(dir.path(), |stamp| {
-        stamp["overrides"] = json!([DELETED_ID]);
-    });
-    assert!(
-        !update_output(dir.path()).contains(DELETED_ID),
-        "update still reports the archived entry after its id is listed"
+    install_the_process_pack(dir.path(), &kit_process_pack(), "kit");
+    let id = uncited_seeded_entry();
+    write_json(
+        &dir.path().join("knowledge/overrides.json"),
+        &json!({
+            "schema": "houserules/overrides@1.0.0",
+            "overrides": [{"id": id, "fields": {"status": "retired"}}],
+        }),
     );
-    assert_fails_with_both_findings(dir.path());
-    assert_eq!(list_the_files_the_findings_name(dir.path()), CITING_FILES);
+    render(dir.path());
+    let output = run(dir.path(), "check-knowledge");
+    assert_eq!(String::from_utf8_lossy(&output.stderr), "");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        format!("override {id}: status\nknowledge: ok\n")
+    );
+    assert_eq!(output.status.code(), Some(0));
+
+    assert!(
+        !update_output(dir.path()).contains(&id),
+        "update reports the retired entry"
+    );
+    assert_eq!(run(dir.path(), "check-knowledge").status.code(), Some(0));
+}
+
+/// The `sha256` pin of a pack copy, as `pack add` writes it: the SHA-256 of
+/// the compact JSON of the parsed copy with every object's keys sorted.
+fn pack_pin(copy: &Value) -> String {
+    let mut canonical = copy.clone();
+    canonical.sort_all_objects();
+    Sha256::digest(serde_json::to_vec(&canonical).expect("serialize"))
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// The kit's `process` pack, as `template/packs/process.json` ships it.
+fn kit_process_pack() -> Value {
+    read_json(&template_dir().join("packs/process.json"))
+}
+
+/// Turns the seeded `process` topic file into the pack copy `copy`, and pins
+/// it in `.houserules.json` with the version of the copy and `source`: the
+/// state that `pack add process` leaves for `source` `kit`. Renders after,
+/// so the lint is the only finding of a case that changes nothing else.
+fn install_the_process_pack(root: &Path, copy: &Value, source: &str) {
+    fs::create_dir_all(root.join("knowledge/packs")).expect("create knowledge/packs");
+    write_json(&root.join("knowledge/packs/process.json"), copy);
+    fs::remove_file(root.join(ACTIVE_TOPIC_FILE)).expect("remove the local process topic");
+    edit_stamp(root, |stamp| {
+        stamp["packs"] = json!({
+            "process": {
+                "version": copy["version"], "source": source,
+                "sha256": pack_pin(copy), "addedAreas": [],
+            },
+        });
+    });
+    render(root);
+}
+
+/// The kit's `process` pack without `DELETED_ID`, and without the `see`
+/// links to it, as an adopter or an older release leaves it.
+fn process_pack_without_the_entry() -> Value {
+    let mut copy = kit_process_pack();
+    let entries = copy["entries"].as_array_mut().expect("entries array");
+    entries.retain(|entry| entry["id"] != DELETED_ID);
+    for entry in entries.iter_mut() {
+        if let Some(see) = entry.get_mut("see").and_then(Value::as_array_mut) {
+            see.retain(|id| id != DELETED_ID);
+        }
+    }
+    copy
+}
+
+/// Writes `knowledge/overrides.json` with the one override of `DELETED_ID`
+/// that sets `fields`, and renders.
+fn override_the_entry(root: &Path, fields: Value) {
+    write_json(
+        &root.join("knowledge/overrides.json"),
+        &json!({
+            "schema": "houserules/overrides@1.0.0",
+            "overrides": [{"id": DELETED_ID, "fields": fields}],
+        }),
+    );
+    render(root);
+}
+
+/// Installs the kit's `process` pack and excludes `DELETED_ID` in
+/// `knowledge/overrides.json`: the state that `pack add process` and an
+/// exclusion leave. Then renders, so the lint is the only finding.
+fn exclude_the_entry_through_the_process_pack(root: &Path) {
+    install_the_process_pack(root, &kit_process_pack(), "kit");
+    write_json(
+        &root.join("knowledge/overrides.json"),
+        &json!({
+            "schema": "houserules/overrides@1.0.0",
+            "exclusions": [{"id": DELETED_ID, "reason": "not for this project"}],
+        }),
+    );
+    render(root);
+}
+
+/// The whole finding line for a file that cites the excluded `DELETED_ID`.
+fn excluded_finding_for(file: &str) -> String {
+    format!(
+        "{file}: cites \"process.evals-rerun\", which knowledge/overrides.json excludes; remove \
+         the exclusion, or replace it with an override that carries your own text\n"
+    )
+}
+
+/// The precondition of the two remedy cases: `check-knowledge` fails with
+/// exit 1 and the excluded line for each of the two files that cite
+/// `DELETED_ID`. The cases then prove a remedy turns that failure into a
+/// pass, never a pass that held already.
+fn assert_fails_with_both_excluded_findings(root: &Path) {
+    let output = run(root, "check-knowledge");
+    let both: String = CITING_FILES
+        .iter()
+        .map(|file| excluded_finding_for(file))
+        .collect();
+    assert_eq!(String::from_utf8_lossy(&output.stderr), both);
+    assert_eq!(output.status.code(), Some(1));
+}
+
+/// A kit-owned citation of an excluded entry fails with the whole line,
+/// and `check-knowledge` lists the exclusion on stdout, whether it fails or
+/// passes.
+#[test]
+fn check_knowledge_fails_a_kit_owned_citation_of_an_excluded_entry() {
+    let dir = seeded_repo();
+    exclude_the_entry_through_the_process_pack(dir.path());
+    let output = run(dir.path(), "check-knowledge");
+    let both: String = CITING_FILES
+        .iter()
+        .map(|file| excluded_finding_for(file))
+        .collect();
+    assert_eq!(String::from_utf8_lossy(&output.stderr), both);
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "exclusion process.evals-rerun: not for this project\n"
+    );
+    assert_eq!(output.status.code(), Some(1));
+}
+
+/// The first way the excluded line names: remove the exclusion. The entry
+/// is the pack's again, and the install passes.
+#[test]
+fn removing_the_exclusion_clears_the_excluded_finding() {
+    let dir = seeded_repo();
+    exclude_the_entry_through_the_process_pack(dir.path());
+    assert_fails_with_both_excluded_findings(dir.path());
+    fs::remove_file(dir.path().join("knowledge/overrides.json")).expect("remove the exclusion");
+    render(dir.path());
     assert_passes(dir.path());
 }
 
-/// The same instruction for an entry no kit-owned file cites: archive it,
-/// list its id, and the run is green without the second step. Before the id
-/// is listed, `update` reports the entry; after, it does not.
+/// The second way: replace the exclusion with an override that carries the
+/// project's own text. The entry is live again, with that text, and the
+/// install passes; `check-knowledge` lists the override.
 #[test]
-fn following_the_readme_archive_instruction_for_an_uncited_entry_ends_green() {
+fn replacing_the_exclusion_with_an_override_clears_the_excluded_finding() {
     let dir = seeded_repo();
-    let id = uncited_seeded_entry();
-    archive_entry(dir.path(), &id);
-    assert!(
-        update_output(dir.path()).contains(&format!("skipped {id} (deleted)")),
-        "update does not report the archived entry before its id is listed"
+    exclude_the_entry_through_the_process_pack(dir.path());
+    assert_fails_with_both_excluded_findings(dir.path());
+    write_json(
+        &dir.path().join("knowledge/overrides.json"),
+        &json!({
+            "schema": "houserules/overrides@1.0.0",
+            "overrides": [{
+                "id": DELETED_ID,
+                "fields": {"summary": "The project's own summary of the rule."},
+            }],
+        }),
     );
-    edit_stamp(dir.path(), |stamp| {
-        stamp["overrides"] = json!([id]);
-    });
+    render(dir.path());
+    let output = run(dir.path(), "check-knowledge");
+    assert_eq!(String::from_utf8_lossy(&output.stderr), "");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "override process.evals-rerun: summary\nknowledge: ok\n"
+    );
+    assert_eq!(output.status.code(), Some(0));
+}
+
+/// The whole finding line for a file that cites `DELETED_ID` when an
+/// override sets the status `retired` for it.
+fn override_status_finding_for(file: &str) -> String {
+    format!(
+        "{file}: cites \"process.evals-rerun\", which knowledge/overrides.json sets to status \
+         \"retired\"; remove that status from the override, or replace the override with one \
+         that carries your own text\n"
+    )
+}
+
+/// The precondition of the two remedy cases of the override-status line:
+/// `check-knowledge` fails with exit 1 and the line for each of the two
+/// files that cite `DELETED_ID`.
+fn assert_fails_with_both_override_status_findings(root: &Path) {
+    let output = run(root, "check-knowledge");
+    let both: String = CITING_FILES
+        .iter()
+        .map(|file| override_status_finding_for(file))
+        .collect();
+    assert_eq!(String::from_utf8_lossy(&output.stderr), both);
+    assert_eq!(output.status.code(), Some(1));
+}
+
+/// A kit-owned citation of an entry that an override retires fails with the
+/// whole line, and `check-knowledge` lists the override on stdout.
+#[test]
+fn check_knowledge_fails_a_kit_owned_citation_of_an_entry_an_override_retires() {
+    let dir = seeded_repo();
+    install_the_process_pack(dir.path(), &kit_process_pack(), "kit");
+    override_the_entry(dir.path(), json!({"status": "retired"}));
+    let output = run(dir.path(), "check-knowledge");
+    let both: String = CITING_FILES
+        .iter()
+        .map(|file| override_status_finding_for(file))
+        .collect();
+    assert_eq!(String::from_utf8_lossy(&output.stderr), both);
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "override process.evals-rerun: status\n"
+    );
+    assert_eq!(output.status.code(), Some(1));
+}
+
+/// The first way the override-status line names: remove that status from the
+/// override. The override stays, with no field, and the install passes.
+#[test]
+fn removing_the_status_from_the_override_clears_the_override_status_finding() {
+    let dir = seeded_repo();
+    install_the_process_pack(dir.path(), &kit_process_pack(), "kit");
+    override_the_entry(dir.path(), json!({"status": "retired"}));
+    assert_fails_with_both_override_status_findings(dir.path());
+    let path = dir.path().join("knowledge/overrides.json");
+    let mut overrides = read_json(&path);
+    overrides["overrides"][0]["fields"]
+        .as_object_mut()
+        .expect("the override fields")
+        .remove("status");
+    write_json(&path, &overrides);
+    render(dir.path());
+    let output = run(dir.path(), "check-knowledge");
+    assert_eq!(String::from_utf8_lossy(&output.stderr), "");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "override process.evals-rerun\nknowledge: ok\n"
+    );
+    assert_eq!(output.status.code(), Some(0));
+}
+
+/// The second way: replace the override with one that carries the project's
+/// own text and no inactive status. The entry is live again, with that text,
+/// and the install passes.
+#[test]
+fn replacing_the_override_with_one_that_carries_own_text_clears_the_override_status_finding() {
+    let dir = seeded_repo();
+    install_the_process_pack(dir.path(), &kit_process_pack(), "kit");
+    override_the_entry(dir.path(), json!({"status": "retired"}));
+    assert_fails_with_both_override_status_findings(dir.path());
+    override_the_entry(
+        dir.path(),
+        json!({"summary": "The project's own summary of the rule."}),
+    );
+    let output = run(dir.path(), "check-knowledge");
+    assert_eq!(String::from_utf8_lossy(&output.stderr), "");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "override process.evals-rerun: summary\nknowledge: ok\n"
+    );
+    assert_eq!(output.status.code(), Some(0));
+}
+
+/// The source that an upstream pack with the name `process` records.
+const UPSTREAM_SOURCE: &str = "git+https://example.invalid/org/repo@v1.0.0#process.json";
+
+/// The whole finding line for a file that cites `DELETED_ID` when an
+/// installed pack named `process` comes from `source`.
+fn name_held_finding_for(file: &str, source: &str) -> String {
+    format!(
+        "{file}: cites \"process.evals-rerun\" from the kit pack \"process\", but the \
+         installed pack \"process\" comes from {source}; the kit pack cannot be installed \
+         while another pack holds its name\n"
+    )
+}
+
+/// An upstream pack that carries the name `process` is not the kit pack, so
+/// it does not make the kit text's citations live: an id that it lacks is a
+/// finding for each citing file, whatever its name.
+#[test]
+fn an_upstream_pack_named_like_a_kit_pack_does_not_make_the_citations_live() {
+    let dir = seeded_repo();
+    install_the_process_pack(
+        dir.path(),
+        &process_pack_without_the_entry(),
+        UPSTREAM_SOURCE,
+    );
+    let output = run(dir.path(), "check-knowledge");
+    let both: String = CITING_FILES
+        .iter()
+        .map(|file| name_held_finding_for(file, UPSTREAM_SOURCE))
+        .collect();
+    assert_eq!(String::from_utf8_lossy(&output.stderr), both);
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
+    assert_eq!(output.status.code(), Some(1));
+}
+
+/// The control of the case above: the same upstream source passes when its
+/// pack ships every id that the kit text cites, so the finding is the missing
+/// id and not the name.
+#[test]
+fn an_upstream_pack_named_like_a_kit_pack_passes_when_it_ships_every_cited_id() {
+    let dir = seeded_repo();
+    install_the_process_pack(dir.path(), &kit_process_pack(), UPSTREAM_SOURCE);
+    assert_passes(dir.path());
+}
+
+/// The whole finding line for a file that cites `DELETED_ID` when the
+/// installed kit pack `process` at `version` does not ship it as an active
+/// entry.
+fn inactive_in_copy_finding_for(file: &str, version: &str) -> String {
+    format!(
+        "{file}: cites \"process.evals-rerun\", which the installed pack \"process\" {version} \
+         does not ship as an active entry; run houserules update\n"
+    )
+}
+
+/// The installed kit pack is the copy whose pin records the source `kit`. A
+/// copy older than the kit text that lacks a cited id is one finding for each
+/// citing file, with the version of the pin.
+#[test]
+fn an_older_kit_copy_that_lacks_a_cited_id_is_a_finding_for_each_citing_file() {
+    let dir = seeded_repo();
+    let mut older = process_pack_without_the_entry();
+    older["version"] = json!("0.9.0");
+    install_the_process_pack(dir.path(), &older, "kit");
+    let output = run(dir.path(), "check-knowledge");
+    let both: String = CITING_FILES
+        .iter()
+        .map(|file| inactive_in_copy_finding_for(file, "0.9.0"))
+        .collect();
+    assert_eq!(String::from_utf8_lossy(&output.stderr), both);
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
+    assert_eq!(output.status.code(), Some(1));
+}
+
+/// The line says to run `houserules update`, and the run clears it: `update`
+/// moves the older kit copy to the pack of the binary, which ships the id, so
+/// the install passes.
+#[test]
+fn the_printed_remedy_of_an_older_kit_copy_clears_the_finding_through_update() {
+    let dir = seeded_repo();
+    let mut older = process_pack_without_the_entry();
+    older["version"] = json!("0.9.0");
+    install_the_process_pack(dir.path(), &older, "kit");
+    let output = run(dir.path(), "check-knowledge");
+    let both: String = CITING_FILES
+        .iter()
+        .map(|file| inactive_in_copy_finding_for(file, "0.9.0"))
+        .collect();
+    assert_eq!(String::from_utf8_lossy(&output.stderr), both);
+    assert_eq!(output.status.code(), Some(1));
+
+    let printed = update_output(dir.path());
+
     assert!(
-        !update_output(dir.path()).contains(&id),
-        "update still reports the archived entry after its id is listed"
+        printed.contains(&format!(
+            "moved pack process from 0.9.0 to {}",
+            kit_process_pack()["version"].as_str().expect("a version")
+        )),
+        "update did not move the pack: {printed}"
     );
     assert_passes(dir.path());
+}
+
+/// The same line when the status of the kit copy itself retires the cited
+/// id: the copy ships the id, and no read returns it.
+#[test]
+fn a_kit_copy_whose_own_status_retires_a_cited_id_is_a_finding_for_each_citing_file() {
+    let dir = seeded_repo();
+    let mut copy = kit_process_pack();
+    for entry in copy["entries"].as_array_mut().expect("entries array") {
+        if entry["id"] == DELETED_ID {
+            entry["status"] = json!("retired");
+        }
+    }
+    install_the_process_pack(dir.path(), &copy, "kit");
+    let output = run(dir.path(), "check-knowledge");
+    let both: String = CITING_FILES
+        .iter()
+        .map(|file| {
+            inactive_in_copy_finding_for(
+                file,
+                kit_process_pack()["version"].as_str().expect("a version"),
+            )
+        })
+        .collect();
+    assert_eq!(String::from_utf8_lossy(&output.stderr), both);
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
+    assert_eq!(output.status.code(), Some(1));
 }

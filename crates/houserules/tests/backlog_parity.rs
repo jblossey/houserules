@@ -18,6 +18,7 @@
 //! failure slice.
 
 mod common;
+mod install_shape;
 
 use std::fs;
 use std::path::Path;
@@ -312,6 +313,7 @@ fn set_with_a_bad_key_value_pair_prints_the_frozen_message_and_exits_2() {
 #[test]
 fn a_missing_backlog_directory_prints_a_named_error_and_exits_2() {
     let dir = tempfile::tempdir().expect("tempdir");
+    install_shape::mark_2_0(dir.path());
     let output = houserules()
         .args(["check-backlog", "--dir"])
         .arg(dir.path())

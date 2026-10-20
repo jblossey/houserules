@@ -14,8 +14,7 @@ Every project-specific rule you already live by is still scattered across
 AGENTS.md, docs, code, past conversations, and whatever only lives in an
 agent's own memory. This skill moves it in. Knowledge that exists only
 in memory is the most fragile source: write it down explicitly, the same
-turn you notice it (`process.keep-knowledge-current`), before it is lost
-to the next compaction.
+turn you notice it, before it is lost to the next compaction.
 
 ## When
 
@@ -30,11 +29,12 @@ before the first check.
 
 ## If `init` or `update` kept your own AGENTS.md
 
-`AGENTS.md` is seed-once: neither `init` nor `update` overwrites a file
-that is already there. `init` reports `kept AGENTS.md`; `update` leaves
-it untouched and prints no line for it at all -- absence of any AGENTS.md
-line in `update`'s output means it was already there, not that it was
-skipped some other way. Merge the two starter sections by hand: run
+`AGENTS.md` is seed-once: neither `init` nor `update` replaces a file
+that is already there, and your own text in it stays as it is. `init`
+reports `kept AGENTS.md`. `render`, which `init` and `update` run, adds
+the houserules block to the end of the file (or rewrites the block where
+it already is), and prints `AGENTS.md: written` when it changes the
+file. Merge the two starter sections by hand: run
 `houserules init --dir <an empty scratch git repo>` somewhere else, open
 the `AGENTS.md` it writes there, and copy its `## Knowledge base` and
 `## Workflow` sections into your own `AGENTS.md` wherever they fit your
@@ -96,7 +96,8 @@ its own `history` entry when it is long enough to want one.
   duplicate instead of filing it — the seed already carries 33 standing
   rules (conventional commits, TDD, exact pins, and more).
 - Before you delete a seeded entry, search the kit-owned files for its id
-  (`grep -rn '<id>' .claude/agents .claude/skills`):
+  (`grep -rn '<id>' .claude/agents .claude/skills`; `.claude/agents` exists after
+  `houserules init --target claude`):
   `houserules check-knowledge` fails when a kit-owned file cites an id the
   knowledge base no longer holds.
 - `summary` states the rule in one sentence, ≤ 160 characters, with no
@@ -125,10 +126,10 @@ its own `history` entry when it is long enough to want one.
 ## Areas
 
 An entry's `area` scopes which files load its rule. Before you file the
-first entry for a new area, extend `$defs.area.enum` in
-`knowledge/schema.json` and the matching globs in `knowledge/areas.json`
-together, in the same commit — one without the other fails validation or
-never loads.
+first entry for a new area, add the area and its globs to
+`knowledge/areas.json`, in the same commit — `houserules check-knowledge`
+fails an entry whose area is no key of that file, and an area whose globs
+match no file loads its rule for no file.
 
 Mark a migrated non-negotiable `standing: true`; it loads in every session
 instead of only when a matching file is read. `houserules check-knowledge` allows
@@ -234,8 +235,8 @@ The shell installer of release `<version>` is
 Do not install the latest release: it can run a check that your kit files
 do not satisfy until you run `houserules update` and commit the result.
 Name the job and its trigger once written, so the wiring is a claim
-someone can grep against (`process.wiring-checks-run-the-resolution`), and
-prove it with a real run before trusting it, not a syntax check alone.
+someone can grep against. Prove it with a real run before trusting it, not
+a syntax check alone.
 
 ## A worked example
 

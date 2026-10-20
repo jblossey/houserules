@@ -27,16 +27,16 @@ tests/goldens/** -text
 # bytes exact on every checkout.
 tests/fixtures/** -text
 
-# This repository's own generated knowledge surface -- render_all()'s
-# output set (render.rs: RULE_KINDS's per-area .claude/rules/*.md files,
-# standing-rules.md, and the fixed SKILL_PATH) -- is compared
-# exact-string by dogfood.rs's freshness check (`houserules render
-# --check` against this checkout's own live root). Same reason as above:
-# `-text` keeps the committed bytes exact on every checkout.
+# This repository's own generated knowledge surface -- the output set of
+# `houserules render` (the per-area .claude/rules/*.md files, the fixed
+# knowledge skill path, and the blocks of the AGENTS.md files) -- is
+# compared exact-string by dogfood.rs's freshness check (`houserules
+# render --check` against this checkout's own live root). Same reason as
+# above: `-text` keeps the committed bytes exact on every checkout.
 .claude/rules/** -text
 .claude/skills/project-knowledge/** -text
 
-# The embedded install payload (crates/houserules/src/install.rs) walks
+# The embedded install payload (crates/houserules/src/install/mod.rs) walks
 # template/ at compile time and bakes its exact checkout bytes into the
 # binary. `-text` keeps every checkout of template/ LF regardless of the
 # build host's core.autocrlf, so every build embeds the same bytes and a

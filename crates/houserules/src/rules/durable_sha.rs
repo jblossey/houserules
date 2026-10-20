@@ -33,9 +33,12 @@
 //! below, mirroring the review's own probes B1/B2 exactly.
 //!
 //! [`resolve_default_branch`] resolves the real default branch instead,
-//! independent of whatever `--base`/`--head` a caller happens to pass,
-//! trying in order: `refs/remotes/origin/HEAD` (set on a plain `git
-//! clone`, but NOT reliably by `actions/checkout` even with
+//! independent of whatever `--base`/`--head` a caller happens to pass.
+//! The install marker's `defaultBranch` (`.houserules.json`) names the
+//! branch first, for a repository whose default branch is neither `main`
+//! nor `master` and that has no `origin/HEAD`; its own doc has the order.
+//! Without that key, it tries in order: `refs/remotes/origin/HEAD` (set
+//! on a plain `git clone`, but NOT reliably by `actions/checkout` even with
 //! `fetch-depth: 0` -- a documented regression against Git 2.50,
 //! actions/checkout#2219); `refs/remotes/origin/main` and
 //! `refs/remotes/origin/master` (present after a `fetch-depth: 0`
@@ -210,16 +213,64 @@ fn resolve_commit(root: &Path, candidate: &str) -> Result<Option<String>, String
     }
 }
 
+/// The full sha `refname` names, `None` when it names no object. A failure
+/// to run git is the operating system's own text.
+fn resolve_ref(root: &Path, refname: &str) -> Result<Option<String>, String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "--verify", "--quiet", refname])
+        .env("LC_ALL", "C")
+        .current_dir(root)
+        .output()
+        .map_err(|error| error.to_string())?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Ok(if sha.is_empty() { None } else { Some(sha) })
+}
+
+/// The `defaultBranch` string of the install marker `.houserules.json` in
+/// `root`, which `install::marker` reads; `None` when the marker or the key
+/// is absent. Present but malformed data is one named line, never a silent
+/// default (`houserules.crash-paths-are-named`): a marker that cannot be read
+/// or parsed, a marker that is not a JSON object, and a value that is not a
+/// string.
+fn configured_default_branch(root: &Path) -> Result<Option<String>, String> {
+    use crate::install::marker::{DefaultBranchFault, read_default_branch_for_gate};
+
+    let marker = crate::root::INSTALL_MARKER;
+    read_default_branch_for_gate(root).map_err(|fault| match fault {
+        DefaultBranchFault::Unreadable(os_error) => {
+            format!("durable-sha: cannot read {marker}: {os_error}")
+        }
+        DefaultBranchFault::InvalidJson(parse_error) => {
+            format!("durable-sha: {marker} is not valid JSON: {parse_error}")
+        }
+        DefaultBranchFault::NotAnObject => format!("durable-sha: {marker} is not a JSON object."),
+        DefaultBranchFault::NotAString => {
+            format!("durable-sha: defaultBranch in {marker} must be a branch name string.")
+        }
+    })
+}
+
 /// Resolves this repository's real default branch tip, independent of
 /// whatever `--base`/`--head` an audit invocation happens to use --
 /// this module's own doc, "Why the default branch is resolved
 /// explicitly", has the full account of why `--base` cannot stand in
-/// for it, and the order these candidates are tried in. `Err` names the
-/// failure; this function never falls back to substituting some other
-/// ref when none of these resolve. `pub(super)`: `audit.rs`'s own
-/// `run_check` resolves the default branch once per `CheckType::
-/// DurableSha` evaluation through this same function.
+/// for it. The install marker's `defaultBranch` comes first: its branch
+/// resolves from `origin` and then from the local branches, and a name
+/// that resolves nowhere is a named error, because falling back to
+/// another branch would judge reachability against a branch the project
+/// did not name. Without the key, the candidates this module's doc lists
+/// are tried in order. `Err` names the failure; this function never
+/// falls back to substituting some other ref when none of these resolve.
+/// `pub(super)`: `audit.rs`'s own `run_check` resolves the default branch
+/// once per `CheckType::DurableSha` evaluation through this same
+/// function.
 pub(super) fn resolve_default_branch(root: &Path) -> Result<String, String> {
+    if let Some(name) = configured_default_branch(root)? {
+        return resolve_configured_branch(root, &name);
+    }
     const CANDIDATES: [&str; 5] = [
         "refs/remotes/origin/HEAD",
         "refs/remotes/origin/main",
@@ -228,25 +279,33 @@ pub(super) fn resolve_default_branch(root: &Path) -> Result<String, String> {
         "refs/heads/master",
     ];
     for candidate in CANDIDATES {
-        let output = Command::new("git")
-            .args(["rev-parse", "--verify", "--quiet", candidate])
-            .env("LC_ALL", "C")
-            .current_dir(root)
-            .output()
-            .map_err(|error| error.to_string())?;
-        if output.status.success() {
-            let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !sha.is_empty() {
-                return Ok(sha);
-            }
+        if let Some(sha) = resolve_ref(root, candidate)? {
+            return Ok(sha);
         }
     }
     Err(
-        "durable-sha: could not resolve the repository's default branch (no origin/HEAD, \
-         origin/main, origin/master, or local main/master branch) -- reachability cannot be \
-         judged without it"
+        "durable-sha: cannot resolve the default branch. No origin/HEAD, origin/main, \
+         origin/master, main, or master exists. Set \"defaultBranch\" in .houserules.json."
             .to_string(),
     )
+}
+
+/// The tip of the branch `name`: `refs/remotes/origin/<name>` first, then
+/// `refs/heads/<name>`. A name that resolves nowhere is a named error.
+fn resolve_configured_branch(root: &Path, name: &str) -> Result<String, String> {
+    for refname in [
+        format!("refs/remotes/origin/{name}"),
+        format!("refs/heads/{name}"),
+    ] {
+        if let Some(sha) = resolve_ref(root, &refname)? {
+            return Ok(sha);
+        }
+    }
+    Err(format!(
+        "durable-sha: defaultBranch \"{name}\" in {} names no branch. Neither origin/{name} nor \
+         {name} exists.",
+        crate::root::INSTALL_MARKER
+    ))
 }
 
 /// `true` when `commit` is `of` itself or an ancestor of it. Git's own
@@ -703,6 +762,176 @@ mod tests {
         write_file(root, "README.md", "seed\n");
         commit(root, "chore: seed on trunk");
         let error = resolve_default_branch(root).expect_err("no main/master, no origin");
-        assert!(error.contains("default branch"), "{error}");
+        assert_eq!(
+            error,
+            "durable-sha: cannot resolve the default branch. No origin/HEAD, origin/main, \
+             origin/master, main, or master exists. Set \"defaultBranch\" in .houserules.json."
+        );
+    }
+
+    /// A repository whose `main` has one commit and whose `trunk` has a
+    /// second, so the two branches resolve to different shas; returns the
+    /// fixture and the tip of `trunk`.
+    fn fixture_with_a_trunk_branch() -> (Fixture, String) {
+        let fixture = Fixture::new();
+        let root = fixture.root();
+        git(root, &["checkout", "-q", "-b", "trunk"]);
+        let trunk_tip = commit(root, "chore: a commit only trunk has");
+        git(root, &["checkout", "-q", "main"]);
+        (fixture, trunk_tip)
+    }
+
+    fn write_marker(root: &Path, content: &str) {
+        write_file(root, ".houserules.json", content);
+    }
+
+    /// `defaultBranch` names the branch: it wins over `origin/HEAD`, which
+    /// would otherwise resolve first.
+    #[test]
+    fn resolve_default_branch_reads_the_configured_branch_before_origin_head() {
+        let (fixture, trunk_tip) = fixture_with_a_trunk_branch();
+        let root = fixture.root();
+        git(
+            root,
+            &["update-ref", "refs/remotes/origin/main", &fixture.main_tip],
+        );
+        git(
+            root,
+            &[
+                "symbolic-ref",
+                "refs/remotes/origin/HEAD",
+                "refs/remotes/origin/main",
+            ],
+        );
+        write_marker(root, "{\"defaultBranch\": \"trunk\"}\n");
+
+        assert_eq!(resolve_default_branch(root).expect("resolves"), trunk_tip);
+    }
+
+    /// The configured branch resolves from `origin` first, as the fallback
+    /// order does: a local branch of the same name may be stale.
+    #[test]
+    fn resolve_default_branch_reads_the_origin_branch_before_the_local_branch_of_that_name() {
+        let (fixture, trunk_tip) = fixture_with_a_trunk_branch();
+        let root = fixture.root();
+        git(
+            root,
+            &["update-ref", "refs/remotes/origin/trunk", &trunk_tip],
+        );
+        git(root, &["update-ref", "refs/heads/trunk", &fixture.main_tip]);
+        write_marker(root, "{\"defaultBranch\": \"trunk\"}\n");
+
+        assert_eq!(resolve_default_branch(root).expect("resolves"), trunk_tip);
+    }
+
+    /// A marker without the key, and a repository without a marker, keep
+    /// the fallback order.
+    #[test]
+    fn resolve_default_branch_keeps_the_fallback_order_without_the_key() {
+        let (fixture, _trunk_tip) = fixture_with_a_trunk_branch();
+        let root = fixture.root();
+        assert_eq!(
+            resolve_default_branch(root).expect("resolves without a marker"),
+            fixture.main_tip
+        );
+
+        write_marker(root, "{\"version\": \"1.4.0\"}\n");
+
+        assert_eq!(
+            resolve_default_branch(root).expect("resolves without the key"),
+            fixture.main_tip
+        );
+    }
+
+    /// A configured branch that exists nowhere is one named line, never a
+    /// fall back to the other branches: `main` exists here and is not
+    /// used.
+    #[test]
+    fn resolve_default_branch_names_a_configured_branch_that_does_not_exist() {
+        let fixture = Fixture::new();
+        let root = fixture.root();
+        write_marker(root, "{\"defaultBranch\": \"develop\"}\n");
+
+        let error = resolve_default_branch(root).expect_err("no develop branch");
+
+        assert_eq!(
+            error,
+            "durable-sha: defaultBranch \"develop\" in .houserules.json names no branch. \
+             Neither origin/develop nor develop exists."
+        );
+    }
+
+    /// A `defaultBranch` that is not a string is one named line.
+    #[test]
+    fn resolve_default_branch_names_a_default_branch_that_is_not_a_string() {
+        let fixture = Fixture::new();
+        let root = fixture.root();
+        for value in ["5", "[\"main\"]", "null", "true", "{}"] {
+            write_marker(root, &format!("{{\"defaultBranch\": {value}}}\n"));
+
+            let error = resolve_default_branch(root).expect_err("not a string");
+
+            assert_eq!(
+                error,
+                "durable-sha: defaultBranch in .houserules.json must be a branch name string.",
+                "{value}"
+            );
+        }
+    }
+
+    /// A marker that is valid JSON but not an object cannot hold the key:
+    /// one named line, not the not-found line that tells the user to set a
+    /// key there.
+    #[test]
+    fn resolve_default_branch_names_a_marker_that_is_not_a_json_object() {
+        let fixture = Fixture::new();
+        let root = fixture.root();
+        for value in ["\"trunk\"", "[\"trunk\"]", "5", "null", "true"] {
+            write_marker(root, &format!("{value}\n"));
+
+            let error = resolve_default_branch(root).expect_err("not an object");
+
+            assert_eq!(
+                error, "durable-sha: .houserules.json is not a JSON object.",
+                "{value}"
+            );
+        }
+    }
+
+    /// A marker that is not JSON is one named line that keeps the parser's
+    /// own text.
+    #[test]
+    fn resolve_default_branch_names_a_marker_that_is_not_json() {
+        let fixture = Fixture::new();
+        let root = fixture.root();
+        write_marker(root, "{\"defaultBranch\": ");
+        let parse_error = serde_json::from_str::<serde_json::Value>("{\"defaultBranch\": ")
+            .expect_err("truncated JSON");
+
+        let error = resolve_default_branch(root).expect_err("not JSON");
+
+        assert_eq!(
+            error,
+            format!("durable-sha: .houserules.json is not valid JSON: {parse_error}")
+        );
+    }
+
+    /// A marker that cannot be read, for a reason other than absence, is
+    /// one named line that keeps the operating system's own text. A
+    /// directory in the marker's place cannot be read as a file.
+    #[test]
+    fn resolve_default_branch_names_a_marker_that_cannot_be_read() {
+        let fixture = Fixture::new();
+        let root = fixture.root();
+        std::fs::create_dir(root.join(".houserules.json")).expect("create the directory");
+        let os_error = std::fs::read_to_string(root.join(".houserules.json"))
+            .expect_err("a directory is not a file");
+
+        let error = resolve_default_branch(root).expect_err("unreadable marker");
+
+        assert_eq!(
+            error,
+            format!("durable-sha: cannot read .houserules.json: {os_error}")
+        );
     }
 }

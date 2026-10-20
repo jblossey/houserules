@@ -41,9 +41,12 @@
 //!   ecosystem glob examples would false-positive a bare content sweep.
 //! - `.claude/rules/`, `.claude/skills/project-knowledge/` -- both carry
 //!   the header "Generated from knowledge/ by houserules render. Do not
-//!   edit."; `render.rs` copies `knowledge/`'s own id/summary/body text
+//!   edit."; `render` copies `knowledge/`'s own id/summary/body text
 //!   into a template shape and adds no prose of its own, so a residue
 //!   here can only be a residue already gated at its `knowledge/` source.
+//!   The block of the root `AGENTS.md` is the same generated text inside a
+//!   hand-written file, so a named exception covers it
+//!   (`in_houserules_block`).
 //! - `docs/specs/`, `docs/plans/`, `docs/design.md` -- frozen once
 //!   approved.
 //! - `tests/` -- `tests/fixtures/batch14-workspace/` is pinned byte for
@@ -236,6 +239,23 @@ struct Exception {
     matches: fn(&Hit, &str) -> bool,
 }
 
+/// `true` when the 1-based `line` of `text` lies between the begin and the end
+/// marker line of the houserules block, both marker lines included. A line of
+/// a file without a complete block lies in none.
+fn in_houserules_block(text: &str, line: usize) -> bool {
+    let mut begin = None;
+    for (index, content) in text.lines().enumerate() {
+        match content.trim() {
+            "<!-- houserules:begin -->" => begin = Some(index + 1),
+            "<!-- houserules:end -->" => {
+                return begin.is_some_and(|start| (start..=index + 1).contains(&line));
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
 /// The named, auditable exceptions within the walked scope -- this
 /// module's own doc has the wider account of why the scope is what it
 /// is; these are the individual mentions that scope still contains.
@@ -248,20 +268,28 @@ fn exceptions() -> Vec<Exception> {
             matches: |hit, _file_text| hit.file == "README.md" && hit.text.contains("no Node"),
         },
         Exception {
-            label: "template/knowledge/security-hygiene.json (whole file)",
-            reason: "security-hygiene.exact-pins ships generic, ecosystem-agnostic manifest \
-                globs and CLI examples (package.json alongside Cargo.toml/pyproject.toml/go.mod, \
-                `pnpm add --save-exact` alongside `cargo add`) to every adopter regardless of \
-                their own ecosystem -- verified clean of this repository's own toolchain by hand \
-                at the batch 20 T4 closing sweep.",
-            matches: |hit, _file_text| hit.file == "template/knowledge/security-hygiene.json",
+            label: "AGENTS.md: the houserules block",
+            reason: "the block between the houserules markers is generated from knowledge/, an \
+                excluded prefix, and adds no prose of its own: a residue there is already gated \
+                at its knowledge/ source, as in .claude/rules/.",
+            matches: |hit, file_text| {
+                hit.file == "AGENTS.md" && in_houserules_block(file_text, hit.line)
+            },
         },
         Exception {
-            label: "template/knowledge/process.json (whole file)",
-            reason: "process.no-tech-debt's leftover-marker grep-absent check ships a multi-\
-                language file-glob list (.mjs/.mts alongside .rs/.py/.go/.rb/.java/...) to every \
-                adopter, not a claim this repository's own toolchain includes them.",
-            matches: |hit, _file_text| hit.file == "template/knowledge/process.json",
+            label: "template/packs/security-hygiene.json (whole file)",
+            reason: "the security-hygiene pack carries security-hygiene.exact-pins with the \
+                ecosystem-agnostic manifest globs and CLI examples (package.json alongside \
+                Cargo.toml/pyproject.toml/go.mod, `pnpm add --save-exact` alongside `cargo add`); \
+                they ship to every adopter regardless of their own ecosystem.",
+            matches: |hit, _file_text| hit.file == "template/packs/security-hygiene.json",
+        },
+        Exception {
+            label: "template/packs/process.json (whole file)",
+            reason: "the process pack carries process.no-tech-debt's leftover-marker grep-absent \
+                check with a multi-language file-glob list, not a \
+                claim this repository's own toolchain includes them.",
+            matches: |hit, _file_text| hit.file == "template/packs/process.json",
         },
         Exception {
             label: "template/.claude/evals/ (whole subtree)",
@@ -569,7 +597,7 @@ mod tests {
             "crates/houserules/src/main.rs",
             "knowledge/houserules.json",
             "backlog/items/kit.json",
-            ".claude/rules/standing-rules.md",
+            ".claude/rules/cli.md",
             ".claude/skills/project-knowledge/SKILL.md",
             "docs/specs/2026-09-07-batch-20-phase5.md",
             "docs/plans/2026-09-07-batch-20-phase5.md",
@@ -591,7 +619,7 @@ mod tests {
             "tools/claude-session-start.sh",
             ".github/workflows/ci.yml",
             "template/CLAUDE.md",
-            "template/knowledge/quality.json",
+            "template/packs/quality.json",
             "template/.claude/evals/dependency-add.json",
             "release-please-config.json",
         ];
@@ -718,23 +746,58 @@ mod tests {
         assert!(matched, "the \"no Node\" line must be excepted");
     }
 
-    /// `template/knowledge/security-hygiene.json` and `process.json` are
-    /// whole-file excepted; a sibling template knowledge file is not.
+    /// The `security-hygiene` and `process` pack files carry generic,
+    /// ecosystem-agnostic text and are whole-file excepted; a sibling pack
+    /// file is not.
     #[test]
-    fn only_the_two_named_template_knowledge_files_are_excepted() {
-        let excepted = Hit {
-            file: "template/knowledge/security-hygiene.json".to_string(),
-            line: 1,
-            text: "pnpm add --save-exact".to_string(),
-        };
-        let not_excepted = Hit {
-            file: "template/knowledge/quality.json".to_string(),
+    fn only_the_two_named_template_pack_files_are_excepted() {
+        let hit = |file: &str| Hit {
+            file: file.to_string(),
             line: 1,
             text: "pnpm add --save-exact".to_string(),
         };
         let exceptions = exceptions();
-        assert!(exceptions.iter().any(|e| (e.matches)(&excepted, "")));
-        assert!(!exceptions.iter().any(|e| (e.matches)(&not_excepted, "")));
+        for excepted in [
+            "template/packs/security-hygiene.json",
+            "template/packs/process.json",
+        ] {
+            assert!(
+                exceptions.iter().any(|e| (e.matches)(&hit(excepted), "")),
+                "{excepted} must be excepted"
+            );
+        }
+        for not_excepted in [
+            "template/packs/quality.json",
+            "template/packs/knowledge-base.json",
+            "template/packs/writing-style.json",
+        ] {
+            assert!(
+                !exceptions
+                    .iter()
+                    .any(|e| (e.matches)(&hit(not_excepted), "")),
+                "{not_excepted} must not be excepted"
+            );
+        }
+    }
+
+    /// A hit inside the houserules block of the root `AGENTS.md` is excepted:
+    /// the block is generated from `knowledge/`, an excluded prefix. A hit in
+    /// the hand-written text of the file, or in the block of another file, is
+    /// not.
+    #[test]
+    fn a_hit_in_the_generated_block_of_the_root_agents_md_is_excepted() {
+        let text = "# Notes\nuse pnpm here\n<!-- houserules:begin -->\n- [a.b] use pnpm add\n<!-- houserules:end -->\nafter pnpm\n";
+        let hit = |file: &str, line: usize| Hit {
+            file: file.to_string(),
+            line,
+            text: "pnpm".to_string(),
+        };
+        let excepted = |hit: &Hit| exceptions().iter().any(|e| (e.matches)(hit, text));
+
+        assert!(excepted(&hit("AGENTS.md", 4)), "inside the block");
+        assert!(!excepted(&hit("AGENTS.md", 2)), "before the block");
+        assert!(!excepted(&hit("AGENTS.md", 6)), "after the block");
+        assert!(!excepted(&hit("docs/AGENTS.md", 4)), "another file");
     }
 
     /// Every file under `template/.claude/evals/` is excepted, by prefix.

@@ -10,15 +10,23 @@
 //!
 //! # Scope (the two places a shipped reference can live)
 //!
-//! Every file under `template/` (recursive), and four Rust source files
-//! that hold literals the CLI prints or embeds in generated output:
-//! `rules/render.rs`, `rules/check.rs`, `install.rs`, and `main.rs` (its
-//! struct doc comment IS `houserules --help`'s "about" text verbatim, so
-//! a stale reference there is adopter-visible). Every OTHER Rust source
-//! file under `crates/` is source the compiler and the test suite verify,
-//! not instructional prose an adopter follows -- a stale reference there
-//! cannot mislead anyone the way an adopter-facing string can -- so this
+//! Every file under `template/` (recursive), and the Rust source files that
+//! hold literals the CLI prints or embeds in generated output:
+//! `rules/budget.rs` and `rules/check.rs` (the findings of `check-knowledge`),
+//! `install/mod.rs`, `main.rs` (its struct doc comment IS `houserules
+//! --help`'s "about" text verbatim, so a stale reference there is
+//! adopter-visible), and every `.rs` file of `rules/render/` (the render port
+//! writes the generated files). The scan reads the render directory from
+//! disk, so a file added there is scanned without an edit here. Every OTHER
+//! Rust source file under `crates/` is source the compiler and the test suite
+//! verify, not instructional prose an adopter follows -- a stale reference
+//! there cannot mislead anyone the way an adopter-facing string can -- so this
 //! script does not search there.
+//!
+//! A listed Rust file that cannot be read, and a listed directory that holds
+//! no `.rs` file, stop the run with a panic that names it
+//! (`houserules.crash-paths-are-named`): the scan never counts a file it did
+//! not read.
 //!
 //! `PATTERNS` matches `kb.sh`/`backlog.sh` bare, without requiring a
 //! `tools/` prefix: `template/tools/claude-session-start.sh` can invoke
@@ -29,7 +37,7 @@
 //!
 //! Named here, not hidden in a blanket file skip -- the "zero remaining"
 //! claim means "zero UNEXPECTED", not "the search saw nothing":
-//!   - `crates/houserules/src/install.rs`: narrowed to exactly the
+//!   - `crates/houserules/src/install/mod.rs`: narrowed to exactly the
 //!     `RETIRED` constant's own item doc and declaration, plus the doc and
 //!     body of its test function -- not the whole file, since `RETIRED`
 //!     and its own item doc and test literally are the two shell-wrapper
@@ -63,15 +71,19 @@ const PATTERNS: [&str; 2] = ["kb.sh", "backlog.sh"];
 /// test does, or its own window silently stops opening.
 const RETIRED_TEST_FN: &str = "retired_holds_the_shell_tools_and_the_js_engines_they_fronted";
 
-/// The Rust source files holding literals the CLI prints or embeds in
-/// generated output -- this module's own doc has the full account of why
-/// these four and no others.
+/// The single Rust source files outside `RUST_DIRS` that hold literals the
+/// CLI prints or embeds in generated output. This module's own doc names the
+/// whole scope.
 const RUST_FILES: [&str; 4] = [
-    "crates/houserules/src/rules/render.rs",
+    "crates/houserules/src/rules/budget.rs",
     "crates/houserules/src/rules/check.rs",
-    "crates/houserules/src/install.rs",
+    "crates/houserules/src/install/mod.rs",
     "crates/houserules/src/main.rs",
 ];
+
+/// The directories whose every `.rs` file the scan reads: the render port,
+/// which writes the generated files.
+const RUST_DIRS: [&str; 1] = ["crates/houserules/src/rules/render"];
 
 /// One matched line: its repo-relative path, 1-based line number, and
 /// trimmed text.
@@ -111,19 +123,36 @@ fn walk_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Every line in `abs_path` containing a `PATTERNS` substring, as `Hit`s
-/// with `file` relative to `root`. A file this process cannot read as
-/// UTF-8 (a binary asset under `template/`, say) carries no text
-/// reference and is silently skipped.
-fn find_matches(root: &Path, abs_path: &Path) -> Vec<Hit> {
+/// The Rust source files the scan reads under `root`: `RUST_FILES`, then
+/// every `.rs` file of each `RUST_DIRS` directory, sorted by name. A listed
+/// directory that holds no `.rs` file is a named, fatal error, never an empty
+/// scan.
+fn rust_sources(root: &Path) -> Vec<PathBuf> {
+    let mut sources: Vec<PathBuf> = RUST_FILES.iter().map(|file| root.join(file)).collect();
+    for dir in RUST_DIRS {
+        let mut files = Vec::new();
+        walk_files(&root.join(dir), &mut files);
+        files.retain(|file| file.extension().is_some_and(|extension| extension == "rs"));
+        assert!(!files.is_empty(), "{dir} holds no .rs file");
+        sources.extend(files);
+    }
+    sources
+}
+
+/// The text of the listed Rust source file `path`. A file this process
+/// cannot read is a named, fatal error, never empty text.
+fn read_rust_source(path: &Path) -> String {
+    fs::read_to_string(path).unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
+}
+
+/// Every line of `text`, the content of `abs_path`, containing a `PATTERNS`
+/// substring, as `Hit`s with `file` relative to `root`.
+fn find_matches(root: &Path, abs_path: &Path, text: &str) -> Vec<Hit> {
     let rel = abs_path
         .strip_prefix(root)
         .expect("abs_path is under root")
         .to_string_lossy()
         .replace('\\', "/");
-    let Ok(text) = fs::read_to_string(abs_path) else {
-        return Vec::new();
-    };
     let mut hits = Vec::new();
     for (index, line) in text.split('\n').enumerate() {
         if PATTERNS.iter().any(|pattern| line.contains(pattern)) {
@@ -137,7 +166,7 @@ fn find_matches(root: &Path, abs_path: &Path) -> Vec<Hit> {
     hits
 }
 
-/// The 1-based line numbers in `install.rs`'s own source `text` exempted
+/// The 1-based line numbers in `install/mod.rs`'s own source `text` exempted
 /// as "the `RETIRED` constant and its own doc and test lines" (module doc
 /// has the full account of why this is narrower than a whole-file
 /// exception): the item doc immediately preceding `const RETIRED` plus
@@ -247,14 +276,14 @@ struct Exception {
 /// full reasoning.
 fn exceptions() -> Vec<Exception> {
     vec![Exception {
-        label: "crates/houserules/src/install.rs (RETIRED's own doc/test only)",
+        label: "crates/houserules/src/install/mod.rs (RETIRED's own doc/test only)",
         reason: "RETIRED and its own item doc and test literally are \
             \"tools/kb.sh\"/\"tools/backlog.sh\" -- FILE PATHS the deletion mechanism removes, \
             not command instructions a rewrite could flip. Narrowed to exactly that window \
             (RETIRED's own doc and test) so a whole-file exception cannot swallow an unrelated \
             hit.",
         matches: |hit, file_text| {
-            hit.file == "crates/houserules/src/install.rs"
+            hit.file == "crates/houserules/src/install/mod.rs"
                 && install_rs_exempt_lines(file_text).contains(&hit.line)
         },
     }]
@@ -295,22 +324,31 @@ fn declared_exception_counts(
 /// the one gate that fails on that condition (HR-115).
 fn main() {
     let root = repo_root();
-    let mut all_files = Vec::new();
-    walk_files(&root.join("template"), &mut all_files);
-    for rust_file in RUST_FILES {
-        all_files.push(root.join(rust_file));
+    let mut template_files = Vec::new();
+    walk_files(&root.join("template"), &mut template_files);
+    // A template file this process cannot read as UTF-8 (a binary asset, say)
+    // carries no text reference and is counted with empty text.
+    let mut all_files: Vec<(PathBuf, String)> = template_files
+        .into_iter()
+        .map(|path| {
+            let text = fs::read_to_string(&path).unwrap_or_default();
+            (path, text)
+        })
+        .collect();
+    for path in rust_sources(&root) {
+        let text = read_rust_source(&path);
+        all_files.push((path, text));
     }
 
     let exceptions = exceptions();
     let mut target: Vec<Hit> = Vec::new();
     let mut excepted: Vec<(Hit, &'static str, &'static str)> = Vec::new();
 
-    for abs_path in &all_files {
-        let file_text = fs::read_to_string(abs_path).unwrap_or_default();
-        for hit in find_matches(&root, abs_path) {
+    for (abs_path, file_text) in &all_files {
+        for hit in find_matches(&root, abs_path, file_text) {
             match exceptions
                 .iter()
-                .find(|exception| (exception.matches)(&hit, &file_text))
+                .find(|exception| (exception.matches)(&hit, file_text))
             {
                 Some(exception) => excepted.push((hit, exception.label, exception.reason)),
                 None => target.push(hit),
@@ -373,11 +411,11 @@ fn main() {
 mod tests {
     use super::*;
 
-    /// A minimal install.rs-shaped fixture: `RETIRED`'s own doc and
+    /// A minimal install/mod.rs-shaped fixture: `RETIRED`'s own doc and
     /// declaration, then a production `fn delete_retired` (the same
-    /// doc-then-signature-then-body shape install.rs itself uses), then
+    /// doc-then-signature-then-body shape install/mod.rs itself uses), then
     /// the one test this file's own doc names. Built as a standalone
-    /// string, not read from the real install.rs, so this test does not
+    /// string, not read from the real install/mod.rs, so this test does not
     /// drift with unrelated edits there.
     const FIXTURE: &str = "\
 /// The two paths `update` deletes from an existing install, in call
@@ -622,7 +660,7 @@ mod tests {
     }
 
     /// The reviewer's own round-1 probe: appending this sentence to the
-    /// `install.rs` exception's reason once passed the (too-narrow)
+    /// `install/mod.rs` exception's reason once passed the (too-narrow)
     /// history-marker check, so it stays pinned here as a permanent
     /// regression test independent of the live `reason` literal's own
     /// current wording.
@@ -646,7 +684,7 @@ mod tests {
         );
     }
 
-    /// The surviving `install.rs` exception's own printed `reason` states
+    /// The surviving `install/mod.rs` exception's own printed `reason` states
     /// the present-tense rule (RETIRED's own doc and test ARE the file
     /// paths the deletion mechanism removes, narrowed to exactly that
     /// window) and carries none of `history_narration_marker`'s classes
@@ -659,9 +697,9 @@ mod tests {
             .find(|exception| {
                 exception
                     .label
-                    .starts_with("crates/houserules/src/install.rs")
+                    .starts_with("crates/houserules/src/install/mod.rs")
             })
-            .expect("the install.rs exception is still declared")
+            .expect("the install/mod.rs exception is still declared")
             .reason;
         assert_eq!(
             history_narration_marker(reason),
@@ -674,5 +712,53 @@ mod tests {
                 .contains("narrowed to exactly that window"),
             "reason does not state the current narrowing rule: {reason}"
         );
+    }
+
+    /// Every path of `RUST_FILES` is a regular file of this checkout.
+    #[test]
+    fn every_listed_rust_file_exists() {
+        let root = repo_root();
+        for file in RUST_FILES {
+            assert!(
+                root.join(file).is_file(),
+                "{file} is no file of this checkout"
+            );
+        }
+    }
+
+    /// The scan reads every `.rs` file of the render module, found on disk,
+    /// so a file added there is scanned without an edit of this binary.
+    #[test]
+    fn the_scan_reads_every_file_of_the_render_module() {
+        let root = repo_root();
+        let sources = rust_sources(&root);
+        let mut on_disk = Vec::new();
+        for entry in fs::read_dir(root.join("crates/houserules/src/rules/render")).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_some_and(|extension| extension == "rs") {
+                on_disk.push(path);
+            }
+        }
+        assert!(on_disk.len() >= 5, "the render module shrank: {on_disk:?}");
+        for path in on_disk {
+            assert!(sources.contains(&path), "{} is not scanned", path.display());
+        }
+    }
+
+    /// A listed directory without a `.rs` file is a named fatal error, not an
+    /// empty scan.
+    #[test]
+    #[should_panic(expected = "holds no .rs file")]
+    fn an_empty_listed_directory_is_a_named_fatal_error() {
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir_all(root.path().join(RUST_DIRS[0])).unwrap();
+        rust_sources(root.path());
+    }
+
+    /// A listed file that cannot be read is a fatal error that names it.
+    #[test]
+    #[should_panic(expected = "gone.rs")]
+    fn an_unreadable_listed_file_is_a_named_fatal_error() {
+        read_rust_source(Path::new("/nonexistent/gone.rs"));
     }
 }

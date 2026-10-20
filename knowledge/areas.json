@@ -4,7 +4,7 @@
   "docs": { "paths": ["docs/**", "README.md", "AGENTS.md", "knowledge/**", "backlog/**", ".claude/**"] },
   "tools": { "paths": ["tools/**", ".github/**", "mise.toml"] },
   "cli": { "paths": ["crates/houserules/src/**"] },
-  "template": { "paths": ["template/**"] },
+  "template": { "paths": ["template/**"], "agentsMd": false },
   "tests": { "paths": ["tests/**"] },
   "rust": { "paths": ["crates/**", "Cargo.toml", "Cargo.lock"] }
 }

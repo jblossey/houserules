@@ -43,9 +43,10 @@
 //!
 //! A positional message-file argument runs the hook arm (`template/
 //! .githooks/commit-msg` probes `houserules check-commit --help` and
-//! execs this command directly); `--from`/`--to`, defaulting `--to` to
-//! `HEAD` the way `audit`'s own `--head` already does, runs the range
-//! arm (`.github/workflows/ci.yml`'s `check-commit` job). Exactly one arm
+//! execs this command directly, with `--dir <install root>`);
+//! `--from`/`--to`, defaulting `--to` to `HEAD` the way `audit`'s own
+//! `--head` already does, runs the range arm
+//! (`.github/workflows/ci.yml`'s `check-commit` job). Exactly one arm
 //! applies per invocation; `cmd_check_commit` reports the other
 //! combinations as named usage errors, exit 2.
 //!
@@ -66,6 +67,28 @@
 //! into the same `Commit` shape `commits_in` reads back off real history
 //! (see that function's own doc for the deliberately simple split it
 //! uses).
+//!
+//! ## Subdirectory installs
+//!
+//! In an install below the git top level, `check-commit` skips a commit
+//! only when it changes at least one path and none of them is below the
+//! install root. The range arm reads the paths of every parent diff of a
+//! commit (`paths_changed_against_any_parent`, `git diff-tree -m`): a merge
+//! counts the paths of each parent diff. The message-file arm reads the
+//! staged files (`git diff --cached`). A commit that changes no path, an
+//! empty commit or an empty index, is checked by both arms. A skipped
+//! commit is counted, and one line says how many (`skipped_line`): the
+//! range arm prints it on every run of a subdirectory install, `skipped 0
+//! commits` included, and the message-file arm prints it only when it
+//! skips. An install at the git top level checks every commit and prints
+//! no such line. Every path the checks match is an install-root path
+//! (`git_paths`'s own doc has the account).
+//!
+//! One limit follows from the message-file arm reading only the staged
+//! files: an amendment that stages only paths outside the install root, on
+//! top of a commit that touched the install, is skipped, because the hook
+//! cannot see the amended commit's own paths. The range arm checks the
+//! same commit.
 //!
 //! ## Output shape
 //!
@@ -106,9 +129,11 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 
 use super::audit::{
-    CoChangeCheck, Commit, CommitsCheck, changed_files_for, commits_in, rev, tree_files,
+    CoChangeCheck, Commit, CommitsCheck, changed_files_for, commits_in,
+    paths_changed_against_any_parent, rev, tree_files,
 };
 use super::check_shape::{CheckLevel, CheckType};
+use super::git_paths::InstallPrefix;
 use super::model::{Base, CheckField, load_base};
 
 /// `git commit --verbose`'s own "cut here" line's fixed second half; the
@@ -273,14 +298,80 @@ pub(crate) struct CheckCommitOpts {
     pub to: Option<String>,
 }
 
+/// What `check_commit` found, in `backlog::commands::check_backlog`'s own
+/// `(errors, warnings)` shape (`cli.rs`'s own doc) plus the skipped-commit
+/// count line.
+#[derive(Debug)]
+pub(crate) struct Findings {
+    /// One `"<id>: <evidence>"` line per violation of a `fail`-level check.
+    pub fails: Vec<String>,
+    /// One `"<id>: <evidence>"` line per violation of a `warn`-level check.
+    pub warns: Vec<String>,
+    /// The line that counts the commits a subdirectory install skipped
+    /// (`skipped_line`). The range arm has it on every run of a
+    /// subdirectory install, a zero count included; the message-file arm
+    /// has it only when it skipped. `None` for an install at the git top
+    /// level.
+    pub skipped: Option<String>,
+}
+
+/// The line that counts `count` commits skipped in the install below
+/// `prefix` (`InstallPrefix::as_str`): `check-commit: skipped 2 commits
+/// with no change under sub/`.
+fn skipped_line(count: usize, prefix: &str) -> String {
+    let noun = if count == 1 { "commit" } else { "commits" };
+    format!("check-commit: skipped {count} {noun} with no change under {prefix}")
+}
+
+/// Every top-level path the index changes against `HEAD` (`git diff
+/// --cached`), NUL-separated, read from `root`. The environment passes
+/// through: a hook's `GIT_INDEX_FILE` names the index git is about to
+/// commit (relative to the git top level, `.git/index`), and git resolves
+/// that relative name against the top level from any directory of the
+/// work tree.
+fn staged_paths(root: &Path) -> Result<String, String> {
+    let output = Command::new("git")
+        .args(["diff", "--cached", "--name-only", "-z"])
+        .current_dir(root)
+        .env("LC_ALL", "C")
+        .output()
+        .map_err(|error| format!("could not run git diff --cached: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "git diff --cached failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// `true` when `commit` changes at least one path and none of them is
+/// below the install root, so a subdirectory install skips it. A commit
+/// that changes no path (an empty commit) is checked. The range arm reads
+/// the paths of every parent diff (`paths_changed_against_any_parent`); a
+/// commit with no sha, the message-file arm, reads the staged files.
+fn changes_only_outside_the_install(
+    root: &Path,
+    prefix: &InstallPrefix,
+    commit: &Commit,
+) -> Result<bool, String> {
+    let paths = if commit.sha.is_empty() {
+        staged_paths(root)?
+    } else {
+        paths_changed_against_any_parent(root, &commit.sha)?
+    };
+    Ok(prefix.changes_only_outside(&paths))
+}
+
 /// Runs every `commits`-type knowledge entry, and every `co-change`-type
 /// entry that opts into `per_commit: true`, in `base` against `opts`'
-/// commit(s), returning `(fails, warns)`: one `"<id>: <evidence>"` finding
-/// per violation, sorted into whichever list its own check's `level` names
-/// -- `backlog::commands::check_backlog`'s own `(errors, warnings)` return
-/// shape (`cli.rs`'s own doc). Findings are grouped by commit (the range
-/// arm's own `git log` order, newest first, matching `audit`'s own
-/// `commits_in`), each commit checked against every entry in id order. A
+/// commit(s), returning the `Findings`. Findings are grouped by commit (the
+/// range arm's own `git log` order, newest first, matching `audit`'s own
+/// `commits_in`), each commit checked against every entry in id order. In a
+/// subdirectory install a commit that changes at least one path, none of
+/// them below the install root, is skipped and counted
+/// (`changes_only_outside_the_install`). An install at the git top level
+/// checks every commit. A
 /// `co-change` entry lacking `per_commit: true` (`process.evals-rerun`'s
 /// own entry, say) is never evaluated here at all -- `run_check`'s own
 /// range-level `CheckType::CoChange` arm still reads it, unaffected either
@@ -292,7 +383,7 @@ pub(crate) struct CheckCommitOpts {
 /// violation. An unreadable message file, an unresolvable `--from`/`--to`
 /// ref, a failed `git stripspace`, or a malformed check pattern is a named
 /// `Err`, never a panic (`houserules.crash-paths-are-named`).
-fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<(Vec<String>, Vec<String>), String> {
+fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<Findings, String> {
     let commits = match (&opts.message_file, &opts.from) {
         (Some(path), None) => {
             let raw =
@@ -331,9 +422,17 @@ fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<(Vec<String>, Vec
         }
     }
 
+    let prefix = InstallPrefix::of(&base.root)?;
     let mut fails = Vec::new();
     let mut warns = Vec::new();
+    let mut skipped = 0;
     for commit in &commits {
+        if prefix.is_subdirectory()
+            && changes_only_outside_the_install(&base.root, &prefix, commit)?
+        {
+            skipped += 1;
+            continue;
+        }
         for (id, compiled) in &commit_checks {
             if let Some(evidence) = compiled.violation(commit) {
                 let line = format!("{id}: {evidence}");
@@ -346,9 +445,9 @@ fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<(Vec<String>, Vec
         if cochange_checks.is_empty() || commit.sha.is_empty() {
             continue;
         }
-        let files = changed_files_for(&base.root, &commit.sha)?;
+        let files = changed_files_for(&base.root, &prefix, &commit.sha)?;
         let parent_tree = match rev(&base.root, &format!("{}^", commit.sha)) {
-            Ok(parent_sha) => tree_files(&base.root, &parent_sha)?,
+            Ok(parent_sha) => tree_files(&base.root, &prefix, &parent_sha)?,
             Err(_) => Vec::new(), // a root commit has no parent tree: no mechanism can exist yet
         };
         for (id, compiled) in &cochange_checks {
@@ -370,19 +469,27 @@ fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<(Vec<String>, Vec
             }
         }
     }
-    Ok((fails, warns))
+    let counts_every_run = opts.from.is_some();
+    Ok(Findings {
+        fails,
+        warns,
+        skipped: (prefix.is_subdirectory() && (counts_every_run || skipped > 0))
+            .then(|| skipped_line(skipped, prefix.as_str())),
+    })
 }
 
 /// Runs the `check-commit` subcommand: resolves `root` (`--dir`, or the
-/// enclosing git repository's top level), loads the knowledge base there,
+/// nearest install root), loads the knowledge base there,
 /// and runs every `commits`-type check against `message_file` or the
 /// `from`/`to` range. Neither `message_file` nor `from` given, or both, is
 /// a named usage error, exit 2, matching `audit`'s own `--report`/
 /// `--workspace` exclusivity message shape; `to` without `from` is the
 /// same. Warn-level findings print as `warn: <finding>` on stdout
-/// unconditionally (`cmd_check_backlog`'s own `warn: ` convention);
-/// fail-level findings print on stderr and exit 1, only when at least one
-/// exists -- a warn-only run still prints `check-commit: ok` and exits 0.
+/// unconditionally (`cmd_check_backlog`'s own `warn: ` convention); the
+/// line that counts the commits a subdirectory install skipped follows
+/// them on stdout (`Findings::skipped` says when it prints); fail-level
+/// findings print on stderr and exit 1, only when at least one exists -- a
+/// warn-only run still prints `check-commit: ok` and exits 0.
 pub(crate) fn cmd_check_commit(
     dir: Option<PathBuf>,
     message_file: Option<PathBuf>,
@@ -421,9 +528,16 @@ pub(crate) fn cmd_check_commit(
         to,
     };
     match check_commit(&base, &opts) {
-        Ok((fails, warns)) => {
+        Ok(Findings {
+            fails,
+            warns,
+            skipped,
+        }) => {
             for warn in &warns {
                 println!("warn: {warn}");
+            }
+            if let Some(line) = &skipped {
+                println!("{line}");
             }
             if !fails.is_empty() {
                 for fail in &fails {
@@ -652,6 +766,20 @@ mod tests {
         );
     }
 
+    /// The count line reads in the singular and the plural, and names the
+    /// install path as git prints it.
+    #[test]
+    fn skipped_line_counts_the_skipped_commits() {
+        assert_eq!(
+            skipped_line(1, "sub/"),
+            "check-commit: skipped 1 commit with no change under sub/"
+        );
+        assert_eq!(
+            skipped_line(2, "sub dir/sä/"),
+            "check-commit: skipped 2 commits with no change under sub dir/sä/"
+        );
+    }
+
     // ---- check_commit: message-file arm ----
 
     fn soft_subject_entry() -> Value {
@@ -666,7 +794,8 @@ mod tests {
         let dir = make_repo(&[conventional_commits_entry(), no_coauthor_entry()]);
         let base = load_base(dir.path()).expect("load base");
         let msg = write_message(dir.path(), "feat: a clean subject\n\nAn unrelated line.\n");
-        let (fails, warns) = check_commit(&base, &message_opts(msg)).expect("check_commit");
+        let Findings { fails, warns, .. } =
+            check_commit(&base, &message_opts(msg)).expect("check_commit");
         assert_eq!(fails, Vec::<String>::new());
         assert_eq!(warns, Vec::<String>::new());
     }
@@ -676,7 +805,8 @@ mod tests {
         let dir = make_repo(&[conventional_commits_entry()]);
         let base = load_base(dir.path()).expect("load base");
         let msg = write_message(dir.path(), "bad subject\n");
-        let (fails, warns) = check_commit(&base, &message_opts(msg)).expect("check_commit");
+        let Findings { fails, warns, .. } =
+            check_commit(&base, &message_opts(msg)).expect("check_commit");
         assert_eq!(
             fails,
             vec![
@@ -692,7 +822,7 @@ mod tests {
         let dir = make_repo(&[no_coauthor_entry()]);
         let base = load_base(dir.path()).expect("load base");
         let msg = write_message(dir.path(), "feat: x\n\nCo-Authored-By: someone\n");
-        let (fails, _warns) = check_commit(&base, &message_opts(msg)).expect("check_commit");
+        let Findings { fails, .. } = check_commit(&base, &message_opts(msg)).expect("check_commit");
         assert_eq!(
             fails,
             vec![
@@ -707,7 +837,7 @@ mod tests {
         let dir = make_repo(&[conventional_commits_entry()]);
         let base = load_base(dir.path()).expect("load base");
         let msg = write_message(dir.path(), &format!("feat: x\n\n{}\n", "x".repeat(101)));
-        let (fails, _warns) = check_commit(&base, &message_opts(msg)).expect("check_commit");
+        let Findings { fails, .. } = check_commit(&base, &message_opts(msg)).expect("check_commit");
         assert_eq!(
             fails,
             vec![
@@ -724,7 +854,8 @@ mod tests {
         let dir = make_repo(&[soft_subject_entry()]);
         let base = load_base(dir.path()).expect("load base");
         let msg = write_message(dir.path(), "not an ok subject\n");
-        let (fails, warns) = check_commit(&base, &message_opts(msg)).expect("check_commit");
+        let Findings { fails, warns, .. } =
+            check_commit(&base, &message_opts(msg)).expect("check_commit");
         assert_eq!(fails, Vec::<String>::new(), "{fails:#?}");
         assert_eq!(
             warns,
@@ -774,7 +905,8 @@ mod tests {
         let dir = make_repo(&[conventional_commits_entry()]);
         let base = load_base(dir.path()).expect("load base");
         let msg = write_message(dir.path(), VERBOSE_MESSAGE_FIXTURE);
-        let (fails, warns) = check_commit(&base, &message_opts(msg)).expect("check_commit");
+        let Findings { fails, warns, .. } =
+            check_commit(&base, &message_opts(msg)).expect("check_commit");
         assert_eq!(fails, Vec::<String>::new(), "{fails:#?}");
         assert_eq!(warns, Vec::<String>::new());
     }
@@ -791,7 +923,7 @@ mod tests {
             dir.path(),
             &format!("feat: a real subject\n\n{}\n", "x".repeat(161)),
         );
-        let (fails, _warns) = check_commit(&base, &message_opts(msg)).expect("check_commit");
+        let Findings { fails, .. } = check_commit(&base, &message_opts(msg)).expect("check_commit");
         assert_eq!(fails.len(), 1, "{fails:#?}");
     }
 
@@ -818,7 +950,8 @@ mod tests {
         persist_comment_char(dir.path(), ";");
         let base = load_base(dir.path()).expect("load base");
         let msg = write_message(dir.path(), VERBOSE_MESSAGE_FIXTURE_SEMICOLON);
-        let (fails, warns) = check_commit(&base, &message_opts(msg)).expect("check_commit");
+        let Findings { fails, warns, .. } =
+            check_commit(&base, &message_opts(msg)).expect("check_commit");
         assert_eq!(fails, Vec::<String>::new(), "{fails:#?}");
         assert_eq!(warns, Vec::<String>::new());
     }
@@ -836,7 +969,7 @@ mod tests {
             dir.path(),
             &format!("feat: a real subject\n\n{}\n", "x".repeat(161)),
         );
-        let (fails, _warns) = check_commit(&base, &message_opts(msg)).expect("check_commit");
+        let Findings { fails, .. } = check_commit(&base, &message_opts(msg)).expect("check_commit");
         assert_eq!(fails.len(), 1, "{fails:#?}");
     }
 
@@ -854,7 +987,7 @@ mod tests {
         persist_comment_char(dir.path(), "auto");
         let base = load_base(dir.path()).expect("load base");
         let msg = write_message(dir.path(), VERBOSE_MESSAGE_FIXTURE);
-        let (fails, _warns) = check_commit(&base, &message_opts(msg)).expect("check_commit");
+        let Findings { fails, .. } = check_commit(&base, &message_opts(msg)).expect("check_commit");
         assert_eq!(fails.len(), 1, "{fails:#?}");
     }
 
@@ -868,7 +1001,7 @@ mod tests {
         commit(root, "feat: good one", None);
         commit(root, "fix: good two", None);
         let base = load_base(root).expect("load base");
-        let (fails, warns) =
+        let Findings { fails, warns, .. } =
             check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
         assert_eq!(fails, Vec::<String>::new());
         assert_eq!(warns, Vec::<String>::new());
@@ -882,7 +1015,7 @@ mod tests {
         commit(root, "feat: good", None);
         commit(root, "bad subject", None);
         let base = load_base(root).expect("load base");
-        let (fails, _warns) =
+        let Findings { fails, .. } =
             check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
         assert_eq!(
             fails,
@@ -908,7 +1041,7 @@ mod tests {
         );
         commit(root, "feat: human", Some(compare_link));
         let base = load_base(root).expect("load base");
-        let (fails, _warns) =
+        let Findings { fails, .. } =
             check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
         assert_eq!(
             fails,
@@ -927,7 +1060,7 @@ mod tests {
         commit(root, "bad one", None);
         commit(root, "bad two", None);
         let base = load_base(root).expect("load base");
-        let (fails, _warns) =
+        let Findings { fails, .. } =
             check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
         assert_eq!(fails.len(), 2, "{fails:#?}");
     }
@@ -939,7 +1072,7 @@ mod tests {
         let base_sha = commit(root, "chore: base", None);
         commit(root, "bad subject", None);
         let base = load_base(root).expect("load base");
-        let (fails, _warns) =
+        let Findings { fails, .. } =
             check_commit(&base, &range_opts(&base_sha, Some("HEAD"))).expect("check_commit");
         assert_eq!(fails.len(), 1);
     }
@@ -953,7 +1086,7 @@ mod tests {
         let base_sha = commit(root, "chore: base", None);
         commit(root, "not an ok subject", None);
         let base = load_base(root).expect("load base");
-        let (fails, warns) =
+        let Findings { fails, warns, .. } =
             check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
         assert_eq!(fails, Vec::<String>::new(), "{fails:#?}");
         assert_eq!(
@@ -1025,7 +1158,7 @@ mod tests {
         write_file(root, "template/a.txt", "a\n");
         commit(root, "feat(template): add a", None);
         let base = load_base(root).expect("load base");
-        let (fails, _warns) =
+        let Findings { fails, .. } =
             check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
         assert_eq!(
             fails,
@@ -1048,7 +1181,7 @@ mod tests {
         write_file(root, "STAMP", "digest2\n");
         commit(root, "feat(template): add a and restamp", None);
         let base = load_base(root).expect("load base");
-        let (fails, warns) =
+        let Findings { fails, warns, .. } =
             check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
         assert_eq!(fails, Vec::<String>::new(), "{fails:#?}");
         assert_eq!(warns, Vec::<String>::new());
@@ -1071,7 +1204,7 @@ mod tests {
         write_file(root, "template/post.txt", "post\n");
         commit(root, "feat(template): post-mechanism split", None);
         let base = load_base(root).expect("load base");
-        let (fails, _warns) =
+        let Findings { fails, .. } =
             check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
         assert_eq!(
             fails,
@@ -1092,7 +1225,7 @@ mod tests {
         write_file(root, "template/a.txt", "a\n");
         commit(root, "feat(template): add a", None);
         let base = load_base(root).expect("load base");
-        let (fails, warns) =
+        let Findings { fails, warns, .. } =
             check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
         assert_eq!(fails, Vec::<String>::new(), "{fails:#?}");
         assert_eq!(
@@ -1121,7 +1254,7 @@ mod tests {
             None,
         );
         let base = load_base(root).expect("load base");
-        let (fails, warns) =
+        let Findings { fails, warns, .. } =
             check_commit(&base, &range_opts(&base_sha, None)).expect("check_commit");
         assert_eq!(fails, Vec::<String>::new(), "{fails:#?}");
         assert_eq!(warns, Vec::<String>::new(), "{warns:#?}");
@@ -1134,7 +1267,8 @@ mod tests {
         let dir = make_repo(&[co_change_entry()]);
         let base = load_base(dir.path()).expect("load base");
         let msg = write_message(dir.path(), "feat(template): x\n");
-        let (fails, warns) = check_commit(&base, &message_opts(msg)).expect("check_commit");
+        let Findings { fails, warns, .. } =
+            check_commit(&base, &message_opts(msg)).expect("check_commit");
         assert_eq!(fails, Vec::<String>::new());
         assert_eq!(warns, Vec::<String>::new());
     }

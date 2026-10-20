@@ -43,7 +43,7 @@
       "standing": true,
       "summary": "Always run the mini fixture's own regeneration before trusting its output.",
       "body": [
-        "Synthetic standing rule for the mini fixture; it exercises standing-rules.md rendering."
+        "Synthetic standing rule for the mini fixture; it exercises the standing section of the AGENTS.md block."
       ],
       "tags": ["fixture", "standing"],
       "source": { "date": "2026-09-04", "by": "docs", "ref": "HR-054 fixture corpus" }

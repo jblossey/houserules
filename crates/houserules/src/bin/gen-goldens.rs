@@ -6,7 +6,8 @@
 //! # What this writes
 //!
 //! - `tests/goldens/render/root/**` -- every file `houserules render`
-//!   produces for a detached worktree at the frozen sha (this
+//!   produces for a detached worktree at the frozen sha (the `AGENTS.md`
+//!   files with their blocks, the Claude files; this
 //!   repository's own, larger knowledge base; area order table-stakes
 //!   `render_parity.rs`'s own "root" test still needs).
 //! - `tests/goldens/render/mini/**` -- the same, for a scratch copy of
@@ -78,6 +79,13 @@ const FROZEN_SHA: &str = "5f14727b4adeeb347a8d1f0c8f98d929f62bc7f4";
 /// existence and its budget, so any short text under the 200-line/
 /// 12288-byte instruction budget is equally valid here.
 const ROOT_WORKTREE_AGENTS_MD_STUB: &str = "# AGENTS.md stub\n\nWritten by the check-parity harness: the frozen sha this worktree checks out predates AGENTS.md joining SEED_ONCE. A real adopter's own checkout already has one.\n";
+
+/// The `CLAUDE.md` content that the `root` corpus's frozen worktree gets:
+/// the frozen sha's own `CLAUDE.md` predates the `@AGENTS.md` import that
+/// `check_base` now requires of any `CLAUDE.md`.
+/// `crates/houserules/tests/check_parity.rs` keeps its own copy of this
+/// constant, for the reason given for the `AGENTS.md` stub above.
+const ROOT_WORKTREE_CLAUDE_MD_STUB: &str = "@AGENTS.md\n";
 
 /// A fresh, empty directory under the OS temp root, removed by its own
 /// `Drop`. `tempfile` (this crate's `[dev-dependencies]`) is unavailable to
@@ -188,11 +196,32 @@ impl Worktree {
             .status()
             .expect("run git worktree add");
         assert!(status.success(), "git worktree add {sha} failed");
+        stamp_install_schema(&path);
         Worktree {
             repo_root: repo_root.to_path_buf(),
             path,
         }
     }
+}
+
+/// Adds the install `schema` key to the `.houserules.json` of the worktree at
+/// `path`, so that D4 lets the commands under capture read it. The frozen sha
+/// holds a marker of release 1.x. The key is the only change:
+/// `tests/common/mod.rs`'s `FrozenWorktree` makes the same change.
+fn stamp_install_schema(path: &Path) {
+    let marker = path.join(".houserules.json");
+    let mut stamp: serde_json::Map<String, Value> =
+        serde_json::from_str(&fs::read_to_string(&marker).unwrap_or_else(|_| "{}".to_string()))
+            .expect("the frozen marker is a JSON object");
+    stamp.insert("schema".to_string(), json!("houserules/install@2.0.0"));
+    fs::write(
+        &marker,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&stamp).expect("serialize the marker")
+        ),
+    )
+    .expect("write the marker");
 }
 
 impl Drop for Worktree {
@@ -227,9 +256,54 @@ fn run_dir(bin: &Path, subcommand: &str, cwd: &Path) -> (String, String, i32) {
     )
 }
 
-/// Every `.claude/rules/*.md` file plus the knowledge skill, present under
-/// `root` after a render.
+/// The `AGENTS.md` files below `relative` (a path under `root`, empty for
+/// the root itself), as `/`-separated paths relative to `root`, in directory
+/// order. A `.git` entry is skipped.
+fn agents_md_files(root: &Path, relative: &str, found: &mut Vec<String>) {
+    let dir = relative
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .fold(root.to_path_buf(), |path, part| path.join(part));
+    let mut entries: Vec<_> = fs::read_dir(&dir)
+        .unwrap_or_else(|error| panic!("read {}: {error}", dir.display()))
+        .map(|entry| entry.expect("a directory entry"))
+        .collect();
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let name = entry.file_name().into_string().expect("utf8 filename");
+        let path = if relative.is_empty() {
+            name.clone()
+        } else {
+            format!("{relative}/{name}")
+        };
+        if entry.file_type().expect("a file type").is_dir() {
+            if name != ".git" {
+                agents_md_files(root, &path, found);
+            }
+        } else if name == "AGENTS.md" {
+            found.push(path);
+        }
+    }
+}
+
+/// The text of `text` before its begin marker line: the project text of an
+/// `AGENTS.md` whose generated block sits at its end.
+fn text_before_block(text: &str) -> String {
+    let mut kept = String::new();
+    for line in text.split_inclusive('\n') {
+        if line.trim() == "<!-- houserules:begin -->" {
+            break;
+        }
+        kept.push_str(line);
+    }
+    kept
+}
+
+/// Every `AGENTS.md` file below `root`, every `.claude/rules/*.md` file, and
+/// the knowledge skill, present under `root` after a render.
 fn rendered_paths(root: &Path) -> Vec<String> {
+    let mut agents_md = Vec::new();
+    agents_md_files(root, "", &mut agents_md);
     let rules_dir = root.join(".claude/rules");
     let mut files: Vec<String> = fs::read_dir(&rules_dir)
         .unwrap_or_else(|error| panic!("read {}: {error}", rules_dir.display()))
@@ -240,7 +314,21 @@ fn rendered_paths(root: &Path) -> Vec<String> {
         .collect();
     files.sort();
     files.push(".claude/skills/project-knowledge/SKILL.md".to_string());
-    files
+    agents_md.extend(files);
+    agents_md
+}
+
+/// The path of the golden for the generated file `relative`: the file
+/// itself, or for an `AGENTS.md` its copy with the suffix `.golden`. A golden
+/// named `AGENTS.md` would be an `AGENTS.md` of this repository that holds a
+/// block the area rules of this repository do not write, and `render` removes
+/// such a block. `tests/common/mod.rs` keeps the same rule (`golden_file`).
+fn golden_name(relative: &str) -> String {
+    if relative.rsplit('/').next() == Some("AGENTS.md") {
+        format!("{relative}.golden")
+    } else {
+        relative.to_string()
+    }
 }
 
 /// Runs `houserules render` in `cwd`, then copies every file it produces
@@ -250,10 +338,11 @@ fn render_and_freeze(bin: &Path, cwd: &Path, goldens_dir: &Path, prefix: &str) -
     assert_eq!(exit, 0, "render --dir {} failed: {stderr}", cwd.display());
     let mut written = Vec::new();
     for relative in rendered_paths(cwd) {
-        let dest = goldens_dir.join("render").join(prefix).join(&relative);
+        let golden = golden_name(&relative);
+        let dest = goldens_dir.join("render").join(prefix).join(&golden);
         fs::create_dir_all(dest.parent().expect("dest has a parent")).expect("mkdir golden dir");
         fs::copy(cwd.join(&relative), &dest).expect("copy rendered file to golden");
-        written.push(format!("render/{prefix}/{relative}"));
+        written.push(format!("render/{prefix}/{golden}"));
     }
     written
 }
@@ -545,6 +634,11 @@ fn main() {
             ROOT_WORKTREE_AGENTS_MD_STUB,
         )
         .expect("write AGENTS.md stub into the frozen worktree");
+        fs::write(
+            worktree.path.join("CLAUDE.md"),
+            ROOT_WORKTREE_CLAUDE_MD_STUB,
+        )
+        .expect("write CLAUDE.md stub into the frozen worktree");
         written.extend(render_and_freeze(
             &bin,
             &worktree.path,
@@ -579,9 +673,9 @@ fn main() {
     }
 
     // render/mini and check/mini: a scratch copy of the small, synthetic
-    // mini fixture, its checked-in `.claude/rules` and skill removed first
-    // so the render below proves the golden, not the fixture's own
-    // (already-current) copy.
+    // mini fixture, its checked-in `.claude/rules`, skill, directory block,
+    // and root block removed first so the render below proves the golden,
+    // not the fixture's own (already-current) copy.
     {
         let mini_src = root.join("tests/fixtures/mini");
         let scratch = ScratchDir::new("houserules-goldens-mini");
@@ -593,6 +687,12 @@ fn main() {
                 .join(".claude/skills/project-knowledge/SKILL.md"),
         )
         .expect("remove the knowledge skill");
+        fs::remove_file(scratch.path().join("mini-tools/AGENTS.md"))
+            .expect("remove the directory block");
+        let agents_md = scratch.path().join("AGENTS.md");
+        let project_text =
+            text_before_block(&fs::read_to_string(&agents_md).expect("read the root AGENTS.md"));
+        fs::write(&agents_md, project_text).expect("remove the root block");
         written.extend(render_and_freeze(
             &bin,
             scratch.path(),

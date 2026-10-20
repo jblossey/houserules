@@ -47,11 +47,12 @@ and lint first.
    ```
    `archive` moves every item, batch, and knowledge entry the ruling above
    just retired into `backlog/archive/`/`knowledge/archive/`; running it
-   is safe even when nothing qualifies yet. `render` regenerates
-   `.claude/rules/*.md` and the `project-knowledge` skill: a sweep that
-   moves a rendered (standing or area-file) knowledge entry leaves those
-   generated files stale, and `check-knowledge` fails on that drift if you
-   skip this step. If either check still fails after `render`, the finding
+   is safe even when nothing qualifies yet. `render` regenerates the
+   houserules blocks of the `AGENTS.md` files and, in an install with the
+   Claude renderer, `.claude/rules/*.md` and the `project-knowledge`
+   skill: a sweep that moves a rendered (standing or area-file) knowledge
+   entry leaves those generated files stale, and `check-knowledge` fails
+   on that drift if you skip this step. If either check still fails after `render`, the finding
    is real — fix it (or revert the sweep) before continuing; do not
    proceed to step 4 with a red gate. Commit the sweep and the
    regenerated files together, with the backlog update or in the branch

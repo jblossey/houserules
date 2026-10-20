@@ -6,8 +6,8 @@
 //!
 //! This module reads the files and keeps the four original keys
 //! (`violations`, `unused_ids`, `audits`, `reviews`). `cost.rs` renders
-//! the `workspaces` and `cost` keys; `proposals.rs` renders `rules` and
-//! `proposals`.
+//! the `workspaces` and `cost` keys; `proposals.rs` renders `rules`,
+//! `packs`, and `proposals`.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
@@ -389,12 +389,13 @@ pub(super) fn stats(dirs: &[PathBuf], base: &Base) -> Result<Value, String> {
         "workspaces": cost::workspace_rows(&workspaces),
         "cost": cost::cost(&workspaces),
         "rules": proposals::rules_json(&rows),
+        "packs": proposals::packs_json(base, &rows, &tally.violations),
         "proposals": proposals::proposals(&rows),
     }))
 }
 
 /// Runs the `stats` subcommand: resolves `root` (`--dir`, or the
-/// enclosing git repository's top level), loads the knowledge base there
+/// nearest install root), loads the knowledge base there
 /// before it reads any workspace -- so a repository whose knowledge base
 /// fails to load fails `stats` too, not only `audit` -- then runs `stats`
 /// over `workspaces` and prints its JSON result.
@@ -431,7 +432,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::rules::test_support::{base_with, entry, valid_check};
+    use crate::rules::test_support::{base_with, base_with_packs, entry, valid_check};
 
     fn write(dir: &Path, name: &str, value: &Value) {
         fs::write(dir.join(name), serde_json::to_string(value).unwrap()).unwrap();
@@ -549,7 +550,7 @@ mod tests {
     }
 
     /// The four old keys come first, then `workspaces`, `cost`, `rules`,
-    /// and `proposals`, in this order.
+    /// `packs`, and `proposals`, in this order.
     #[test]
     fn the_new_keys_follow_the_four_old_keys() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -570,6 +571,7 @@ mod tests {
                 "workspaces",
                 "cost",
                 "rules",
+                "packs",
                 "proposals"
             ]
         );
@@ -1219,14 +1221,14 @@ mod tests {
             value["rules"],
             json!([
                 {
-                    "id": "a.one", "standing": false, "mode": "judged",
+                    "id": "a.one", "source": "local", "standing": false, "mode": "judged",
                     "workspaces": 0, "injected": 0, "rows": 0, "fails": 0,
                     "findings": {"critical": 0, "important": 0, "minor": 0, "other": 0},
                     "targets": {"code": 0, "deliverable": 0, "prose": 0, "other": 0},
                     "cited": 0,
                 },
                 {
-                    "id": "b.two", "standing": true, "mode": "deterministic",
+                    "id": "b.two", "source": "local", "standing": true, "mode": "deterministic",
                     "workspaces": 1, "injected": 1, "rows": 1, "fails": 0,
                     "findings": {"critical": 0, "important": 1, "minor": 0, "other": 0},
                     "targets": {"code": 1, "deliverable": 0, "prose": 0, "other": 0},
@@ -1312,6 +1314,69 @@ mod tests {
             json!([
                 {"id": "a.rule", "count": 1, "tasks": ["1"]},
                 {"id": "b.rule", "count": 1, "tasks": ["1"]},
+            ])
+        );
+    }
+
+    /// `stats` over one local rule and one pack rule: each `rules` row
+    /// names its source, and the `packs` key sums the cost of each source,
+    /// `local` first. The violation counts come from the audit and review
+    /// files the workspace holds, the way the top-level `violations` key
+    /// counts them.
+    #[test]
+    fn stats_names_the_source_of_each_rule_and_sums_the_cost_per_source() {
+        let parent = tempfile::tempdir().expect("tempdir");
+        let dir = workspace_dir(parent.path(), "batch-9");
+        write(
+            &dir,
+            "task-1-audit.json",
+            &json!({
+                "ids": [],
+                "rules": [
+                    {"id": "test.local", "mode": "deterministic", "result": "fail"},
+                    {"id": "alpha.pack", "mode": "judged", "result": "open"},
+                ],
+            }),
+        );
+        write(
+            &dir,
+            "task-1-review.json",
+            &json!({
+                "kind": "task-review",
+                "rule_adherence": [
+                    {"id": "alpha.pack", "mode": "judged", "result": "fail"},
+                    {"id": "test.local", "mode": "deterministic", "result": "pass"},
+                ],
+            }),
+        );
+        let (_guard, base) = base_with_packs(
+            &[entry(
+                "test.local",
+                json!({"standing": true, "check": valid_check()}),
+            )],
+            &[("alpha", &[entry("alpha.pack", json!({}))])],
+            &[],
+        );
+
+        let value = stats(std::slice::from_ref(&dir), &base).unwrap();
+
+        let sources: Vec<(&str, &str)> = value["rules"]
+            .as_array()
+            .expect("rows")
+            .iter()
+            .map(|row| {
+                (
+                    row["id"].as_str().expect("id"),
+                    row["source"].as_str().expect("source"),
+                )
+            })
+            .collect();
+        assert_eq!(sources, [("alpha.pack", "alpha"), ("test.local", "local")]);
+        assert_eq!(
+            value["packs"],
+            json!([
+                {"source": "local", "entries": 1, "standing": 1, "judged_rows": 0, "violations": 1},
+                {"source": "alpha", "entries": 1, "standing": 0, "judged_rows": 1, "violations": 1},
             ])
         );
     }

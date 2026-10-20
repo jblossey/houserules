@@ -12,7 +12,7 @@
 //! duplicated in each so the two feature modules' output format cannot
 //! drift apart (`emit.rs`'s own module doc has the full account); `get`
 //! sits beside it for the same reason. `root` holds `resolve_root`, the
-//! one `--dir`-or-git-root fallback every load-first command and `get`
+//! one `--dir`-or-install-root fallback every load-first command and `get`
 //! itself share (`root.rs`'s own module doc has the full account).
 //! `check-commit` (`rules::check_commit`) runs the knowledge base's
 //! `commits`-type checks against a not-yet-committed message or a git
@@ -22,7 +22,7 @@
 //! (`rust-embed`): `init` seeds a target repository, `files` prints the
 //! ownership split, and `update` syncs an existing install against its
 //! recorded baseline, all with no `template/` checkout needed at runtime
-//! (`install.rs`'s own module doc has the full account). `node_path`
+//! (`install/mod.rs`'s own module doc has the full account). `node_path`
 //! holds `resolve_like_node`, the Node-`path.resolve` parity `validate`
 //! and `install` both need (`node_path.rs`'s own module doc has the full
 //! account). `check-report-claims`
@@ -43,6 +43,20 @@
 //! update-available header on stderr when a cached, receipt-free check
 //! says a newer release exists, or stays silent on every gate and every
 //! failure (`update_check.rs`'s own module doc has the full account).
+//! `pack` (`pack::cmd_pack_list`, `cmd_pack_add`, `cmd_pack_remove`,
+//! `cmd_pack_upgrade`) lists, adds, removes, and upgrades the knowledge
+//! packs of an install (`pack/mod.rs`'s own module doc has the full
+//! account). D4 (`install::refuse_install_schema`) refuses a tree before a
+//! command runs and exits 2 with one named line. `main` runs it before every
+//! command but `files` and `update` (`d4_guard` lists the commands); `update`
+//! runs it after its self-update phase and before its repo phase (spec C22),
+//! so that it can install the release that the line names. A command that
+//! reads the install refuses a tree whose install schema is missing or older
+//! than major 2 with a line that names `houserules update`. `update` and
+//! `init` run on such a tree. Every command but `files`, `update` and `init`
+//! included, refuses a tree whose install schema is newer than major 2 with a
+//! line that names the release it needs, and a tree whose install schema is no
+//! install schema id with a line that names the value (spec C23).
 
 mod archive;
 mod backlog;
@@ -51,6 +65,8 @@ mod emit;
 mod get;
 mod install;
 mod node_path;
+mod pack;
+mod packs;
 mod report_claims;
 mod root;
 mod rules;
@@ -59,7 +75,7 @@ mod schema_pin;
 mod selfupdate;
 mod update_check;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
@@ -105,23 +121,40 @@ struct Cli {
 /// `backlog`/`rules` function directly -- see that module's doc for why.
 #[derive(Subcommand)]
 enum Command {
-    /// Writes every stale generated knowledge file, or lists them with `--check`.
+    /// Writes every stale generated knowledge file, or lists them with
+    /// `--check`. The AGENTS.md renderer is always on: it owns the block
+    /// between the `<!-- houserules:begin -->` and `<!-- houserules:end -->`
+    /// lines of the root `AGENTS.md` and of the `AGENTS.md` of each directory
+    /// that the globs of an area share, and it removes a block it no longer
+    /// writes. The Claude renderer, which `renderers` in `.houserules.json`
+    /// enables, writes `.claude/rules/<area>.md` and the `project-knowledge`
+    /// skill, and deletes a generated file in `.claude/rules/` that it no
+    /// longer writes. A marker with no pair, or two blocks in one file, is
+    /// one line that names the file, and exit 2.
     Render {
-        /// Report stale files on stderr and exit 1, instead of writing them.
+        /// Report the files that would change on stderr and exit 1, instead
+        /// of writing them.
         #[arg(long)]
         check: bool,
-        /// Repository root to render from; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to render from; defaults to the nearest directory at
+        /// or above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
-    /// Validates the knowledge base: schema, cross-entry invariants, every
-    /// generated file's freshness and budget, and that every id a kit-owned
-    /// file cites from a topic the kit seeds is an entry of the knowledge
-    /// base.
+    /// Validates the knowledge base: schema, cross-entry invariants, one
+    /// source for each id, the area of every entry, every generated file's
+    /// freshness and budget, the `@AGENTS.md` import in CLAUDE.md, and
+    /// compression markers that a context proxy left in a file. Checks each
+    /// pack copy against its pin in `.houserules.json`, and each override and
+    /// exclusion in `knowledge/overrides.json` against the installed packs.
+    /// Checks that every id a kit-owned file cites from a topic the kit seeds
+    /// is an entry of the knowledge base. Prints each override and exclusion
+    /// on stdout.
     CheckKnowledge {
-        /// Repository root to check; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to check; defaults to the nearest directory at or
+        /// above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
@@ -129,12 +162,18 @@ enum Command {
     /// backlog item (`<idPrefix>-\d{3}`, the project's own stamped
     /// prefix), an amendment or parked item (`A-\d{2}`, `PP-\d+-\d{2}`,
     /// both kit-fixed regardless of idPrefix), or otherwise a knowledge
-    /// entry.
+    /// entry. A pack entry with an override prints as its effective entry,
+    /// with an `overridden` field that lists the replaced fields. An entry
+    /// that `knowledge/overrides.json` excludes prints too, with an
+    /// `excluded` field that holds the reason, or `true` when there is
+    /// none. A pack entry with status `retired` or `superseded` prints,
+    /// which the other commands leave out.
     Get {
         /// Backlog and/or knowledge ids to print, in any mix.
         ids: Vec<String>,
-        /// Repository root to read from; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to read from; defaults to the nearest directory at or
+        /// above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
@@ -158,8 +197,9 @@ enum Command {
         /// Only items assigned to this exact batch number.
         #[arg(long)]
         batch: Option<String>,
-        /// Repository root to read from; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to read from; defaults to the nearest directory at or
+        /// above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
@@ -167,8 +207,9 @@ enum Command {
     Batch {
         /// The batch number (exactly one).
         numbers: Vec<String>,
-        /// Repository root to read from; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to read from; defaults to the nearest directory at or
+        /// above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
@@ -176,20 +217,24 @@ enum Command {
     Set {
         /// The item id, followed by one or more `field=value` assignments.
         args: Vec<String>,
-        /// Repository root to write into; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to write into; defaults to the nearest directory at
+        /// or above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
-    /// Validates the backlog: schema, cross-file invariants.
+    /// Validates the backlog: schema, cross-file invariants, and compression
+    /// markers that a context proxy left in a backlog file.
     CheckBacklog {
-        /// Repository root to check; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to check; defaults to the nearest directory at or
+        /// above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
     /// Builds the rule package for a git range and runs every member's
-    /// deterministic check.
+    /// deterministic check. Every path it matches is relative to the install
+    /// root; a changed path outside the install root is out of scope.
     Audit {
         /// The range's base ref.
         #[arg(long)]
@@ -220,32 +265,39 @@ enum Command {
         /// outside the audit's package is an error: add it to `--ids`.
         #[arg(long)]
         sanctioned: Vec<String>,
-        /// Repository root to audit; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to audit; defaults to the nearest directory at or
+        /// above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
     /// Validates one or more deliverable JSON files against
-    /// `.claude/schemas/deliverables.json`.
+    /// `.claude/schemas/deliverables.json`, and rejects a compression marker
+    /// that a context proxy left in a file.
     Validate {
         /// Deliverable files to validate.
         files: Vec<PathBuf>,
-        /// Repository root the deliverables schema resolves from; defaults
-        /// to the enclosing git repository's top level, resolved from the
-        /// current directory.
+        /// Install root the deliverables schema resolves from; defaults to
+        /// the nearest directory at or above the current one that holds
+        /// `.houserules.json`, no higher than the git top level, else the git
+        /// top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
     /// Aggregates rule violations, unused injected ids, process cost, and
     /// knowledge-base proposals across one or more workspace directories'
-    /// JSON deliverables.
+    /// JSON deliverables. Each `rules` row names its `source`: `local`, or
+    /// the name of the pack that ships the entry. The `packs` key sums
+    /// entries, standing entries, judged rows, and violations for `local`
+    /// and for each installed pack.
     Stats {
         /// One or more workspace directories to aggregate.
         #[arg(required = true, value_name = "WORKSPACE")]
         workspaces: Vec<PathBuf>,
-        /// Repository root to check the knowledge base under; defaults to
-        /// the enclosing git repository's top level, resolved from the
-        /// current directory.
+        /// Install root to check the knowledge base under; defaults to the
+        /// nearest directory at or above the current one that holds
+        /// `.houserules.json`, no higher than the git top level, else the git
+        /// top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
@@ -266,8 +318,9 @@ enum Command {
         /// Only standing entries.
         #[arg(long)]
         standing: bool,
-        /// Repository root to read from; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to read from; defaults to the nearest directory at or
+        /// above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
@@ -275,32 +328,47 @@ enum Command {
     /// areas' rule-shaped entries, plus every entry whose `verify` names
     /// one of the paths.
     For {
-        /// Changed paths to resolve.
+        /// Changed paths to resolve, each relative to the install root, not
+        /// to the git top level.
         paths: Vec<String>,
         /// Print each matching entry whole, instead of its index row.
         #[arg(long)]
         full: bool,
-        /// Repository root to read from; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to read from; defaults to the nearest directory at or
+        /// above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
     /// Lists every loaded knowledge topic's name, entry count, and title.
+    /// A topic sums the entries of every source: the local topic file and
+    /// each installed pack copy. An excluded entry and a pack entry with
+    /// status `retired` or `superseded` do not count.
     Topics {
-        /// Repository root to read from; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to read from; defaults to the nearest directory at or
+        /// above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
     /// Lists the standing rules, rules before invariants.
     Standing {
-        /// Repository root to read from; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to read from; defaults to the nearest directory at or
+        /// above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
     /// Runs every `commits`-type knowledge check against a not-yet-committed
-    /// message or a git range.
+    /// message or a git range. In an install below the git top level, it
+    /// skips a commit that changes at least one path and none of them under
+    /// the install root; a merge counts the paths of every parent diff, and
+    /// a commit that changes no path is checked. With `--from` it always
+    /// prints one line that counts the skipped commits, `skipped 0 commits`
+    /// included. With a message file it reads the staged files and prints
+    /// that line only when it skips: an amendment that stages only paths
+    /// outside the install root is skipped, though the amended commit
+    /// touched the install.
     CheckCommit {
         /// A not-yet-committed message file (the commit-msg hook's own call
         /// shape: git passes the proposed message's path as `$1`). Exactly
@@ -314,39 +382,94 @@ enum Command {
         /// alongside `--from`.
         #[arg(long)]
         to: Option<String>,
-        /// Repository root to check from; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to check from; defaults to the nearest directory at
+        /// or above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
-    /// Seeds the kit into a target git repository from the embedded payload.
+    /// Installs the kit into a target git repository from the embedded
+    /// payload: the kit-owned files, the seed-once files, and, on a new
+    /// install, the five kit packs with their pins in `.houserules.json`.
+    /// Without `--target claude` it leaves out the Claude Code files and the
+    /// hook entry, and prints the line that enables them. Running it again
+    /// seeds what is missing and keeps what exists. On an existing install it
+    /// installs no pack and adds no area: only the `pack` commands and
+    /// `update` change the pins. It never seeds a path that `ownedPaths` in
+    /// `.houserules.json` lists; the files that `render` generates follow the
+    /// knowledge base, not `ownedPaths`. It refuses an install whose schema is
+    /// newer than the binary writes, with a line that names the release it
+    /// needs, and an install whose schema is no install schema id, with a line
+    /// that names the value; it changes nothing then.
     Init {
-        /// The target directory; defaults to the current directory. Unlike
+        /// The install root; defaults to the current directory. Unlike
         /// every read command's `--dir` above, this is not resolved against
-        /// an enclosing git repository -- the target itself must already be
-        /// a git repository's top level (`install::cmd_init`'s own doc has
-        /// the full account).
+        /// an enclosing install -- the directory itself is the root. It must
+        /// exist and lie in a git repository: the top level, or a directory
+        /// below it for a subdirectory install, which writes its CI workflow
+        /// at the top level as `.github/workflows/knowledge-<folder>.yml`.
+        /// It is refused when it nests with another install of the
+        /// repository or would write another install's workflow file.
         #[arg(long)]
         dir: Option<PathBuf>,
         /// The backlog id prefix seeded schemas carry; defaults to `WI`.
         #[arg(long)]
         id_prefix: Option<String>,
+        /// A render target to enable, in the install root. On an existing
+        /// install it adds the target to `renderers`, seeds the files of the
+        /// target that are missing, keeps every file that exists, and
+        /// renders. For `claude`, it adds the hook entry to an existing
+        /// `.claude/settings.json` and keeps the other keys. A
+        /// `.claude/settings.json` that `ownedPaths` in `.houserules.json`
+        /// lists gets no hook entry.
+        #[arg(long, value_enum)]
+        target: Option<install::InitTarget>,
     },
-    /// Prints the kit-owned and seed-once file lists the embedded payload defines.
+    /// Prints the file classes of the kit as JSON: the kit-owned files, the
+    /// seed-once files, the copies of the kit packs, and the D3 files, which
+    /// `init` seeds and `update` keeps current through a baseline. Each path
+    /// is in one class. The CI workflow is a D3 file that only a GitHub-hosted
+    /// target gets.
     Files,
     /// Self-updates the installed binary first, where the install channel
-    /// supports it (`HOUSERULES_SKIP_SELF_UPDATE` opts out), then syncs an
-    /// already-`init`ed target's `KIT_OWNED` files from the embedded
-    /// payload, deletes any retired kit file still present, and reports
-    /// the stamped-to-running version drift.
+    /// supports it (`HOUSERULES_SKIP_SELF_UPDATE` opts out), then updates the
+    /// install. After the self-update and before any write, it refuses an
+    /// install whose schema is newer than the binary writes, with a line that
+    /// names the release it needs, and an install whose schema is no install
+    /// schema id, with a line that names the value. An install of houserules
+    /// 1.x is converted to the 2.0 layout:
+    /// the seeded entries become the five kit packs in `knowledge/packs/`,
+    /// the `overrides` of `.houserules.json` become `ownedPaths` and
+    /// `knowledge/overrides.json`, and the `schema` key is written last. A
+    /// topic file `knowledge/overrides.json` of 1.x stops the conversion
+    /// before any write, and so does a `knowledge/` directory that does not
+    /// exist or is empty: restore the directory from version control and run
+    /// `update` again, or remove `.houserules.json` and run `init --id-prefix
+    /// <prefix>` for a fresh install, with the `idPrefix` of the marker. A
+    /// `knowledge/areas.json` that `ownedPaths` lists and that does not exist
+    /// stops it too. On a 2.0 install it moves the pins of the kit packs
+    /// to the versions of the binary and turns a local entry with a pack id
+    /// into an override. Then it syncs the kit-owned files of an
+    /// already-`init`ed target from the embedded payload: it writes a missing
+    /// file, or one that the project has not changed, and lists it only when
+    /// its bytes change; it keeps and lists a file the project changed
+    /// (`kept <file> (locally modified)`); it never syncs a path that
+    /// `ownedPaths` in `.houserules.json` lists. While `renderers` lacks
+    /// `claude`, it skips the Claude Code files. It deletes any retired kit
+    /// file still present, prints each hand step that the project has left
+    /// (`hand step: ...`), and reports the stamped-to-running version drift.
+    /// Every other command that reads the install refuses an install of 1.x
+    /// with one line that names this command.
     Update {
-        /// The target directory; defaults to the current directory. Resolved
-        /// the same way `init`'s own `--dir` is (`install::cmd_update`'s own
-        /// doc has the full account).
+        /// The install root; defaults to the current directory. Resolved the
+        /// same way `init`'s own `--dir` is. A directory below the git top
+        /// level must hold a `.houserules.json`.
         #[arg(long)]
         dir: Option<PathBuf>,
-        /// The backlog id prefix a still-unstamped install's marker
-        /// defaults to; defaults to `WI`.
+        /// The backlog id prefix of an install that has no `.houserules.json`
+        /// yet; defaults to `WI`. A directory that holds `knowledge/` and no
+        /// `.houserules.json` needs it: `update` refuses without it, so that
+        /// it never stamps `WI` on a project with its own prefix.
         #[arg(long)]
         id_prefix: Option<String>,
     },
@@ -362,28 +485,162 @@ enum Command {
     CheckReportClaims {
         /// The report file to check.
         report_path: PathBuf,
-        /// Repository root the report's cited artifacts and commit shas
-        /// resolve against; defaults to the enclosing git repository's
-        /// top level, resolved from the current directory. Independent of
-        /// `report_path`, which always resolves against the real current
-        /// directory (`report_claims.rs`'s own module doc has the full
-        /// account).
+        /// Install root the report's cited artifacts and commit shas resolve
+        /// against; defaults to the nearest directory at or above the current
+        /// one that holds `.houserules.json`, no higher than the git top
+        /// level, else the git top level. Independent of `report_path`,
+        /// which always resolves against the real current directory.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
     /// Moves done/dropped backlog items, done batch entries, and
     /// superseded/retired knowledge entries into their `archive/` mirrors.
+    /// It moves local knowledge entries only: a pack entry with status
+    /// `retired` or `superseded` stays in its pack copy, whether the pack
+    /// ships the status or an override sets it.
     Archive {
-        /// Repository root to sweep; defaults to the enclosing git
-        /// repository's top level, resolved from the current directory.
+        /// Install root to sweep; defaults to the nearest directory at or
+        /// above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
+    /// Lists, adds, upgrades, and removes the knowledge packs of an install.
+    Pack {
+        #[command(subcommand)]
+        action: PackCommand,
+    },
+}
+
+/// The `pack` subcommands.
+#[derive(Subcommand)]
+enum PackCommand {
+    /// Lists the installed packs with their version, source, entry count,
+    /// and the counts of their overrides and exclusions, and the kit packs
+    /// that the install lacks. A copy with no pin shows the source
+    /// `unpinned`; a pin with no copy shows `no copy` for its counts.
+    List {
+        /// Install root to read from; defaults to the nearest directory at or
+        /// above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
+    /// Installs a pack: a kit pack by name, an upstream pack from
+    /// `git+<url>@<tag>#<path>`, or a pack file inside the install. It copies
+    /// the pack into `knowledge/packs/`, pins it in `.houserules.json`, adds
+    /// the areas it declares, and turns each local entry that the pack ships
+    /// into an override or drops it. It then renders the generated files.
+    Add {
+        /// A kit pack name, `git+<url>@<tag>#<path>` (the tag must be a tag,
+        /// never a branch or a commit), or the path of a pack file.
+        source: String,
+        /// Install root to write into; defaults to the nearest directory at
+        /// or above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
+    /// Deletes a pack's copy and pin and removes the areas it added. It
+    /// refuses while `knowledge/overrides.json` names one of the pack's ids.
+    /// It then renders the generated files.
+    Remove {
+        /// The pack name.
+        name: String,
+        /// Install root to write into; defaults to the nearest directory at
+        /// or above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
+    /// Moves an upstream pack to a new tag of its git source, or re-copies
+    /// it from its file source. It keeps the overrides and the exclusions,
+    /// prints the ids it adds and drops, and renders the generated files. A
+    /// kit pack moves with `update`.
+    Upgrade {
+        /// The pack name.
+        name: String,
+        /// The new tag, for a pack with a git source; a pack with a file
+        /// source takes none.
+        tag: Option<String>,
+        /// Install root to write into; defaults to the nearest directory at
+        /// or above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
 }
 
+/// How `main` runs D4 before a command, with the `--dir` that names its install
+/// root, or `None` for the two commands that `main` leaves out: `files` reads
+/// no install and runs on any tree, and `update` runs D4 itself after its
+/// self-update phase (`install::cmd_update`, spec C22). `init` refuses a 1.x
+/// install with its own line, so it runs on a tree with no install schema or
+/// an older one (`Guard::ConvertsInstall`); every other command reads the
+/// install (`Guard::ReadsInstall`). The match names every variant, so a new
+/// command cannot skip D4 unseen.
+fn d4_guard(command: &Command) -> Option<(install::Guard, &Option<PathBuf>)> {
+    use install::Guard::{ConvertsInstall, ReadsInstall};
+    match command {
+        Command::Files | Command::Update { .. } => None,
+        Command::Init { dir, .. } => Some((ConvertsInstall, dir)),
+        Command::Render { dir, .. }
+        | Command::CheckKnowledge { dir }
+        | Command::Get { dir, .. }
+        | Command::List { dir, .. }
+        | Command::Batch { dir, .. }
+        | Command::Set { dir, .. }
+        | Command::CheckBacklog { dir }
+        | Command::Audit { dir, .. }
+        | Command::Validate { dir, .. }
+        | Command::Stats { dir, .. }
+        | Command::Index { dir, .. }
+        | Command::For { dir, .. }
+        | Command::Topics { dir }
+        | Command::Standing { dir }
+        | Command::CheckCommit { dir, .. }
+        | Command::CheckReportClaims { dir, .. }
+        | Command::Archive { dir } => Some((ReadsInstall, dir)),
+        Command::Pack { action } => Some((
+            ReadsInstall,
+            match action {
+                PackCommand::List { dir }
+                | PackCommand::Add { dir, .. }
+                | PackCommand::Remove { dir, .. }
+                | PackCommand::Upgrade { dir, .. } => dir,
+            },
+        )),
+    }
+}
+
+/// D4: resolves the install root of a command like the command does, and
+/// refuses the tree that `guard` does not allow. A refusal is one stderr line
+/// and exit 2. `init` resolves `--dir` as itself (the directory is the root);
+/// a path that cannot resolve is its to name.
+fn refuse_install_schema(guard: install::Guard, dir: &Option<PathBuf>) -> Result<(), ExitCode> {
+    let root = match guard {
+        install::Guard::ReadsInstall => root::resolve_root(dir.clone())?,
+        install::Guard::ConvertsInstall => {
+            match node_path::resolve_like_node(dir.as_deref().unwrap_or(Path::new("."))) {
+                Ok(root) => root,
+                Err(_) => return Ok(()),
+            }
+        }
+    };
+    install::refuse_install_schema(&root, guard).map_err(|line| {
+        eprintln!("{line}");
+        ExitCode::from(2)
+    })
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     update_check::maybe_print_header(matches!(cli.command, Some(Command::Update { .. })));
+    if let Some((guard, dir)) = cli.command.as_ref().and_then(d4_guard)
+        && let Err(code) = refuse_install_schema(guard, dir)
+    {
+        return code;
+    }
     match cli.command {
         // Unreachable through the CLI itself: `arg_required_else_help` makes
         // clap exit the process before `main` ever sees a bare invocation.
@@ -454,13 +711,23 @@ fn main() -> ExitCode {
             to,
             dir,
         }) => rules::cmd_check_commit(dir, message_file, from, to),
-        Some(Command::Init { dir, id_prefix }) => install::cmd_init(dir, id_prefix),
+        Some(Command::Init {
+            dir,
+            id_prefix,
+            target,
+        }) => install::cmd_init(dir, id_prefix, target),
         Some(Command::Files) => install::cmd_files(),
         Some(Command::Update { dir, id_prefix }) => install::cmd_update(dir, id_prefix),
         Some(Command::CheckReportClaims { report_path, dir }) => {
             report_claims::cmd_check_report_claims(dir, report_path)
         }
         Some(Command::Archive { dir }) => archive::cmd_archive(dir),
+        Some(Command::Pack { action }) => match action {
+            PackCommand::List { dir } => pack::cmd_pack_list(dir),
+            PackCommand::Add { source, dir } => pack::cmd_pack_add(dir, source),
+            PackCommand::Remove { name, dir } => pack::cmd_pack_remove(dir, name),
+            PackCommand::Upgrade { name, tag, dir } => pack::cmd_pack_upgrade(dir, name, tag),
+        },
     }
 }
 
@@ -493,7 +760,7 @@ mod tests {
     /// none carries a `long_about` distinct from its own short `about`
     /// either. Enumerated from `Cli::command().get_subcommands()` -- the
     /// same set clap itself renders, not a hand-typed list -- exactly the
-    /// 20 `Command` variants (clap's own built-in `help` subcommand is
+    /// 21 `Command` variants (clap's own built-in `help` subcommand is
     /// rendered separately and is not itself one of `get_subcommands()`'s
     /// entries).
     #[test]
@@ -502,8 +769,8 @@ mod tests {
         let subcommands: Vec<_> = command.get_subcommands().collect();
         assert_eq!(
             subcommands.len(),
-            20,
-            "expected the full flat subcommand surface (20 Command variants), got: {:?}",
+            21,
+            "expected the full subcommand surface (21 Command variants), got: {:?}",
             subcommands.iter().map(|s| s.get_name()).collect::<Vec<_>>()
         );
         for subcommand in subcommands {
@@ -703,14 +970,60 @@ mod tests {
         );
     }
 
-    /// The 1.0 frozen CLI surface (design.md 5.82): exactly these 20
-    /// subcommand names, in `--help`'s own declaration order. The count
-    /// assertion above cannot see a same-length rename (batch 25 T5
-    /// review: a renamed variant keeps `get_subcommands().len() == 20`
-    /// and this file's own test green); comparing the names themselves
-    /// does.
+    /// The about of `name`, as `--help` prints it.
+    fn about_of(name: &str) -> String {
+        Cli::command()
+            .find_subcommand(name)
+            .and_then(|subcommand| subcommand.get_about())
+            .map(ToString::to_string)
+            .unwrap_or_else(|| panic!("{name} has an about"))
+    }
+
+    /// `check-knowledge --help` names each class of check the command runs
+    /// beyond the schema and the generated files, and the one kind of line
+    /// it prints on stdout. Each phrase pairs with the check it names.
     #[test]
-    fn the_1_0_cli_surface_names_exactly_these_20_subcommands() {
+    fn the_check_knowledge_about_names_every_class_of_check_and_line() {
+        let about = about_of("check-knowledge");
+        for (phrase, names) in [
+            ("one source for each id", "one id, one source"),
+            ("against its pin in `.houserules.json`", "the pack pins"),
+            (
+                "`knowledge/overrides.json`",
+                "the validity of overrides.json",
+            ),
+            ("the area of every entry", "the area of an entry"),
+            ("`@AGENTS.md` import in CLAUDE.md", "the CLAUDE.md import"),
+            ("compression markers", "the marker gate"),
+            ("each override and exclusion on stdout", "the listing"),
+        ] {
+            assert!(
+                about.contains(phrase),
+                "the about does not name {names} ({phrase:?}): {about:?}"
+            );
+        }
+    }
+
+    /// The marker gate runs in `check-knowledge`, `check-backlog`, and
+    /// `validate`, so each of the three abouts names it.
+    #[test]
+    fn the_three_gate_commands_name_the_compression_marker_gate() {
+        let silent: Vec<&str> = ["check-knowledge", "check-backlog", "validate"]
+            .into_iter()
+            .filter(|name| !about_of(name).contains("compression marker"))
+            .collect();
+        assert!(
+            silent.is_empty(),
+            "the about of {silent:?} does not name the marker gate"
+        );
+    }
+
+    /// The CLI surface: exactly these 21 subcommand names, in `--help`'s own
+    /// declaration order. The count assertion above cannot see a same-length
+    /// rename, because a renamed variant keeps `get_subcommands().len()`;
+    /// comparing the names themselves does.
+    #[test]
+    fn the_cli_surface_names_exactly_these_21_subcommands() {
         let command = Cli::command();
         let names: Vec<&str> = command.get_subcommands().map(|s| s.get_name()).collect();
         assert_eq!(
@@ -736,9 +1049,30 @@ mod tests {
                 "update",
                 "check-report-claims",
                 "archive",
+                "pack",
             ],
-            "the 1.0 frozen CLI surface (design.md 5.82) changed"
+            "the CLI surface (the 1.0 surface of design.md 5.82, then `pack`) changed"
         );
+    }
+
+    /// `pack` has exactly these four subcommands, each with a short `about`
+    /// and no `long_about` beyond it, as every top-level subcommand has.
+    #[test]
+    fn the_pack_subcommands_are_exactly_these_four() {
+        let command = Cli::command();
+        let pack = command.find_subcommand("pack").expect("pack is declared");
+        let names: Vec<&str> = pack.get_subcommands().map(|s| s.get_name()).collect();
+        assert_eq!(names, ["list", "add", "remove", "upgrade"]);
+        for subcommand in pack.get_subcommands() {
+            let about = subcommand.get_about().map(ToString::to_string);
+            let long_about = subcommand.get_long_about().map(ToString::to_string);
+            assert!(about.is_some(), "{}: no about", subcommand.get_name());
+            assert!(
+                long_about.is_none() || long_about == about,
+                "{}: long_about {long_about:?} diverges from about {about:?}",
+                subcommand.get_name(),
+            );
+        }
     }
 
     /// `get`'s own about text is adopter-visible (`houserules --help`'s
@@ -763,5 +1097,123 @@ mod tests {
             about.contains("idPrefix"),
             "get's about does not state that the item shape follows idPrefix: {about:?}"
         );
+    }
+
+    /// Every help text of `command` and of its subcommands, as pairs of the
+    /// surface it belongs to and its text: the about, the long about, and the
+    /// help and long help of each argument.
+    fn help_texts(command: &clap::Command, surface: &str, out: &mut Vec<(String, String)>) {
+        let surface = if surface.is_empty() {
+            command.get_name().to_string()
+        } else {
+            format!("{surface} {}", command.get_name())
+        };
+        for text in [command.get_about(), command.get_long_about()]
+            .into_iter()
+            .flatten()
+        {
+            out.push((surface.clone(), text.to_string()));
+        }
+        for argument in command.get_arguments() {
+            for text in [argument.get_help(), argument.get_long_help()]
+                .into_iter()
+                .flatten()
+            {
+                out.push((
+                    format!("{surface} --{}", argument.get_id()),
+                    text.to_string(),
+                ));
+            }
+        }
+        for subcommand in command.get_subcommands() {
+            help_texts(subcommand, &surface, out);
+        }
+    }
+
+    /// Help is for the adopter who runs the command. No help text names a
+    /// Rust path, a source file, or a doc comment: an adopter cannot read
+    /// them. The texts come from the clap definition itself, so a command or
+    /// an argument added later is swept without an edit here.
+    #[test]
+    fn no_help_text_names_a_rust_symbol_a_source_file_or_a_doc_comment() {
+        let mut texts = Vec::new();
+        help_texts(&Cli::command(), "", &mut texts);
+        assert!(texts.len() > 50, "the sweep found {} texts", texts.len());
+        let offenders: Vec<String> = texts
+            .into_iter()
+            .filter(|(_, text)| {
+                ["::", ".rs", "own doc", "module doc"]
+                    .iter()
+                    .any(|needle| text.contains(needle))
+            })
+            .map(|(surface, _)| surface)
+            .collect();
+        assert!(
+            offenders.is_empty(),
+            "these help texts name a Rust symbol, a source file, or a doc comment: {offenders:?}"
+        );
+    }
+
+    /// `init --help` says what `init` installs and what it leaves alone: a new
+    /// install gets the five kit packs, a second run seeds the missing files
+    /// and keeps those that exist, an existing install gets no pack and no
+    /// area, a path of `ownedPaths` is never seeded, and an install schema that
+    /// is newer or malformed is refused. The update about says the same of its
+    /// sync, because both commands end with `render`. `--target` says that
+    /// a settings file of `ownedPaths` gets no hook entry. The test pins every
+    /// sentence of both texts whole, in order, so a deleted, added, or
+    /// reworded sentence fails it.
+    #[test]
+    fn the_init_help_states_what_an_existing_install_and_an_owned_path_get() {
+        let command = Cli::command();
+        let init = command.find_subcommand("init").expect("init is declared");
+        let about = init
+            .get_about()
+            .map(ToString::to_string)
+            .expect("init has an about");
+        assert_eq!(
+            sentences(&about),
+            [
+                "Installs the kit into a target git repository from the embedded payload: the kit-owned files, the seed-once files, and, on a new install, the five kit packs with their pins in `.houserules.json`",
+                "Without `--target claude` it leaves out the Claude Code files and the hook entry, and prints the line that enables them",
+                "Running it again seeds what is missing and keeps what exists",
+                "On an existing install it installs no pack and adds no area: only the `pack` commands and `update` change the pins",
+                "It never seeds a path that `ownedPaths` in `.houserules.json` lists; the files that `render` generates follow the knowledge base, not `ownedPaths`",
+                "It refuses an install whose schema is newer than the binary writes, with a line that names the release it needs, and an install whose schema is no install schema id, with a line that names the value; it changes nothing then",
+            ],
+            "the sentences of the init about"
+        );
+        let update = command
+            .find_subcommand("update")
+            .and_then(|update| update.get_about())
+            .map(ToString::to_string)
+            .expect("update has an about");
+        assert!(
+            update.contains("it never syncs a path that `ownedPaths` in `.houserules.json` lists")
+                && !update.contains("never writes"),
+            "the update about limits ownedPaths to the synced files: {update}"
+        );
+        let target = init
+            .get_arguments()
+            .find(|argument| argument.get_id() == "target")
+            .and_then(|argument| argument.get_help())
+            .map(ToString::to_string)
+            .expect("init --target has a help");
+        assert_eq!(
+            sentences(&target),
+            [
+                "A render target to enable, in the install root",
+                "On an existing install it adds the target to `renderers`, seeds the files of the target that are missing, keeps every file that exists, and renders",
+                "For `claude`, it adds the hook entry to an existing `.claude/settings.json` and keeps the other keys",
+                "A `.claude/settings.json` that `ownedPaths` in `.houserules.json` lists gets no hook entry",
+            ],
+            "the sentences of the init --target help"
+        );
+    }
+
+    /// The sentences of a help text, each without its period: clap drops the
+    /// final period of a help, so the last sentence has none to strip.
+    fn sentences(text: &str) -> Vec<&str> {
+        text.split(". ").collect()
     }
 }

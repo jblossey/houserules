@@ -5,11 +5,11 @@
 //! `check_base` runs its own JSON-Schema-subset validator (`validate`,
 //! operating on `serde_json::Value` directly) against every knowledge
 //! file's raw content, so the check surface needs the schema-subset
-//! engine, not only the typed `Entry`/`AreaDef` shapes `render.rs` reads
-//! (see `model.rs`'s module doc for why loading stays lenient about
-//! shape).
+//! engine, not only the typed `Entry`/`AreaDef` shapes the render port
+//! (`rules::render`) reads (see `model.rs`'s module doc for why loading
+//! stays lenient about shape).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -17,29 +17,15 @@ use std::process::ExitCode;
 use regress::Regex;
 use serde_json::Value;
 
+use super::check_packs::{
+    area_findings, areas_at_their_pack_globs, claude_import_finding, override_listing,
+    pack_findings, pack_see_findings, see_is_held,
+};
 use super::glob::compile;
 use super::kit_citations::{KitScope, kit_citation_findings};
+use super::markers::{base_marker_findings, marker_findings};
 use super::model::{Base, load_base};
-use super::render::{RULE_KINDS, SKILL_PATH, render_all};
-
-/// Size limits `check_base` enforces on the generated markdown files and
-/// on `AGENTS.md`, the canonical instruction file
-/// (`houserules.agents-md-is-canonical`).
-struct Budgets {
-    agents_md_lines: usize,
-    agents_md_bytes: usize,
-    standing_lines: usize,
-    area_lines: usize,
-    skill_lines: usize,
-}
-
-const BUDGETS: Budgets = Budgets {
-    agents_md_lines: 200,
-    agents_md_bytes: 12288,
-    standing_lines: 60,
-    area_lines: 160,
-    skill_lines: 120,
-};
+use super::render::{self, RULE_KINDS};
 
 /// Maps a `check` entry's `type` to the fields `check_shape` requires it
 /// to carry. An unknown type (already reported by the schema's own
@@ -228,42 +214,6 @@ fn check_shape(check: &Value, at: &str, errors: &mut Vec<String>) {
     }
 }
 
-/// Checks `path` (relative to `root`) against a line budget and, when
-/// `max_bytes` is given, a byte budget. `required` decides what a missing
-/// file means: a finding of its own (the canonical `AGENTS.md`, every
-/// generated file) when `true`, or nothing at all (the optional
-/// `CLAUDE.md` pointer, which an adopter on another harness may delete)
-/// when `false` -- a file this check tolerates absent is never budgeted
-/// either, since there is nothing to measure.
-fn check_budget(
-    root: &Path,
-    path: &str,
-    max_lines: usize,
-    max_bytes: Option<usize>,
-    required: bool,
-    errors: &mut Vec<String>,
-) {
-    let abs = root.join(path);
-    let text = match fs::read_to_string(&abs) {
-        Ok(text) => text,
-        Err(_) if required => {
-            errors.push(format!("{path}: missing"));
-            return;
-        }
-        Err(_) => return,
-    };
-    let lines = text.split('\n').count() - usize::from(text.ends_with('\n'));
-    if lines > max_lines {
-        errors.push(format!("{path}: {lines} lines, budget {max_lines}"));
-    }
-    let bytes = text.len();
-    if let Some(max_bytes) = max_bytes
-        && bytes > max_bytes
-    {
-        errors.push(format!("{path}: {bytes} bytes, budget {max_bytes}"));
-    }
-}
-
 /// Resolves a local `$ref` (`#/a/b/...`) against `root`, the one
 /// indirection `validate`'s schema walk follows. Every schema this binary
 /// ships resolves cleanly, so this path's `Err` arm is unreached in
@@ -282,20 +232,6 @@ fn deref<'a>(root: &'a Value, reference: &str) -> Result<&'a Value, String> {
         }
     }
     Ok(node)
-}
-
-/// JavaScript-style `Object.keys()` for a JSON value read through
-/// `serde_json`: an object's own keys in declared order; an array's
-/// index keys as strings (`["a","b"]` -> `["0","1"]`); anything else,
-/// none. `check_base`'s "unknown area" sweep is the one caller:
-/// `areas.json` as an array must still report each of its elements'
-/// index as an unknown area.
-fn object_keys(value: &Value) -> Vec<String> {
-    match value {
-        Value::Object(map) => map.keys().cloned().collect(),
-        Value::Array(items) => (0..items.len()).map(|i| i.to_string()).collect(),
-        _ => Vec::new(),
-    }
 }
 
 /// `true` when `value` satisfies one of `type_spec`'s JSON Schema type
@@ -507,7 +443,7 @@ pub(crate) fn validate(
 /// since the two disagree exactly on the residue a gitignored or
 /// untracked file leaves behind.
 #[derive(Clone, Copy)]
-enum TreeSource {
+pub(crate) enum TreeSource {
     /// `git ls-files` succeeded: this repository's tracked files, a
     /// gitignored or plain untracked file excluded regardless of whether
     /// it sits on disk.
@@ -572,7 +508,9 @@ impl TreeSource {
 /// still gets that path named, not silently absorbed into a bare
 /// `Filesystem` fallback that looks exactly like "nothing is tracked
 /// here at all".
-fn tracked_tree_files(root: &Path) -> Result<(Vec<String>, TreeSource, Vec<String>), String> {
+pub(crate) fn tracked_tree_files(
+    root: &Path,
+) -> Result<(Vec<String>, TreeSource, Vec<String>), String> {
     // An empty index falls back too: a `git init` with nothing yet
     // `git add`ed reads identically to "no git repository" from a
     // liveness point of view -- without this fallback, `git init` then
@@ -597,6 +535,14 @@ fn tracked_tree_files(root: &Path) -> Result<(Vec<String>, TreeSource, Vec<Strin
     // fallback that looks like "nothing is tracked here at all".
     let files = filesystem_tree_files(root)?;
     Ok((files, TreeSource::Filesystem, skipped))
+}
+
+/// The text that names one tracked path that `tracked_tree_files` skipped
+/// because it is not valid UTF-8. `check-knowledge` prints it after the
+/// file it names, `knowledge/areas.json`; `pack add` prints it as it
+/// stands. Both commands print each skipped path with this one spelling.
+pub(crate) fn skipped_path_line(path: &str) -> String {
+    format!("a tracked path is not valid UTF-8, skipped from the dead-glob scan: {path}")
 }
 
 /// Runs `git ls-files -z` at `root`, decoding each NUL-separated entry on
@@ -696,7 +642,8 @@ fn walk_tree(root: &Path, dir: &Path, out: &mut Vec<String>) -> Result<(), Strin
 /// (`global`/`process`'s own shape), which this never reports, because
 /// iterating zero globs finds zero dead ones by construction (no special
 /// case needed or wanted: empty-list legality falls out of checking per
-/// glob, not per area). `glob` is compiled once, outside the per-path
+/// glob, not per area). An area of `at_pack_globs` is left out entirely
+/// (`areas_at_their_pack_globs`, spec C16). `glob` is compiled once, outside the per-path
 /// scan: recompiling per candidate path is measurably slower on a large
 /// tree, one compile per file times glob rather than one compile per
 /// glob. A glob's compile failure is unreachable here: `model::build_areas`
@@ -706,9 +653,13 @@ fn dead_glob_findings(
     areas: &[(String, super::model::AreaDef)],
     tree: &[String],
     source: TreeSource,
+    at_pack_globs: &BTreeSet<String>,
 ) -> Vec<String> {
     let mut findings = Vec::new();
     for (area, def) in areas {
+        if at_pack_globs.contains(area) {
+            continue;
+        }
         for glob in &def.paths {
             let matcher =
                 compile(glob).expect("area globs are validated at load time (model::build_areas)");
@@ -726,9 +677,9 @@ fn dead_glob_findings(
 
 /// Validates every file directly under `knowledge/archive/` against the
 /// knowledge schema (`base.schema`, the same root every active topic file
-/// validates against) and collects every archived entry's id, so a `see`
-/// citation to one still resolves (`knowledge-base.ids-are-permanent`,
-/// below).
+/// validates against) and maps every archived entry's id to the first
+/// archive file that holds it, so a finding for an id that is both active
+/// and archived can name both files (`check_packs`).
 ///
 /// An absent `knowledge/archive/` directory is not itself a finding --
 /// most repositories have archived nothing yet. Any other reason the
@@ -740,18 +691,19 @@ fn dead_glob_findings(
 /// platform: `read_json_as` takes that name directly rather than
 /// deriving one from the path it reads.
 ///
-/// This is a SCHEMA check plus id collection only: an archived entry's
-/// `verify` path or area-glob liveness is never judged here, only whether
-/// the file's shape still parses as a valid knowledge topic file.
-fn check_archive(base: &Base, errors: &mut Vec<String>) -> HashSet<String> {
-    let mut ids = HashSet::new();
+/// This is a SCHEMA check, a compression-marker scan (`markers`), plus id
+/// collection only: an archived entry's `verify` path or area-glob
+/// liveness is never judged here, only whether the file's shape still
+/// parses as a valid knowledge topic file.
+fn check_archive(base: &Base, errors: &mut Vec<String>) -> BTreeMap<String, String> {
+    let mut files = BTreeMap::new();
     let dir = base.root.join("knowledge/archive");
     let names = match crate::archive::list_archive_json_files(&dir) {
         Ok(Some(names)) => names,
-        Ok(None) => return ids,
+        Ok(None) => return files,
         Err(message) => {
             errors.push(message);
-            return ids;
+            return files;
         }
     };
     for name in names {
@@ -759,6 +711,7 @@ fn check_archive(base: &Base, errors: &mut Vec<String>) -> HashSet<String> {
         match crate::archive::read_json_as(&dir.join(&name), &relative) {
             Ok(content) => {
                 validate(&content, &base.schema, &relative, errors, &base.schema);
+                errors.extend(marker_findings(&content, &relative));
                 for entry in content
                     .get("entries")
                     .and_then(Value::as_array)
@@ -766,26 +719,40 @@ fn check_archive(base: &Base, errors: &mut Vec<String>) -> HashSet<String> {
                     .flatten()
                 {
                     if let Some(id) = entry.get("id").and_then(Value::as_str) {
-                        ids.insert(id.to_string());
+                        files
+                            .entry(id.to_string())
+                            .or_insert_with(|| relative.clone());
                     }
                 }
             }
             Err(message) => errors.push(message),
         }
     }
-    ids
+    files
 }
 
 /// Validates a loaded base against the schema and every cross-entry and
 /// generated-file invariant, in two stages: schema/id/area/standing/see/
 /// verify/check-shape errors accumulate first, and if any fired,
 /// `check_base` returns immediately, since rendering needs a valid base;
-/// only a clean first stage reaches the dead-glob, stale/stray, and
-/// budget checks below, which need the generated files (and, for the
-/// dead-glob gate, a valid `areas` list) to exist meaningfully.
+/// only a clean first stage reaches the dead-glob check and the
+/// generated-file checks of `render::check_findings` (what `render` has left
+/// to change, the files of `.claude/rules/` that no renderer owns, and the
+/// budgets), which need a valid `areas` list and a valid base to mean
+/// anything.
+///
+/// The area of an active entry must be a key of `areas.json`: the schema
+/// holds no area enum to compare with. `area_findings` and
+/// `pack_see_findings`, both of the pack layer (`check_packs`), join the
+/// first stage, so a finding of either stops the second stage. The trailing
+/// group comes last in both cases, so it never hides the other stage: the
+/// findings of `pack_findings` (the pins, `overrides.json`, one id one
+/// source), the `CLAUDE.md` import, the compression markers, and the
+/// archive.
 pub(crate) fn check_base(base: &Base) -> Vec<String> {
     let mut archive_errors = Vec::new();
-    let archived_ids = check_archive(base, &mut archive_errors);
+    let archive_files = check_archive(base, &mut archive_errors);
+    let marker_errors = base_marker_findings(base);
 
     let mut errors = Vec::new();
     let areas_schema = base
@@ -801,24 +768,6 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
         &mut errors,
         &base.schema,
     );
-
-    let area_names: Vec<&str> = base
-        .schema
-        .pointer("/$defs/area/enum")
-        .and_then(Value::as_array)
-        .map(|values| values.iter().filter_map(Value::as_str).collect())
-        .unwrap_or_default();
-    let areas_obj = base.areas_raw.as_object().cloned().unwrap_or_default();
-    for area in &area_names {
-        if !areas_obj.contains_key(*area) {
-            errors.push(format!("knowledge/areas.json: area \"{area}\" is missing"));
-        }
-    }
-    for area in object_keys(&base.areas_raw) {
-        if !area_names.contains(&area.as_str()) {
-            errors.push(format!("knowledge/areas.json: unknown area \"{area}\""));
-        }
-    }
 
     let mut seen: HashMap<&str, &str> = HashMap::new();
     for (file, name, content) in &base.topic_files {
@@ -871,9 +820,7 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
                 .flatten()
             {
                 let see_id = to_js_string(see_id);
-                if !base.entries.contains_key(see_id.as_str())
-                    && !archived_ids.contains(see_id.as_str())
-                {
+                if !see_is_held(base, &see_id) {
                     errors.push(format!("{at}: see \"{see_id}\" does not exist"));
                 }
             }
@@ -899,8 +846,14 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
             }
         }
     }
+    errors.extend(area_findings(base));
+    errors.extend(pack_see_findings(base));
+    let mut trailing_errors = pack_findings(base, &archive_files);
+    trailing_errors.extend(claude_import_finding(&base.root));
+    trailing_errors.extend(marker_errors);
+    trailing_errors.extend(archive_errors);
     if !errors.is_empty() {
-        errors.extend(archive_errors);
+        errors.extend(trailing_errors);
         return errors; // rendering needs a valid base
     }
 
@@ -912,112 +865,37 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
             // `source` names truthfully.
             for entry in &skipped {
                 errors.push(format!(
-                    "knowledge/areas.json: a tracked path is not valid UTF-8, skipped from \
-                     the dead-glob scan: {entry}"
+                    "knowledge/areas.json: {}",
+                    skipped_path_line(entry)
                 ));
             }
-            errors.extend(dead_glob_findings(&base.areas, &tree, source));
+            errors.extend(dead_glob_findings(
+                &base.areas,
+                &tree,
+                source,
+                &areas_at_their_pack_globs(base),
+            ));
         }
         Err(message) => errors.push(message),
     }
 
-    let rendered = render_all(base);
-    let rendered_paths: HashSet<&str> = rendered.iter().map(|(path, _)| path.as_str()).collect();
-    for (path, content) in &rendered {
-        let abs = base.root.join(path);
-        let current = fs::read_to_string(&abs).ok();
-        if current.as_deref() != Some(content.as_str()) {
-            errors.push(format!(
-                "{path}: generated file is out of date (run houserules render)"
-            ));
-        }
-    }
-    let rules_dir = base.root.join(".claude/rules");
-    if rules_dir.is_dir() {
-        // `fs::read_dir` gives no ordering guarantee, so this explicit sort
-        // makes the stray-file report deterministic, independent of the
-        // filesystem's own directory-entry order.
-        let mut names: Vec<String> = fs::read_dir(&rules_dir)
-            .into_iter()
-            .flatten()
-            .filter_map(|entry| entry.ok())
-            .filter_map(|entry| entry.file_name().into_string().ok())
-            .filter(|name| name.ends_with(".md"))
-            .collect();
-        names.sort();
-        for name in names {
-            let relative = format!(".claude/rules/{name}");
-            if !rendered_paths.contains(relative.as_str()) {
-                errors.push(format!("{relative}: not generated by kb; remove it"));
-            }
-        }
-    }
-    check_budget(
-        &base.root,
-        "AGENTS.md",
-        BUDGETS.agents_md_lines,
-        Some(BUDGETS.agents_md_bytes),
-        true,
-        &mut errors,
-    );
-    // CLAUDE.md is the optional Claude Code pointer to AGENTS.md
-    // (houserules.agents-md-is-canonical): a harness that never reads it
-    // may delete it, so its absence is never a finding. Present, it still
-    // shares AGENTS.md's own budget -- an adopter migrating off a
-    // pre-AGENTS.md install may still carry real content there until they
-    // move it, and that content should not grow unbounded either.
-    check_budget(
-        &base.root,
-        "CLAUDE.md",
-        BUDGETS.agents_md_lines,
-        Some(BUDGETS.agents_md_bytes),
-        false,
-        &mut errors,
-    );
-    for (path, _) in &rendered {
-        if path == ".claude/rules/standing-rules.md" {
-            check_budget(
-                &base.root,
-                path,
-                BUDGETS.standing_lines,
-                None,
-                true,
-                &mut errors,
-            );
-        } else if path == SKILL_PATH {
-            check_budget(
-                &base.root,
-                path,
-                BUDGETS.skill_lines,
-                None,
-                true,
-                &mut errors,
-            );
-        } else {
-            check_budget(
-                &base.root,
-                path,
-                BUDGETS.area_lines,
-                None,
-                true,
-                &mut errors,
-            );
-        }
-    }
-    errors.extend(archive_errors);
+    errors.extend(render::check_findings(base));
+    errors.extend(trailing_errors);
     errors
 }
 
 /// Runs the `check-knowledge` subcommand: loads the knowledge base at
-/// `root` (resolving the enclosing git repository's top level when `root`
+/// `root` (resolving the nearest install root when `root`
 /// is `None`, exactly like `cmd_render`), then runs `check_base` against
 /// it. It then runs the kit-owned citation lint (`kit_citations`), with the
 /// scope `kit_scope` builds for the resolved root: the crate root passes
-/// `install::kit_citation_scope`, because `rules` never imports `install`.
+/// `install::kit_citation_scope`, which owns the kit-owned file list.
 /// A `kit_scope` failure is one finding that names the failure and says no
 /// citation was checked. A load failure prints one named line and exits 2
 /// -- distinct from a clean load whose check findings print as stderr
-/// lines and exit 1.
+/// lines and exit 1. Every override and exclusion of `overrides.json` prints
+/// to stdout first, one line each, whether the gate passes or fails
+/// (`check_packs::override_listing`): the list never fails the gate.
 pub(crate) fn cmd_check_knowledge(
     root: Option<PathBuf>,
     kit_scope: fn(&Path) -> Result<KitScope, String>,
@@ -1033,6 +911,9 @@ pub(crate) fn cmd_check_knowledge(
             return ExitCode::from(2);
         }
     };
+    for line in override_listing(&base) {
+        println!("{line}");
+    }
     let mut errors = check_base(&base);
     match kit_scope(&root) {
         Ok(scope) => errors.extend(kit_citation_findings(&base, &scope)),
@@ -1057,6 +938,8 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::rules::render::SKILL_PATH;
+    use crate::rules::test_support::{pin_every_copy, write_pack_copy};
 
     /// Runs `git` at `root`, asserting success -- this module's own copy
     /// of the small per-module helper every git-backed test module in
@@ -1167,17 +1050,22 @@ mod tests {
         base
     }
 
-    /// The seed knowledge schema (`template/knowledge/schema.json`) with
-    /// its area enum project-extended: the seed area enum is a starter,
-    /// and these tests run on a project-extended enum, proving the
-    /// extension path works.
-    fn seed_schema() -> Value {
+    /// The knowledge schema as the kit ships it
+    /// (`template/knowledge/schema.json`): an `area` is any non-empty string,
+    /// and `check_base` checks it against the keys of `areas.json`.
+    fn kit_schema() -> Value {
         let path =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../template/knowledge/schema.json");
-        let mut schema: Value = serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
-        schema["$defs"]["area"]["enum"] = json!([
+        serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap()
+    }
+
+    /// `kit_schema()` with the `$defs.area` enum of release 1.x added: the
+    /// schema of an install that kept the enum (spec section 6, last bullet).
+    fn schema_with_a_kept_area_enum() -> Value {
+        let mut schema = kit_schema();
+        schema["$defs"]["area"] = json!({"enum": [
             "global", "process", "rust", "webview", "api", "schemas", "infra", "docs"
-        ]);
+        ]});
         schema
     }
 
@@ -1260,7 +1148,7 @@ mod tests {
         fs::create_dir_all(root.join("knowledge")).unwrap();
         fs::write(
             root.join("knowledge/schema.json"),
-            serde_json::to_string(&seed_schema()).unwrap(),
+            serde_json::to_string(&kit_schema()).unwrap(),
         )
         .unwrap();
         fs::write(
@@ -1270,7 +1158,7 @@ mod tests {
         .unwrap();
         write_topics(root, entries);
         fs::write(root.join("AGENTS.md"), "# Test\n").unwrap();
-        fs::write(root.join("CLAUDE.md"), "# Test\n").unwrap();
+        fs::write(root.join("CLAUDE.md"), "@AGENTS.md\n").unwrap();
         write_area_marker_files(root);
     }
 
@@ -1282,8 +1170,9 @@ mod tests {
     }
 
     /// A knowledge base under `root` seeded with the real
-    /// `template/knowledge` content, starter `AGENTS.md` and `CLAUDE.md`,
-    /// and the other files its entries' `verify` paths name. No git init
+    /// `template/knowledge` content, the kit packs of `template/packs` as
+    /// pinned copies, starter `AGENTS.md` and `CLAUDE.md`, and the other
+    /// files its entries' `verify` paths name. No git init
     /// or commit: `--dir` bypasses git resolution entirely, and
     /// `check_base` itself never calls git.
     fn make_seed_repo(root: &Path) {
@@ -1303,6 +1192,32 @@ mod tests {
             )
             .unwrap();
         }
+        let mut pins = serde_json::Map::new();
+        for pack in crate::packs::kit_packs() {
+            crate::archive::write_json(
+                &root
+                    .join("knowledge")
+                    .join("packs")
+                    .join(format!("{}.json", pack.name)),
+                &pack.raw,
+            )
+            .unwrap();
+            pins.insert(
+                pack.name.clone(),
+                json!({
+                    "version": pack.version,
+                    "source": "kit",
+                    "sha256": crate::packs::pack_sha256(&pack.raw),
+                    "addedAreas": [],
+                }),
+            );
+        }
+        fs::write(
+            root.join(".houserules.json"),
+            serde_json::to_string(&json!({"schema": "houserules/install@2.0.0", "packs": pins}))
+                .unwrap(),
+        )
+        .unwrap();
         // `AGENTS.md` is the one instruction file the `docs` area's glob
         // list names (`houserules.agents-md-is-canonical`): the dead-glob
         // scan below needs a real match, or that glob reports dead in
@@ -1421,10 +1336,9 @@ mod tests {
         );
     }
 
-    /// `areas.json` as a JSON array instead of an object reports: one
-    /// "must be object" finding, then "area ... is missing" for every
-    /// schema-enum area, then "unknown area" for the array's own index
-    /// keys (`object_keys`'s own array-index-string coercion).
+    /// `areas.json` as a JSON array instead of an object reports one "must
+    /// be object" finding, and no area-key finding for each entry: the
+    /// entries have no keys to be compared with.
     #[test]
     fn check_base_reports_areas_json_as_an_array_instead_of_failing_to_load() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -1439,24 +1353,12 @@ mod tests {
         let errors = check_base(&base);
         assert_eq!(
             errors,
-            vec![
-                "knowledge/areas.json: must be object".to_string(),
-                "knowledge/areas.json: area \"global\" is missing".to_string(),
-                "knowledge/areas.json: area \"process\" is missing".to_string(),
-                "knowledge/areas.json: area \"rust\" is missing".to_string(),
-                "knowledge/areas.json: area \"webview\" is missing".to_string(),
-                "knowledge/areas.json: area \"api\" is missing".to_string(),
-                "knowledge/areas.json: area \"schemas\" is missing".to_string(),
-                "knowledge/areas.json: area \"infra\" is missing".to_string(),
-                "knowledge/areas.json: area \"docs\" is missing".to_string(),
-                "knowledge/areas.json: unknown area \"0\"".to_string(),
-                "knowledge/areas.json: unknown area \"1\"".to_string(),
-            ]
+            vec!["knowledge/areas.json: must be object".to_string()]
         );
     }
 
-    /// Reports schema, id, area, standing, see, verify, and check-shape
-    /// errors.
+    /// Reports schema, id, standing, see, verify, and check-shape errors,
+    /// and a malformed area.
     #[test]
     fn reports_schema_id_area_standing_see_verify_and_check_shape_errors() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -1490,12 +1392,12 @@ mod tests {
             .insert(0, entry(json!({"id": "other.x"})));
         fs::write(&process_path, serde_json::to_string(&topic).unwrap()).unwrap();
 
-        // Simulate a missing area, an unknown one, and a malformed one.
+        // Simulate a malformed area.
         let mut areas = areas_json();
-        let areas_map = areas.as_object_mut().unwrap();
-        areas_map.remove("docs");
-        areas_map.insert("extra".to_string(), json!({"paths": []}));
-        areas_map.insert("rust".to_string(), json!({"nope": 1}));
+        areas
+            .as_object_mut()
+            .unwrap()
+            .insert("rust".to_string(), json!({"nope": 1}));
         fs::write(
             root.join("knowledge/areas.json"),
             serde_json::to_string(&areas).unwrap(),
@@ -1505,8 +1407,6 @@ mod tests {
         let base = load_base(root).expect("loads");
         let errors = check_base(&base);
         for expected in [
-            "knowledge/areas.json: area \"docs\" is missing",
-            "knowledge/areas.json: unknown area \"extra\"",
             "knowledge/areas.json.rust: missing \"paths\"",
             "knowledge/areas.json.rust: unknown field \"nope\"",
             "knowledge/process.json other.x: id must start with \"process.\"",
@@ -1780,7 +1680,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let root = dir.path();
         make_repo(root, &[entry(json!({}))]);
-        fs::write(root.join("CLAUDE.md"), "# Test").unwrap();
+        fs::write(root.join("CLAUDE.md"), "@AGENTS.md").unwrap();
         let base = load_base(root).expect("loads");
         crate::rules::render::render(&base, false).expect("render");
         let base = load_base(root).expect("loads");
@@ -1821,48 +1721,37 @@ mod tests {
         );
     }
 
-    /// AGENTS.md is the canonical instruction file: unlike CLAUDE.md, its
-    /// absence is always a finding.
+    /// AGENTS.md is the canonical instruction file, and `render` writes its
+    /// block: a missing file is a generated file that is out of date.
     #[test]
-    fn flags_a_missing_agents_md() {
+    fn flags_a_missing_agents_md_as_an_out_of_date_generated_file() {
         let dir = tempfile::tempdir().expect("tempdir");
         let root = dir.path();
         make_repo(root, &[entry(json!({}))]);
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
         fs::remove_file(root.join("AGENTS.md")).unwrap();
-        let base = load_base(root).expect("loads");
-        assert!(check_base(&base).contains(&"AGENTS.md: missing".to_string()));
-    }
-
-    /// Flags AGENTS.md over the line budget.
-    #[test]
-    fn flags_agents_md_over_the_line_budget() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let root = dir.path();
-        make_repo(root, &[entry(json!({}))]);
-        fs::write(root.join("AGENTS.md"), "x\n".repeat(201)).unwrap();
-        let base = load_base(root).expect("loads");
-        let errors = check_base(&base);
-        assert!(
-            errors
-                .iter()
-                .any(|e| e.starts_with("AGENTS.md: ") && e.ends_with(" lines, budget 200"))
+        assert_eq!(
+            check_base(&base),
+            vec!["AGENTS.md: generated file is out of date (run houserules render)".to_string()]
         );
     }
 
-    /// Flags AGENTS.md over the byte budget.
+    /// The budget of AGENTS.md reads the generated block alone: hand-written
+    /// text around the block is no finding, however long it is.
     #[test]
-    fn flags_agents_md_over_the_byte_budget() {
+    fn leaves_the_hand_written_text_of_agents_md_out_of_the_budget() {
         let dir = tempfile::tempdir().expect("tempdir");
         let root = dir.path();
         make_repo(root, &[entry(json!({}))]);
-        fs::write(root.join("AGENTS.md"), "x".repeat(12289)).unwrap();
+        fs::write(root.join("AGENTS.md"), "x\n".repeat(300)).unwrap();
         let base = load_base(root).expect("loads");
-        let errors = check_base(&base);
-        assert!(
-            errors
-                .iter()
-                .any(|e| e.starts_with("AGENTS.md: ") && e.ends_with(" bytes, budget 12288"))
-        );
+        crate::rules::render::render(&base, false).expect("render");
+        assert!(fs::read_to_string(root.join("AGENTS.md")).unwrap().len() > 600);
+        assert_eq!(check_base(&base), Vec::<String>::new());
+        fs::write(root.join("AGENTS.md"), "y".repeat(20_000)).unwrap();
+        crate::rules::render::render(&base, false).expect("render");
+        assert_eq!(check_base(&base), Vec::<String>::new());
     }
 
     /// Flags a stray file in .claude/rules and ignores non-markdown
@@ -1877,9 +1766,10 @@ mod tests {
         fs::write(root.join(".claude/rules/notes.txt"), "ignore me\n").unwrap();
         let base = load_base(root).expect("loads");
         let errors = check_base(&base);
-        assert!(
-            errors.contains(&".claude/rules/extra.md: not generated by kb; remove it".to_string())
-        );
+        assert!(errors.contains(
+            &".claude/rules/extra.md: not generated by houserules (it has no generated header); remove it"
+                .to_string()
+        ));
         assert!(!errors.iter().any(|e| e.contains("notes.txt")));
     }
 
@@ -1922,6 +1812,119 @@ mod tests {
                     .to_string()
             ]
         );
+    }
+
+    /// A valid repository with the pack `alpha` installed and pinned. The
+    /// copy declares the area `shop` with `pack_globs`, or no area when
+    /// `pack_globs` is `None`; `knowledge/areas.json` holds `shop` with
+    /// `project_globs`; `recorded` is the `addedAreas` of the pin. No tracked
+    /// file matches a `shop/**` glob. The base is rendered, so the generated
+    /// files are current.
+    fn repo_with_a_pack_area(
+        root: &Path,
+        pack_globs: Option<&[&str]>,
+        project_globs: &[&str],
+        recorded: &[&str],
+    ) -> Base {
+        make_repo(root, &[entry(json!({}))]);
+        let mut areas = areas_json();
+        areas["shop"] = json!({"paths": project_globs});
+        fs::write(
+            root.join("knowledge/areas.json"),
+            serde_json::to_string(&areas).unwrap(),
+        )
+        .unwrap();
+        let mut schema = schema_with_a_kept_area_enum();
+        schema["$defs"]["area"]["enum"]
+            .as_array_mut()
+            .expect("the area enum")
+            .push(json!("shop"));
+        fs::write(
+            root.join("knowledge/schema.json"),
+            serde_json::to_string(&schema).unwrap(),
+        )
+        .unwrap();
+        let declared = match pack_globs {
+            Some(globs) => json!({"shop": {"paths": globs}}),
+            None => json!({}),
+        };
+        let copy = json!({
+            "name": "alpha", "version": "1.0.0", "schema": "houserules/pack@1.0.0",
+            "topics": {"alpha": {"title": "A pack."}},
+            "areas": declared,
+            "entries": [],
+        });
+        fs::create_dir_all(root.join("knowledge/packs")).unwrap();
+        fs::write(
+            root.join("knowledge/packs/alpha.json"),
+            serde_json::to_string(&copy).unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            root.join(".houserules.json"),
+            serde_json::to_string(&json!({"packs": {"alpha": {
+                "version": "1.0.0", "source": "kit",
+                "sha256": crate::packs::pack_sha256(&copy), "addedAreas": recorded,
+            }}}))
+            .unwrap(),
+        )
+        .unwrap();
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        load_base(root).expect("loads")
+    }
+
+    /// The dead-glob finding of the area `shop` for `glob`.
+    fn shop_finding(glob: &str) -> String {
+        format!(
+            "knowledge/areas.json.shop.paths: \"{glob}\" matches no tracked file \
+             (filesystem walk, no git-tracked files found)"
+        )
+    }
+
+    /// C16: a pack declares a convention that a new project may not have yet.
+    /// An area that a pin's `addedAreas` records, and whose globs equal the
+    /// globs of a pack that declares it, is not a dead glob.
+    #[test]
+    fn check_base_leaves_out_a_pack_added_area_whose_globs_equal_the_pack_globs() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let base = repo_with_a_pack_area(dir.path(), Some(&["shop/**"]), &["shop/**"], &["shop"]);
+        assert_eq!(check_base(&base), Vec::<String>::new());
+    }
+
+    /// C16: a pack-added area whose globs the project changed stays checked,
+    /// each glob, the ones the pack wrote included.
+    #[test]
+    fn check_base_checks_a_pack_added_area_whose_globs_the_project_changed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let base = repo_with_a_pack_area(
+            dir.path(),
+            Some(&["shop/**"]),
+            &["shop/**", "stock/**"],
+            &["shop"],
+        );
+        assert_eq!(
+            check_base(&base),
+            [shop_finding("shop/**"), shop_finding("stock/**")]
+        );
+    }
+
+    /// C16: a glob the project wrote stays checked, though a pack declares
+    /// the same globs: no pin records the area as added by a pack.
+    #[test]
+    fn check_base_checks_an_area_the_project_wrote_whatever_a_pack_declares() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let base = repo_with_a_pack_area(dir.path(), Some(&["shop/**"]), &["shop/**"], &[]);
+        assert_eq!(check_base(&base), [shop_finding("shop/**")]);
+    }
+
+    /// C16: a pin that records the area while no installed pack declares it
+    /// any more leaves the area to the project: its globs stay checked.
+    #[test]
+    fn check_base_checks_a_recorded_area_that_no_installed_pack_declares() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let base = repo_with_a_pack_area(dir.path(), None, &["shop/**"], &["shop"]);
+        assert_eq!(check_base(&base), [shop_finding("shop/**")]);
     }
 
     /// A subtle branch, named explicitly: a deliberately empty
@@ -2190,19 +2193,34 @@ mod tests {
         make_repo(root, &entries);
         let base = load_base(root).expect("loads");
         assert!(check_base(&base).contains(
-            &".claude/rules/standing-rules.md: generated file is out of date (run houserules render)".to_string()
+            &"AGENTS.md: generated file is out of date (run houserules render)".to_string()
         ));
+        assert!(
+            check_base(&base).contains(
+                &".claude/rules/rust.md: generated file is out of date (run houserules render)"
+                    .to_string()
+            )
+        );
         crate::rules::render::render(&base, false).expect("render");
         fs::write(root.join(".claude/rules/stray.md"), "x").unwrap();
-        fs::write(root.join("CLAUDE.md"), "x\n".repeat(201)).unwrap();
+        fs::write(
+            root.join("CLAUDE.md"),
+            format!("@AGENTS.md\n{}", "x\n".repeat(200)),
+        )
+        .unwrap();
         assert_eq!(
             check_base(&base),
             vec![
-                ".claude/rules/stray.md: not generated by kb; remove it".to_string(),
+                ".claude/rules/stray.md: not generated by houserules (it has no generated header); remove it"
+                    .to_string(),
                 "CLAUDE.md: 201 lines, budget 200".to_string(),
             ]
         );
-        fs::write(root.join("CLAUDE.md"), format!("{}\n", "x".repeat(12300))).unwrap();
+        fs::write(
+            root.join("CLAUDE.md"),
+            format!("@AGENTS.md {}\n", "x".repeat(12289)),
+        )
+        .unwrap();
         assert!(check_base(&base).contains(&"CLAUDE.md: 12301 bytes, budget 12288".to_string()));
     }
 
@@ -2219,19 +2237,19 @@ mod tests {
         crate::rules::render::render(&base, false).expect("render");
         assert!(
             check_base(&base)
-                .contains(&".claude/rules/standing-rules.md: 65 lines, budget 60".to_string())
+                .contains(&"AGENTS.md: the standing rules have 63 lines, budget 60".to_string())
         );
     }
 
-    /// `BUDGETS.skill_lines` (120) needs its own direct pin: this puts
-    /// the knowledge skill's own standing section over 120 lines and
-    /// asserts the skill-path budget message fires.
+    /// The skill limit (120 lines) needs its own direct pin: this puts the
+    /// knowledge skill's topic list over 120 lines and asserts the
+    /// skill-path budget message fires.
     #[test]
     fn checkbase_reports_the_knowledge_skill_over_its_line_budget() {
         let dir = tempfile::tempdir().expect("tempdir");
         let root = dir.path();
-        let many: Vec<Value> = (0..105)
-            .map(|i| entry(json!({"id": format!("process.r{i}")})))
+        let many: Vec<Value> = (0..110)
+            .map(|i| entry(json!({"id": format!("t{i:03}.r"), "standing": false})))
             .collect();
         make_repo(root, &many);
         let base = load_base(root).expect("loads");
@@ -2262,29 +2280,512 @@ mod tests {
         assert_eq!(check_base(&base), Vec::<String>::new());
     }
 
-    /// Fails `check_base` when the seeded process.json is deliberately
-    /// broken -- disclosed-mutation proof for the test above.
+    /// Fails `check_base` when a local copy of a seeded entry is
+    /// deliberately broken -- disclosed-mutation proof for the test above.
+    /// The pack copies cannot carry the break: a copy that breaks the
+    /// embedded pack schema is a load error, not a finding.
     #[test]
-    fn fails_check_base_when_the_seeded_process_json_is_deliberately_broken() {
+    fn fails_check_base_when_a_local_copy_of_a_seeded_entry_is_deliberately_broken() {
         let dir = tempfile::tempdir().expect("tempdir");
         let root = dir.path();
         make_seed_repo(root);
         let base = load_base(root).expect("loads");
         crate::rules::render::render(&base, false).expect("render");
-        let process_path = root.join("knowledge/process.json");
-        let mut broken: Value =
-            serde_json::from_str(&fs::read_to_string(&process_path).unwrap()).unwrap();
-        for e in broken["entries"].as_array_mut().unwrap() {
-            if e["id"].as_str() == Some("process.conventional-commits") {
-                e["check"]["body_line_max"] = json!(0);
-            }
-        }
-        fs::write(&process_path, serde_json::to_string(&broken).unwrap()).unwrap();
+        let copy: Value = serde_json::from_str(
+            &fs::read_to_string(root.join("knowledge/packs/process.json")).unwrap(),
+        )
+        .unwrap();
+        let mut broken = copy["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["id"].as_str() == Some("process.conventional-commits"))
+            .unwrap()
+            .clone();
+        broken["id"] = json!("team.conventional-commits");
+        broken["check"]["body_line_max"] = json!(0);
+        fs::write(
+            root.join("knowledge/team.json"),
+            serde_json::to_string(&json!({"topic": "team", "title": "Team", "entries": [broken]}))
+                .unwrap(),
+        )
+        .unwrap();
         let base = load_base(root).expect("loads");
         assert!(
             check_base(&base)
                 .iter()
                 .any(|e| e.ends_with("check.body_line_max: below 1"))
+        );
+    }
+
+    /// A compression marker, built here so that no tracked file holds one.
+    fn marker_text() -> String {
+        format!("{}x{}", "<<ccr:", ">>")
+    }
+
+    /// The marker gate covers every file under `knowledge/` (spec L12): a
+    /// topic file, an archive file, a pack copy, and `overrides.json`. Each
+    /// finding names its file and the field path, and none prints the
+    /// marker.
+    #[test]
+    fn check_base_rejects_a_compression_marker_in_every_knowledge_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(
+            root,
+            &[entry(json!({"id": "process.a", "summary": marker_text()}))],
+        );
+        fs::create_dir_all(root.join("knowledge/archive")).unwrap();
+        fs::write(
+            root.join("knowledge/archive/process.json"),
+            serde_json::to_string(&json!({
+                "topic": "process", "title": "t",
+                "entries": [entry(json!({
+                    "id": "process.old", "status": "retired", "body": [marker_text()],
+                }))],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        write_pack_copy(
+            root,
+            "alpha",
+            &["alpha"],
+            &[entry(json!({"id": "alpha.b", "body": [marker_text()]}))],
+        );
+        fs::write(
+            root.join("knowledge/overrides.json"),
+            serde_json::to_string(&json!({
+                "schema": "houserules/overrides@1.0.0",
+                "overrides": [{"id": "alpha.b", "fields": {"summary": marker_text()}}],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let base = load_base(root).expect("loads");
+        let errors = check_base(&base);
+        let finding = |at: &str| {
+            format!(
+                "{at}: holds a compression marker (headroom ccr); a context proxy changed this \
+                 text, so restore the original"
+            )
+        };
+        for at in [
+            "knowledge/process.json.entries[0].summary",
+            "knowledge/archive/process.json.entries[0].body[0]",
+            "knowledge/packs/alpha.json.entries[0].body[0]",
+            "knowledge/overrides.json.overrides[0].fields.summary",
+        ] {
+            assert!(
+                errors.contains(&finding(at)),
+                "missing the finding for {at} in {errors:#?}"
+            );
+        }
+        assert!(
+            errors.iter().all(|line| !line.contains(&marker_text())),
+            "a finding prints the marker: {errors:#?}"
+        );
+    }
+
+    /// The relative paths, with forward slashes, of every `.json` file under
+    /// `dir`, found by walking the directory tree.
+    fn json_files_under(root: &Path, dir: &Path, found: &mut Vec<String>) {
+        for item in fs::read_dir(dir).expect("read a directory") {
+            let path = item.expect("a directory entry").path();
+            if path.is_dir() {
+                json_files_under(root, &path, found);
+            } else if path
+                .extension()
+                .is_some_and(|extension| extension == "json")
+            {
+                let relative = path.strip_prefix(root).expect("a path under the root");
+                found.push(
+                    relative
+                        .components()
+                        .map(|part| part.as_os_str().to_string_lossy().into_owned())
+                        .collect::<Vec<_>>()
+                        .join("/"),
+                );
+            }
+        }
+    }
+
+    /// The scope of the marker gate is derived, not listed: a marker in each
+    /// `.json` file that exists under `knowledge/` is a finding that names
+    /// that file. The files come from walking the directory.
+    #[test]
+    fn check_base_marker_gate_covers_every_json_file_under_knowledge() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(root, &[entry(json!({"id": "process.a"}))]);
+        write_pack_copy(
+            root,
+            "alpha",
+            &["alpha"],
+            &[entry(json!({"id": "alpha.b"}))],
+        );
+        fs::create_dir_all(root.join("knowledge/archive")).unwrap();
+        fs::write(
+            root.join("knowledge/archive/process.json"),
+            serde_json::to_string(&json!({
+                "topic": "process", "title": "t",
+                "entries": [entry(json!({"id": "process.old", "status": "retired"}))],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            root.join("knowledge/overrides.json"),
+            serde_json::to_string(&json!({
+                "schema": "houserules/overrides@1.0.0",
+                "overrides": [{"id": "alpha.b", "fields": {"summary": "Changed."}}],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let mut files = Vec::new();
+        json_files_under(root, &root.join("knowledge"), &mut files);
+        files.sort();
+        assert_eq!(
+            files,
+            [
+                "knowledge/archive/process.json",
+                "knowledge/areas.json",
+                "knowledge/overrides.json",
+                "knowledge/packs/alpha.json",
+                "knowledge/process.json",
+                "knowledge/schema.json",
+            ],
+            "the tree this test builds changed: cover each new file class below"
+        );
+        // A marker goes into a string value of each file: the `description`
+        // of the schema, a note under an area, a field of the override, and
+        // an entry `summary` in the rest.
+        let marked = |path: &str, edit: &dyn Fn(&mut Value)| {
+            let mut content: Value =
+                serde_json::from_str(&fs::read_to_string(root.join(path)).unwrap()).unwrap();
+            edit(&mut content);
+            fs::write(root.join(path), serde_json::to_string(&content).unwrap()).unwrap();
+        };
+        marked("knowledge/schema.json", &|v| {
+            v["description"] = json!(marker_text())
+        });
+        marked("knowledge/areas.json", &|v| {
+            v["global"]["note"] = json!(marker_text())
+        });
+        marked("knowledge/overrides.json", &|v| {
+            v["overrides"][0]["fields"]["summary"] = json!(marker_text());
+        });
+        for path in [
+            "knowledge/process.json",
+            "knowledge/archive/process.json",
+            "knowledge/packs/alpha.json",
+        ] {
+            marked(path, &|v| v["entries"][0]["summary"] = json!(marker_text()));
+        }
+        let base = load_base(root).expect("loads");
+        let errors = check_base(&base);
+        for file in &files {
+            assert!(
+                errors.iter().any(|line| {
+                    line.starts_with(&format!("{file}."))
+                        && line.contains("holds a compression marker")
+                }),
+                "no marker finding names {file} in {errors:#?}"
+            );
+        }
+    }
+
+    /// A marker in a key, and a base with no marker, are clean: the same
+    /// tree passes once the values are plain.
+    #[test]
+    fn check_base_ignores_a_marker_in_a_key() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(root, &[entry(json!({"id": "process.a"}))]);
+        let mut areas = areas_json();
+        areas[marker_text()] = json!({"paths": []});
+        fs::write(
+            root.join("knowledge/areas.json"),
+            serde_json::to_string(&areas).unwrap(),
+        )
+        .unwrap();
+        let base = load_base(root).expect("loads");
+        assert!(
+            check_base(&base)
+                .iter()
+                .all(|line| !line.contains("compression marker")),
+        );
+    }
+
+    /// Replaces the schema of the tree under `root`.
+    fn write_schema(root: &Path, schema: &Value) {
+        fs::write(
+            root.join("knowledge/schema.json"),
+            serde_json::to_string(schema).unwrap(),
+        )
+        .unwrap();
+    }
+
+    /// A base whose schema holds no `$defs.area` enum is valid whatever keys
+    /// `areas.json` holds: the project owns the list of areas.
+    #[test]
+    fn check_base_needs_no_area_enum() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(root, &[entry(json!({"id": "process.a"}))]);
+        write_schema(root, &kit_schema());
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        let base = load_base(root).expect("loads");
+        assert_eq!(check_base(&base), Vec::<String>::new());
+    }
+
+    /// The kit schema accepts the area key `agentsMd: false` (spec section 6)
+    /// and refuses a value that is no boolean.
+    #[test]
+    fn check_base_accepts_agents_md_false_on_an_area_and_refuses_a_string() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(root, &[entry(json!({"id": "process.a"}))]);
+        let mut areas = areas_json();
+        areas["process"]["agentsMd"] = json!(false);
+        fs::write(
+            root.join("knowledge/areas.json"),
+            serde_json::to_string(&areas).unwrap(),
+        )
+        .unwrap();
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        let base = load_base(root).expect("loads");
+        assert_eq!(check_base(&base), Vec::<String>::new());
+
+        areas["process"]["agentsMd"] = json!("no");
+        fs::write(
+            root.join("knowledge/areas.json"),
+            serde_json::to_string(&areas).unwrap(),
+        )
+        .unwrap();
+        let base = load_base(root).expect("loads");
+        assert_eq!(
+            check_base(&base),
+            vec!["knowledge/areas.json.process.agentsMd: must be boolean".to_string()]
+        );
+    }
+
+    /// An active entry whose area is no key of `areas.json` is one finding
+    /// that names its file; an archived entry keeps its area as plain text.
+    #[test]
+    fn check_base_checks_the_area_of_an_active_entry_and_not_of_an_archived_one() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(
+            root,
+            &[
+                entry(json!({"id": "process.a", "area": "ghost", "standing": false})),
+                entry(json!({"id": "process.b", "standing": false})),
+            ],
+        );
+        write_schema(root, &kit_schema());
+        fs::create_dir_all(root.join("knowledge/archive")).unwrap();
+        fs::write(
+            root.join("knowledge/archive/process.json"),
+            serde_json::to_string(&json!({
+                "topic": "process", "title": "t",
+                "entries": [entry(json!({
+                    "id": "process.old", "area": "unchecked", "status": "retired",
+                    "standing": false,
+                }))],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let base = load_base(root).expect("loads");
+        assert_eq!(
+            check_base(&base),
+            ["knowledge/process.json process.a: area \"ghost\" is no key of knowledge/areas.json"]
+        );
+    }
+
+    /// A project-extended enum is no longer compared with `areas.json`: a
+    /// key outside the enum, or an enum area with no key, is no finding by
+    /// itself.
+    #[test]
+    fn check_base_does_not_compare_the_area_enum_with_areas_json() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(root, &[entry(json!({"id": "process.a"}))]);
+        let mut areas = areas_json();
+        let map = areas.as_object_mut().unwrap();
+        map.remove("webview");
+        map.insert("extra".to_string(), json!({"paths": []}));
+        fs::write(
+            root.join("knowledge/areas.json"),
+            serde_json::to_string(&areas).unwrap(),
+        )
+        .unwrap();
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        let base = load_base(root).expect("loads");
+        assert_eq!(check_base(&base), Vec::<String>::new());
+    }
+
+    /// A `see` link to an id that an exclusion or a retired override takes
+    /// out of the active set is not dangling; a link to an id that no source
+    /// ships still fails (spec 4.1).
+    #[test]
+    fn check_base_resolves_a_see_link_to_an_excluded_or_retired_pack_entry() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(
+            root,
+            &[entry(json!({
+                "id": "process.a", "standing": false,
+                "see": ["alpha.b", "alpha.c", "alpha.d", "ghost.x"],
+            }))],
+        );
+        write_pack_copy(
+            root,
+            "alpha",
+            &["alpha"],
+            &[
+                entry(json!({"id": "alpha.b", "standing": false})),
+                entry(json!({"id": "alpha.c", "standing": false})),
+                entry(json!({"id": "alpha.d", "standing": false})),
+            ],
+        );
+        pin_every_copy(root);
+        fs::write(
+            root.join("knowledge/overrides.json"),
+            serde_json::to_string(&json!({
+                "schema": "houserules/overrides@1.0.0",
+                "overrides": [{"id": "alpha.c", "fields": {"status": "retired"}}],
+                "exclusions": [{"id": "alpha.b"}],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let base = load_base(root).expect("loads");
+        assert_eq!(
+            check_base(&base),
+            ["knowledge/process.json process.a: see \"ghost.x\" does not exist"]
+        );
+    }
+
+    /// A tree with a pack copy, its pin, and an override passes; the same
+    /// copy edited by hand fails with the line that points to
+    /// `overrides.json`; a local entry with a pack id fails with both files
+    /// named.
+    #[test]
+    fn check_base_runs_the_pack_layer_checks() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(root, &[entry(json!({"id": "process.a"}))]);
+        write_pack_copy(
+            root,
+            "alpha",
+            &["alpha"],
+            &[entry(json!({"id": "alpha.b", "standing": false}))],
+        );
+        pin_every_copy(root);
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        let base = load_base(root).expect("loads");
+        assert_eq!(check_base(&base), Vec::<String>::new());
+
+        let path = root.join("knowledge/packs/alpha.json");
+        let mut copy: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        copy["entries"][0]["summary"] = json!("Edited in place.");
+        fs::write(&path, serde_json::to_string(&copy).unwrap()).unwrap();
+        let base = load_base(root).expect("loads");
+        assert!(
+            check_base(&base).contains(&crate::rules::check_packs::pin_mismatch_line("alpha")),
+            "{:#?}",
+            check_base(&base)
+        );
+
+        pin_every_copy(root);
+        let local = root.join("knowledge/process.json");
+        let mut topic: Value = serde_json::from_str(&fs::read_to_string(&local).unwrap()).unwrap();
+        topic["entries"]
+            .as_array_mut()
+            .unwrap()
+            .push(entry(json!({"id": "alpha.b", "standing": false})));
+        fs::write(&local, serde_json::to_string(&topic).unwrap()).unwrap();
+        let base = load_base(root).expect("loads");
+        assert!(
+            check_base(&base).contains(
+                &"knowledge/packs/alpha.json alpha.b: duplicate id (also in \
+                  knowledge/process.json)"
+                    .to_string()
+            ),
+            "{:#?}",
+            check_base(&base)
+        );
+    }
+
+    /// The doc of `check_base` names the stage of each pack-layer finding. A
+    /// dangling `see` link of a pack entry (`pack_see_findings`) joins the
+    /// first stage, so the render checks do not run. A pin finding
+    /// (`pack_findings`) is in the trailing group and prints in both cases.
+    #[test]
+    fn a_pack_entrys_dangling_see_link_stops_the_second_stage_but_a_pin_finding_still_prints() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(root, &[entry(json!({"id": "process.a"}))]);
+        let no_pin =
+            "knowledge/packs/alpha.json: the pack \"alpha\" has no pin in .houserules.json";
+        write_pack_copy(
+            root,
+            "alpha",
+            &["alpha"],
+            &[entry(
+                json!({"id": "alpha.b", "standing": false, "see": ["ghost.x"]}),
+            )],
+        );
+        let base = load_base(root).expect("loads");
+        assert_eq!(
+            check_base(&base),
+            [
+                "knowledge/packs/alpha.json alpha.b: see \"ghost.x\" does not exist",
+                no_pin,
+            ]
+        );
+        // The control: nothing was rendered, so without the dangling link the
+        // second stage runs and reports the stale files, and the pin finding
+        // still comes last.
+        write_pack_copy(
+            root,
+            "alpha",
+            &["alpha"],
+            &[entry(json!({"id": "alpha.b", "standing": false}))],
+        );
+        let base = load_base(root).expect("loads");
+        let findings = check_base(&base);
+        assert!(
+            findings
+                .iter()
+                .any(|finding| finding.contains("generated file is out of date")),
+            "{findings:#?}"
+        );
+        assert_eq!(findings.last().map(String::as_str), Some(no_pin));
+    }
+
+    /// A `CLAUDE.md` that does not import `AGENTS.md` is one finding, with
+    /// or without the Claude renderer; one that does passes.
+    #[test]
+    fn check_base_names_a_claude_md_that_does_not_import_agents_md() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        make_repo(root, &[entry(json!({}))]);
+        let base = load_base(root).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        let base = load_base(root).expect("loads");
+        assert_eq!(check_base(&base), Vec::<String>::new());
+        fs::write(root.join("CLAUDE.md"), "# Test\n").unwrap();
+        assert_eq!(
+            check_base(&base),
+            ["CLAUDE.md: the standing rules do not reach Claude Code; add @AGENTS.md to CLAUDE.md"]
         );
     }
 

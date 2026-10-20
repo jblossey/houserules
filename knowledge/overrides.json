@@ -1,0 +1,615 @@
+{
+  "schema": "houserules/overrides@1.0.0",
+  "overrides": [
+    {
+      "id": "knowledge-base.cite-durable-refs",
+      "fields": {
+        "summary": "Cite a commit in a permanent file only if it is or will be reachable from main; name in-branch events by batch/task/round; restate interim SHAs at aggregation.",
+        "source": {
+          "date": "2026-09-11",
+          "by": "review",
+          "ref": "batch 21 branch review, important issue 2"
+        },
+        "verify": [
+          "crates/houserules/src/rules/durable_sha.rs"
+        ]
+      }
+    },
+    {
+      "id": "knowledge-base.ids-are-permanent",
+      "fields": {
+        "body": [
+          "Dispatches, reports, audits, and `see` lists cite ids; a rename breaks every one of them silently.",
+          "Permanence includes reachability through every reader - get, see-citations, batch membership - across an archive sweep; a mover that strands any one reader breaks the rule even though the id still exists on disk (batch 22 T1: three reader paths closed one by one)."
+        ]
+      }
+    },
+    {
+      "id": "knowledge-base.rules-need-a-loading-path",
+      "fields": {
+        "body": [
+          "A non-standing entry in an area with empty globs other than global (`process` in the seed) never loads with a file. A global entry loads with every file through `houserules for` and joins every audit package (a task audit leaves out an entry tagged `controller` unless `--ids` names it), but renders into no rules file (batch 11).",
+          "After filing, run `houserules for <a file the rule governs>` and confirm the entry appears.",
+          "The kit's non-standing procedure rules in the glob-less `process` area load by citation instead: a kit-owned skill or agent template names the id, and its reader runs `houserules get <id>`. `check-knowledge` fails a cited id that the base does not hold. Such an entry never joins an audit package by area; name it in `--ids` to audit against it. `process.risk-tiers`, `process.severity-by-impact`, `process.bounded-review-loop`, `process.knowledge-earns-its-place`, and `process.parallel-on-disjoint-files` load this way.",
+          "A non-standing `process` entry also loads through two paths. The controller reads its summary at the session ritual's `houserules index --area process`. An agent receives its id on the `Knowledge:` line of a dispatch.",
+          "Make a process rule standing only when every session must carry it. Give the `controller` tag to a rule that only the controller can break: a task audit leaves the entry out of its package unless `--ids` names it (`knowledge-base.controller-rules-are-tagged`).",
+          "A `check` needs an audit loading path too: it joins the package when its entry is `standing`, sits in a touched or global area (any kind, not only rule and invariant), or is named in `--ids`. A task audit leaves out the check of an entry tagged `controller` unless `--ids` names that entry."
+        ],
+        "tags": [
+          "knowledge",
+          "authoring",
+          "areas",
+          "standing"
+        ],
+        "source": {
+          "date": "2026-09-02",
+          "by": "review",
+          "ref": "batch 5 branch review, issue 1"
+        },
+        "verify": [
+          "knowledge/areas.json"
+        ],
+        "standing": null
+      }
+    },
+    {
+      "id": "knowledge-base.state-only-the-source",
+      "fields": {
+        "body": [
+          "Invented claims read plausibly; that is what makes them dangerous.",
+          "When two sources disagree, read the code and record which one the entry follows.",
+          "A shipped template or seed names no root-only id, path, or command; verify every reference resolves in a fresh install before syncing the root copy (batch 7 task 3).",
+          "Run every command block you ship exactly as printed, top to bottom, in the environment the reader will have (a fresh directory for a quick start). A block that needs unstated context, or that resolves differently than printed (an unpinned git spec), fails this rule (batch 13: a quick start that exited 1 as printed, an install form floating to the default branch, a kit-only mechanism shipped as generic).",
+          "The walk includes a control: when a line looks optional, re-run the block without it and confirm the block then fails — that proves the line load-bearing instead of decorative (batch 18 T6 r2: the quick start's `houserules update --dir .` line was proven load-bearing by exactly this control). Sweeps keyed on deleted-tool names miss claims keyed on surviving names (batch 18 branch review: a design-doc aside naming `bin/houserules.mjs` escaped a sweep that grepped for the deleted wrappers); sweep for the claim's subject too.",
+          "A corrected measurement sweeps its dependents: when a sentence is corrected, re-open every sentence that cites, paraphrases, or leans on it — not only the lines the round edited; antecedents drift when their referent is repaired (batch 19 T2 r2, README:110).",
+          "An amendment re-derives the entry's summary from the amended body before filing - the summary is the half that renders into the loaded rules files, so a stale summary ships wider than the body it contradicts (batch 20 T3: two amended entries kept summaries their own new bodies had overturned; batch 20 T4: two shipped doc comments stated non-facts their own commits made false).",
+          "Before shipping a uniqueness or attribution sentence ('the only', 'caused by'), run the enumeration that would falsify it against the tree at HEAD - batch 21's two instances (a misattributed gate failure; a false only-bin-that-walks claim) were each falsifiable by one grep the writer did not run.",
+          "A rewritten doc comment is teaching prose under this rule: re-derive caller counts, uniqueness claims, and cross-references from the tree at the revision under edit, never from the pre-rewrite text or another agent's summary (batch 22 T3a/T3c).",
+          "Prose stating an invariant about commit history ('always', 'never', 'by the time it reaches main') enumerates every author class that writes such commits - bot-authored release and dependency commits included; a release-please extra-files commit falsified one such 'always' in batch 24.",
+          "When a commit closes an item, grep the tracked docs for that item's id in the same commit: the closing commit owns every sentence that scheduled the work (batch 24 close, three occurrences of the same forward-reading class).",
+          "A premise in a spec or a brief about what another module does is a claim: open that module's doc or code before a doc comment or a dispatch restates it (batch 28 task 6: 'update overwrites kit-owned files' went from the spec into the brief, a module doc, and the README, while `update` keeps a locally modified file).",
+          "One quoted message for two runs is two claims: copy the text from the log of each run (batch 28: the CodeQL message of PR 34 has its two versions in the other order than the quote taken from PR 33)."
+        ]
+      }
+    },
+    {
+      "id": "knowledge-base.summary-is-the-rule",
+      "fields": {
+        "check": {
+          "type": "grep-absent",
+          "level": "warn",
+          "files": [
+            "knowledge/**/*.json",
+            "template/knowledge/**/*.json",
+            "template/packs/**/*.json"
+          ],
+          "pattern": "\\b(toda[y]|curren[t]ly|for no[w]|at the mo[m]ent)\\b|\\bunti[l]\\b[^.;:]{0,40}\\b(ships?|lands?)\\b",
+          "flags": "i",
+          "scope": "changed"
+        }
+      }
+    },
+    {
+      "id": "process.ask-when-missing",
+      "fields": {
+        "summary": "Ask the user when information is missing. Do not assume.",
+        "body": []
+      }
+    },
+    {
+      "id": "process.brainstorm-first",
+      "fields": {
+        "summary": "Start each batch with a brainstorming session or a written spec; get the user's approval before implementing.",
+        "body": [
+          "Use the superpowers brainstorming and spec skills when the plugin is installed; otherwise write the spec by hand. Specs live in `docs/specs/`.",
+          "The order is strict: spec, then plan. A plan written before its approved spec is nil - deleted and the planning phase redone from the spec, never re-anchored (owner ruling, batch 18, 2026-09-05).",
+          "A light-tier change (`process.risk-tiers`) has no plan. The body of its backlog item is the written spec, and the owner approves it before implementation."
+        ]
+      }
+    },
+    {
+      "id": "process.brief-carries-the-spec",
+      "fields": {
+        "body": [
+          "The controller writes briefs from the spec and plan; a silent omission surfaces only in review, one round late (batch 3, task 3).",
+          "When a brief and the spec disagree, the spec wins and the disagreement is a ruling to record."
+        ],
+        "source": {
+          "date": "2026-09-01",
+          "by": "review",
+          "ref": "batch 3 branch review, uncovered_findings; task 3 review, finding 2"
+        }
+      }
+    },
+    {
+      "id": "process.claims-match-artifacts",
+      "fields": {
+        "body": [
+          "The recurring failure is not fabrication but drift: the work is right while the sentence describing it cites a capture that is not there, quotes a line the capture lost, or keeps a rationale a later verification overturned (batch 16 tasks 2 and 5).",
+          "The check is mechanical: for each named file, open it; for each quoted line, grep it; for each number, recompute it from the artifact. A reviewer does exactly this, so a report that skips it converts Minor findings into review rounds.",
+          "A reversed trend is worth recording too: name the pattern in the review when it appears, and name its reversal when a later round demonstrates it (batch 16 task 2 round 2).",
+          "A SHIPPED doc or comment sentence stating a measurement is a claim like a report sentence (ruled batch 18): it cites a retained capture at a durable path, and a fix round's sweep re-opens every doc sentence the round touched. The report-claims checker cannot see shipped files — the manual sweep is the only net there.",
+          "A command field is the literal command copied from the terminal — never retyped, never annotated inline; labels and notes go beside the field (ruled batch 19: the class failed four review rounds). A reviewer paste-runs command fields; a field that cannot paste-run is a finding by itself.",
+          "Close every report by running the report-claims checker (`houserules check-report-claims <REPORT_FILE>`) over the report file after the last edit, and paste its clean run as the final tests entry. The checker is a floor, not a substitute for the manual sweep: its Limits section (crates/houserules/src/report_claims.rs, reachable only where this kit's own source lives) names what only the sweep catches; an adopter repo carries no such source, so there a false positive is disclosed per report and reported upstream instead. It ships as a `houserules` subcommand (HR-066, batch 20 T2), so the closing act runs in every adopter repo, not only the one that built it. The checker gates gitignored workspace reports, never a tracked artifact a CI job could see, so it carries no CI job of its own -- the implementer template's closing-act mandate (HR-060) is the whole mechanism.",
+          "A commit message body is a claim like a report sentence: recompute its counts from the artifact before committing; a wrong count found post-commit is recorded in the report for aggregation to carry, never amended and never left silent (batch 20 carried five such corrections; commit prose was the largest surviving drift surface once the checker gated reports).",
+          "After any world-changing event - a fix round, an interruption, a rebase - re-derive every count and summary-scope field (implemented, self_review, doc comments citing measurements) from the tree at HEAD before re-submitting; a carried-forward sentence is a new claim, never trusted (batch 21: all four tasks failed this at least once; the interruption seam cost a full review round).",
+          "A claim about a failure names whether it was OBSERVED or INFERRED - a commit body keeps the same observed-vs-reconstructed split its report keeps (batch 21 branch-fix 2: the report drew the split correctly while a local-history commit body collapsed it into one 'panicked').",
+          "Five drift classes, each caught only by re-derivation across batch 22's five tasks: a rewritten command string that was never run as written; a count not re-measured after the change; a citation carrying a stream index where a file line belongs; a false universal ('every', 'all') no enumeration was run for; and a transcription of another agent's wording whose particulars were never checked against the tree.",
+          "Re-derive every sentence from the tree at the final HEAD immediately before the report ships; a sentence carried from a draft, a review, or a dispatch is re-derived before it lands."
+        ],
+        "source": {
+          "date": "2026-09-04",
+          "by": "review",
+          "ref": "batch 16 task 2 re-review r1 trend note; owner ruling at the batch 16 report"
+        }
+      }
+    },
+    {
+      "id": "process.closure-claims-carry-enumeration",
+      "fields": {
+        "body": [
+          "Born from the batch 17 argv-closure arc: every unenumerated closure sentence was false in at least one direction, and each fix was a script whose output the sentence could then cite.",
+          "The enumeration lives at a path that outlives the session and reruns cleanly; its own summary line states the counts the claim cites, so a reader checks the artifact, not the prose.",
+          "A migration or flip closure names its zero-hit sweep of the RETIRED form (the grep pattern and its variants), rerunnable at HEAD; the enumeration is of the old form's residue, not the new form's presence (ruled batch 19: presence enumerations confirm known work, only residue sweeps falsify closure — batch 18 T6 and batch 19 T2 both failed this way).",
+          "The enumeration artifact is executable: a script whose own run prints the counts the claim cites, not a static dump or a hand-asserted mapping (batch 20: an asserted mapping hid a live coverage drop; grep dumps matched no command at HEAD until an executable sweep replaced them; a /tmp list failed durability until the comparison reran from git history).",
+          "The enumeration's pattern derives from the claim's SUBJECT, widened to every spelling the corpus itself uses - run a spelling-discovery probe first and retain it - never from one artifact's name (batch 21: a name-keyed sweep missed six subject-spelling lines; a /tmp-only regex missed six scratchpad citations; a hand-asserted home list omitted a live home).",
+          "The enumeration names its corpus AND its pattern classes, and the pattern set derives from the corpus's own spellings: run a spelling-discovery probe first and retain it beside the verification script. Batch 22 hit all three failure sub-shapes - a spelling the pattern never tested for, an assigned file absent from the file list, and a marker class the script's own header claimed but did not encode."
+        ],
+        "source": {
+          "date": "2026-09-05",
+          "by": "user",
+          "ref": "batch 17 report ruling; branch review retrospective"
+        }
+      }
+    },
+    {
+      "id": "process.contract-refresh-sweep",
+      "fields": {
+        "kind": "procedure",
+        "body": [
+          "Plan the sweep at pre-flight: refresh rounds run right after the contract task closes and before the next task dispatch, so every later review reads a valid workspace (batch 7 ran them after T4, before T5).",
+          "Semantic decisions in a refresh (which tdd mode, which narrative) belong to the task's reviewer, not the refresh dispatch: batch 7's controller over-steered one mode and the re-reviewer had to correct it.",
+          "Controller verification replaces a further review round only for reviewer-prescribed mechanical edits whose expected outcome the reviewer pre-verified; it is scripted (byte-equal audit rows, field presence), gated with && chains, and logged in the ledger. Judged findings always get a real review round.",
+          "The branch review reads the full workspace regardless, so the sweep is auditable end to end.",
+          "A change to the text of an audit row is no contract change for a closed report: `self_audit` records the audit run at report time. The sweep is due only when a closed report stops passing `validate` or `check-report-claims`; run both over every closed report to decide (batch 28 task 3: the row text became \"is present\", every earlier report stayed valid and claim-clean, no sweep)."
+        ],
+        "source": {
+          "date": "2026-09-02",
+          "by": "review",
+          "ref": "batch 7 branch review, retrospective"
+        },
+        "standing": null
+      }
+    },
+    {
+      "id": "process.eval-fixture-procedure",
+      "fields": {
+        "body": [
+          "Seed at least two rule violations of different check types (batch 7: a range devDependency for exact-pins plus a null dependency_vetting) in one small commit inside the detached eval worktree.",
+          "Doctor the report minimally: remove only the seeded fail rows from self_audit, adjust the summary counts to match, and let the prose claim compliance — the reviewer must prove the edit by row arithmetic against a fresh run.",
+          "Keep the undoctored audit output outside the workspace the reviewer reads (batch 7: the session scratchpad), so the judge can score expected_behavior against ground truth.",
+          "The reviewer dispatch carries the identical Knowledge:/Backlog:/--ids block as a real task review; artifacts carry the eval- prefix in the batch workspace and the record append names both template blob ids."
+        ],
+        "source": {
+          "date": "2026-09-02",
+          "by": "review",
+          "ref": "batch 7 branch review, retrospective"
+        }
+      }
+    },
+    {
+      "id": "process.evals-rerun",
+      "fields": {
+        "body": [
+          "The scenarios are the regression suite for the agent templates. The check is a `co-change`: a change to `.claude/agents/implementer.md`, `.claude/agents/task-reviewer.md`, or `.claude/evals/*.json` without a change to `.claude/evals/record.json` fails the audit. The entry routes through the `docs` area (`.claude/**`), so every audit that touches the templates carries it without `--ids`; the `process` area has no paths.",
+          "Run every scenario in a detached scratch worktree at the branch head before the branch review, or before Finish in a batch without one; the orchestrating skill holds the procedure. Keep nothing from a worktree; workspace artifacts carry the `eval-` prefix.",
+          "A run set in the record names `date`, `templates` (the git blob id of each template under test from `git rev-parse HEAD:<path>`; blob ids survive commit aggregation, commit SHAs do not), and one row per scenario: `scenario`, `agent`, `model`, `pass`, `of`, `notes`. The branch reviewer compares the latest blob ids with `HEAD`; in a batch without a branch review, the controller compares them before Finish.",
+          "No scenario covers `branch-reviewer` or the orchestrating skill; a change there needs no run. The `houserules render` command's own retrieval-protocol text shapes the generated skill the implementer loads; run the scenarios after a change there too — the check cannot see it.",
+          "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns; the branch does not merge before the record commit lands, and the branch-range audit is the row that must pass (batches 7-11, 14).",
+          "A template-touching batch may book ONE shared rerun at the final template state instead of a rerun per task (the ledgered economy); each interim task audit's deterministic fail is then recorded plan-mandated, citing the spec section that books the rerun, and the branch-range audit after the record commit is the row that must pass."
+        ],
+        "source": {
+          "date": "2026-08-31",
+          "by": "user",
+          "ref": "tag-pilot fc3241b"
+        }
+      }
+    },
+    {
+      "id": "process.evidence-outlives-the-session",
+      "fields": {
+        "body": [
+          "A report or workspace doc that cites a capture must name a file under the batch workspace (or the repository) that a later reader can open. A session scratchpad path is dead the moment the session ends; a citation into it is a claim nobody can collect on.",
+          "Copy small captures into the workspace beside the doc that cites them (batch 16 task 5: 59 files under t5-evidence/). An artifact too large to retain is disclosed as not retained, with its decisive excerpt quoted inline - never cited at a path that no longer exists.",
+          "Truncation markers count as citations: a marker naming a full log must point at a durable file whose content is a byte-prefix match of the retained excerpt.",
+          "A long-lived SOURCE comment states the rerunnable command and its measured counts inline, self-contained; a batch-workspace path may ride along as provenance but never as the only evidence, because a clone carries no workspace (ruled at the batch 20 report, docs/design.md 5.52)."
+        ],
+        "source": {
+          "date": "2026-09-04",
+          "by": "review",
+          "ref": "batch 16 task 5 review finding 5; owner ruling at the batch 16 report"
+        }
+      }
+    },
+    {
+      "id": "process.fix-proofs-extend-the-reviewers-run",
+      "fields": {
+        "body": [
+          "If the reviewer ran the full pipeline, the fix is proven on the full pipeline.",
+          "Batch 24 T1's record: r1 fell to a source read where the task had read config; r2 fell to a full-pipeline run where the fix had ported the consumer out; r6 fell to CI's real merge base where the report had run the fix-diff base. Each escalation was the reviewer running one level deeper than the fix's own proof; convergence began when the implementer adopted and extended the reviewer's simulation instead of replacing it."
+        ],
+        "tags": [
+          "review",
+          "proofs",
+          "fix-rounds"
+        ],
+        "source": {
+          "date": "2026-09-13",
+          "by": "user",
+          "ref": "batch 24 branch review retrospective, T1 rounds 1-7; adopted standing at the batch-24 report (design.md 5.75)"
+        }
+      }
+    },
+    {
+      "id": "process.fix-round-verification-record",
+      "fields": {
+        "body": [
+          "A re-review deliverable in the workspace is the default for rounds with executable changes or any critical finding. A controller verification note suffices in two cases. First: a report-only or prose round, when the note names finding-by-finding evidence. Second: a reviewer-prescribed mechanical edit whose outcome the reviewer pre-verified, when the round's commit holds that edit and its test alone. A commit that holds more gets the re-review, or the branch review reads it in full and says so (batch 28 task 6 round 3).",
+          "A round that holds only Minor fixes always closes with a controller verification note, whatever the kind of change (`process.bounded-review-loop`). The note runs the check that each Minor finding names (a command and its expected result) and cites the result. When a finding names no check, the controller names one.",
+          "Origin: batch 23 T2's fix round closed on a ledger note alone; the verifications were real and reproducible, but nothing pinned where such a record must live or what it must name."
+        ],
+        "source": {
+          "date": "2026-09-12",
+          "by": "review",
+          "ref": "batch 23 branch review, retrospective"
+        }
+      }
+    },
+    {
+      "id": "process.gate-shell-chains",
+      "fields": {
+        "kind": "gotcha",
+        "body": [
+          "Batch 7 hit the class twice: a heredoc-tail slip forced an amend, and a follow-up verification printed a success message while the evidence append was silently skipped; both were caught only because the output was re-read.",
+          "Write verification scripts so the success message is unreachable when any prior command fails: && chains, or a trailing explicit exit-code check per command. set -e does not protect tool-run shells.",
+          "Re-run, do not hand-repair, any evidence produced by a sequence that later proves unchained.",
+          "Output redirection placed after an && chain binds only the last command; wrap the chain in a subshell, or redirect per command, when the whole sequence is the evidence (batch 9).",
+          "A zero-count probe (grep -c) exits nonzero on zero matches and breaks the chain even when zero is the expected answer; gate count probes on their output, not their exit (batch 9).",
+          "A before/after evidence bracket (snapshot, action, snapshot, diff) is one && chain in one call; snapshots captured across separate calls prove nothing about order. Re-run the whole bracket, never splice it, and check the artifact mtimes increase in chain order (batch 10)."
+        ],
+        "source": {
+          "date": "2026-09-02",
+          "by": "review",
+          "ref": "batch 7 branch review, retrospective"
+        },
+        "standing": null
+      }
+    },
+    {
+      "id": "process.main-wins-backlog-collisions",
+      "fields": {
+        "body": [
+          "Batch 13: an owner-side agent merged HR-047/048 to main while the branch carried candidate filings under the same ids. Never-merged branch-local filings can be dropped without breaching knowledge-base.ids-are-permanent.",
+          "Verify overlap yourself with git diff --name-only on both sides; another agent's no-overlap claim is a claim, not evidence.",
+          "Record the old-to-new sha map in a workspace file and the batch report: closed tasks' deliverables keep pre-rebuild shas, and gc can prune those objects.",
+          "At the branch pre-check, fetch and compare the branch's merge base with the remote main, even when no collision is known: a pull request of a second session can land a rebased copy of a branch commit on main mid-batch (batch 28: PR 42 put a copy of the branch's first commit and the new issue forms on main while the local main ref stayed at the old base; a soft reset after a late fetch would have reverted the issue forms)."
+        ],
+        "source": {
+          "date": "2026-09-03",
+          "by": "review",
+          "ref": "batch 13 branch review; the HR-047/048 collision"
+        }
+      }
+    },
+    {
+      "id": "process.model-policy",
+      "fields": {
+        "summary": "Every review runs on a mightier model than the implementer it reviews. Implementers use the cheapest model that fits the task.",
+        "body": [
+          "Model order: haiku < sonnet < opus < fable. Mightier is strict: an Opus implementer needs a Fable review, so choosing an Opus implementer is a deliberate, costed decision.",
+          "Scoped re-reviews follow the same bar as first reviews: the fix diff's size never lowers the reviewer's tier.",
+          "Name the model on every dispatch; an omitted model inherits the session's most expensive one.",
+          "Effort pins (owner-ruled 2026-09-12): the controller session runs at effort high (settings.json effortLevel), task and branch reviews at high, implementers at xhigh - set in the agent templates' frontmatter; a dispatch that deviates names the deviation."
+        ]
+      }
+    },
+    {
+      "id": "process.owner-content-mid-batch",
+      "fields": {
+        "body": [
+          "Batch 14: the README convergence paragraphs surfaced while T1 ran; secured as their own docs(readme) commit, two notes surfaced to the owner (a dropped link, lowercase product names), nothing silently changed.",
+          "Verify the interleave position with git log before writing the ledger line: state which task commits sit below and above it. A wrong containment claim forces a ledger correction and changes which range the task review must read (batch 14 T1).",
+          "At aggregation the commit stays its own commit; no task diff absorbs it, and the task-review dispatch names it as owner content to be judged as such."
+        ],
+        "source": {
+          "date": "2026-09-04",
+          "by": "review",
+          "ref": "batch 14 branch review"
+        }
+      }
+    },
+    {
+      "id": "process.owner-rulings-need-owner-supersession",
+      "fields": {
+        "body": [
+          "Work that depends on the reversal waits or takes the reversal-free path.",
+          "Batch 24: 5.71 reversed 5.20 (tag shape) mid-task under fix-round latitude, correctly flagged for the checkpoint -- but rounds 2-3 built the linked-versions design on it, and 5.72's rejection discarded that design and reopened the task. The payload-stamp mechanism that finally shipped never needed the reversal, and was reachable on day one under the standing ruling."
+        ],
+        "tags": [
+          "rulings",
+          "owner",
+          "latitude",
+          "controller"
+        ],
+        "source": {
+          "date": "2026-09-13",
+          "by": "user",
+          "ref": "batch 24 branch review retrospective; design.md 5.71/5.72; adopted standing at the batch-24 report (design.md 5.75)"
+        }
+      }
+    },
+    {
+      "id": "process.review-findings-are-claims-too",
+      "fields": {
+        "body": [
+          "Batch 17 caught the reviewer wrong twice (a prescribed device that provably did not work; a divergence tally measured with the wrong command names) and the controller's dispatch premises wrong twice - each caught only because someone re-ran the thing. The discipline that binds the implementer's report binds the review's findings and the dispatch's diagnosis alike.",
+          "The paired task-reviewer template clause lands with HR-060."
+        ],
+        "source": {
+          "date": "2026-09-05",
+          "by": "user",
+          "ref": "batch 17 report ruling; branch review retrospective"
+        }
+      }
+    },
+    {
+      "id": "process.rulings-to-file",
+      "fields": {
+        "body": [
+          "Home files: scope or product rulings go to a backlog entry; process rulings to a knowledge entry (`standing: true` when non-negotiable); design rulings to the batch spec.",
+          "A ledger note may accompany a ruling; it never substitutes for the tracked write.",
+          "A dispatch deviation from the spec's process line (model, order, gate) is a ruling: amend that spec line in the same turn. The batch report at the tick repeats it; it does not replace it.",
+          "An accepted implementer deviation is a ruling. Home it (a spec amendment or a backlog item) in the turn it is accepted, before the next dispatch.",
+          "A code comment is not a home file: a sanctioned deviation homes in the spec's deviations section or the design record the turn it is accepted; the comment may cite that home, never substitute for it (batch 16 task 4)."
+        ]
+      }
+    },
+    {
+      "id": "process.skills-for-procedures",
+      "fields": {
+        "standing": null
+      }
+    },
+    {
+      "id": "process.suggestions-are-unverified",
+      "fields": {
+        "body": [
+          "A reviewer's finding text and a controller's course correction are claims by their authors; the agent who lands them owns their truth at the landing revision.",
+          "Origin: batch 22 T3a round 3 - a review's suggested wording carried line pins wrong in the suggestion itself, and the fix transcribed them unchecked; the repair dropped pins for stable function names.",
+          "This is the transcriber's half of process.review-findings-are-claims-too, which binds only the finding's author.",
+          "Your own earlier prose is another agent's suggestion once the tree has moved (batch 24 T3a)."
+        ],
+        "source": {
+          "date": "2026-09-12",
+          "by": "user",
+          "ref": "batch 22 report, standing proposal 3"
+        }
+      }
+    },
+    {
+      "id": "process.tdd",
+      "fields": {
+        "body": [
+          "Data-only and docs-only changes carry no RED/GREEN. The report's `tests` names the gates that ran instead (`kb check`, `backlog check`, `validate`, render drift, lint); the reviewer judges their sufficiency.",
+          "A data change with a testable consumer — a check pattern with a regression test, a rendered artifact a test pins — is a code change for this rule: the consumer test comes first.",
+          "A new test for behavior that is already correct proves it can fail through a deliberate, disclosed mutation, not a natural RED.",
+          "Never fabricate a cycle: an empty `tdd` with named gates is honest evidence; a manufactured RED is not.",
+          "A fix round that narrows or widens matching behavior carries its own RED or counter-example test. A cycle captured after the commit says so in the report's tdd entry and presents the runs in the order they really happened.",
+          "When no assertion can change (an output-noise or report-only fix), disclosed before/after captures of the observable difference are the honest evidence, presented in the order they ran.",
+          "The `mode` label follows when the shown run happened, not the failure's flavor: `natural` only when the shown RED ran pre-commit; a post-hoc recapture is `reconstructed` and the tdd entry says so; a disclosed-mutation proof is `mutation`.",
+          "Two label failures are ruled (batch 18): a mutation proof's RED shows the test FAILING under the mutation — a capture showing the tests passing proves nothing; and a post-commit recapture is `reconstructed` regardless of what also ran earlier — the label follows the shown run, and one report uses one label for one procedure."
+        ]
+      }
+    },
+    {
+      "id": "process.verify-in-persisted-state",
+      "fields": {
+        "body": [
+          "Batch 18 T2: `git -c core.commentChar=X commitlint --edit` measured 'both tools share the blind spot' because -c never persists and commitlint's `git config` lookup found nothing; with the value persisted in the repository's config, commitlint adapted and check-commit did not - the reversed measurement was the real finding and produced the fix.",
+          "Before citing a tool's behavior under configuration, persist the configuration the way a user would (config file, not a process-scoped flag or env var), then run both sides from that state. State the persistence mechanism in the capture."
+        ],
+        "tags": [
+          "verification",
+          "measurement",
+          "review"
+        ],
+        "source": {
+          "date": "2026-09-06",
+          "by": "review",
+          "ref": "batch 18 T2 fix round 2 correction; task-2-review-r3.json re-derivation"
+        },
+        "standing": null
+      }
+    },
+    {
+      "id": "process.wiring-checks-run-the-resolution",
+      "fields": {
+        "area": "tools",
+        "body": [
+          "The batch-19 shape: release.yml's tag glob matched v0.2.0-alpha, and dist plan --tag=v0.2.0-alpha still exited 255 because CARGO_PKG_VERSION could not resolve the tag - the pattern check passed while the pipeline was broken on every tag the flow would produce (batch 19 task-1-review.json issue 2).",
+          "The proof is the consumer's own run, captured: dist plan for a tag wiring, the updater's replacement count for a pin wiring, the as-CI shell for a workflow step. The match check stays as the cheap first gate, never the verdict.",
+          "A third-party breakage claim states WHEN it fires, derived from the pinned source's call path - never hedged as 'may fail' - because the hedge is what mis-schedules the fix (batch 20: HR-073's original wording queued a push-time failure behind a release-time track until the source derivation re-scoped it pre-merge).",
+          "Run the resolution at the version the pinned consumer BUNDLES (read its dist/build metadata), never at the newest schema or docs version, and pin the two together with a cross-check test.",
+          "A comment or rule that names a gate also names the job or task that invokes it, so the claim is greppable against ci.yml and mise.toml (batch 24: two fails claimed a check runs where nothing runs it).",
+          "Batch-27 retrospective: when the execution environment cannot run the real resolution (no root for the real package, no runner for the real OS), the compliant shape is the substitute run PLUS a filed risk item naming the real-leg proof and its trigger (the HR-137 pattern); an undisclosed substitute is the violation."
+        ],
+        "tags": [
+          "verification",
+          "wiring",
+          "release",
+          "ci"
+        ],
+        "source": {
+          "date": "2026-09-07",
+          "by": "review",
+          "ref": "batch 19 branch review; task-1-review.json issue 2"
+        },
+        "standing": null
+      }
+    },
+    {
+      "id": "quality.gates-derive-their-scope",
+      "fields": {
+        "area": "rust",
+        "body": [
+          "A hand-typed inclusion list cannot cover a file that does not exist yet, and batch 20 T4 showed it already missed ones that did: two seeded violations passed the first shipped residue gate because neither file was ever added to its list. A gate declared permanent has to default to gated, not to remembering.",
+          "Derive the walk set (git ls-files minus an EXCLUDED_PREFIXES-style constant whose doc names the reason for each entry) so a newly tracked file is gated the moment it lands; pin the boundary with a test that classifies every real tracked path.",
+          "An input the gate cannot read is a named, fatal error, never a continue: the silent-skip version under-counted and passed a seeded violation hiding behind a rename. A readable-but-binary input may be a counted, printed skip.",
+          "A gate's file list comes from the authoritative set (git-tracked files, never the working directory); every finding names which derivation decided it; every skip is counted and printed on every branch, including the one where the primary derivation returns nothing; and an enumeration feeding a closure claim fails loudly on input it cannot read (batch 21 T1/T2 arcs).",
+          "A gate that needs a toolchain component derives that need from declared configuration (mise.toml tools, lockfiles), never from what the authoring machine happens to have installed; prove a new gate on a runner shaped like CI's fresh declared install (batch 21 branch-fix: a lint step green only on a hand-added rustup target no tracked file declared).",
+          "Every hand-kept enumeration inside a gate ships with a derivation test that recomputes it from the subject (batch 25: the keyword set derived from the engine's own source, the lint-array pin from mise.toml, the exclusion lists reached by the vacuousness gate)."
+        ],
+        "tags": [
+          "gates",
+          "tooling",
+          "dev-bins"
+        ],
+        "source": {
+          "date": "2026-09-08",
+          "by": "review",
+          "ref": "batch 20 branch review; task-4-review.json important findings 1-2; residue-gate.rs module doc"
+        },
+        "standing": null
+      }
+    },
+    {
+      "id": "quality.no-compat-softening",
+      "fields": {
+        "source": {
+          "date": "2026-09-02",
+          "by": "user",
+          "ref": "owner instruction of 2026-09-02, batch 7"
+        },
+        "see": [
+          "process.no-tech-debt"
+        ]
+      }
+    },
+    {
+      "id": "quality.pin-copies-byte-exact",
+      "fields": {
+        "area": "tests",
+        "body": [
+          "Deleting the differing property from both sides pins the copies modulo the property, not modulo its value: a dropped field, whitespace drift, or key reordering still passes (batch 8 task 1, round 0).",
+          "Assert copyA equals transform(copyB) with the transform the production code applies (batch 8: the id-prefix replaceAll), so the test and the shipped rewrite cannot drift apart.",
+          "When the copies are already in sync, prove the test can fail with a disclosed mutation and label the cycle mode mutation."
+        ],
+        "tags": [
+          "tests",
+          "sync"
+        ],
+        "source": {
+          "date": "2026-09-02",
+          "by": "review",
+          "ref": "batch 8 branch review, uncovered finding 1"
+        },
+        "verify": [
+          "crates/houserules/tests/dogfood.rs"
+        ],
+        "standing": null
+      }
+    },
+    {
+      "id": "quality.principles",
+      "fields": {
+        "body": [
+          "YAGNI: build only what the current backlog item needs.",
+          "KISS: choose the simplest design that meets the requirement. No abstraction for one caller, no option without a second use, no layer that only forwards.",
+          "DRY once logic has two real call sites: never leave a copy that can drift (shared constants, option factories, one write path). One call site is not yet duplication.",
+          "Prefer a well-maintained library (vetted, exact-pinned) to a custom implementation of a solved problem: parsing, validation, globbing, dates, retries. A standing project decision may rule an exception; record it as an entry.",
+          "One responsibility per file and per function. Each unit boundary is one a reader can understand without its internals.",
+          "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test.",
+          "A dedicated compliance pass over the existing codebase is its own backlog item; new code complies immediately.",
+          "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test; an auto-restore setting covers only spies, so a mock created in a module-mock factory gets its own explicit afterEach reset.",
+          "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided (batch 16: the glob translator missed nested braces and panicked; the regex scan flipped four verdicts against V8)."
+        ],
+        "see": [
+          "process.no-tech-debt",
+          "security-hygiene.dependency-vetting"
+        ]
+      }
+    },
+    {
+      "id": "quality.well-maintained-libraries",
+      "fields": {
+        "body": [
+          "The orchestrator researches candidate libraries or packages AT SPEC TIME with maintenance evidence, and presents them for the owner's ruling - never delegated to implementers, never deferred to plan time. The choice is ultimately the owner's.",
+          "Wherever the codebase is touched, existing custom code that a well-maintained library should replace is refactored in that batch: the refactor folds into the spec and plan. Deferring the rewrite is not an option.",
+          "A whole-codebase sweep can conclude 'named but not adopted this batch': record the candidate and the reason adoption waits (a competing spec priority, a not-yet-ruled owner decision), rather than silently dropping the finding. The next batch that touches the same code re-reads the record before repeating the search.",
+          "quality.principles carries the underlying preference (also present in tag-pilot); security-hygiene.dependency-vetting and exact-pins govern each adoption."
+        ],
+        "source": {
+          "date": "2026-09-05",
+          "by": "user",
+          "ref": "owner ruling at the batch 18 spec gate; docs/design.md §5.31"
+        }
+      }
+    },
+    {
+      "id": "security-hygiene.exact-pins",
+      "fields": {
+        "summary": "Pin exact versions. Install only with a CLI (`cargo add <crate>@=<version>`, `pnpm add --save-exact`). Never write a version number by hand.",
+        "body": [
+          "Ranges (`^`, `~`) widen the attack surface. Resolve to the latest stable version at install time.",
+          "The deterministic check covers `package.json` and `Cargo.toml`; ranges inside the `engines` object are floors, not dependency pins, and are exempt. Other ecosystems are judged by the reviewer under the same rule.",
+          "A bare Cargo range (\"2.14\", an implicit caret) is invisible to the pattern without false-positiving the [package] version line; it stays judged material (batch 17: a Cargo dependency landed while the check read zero files)."
+        ]
+      }
+    },
+    {
+      "id": "writing-style.doc-comments",
+      "fields": {
+        "body": [
+          "A doc comment states what the item is for, its invariants, and what it returns or raises when the signature does not say so. It never restates the signature.",
+          "Conventions: TSDoc in TypeScript, JSDoc in JavaScript, rustdoc in Rust, docstrings in Python — the language's standard form.",
+          "Self-documenting code first: full words, verbs for functions, `is`/`has` for booleans, no abbreviation a newcomer must decode, one meaning per name. A comment that explains a name means the name is wrong.",
+          "Comments inside a body still follow writing-style.code-comments: only for a constraint the code cannot show.",
+          "A doc comment stating a behavior ('returns tracked files', 'exits 0 on clean') is a claim under process.claims-match-artifacts - re-read it against the symbol at HEAD in the same pass that edits the symbol (batch 21 T1: a function documented as the tracked-file list walked the whole disk).",
+          "A rewrite re-resolves, in the same commit, every cross-reference to a section, file, or symbol it deletes or renames; the dangling-cross-reference class recurred in three of batch 22's five tasks."
+        ]
+      }
+    },
+    {
+      "id": "writing-style.instructions-cover-the-state-space",
+      "fields": {
+        "area": "template",
+        "body": [
+          "Batch 10 T2 shipped 'set status to DONE_WITH_CONCERNS whenever concerns is non-empty'. The status enum has four values; as written the sentence also captured BLOCKED and NEEDS_CONTEXT reports, which legitimately carry concerns. The fix was three words: 'instead of DONE'.",
+          "Before shipping a conditional instruction into a template or skill, enumerate the conditioned field's full value set and read the sentence once per value it must not change.",
+          "Root-only entry: the seed ships no template area, so this loads here through area template (template/**) and is not seeded.",
+          "After enumerating the conditioned field's values, enumerate each population's hidden environmental state too, and treat a command output the instruction interprets as itself a conditioned field: read the sentence once per output the command can print in each population. Batch 13's residual: an installed copy older than the merged declaration made the drift line read equal, so the equal-sides reassurance misled in exactly the fired-trigger case.",
+          "A gate is an instruction too: when a check is added to a tool, the surrounding protocol's own intermediate artifact states are part of the conditioned state space. Batch 14 T1's hardened validate rejected the retrieval protocol's own write-then-fill draft (terminal status, self_audit null); the fix migrated the flow to audit, fill, validate once, instead of special-casing the draft.",
+          "A shipped instruction that names a repo-local resource states what every other population does instead (batch 20 T2: the closing act's false-positive arm named a Limits-file edit only the kit repository can make; the fix branches on source-present vs installed-binary populations).",
+          "An instruction naming the populations it governs enumerates all of them: test the sentence against each population the code path actually handles (batch 22 T2: a README bullet named two of the three populations a path override governs).",
+          "A procedure's state space includes the states its own automation creates: walk every generated commit and bot-authored PR through the gates the procedure depends on (batch 24: the release PR's own commit was the uncovered state, three gates deep).",
+          "Instructions that branch on host or environment enumerate every branch as shipped text, and the reviewer walks each arm live (batch 25: the non-GitHub origin and the hook-vs-attribution arms).",
+          "Batch-27 retrospective: a seed-once file's instruction set is keyed to an enumerated field with three values - absent, present-generic, present-with-own-content; an instruction written for one names what holds for the other two. The batch-27 instance was the untested third state (own CLAUDE.md content, no AGENTS.md, reached by update's backfill).",
+          "A printed remedy is an instruction: list the states that reach the finding and follow the line as printed in each; a state the line cannot clear gets its own arm or a named limit (batch 28: the task review found one such state of the citation lint's remedy, an unseeded id in a kept file; the branch review found two more, an archived entry the adopter wants retired and an adopter topic name).",
+          "A ruling with a named set of outcomes states the count in every text that lists them ('one of three ways'), so a grep for the count finds a text that lists fewer (batch 32 task 2: a contested finding had three outcomes, and two texts named two)."
+        ],
+        "tags": [
+          "templates",
+          "instructions",
+          "enums"
+        ],
+        "source": {
+          "date": "2026-09-03",
+          "by": "review",
+          "ref": "batch 10 task 2 review, round 0 Important; HR-036"
+        },
+        "standing": null
+      }
+    }
+  ],
+  "exclusions": []
+}

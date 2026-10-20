@@ -1,0 +1,31 @@
+{
+  "knowledge/schema.json": [
+    {
+      "file": "knowledge-schema-1.0.0.json",
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ]
+    }
+  ],
+  ".github/workflows/knowledge.yml": [
+    {
+      "file": "knowledge-workflow-1.0.0.yml",
+      "versions": [
+        "1.0.0",
+        "1.1.0"
+      ]
+    },
+    {
+      "file": "knowledge-workflow-1.2.0.yml",
+      "versions": [
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ]
+    }
+  ]
+}

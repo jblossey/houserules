@@ -4,7 +4,7 @@
 //! (`check_commit.rs`'s module doc): this file needs none of `install.rs`'s
 //! other test-only helpers, so a `mod` share would only add dead-code
 //! warnings there. The deletion mechanism itself (`RETIRED`) is exercised
-//! at the unit level in `install.rs`'s own tests, which inject their own
+//! at the unit level in `install/mod.rs`'s own tests, which inject their own
 //! list directly at the `delete_retired` call site; these CLI-level tests
 //! cover the two production shapes instead: no deletion when the retired
 //! paths are absent (a fresh `init` never seeds them), and
@@ -16,6 +16,19 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use sha2::{Digest, Sha256};
+
+/// `path` canonical, in the form houserules prints it: on Windows without
+/// the `\\?\` prefix that `canonicalize` adds.
+fn resolved(path: &Path) -> PathBuf {
+    let canonical = path.canonicalize().expect("canonicalize");
+    match canonical
+        .to_str()
+        .and_then(|text| text.strip_prefix(r"\\?\"))
+    {
+        Some(plain) => PathBuf::from(plain),
+        None => canonical,
+    }
+}
 
 /// A `Command` for the compiled `houserules` binary under test --
 /// `install.rs`'s own copy of this helper. Sets
@@ -51,23 +64,30 @@ fn scratch_git_repo() -> tempfile::TempDir {
     dir
 }
 
-/// A scratch repository already seeded by a fresh `houserules init` --
-/// `update`'s own tests all start from this, since `update` presupposes an
-/// already-`init`ed install. The binary does not crash on a target that
-/// was never `init`ed.
+/// A scratch repository that a fresh `houserules init --target claude`
+/// installed (`init_seeded_repo`): `update`'s own tests start from this unless
+/// they say otherwise, since `update` presupposes an already-`init`ed
+/// install. The binary does not crash on a target that was never `init`ed.
 /// `update_over_a_never_init_ed_target_is_a_named_error_exit_2` below pins
-/// it as one named stderr line naming `<target>/knowledge/schema.json`,
-/// and exit 2 -- the exact `io::Error` text and path separator are
+/// it as one named stderr line naming `<target>/knowledge/schema.json`, and
+/// exit 2 -- the exact `io::Error` text and path separator are
 /// platform-specific (that test's own doc has the measured Unix/Windows
 /// split), so the pin derives them rather than hardcoding either. `node
 /// bin/houserules.mjs update` dumps a 26-line stack trace for the same
-/// missing file instead. `install.rs`'s own "Failure paths" doc section
+/// missing file instead. `install/mod.rs`'s own "Failure paths" doc section
 /// carries the same account, since a target repository's `update` failure
-/// modes belong there too.
+/// modes belong there too. The conversion of a 1.x install has its own tests
+/// in `conversion.rs`.
 fn seeded_repo() -> tempfile::TempDir {
+    init_seeded_repo()
+}
+
+/// The install of a fresh `houserules init --target claude`: a 2.0 install,
+/// with every kit-owned file.
+fn init_seeded_repo() -> tempfile::TempDir {
     let dir = scratch_git_repo();
     let output = houserules()
-        .args(["init", "--dir"])
+        .args(["init", "--target", "claude", "--dir"])
         .arg(dir.path())
         .output()
         .expect("run init");
@@ -90,7 +110,7 @@ fn seeded_repo() -> tempfile::TempDir {
 /// The expected stderr line is DERIVED, not hardcoded: this test performs
 /// the identical fallible call the binary's failing arm makes --
 /// `rules::model::load_base`'s own `fs::read_to_string` on the same
-/// `root.join("knowledge").join("schema.json")` path (`install.rs`'s own
+/// `root.join("knowledge").join("schema.json")` path (`install/mod.rs`'s own
 /// "Failure paths" doc section has the fuller account) -- against the same
 /// path in the same directory, and formats the captured `io::Error`
 /// exactly as `rules::model::LoadError::Io`'s `Display` does (`"{path}:
@@ -132,7 +152,7 @@ fn update_over_a_never_init_ed_target_is_a_named_error_exit_2() {
     assert_eq!(stderr, expected);
 }
 
-/// Every `KIT_OWNED` path -- `install.rs`'s own copy. `tools/kb.mjs`,
+/// Every `KIT_OWNED` path -- `install/mod.rs`'s own copy. `tools/kb.mjs`,
 /// `tools/backlog.mjs`, `tools/lib/cli.mjs`, and `tools/lib/json-store.mjs`
 /// are not in this list -- they joined `RETIRED` instead.
 const KIT_OWNED: &[&str] = &[
@@ -146,15 +166,10 @@ const KIT_OWNED: &[&str] = &[
     ".claude/skills/migrating-knowledge/SKILL.md",
 ];
 
-/// Every `SEED_ONCE` path -- `install.rs`'s own copy.
+/// Every `SEED_ONCE` path -- `install/mod.rs`'s own copy.
 const SEED_ONCE: &[&str] = &[
     "knowledge/schema.json",
     "knowledge/areas.json",
-    "knowledge/process.json",
-    "knowledge/quality.json",
-    "knowledge/security-hygiene.json",
-    "knowledge/writing-style.json",
-    "knowledge/knowledge-base.json",
     "backlog/schema.json",
     "backlog/amendments.json",
     "backlog/batches.json",
@@ -171,7 +186,7 @@ const SEED_ONCE: &[&str] = &[
     "CLAUDE.md",
 ];
 
-/// Every `GITHUB_HOSTED_SEED_ONCE` path -- `install.rs`'s own array.
+/// The CI workflow, the one D3 file that only a GitHub-hosted target gets.
 const GITHUB_HOSTED_SEED_ONCE: &[&str] = &[".github/workflows/knowledge.yml"];
 
 /// The lowercase hex SHA-256 digest of `content` -- this test file's own
@@ -186,15 +201,18 @@ fn sha256_hex(content: &[u8]) -> String {
 }
 
 /// `env!("CARGO_PKG_VERSION")` at THIS test binary's own compile time --
-/// `install.rs`'s own copy of `kit_version` (that function's own doc has
+/// `install/mod.rs`'s own copy of `kit_version` (that function's own doc has
 /// the account).
 fn kit_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// A file whose bytes would not change is neither written nor listed, so
+/// the first `update` right after `init` prints no `wrote` line, and an
+/// adopter file stays as it is.
 #[test]
-fn update_syncs_every_unmodified_kit_owned_file_and_leaves_adopter_files_alone() {
-    let dir = seeded_repo();
+fn update_right_after_init_writes_and_lists_no_file_and_leaves_adopter_files_alone() {
+    let dir = init_seeded_repo();
     fs::write(dir.path().join("adopter-notes.md"), b"mine").expect("write adopter file");
 
     let output = houserules()
@@ -206,11 +224,7 @@ fn update_syncs_every_unmodified_kit_owned_file_and_leaves_adopter_files_alone()
     let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
     assert!(output.status.success(), "stderr: {stderr}");
 
-    let mut expected_lines: Vec<String> = KIT_OWNED
-        .iter()
-        .map(|file| format!("wrote {file}"))
-        .collect();
-    expected_lines.push("render: up to date".to_string());
+    let mut expected_lines: Vec<String> = vec!["render: up to date".to_string()];
     let version = kit_version();
     expected_lines.push(format!("kit {version} -> {version}"));
     expected_lines.push(format!("houserules: updated {}", dir.path().display()));
@@ -321,8 +335,8 @@ fn update_replaces_an_at_baseline_kit_owned_file_with_the_running_kits_content()
 /// A `KIT_OWNED` file already holding the running kit's exact content, but
 /// with a recorded baseline stamped to something else entirely, is neither
 /// kept-and-reported nor left stale: `update` restamps its baseline to the
-/// running content's hash and reports it the same way an ordinary
-/// at-baseline sync would, never as `kept ... (locally modified)`. This is
+/// running content's hash, and neither writes nor lists the file, since its
+/// bytes would not change; it is never `kept ... (locally modified)`. This is
 /// the dogfood shape a ruled wording change produces when a project's own
 /// copy is hand-synced to a new kit release without an intervening
 /// `update` restamping first.
@@ -352,10 +366,7 @@ fn update_restamps_a_kit_owned_file_already_at_the_running_content_despite_a_sta
         !stdout.contains(&format!("kept {file} (locally modified)\n")),
         "got:\n{stdout}"
     );
-    assert!(
-        stdout.contains(&format!("wrote {file}\n")),
-        "got:\n{stdout}"
-    );
+    assert!(!stdout.contains(file), "got:\n{stdout}");
 
     assert_eq!(
         fs::read(dir.path().join(file)).unwrap(),
@@ -372,11 +383,11 @@ fn update_restamps_a_kit_owned_file_already_at_the_running_content_despite_a_sta
     );
 }
 
-/// An override silences reporting for a locally modified `KIT_OWNED` file
+/// A path in `ownedPaths` silences reporting for a locally modified `KIT_OWNED` file
 /// entirely: no report line, and the adopter's own content is kept exactly
 /// as a plain modified file's would be, but with nothing printed about it.
 #[test]
-fn update_silences_a_locally_modified_kit_owned_file_listed_in_overrides() {
+fn update_silences_a_locally_modified_kit_owned_file_listed_in_owned_paths() {
     let dir = seeded_repo();
     let file = ".claude/agents/implementer.md";
     fs::write(dir.path().join(file), b"adopter owns this now").expect("corrupt file");
@@ -384,7 +395,7 @@ fn update_silences_a_locally_modified_kit_owned_file_listed_in_overrides() {
     let marker_path = dir.path().join(".houserules.json");
     let mut marker: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
-    marker["overrides"] = serde_json::json!([file]);
+    marker["ownedPaths"] = serde_json::json!([file]);
     fs::write(&marker_path, serde_json::to_string_pretty(&marker).unwrap()).unwrap();
 
     let output = houserules()
@@ -407,9 +418,9 @@ fn update_silences_a_locally_modified_kit_owned_file_listed_in_overrides() {
     let restamped: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
     assert_eq!(
-        restamped["overrides"],
+        restamped["ownedPaths"],
         serde_json::json!([file]),
-        "update did not preserve the overrides field"
+        "update did not preserve the ownedPaths field"
     );
 }
 
@@ -502,11 +513,11 @@ fn update_reports_a_named_error_instead_of_silently_overwriting_an_unreadable_ki
     );
 }
 
-/// An override on a deleted `KIT_OWNED` file's path is the adopter's own
+/// A path in `ownedPaths` on a deleted `KIT_OWNED` file is the adopter's own
 /// declaration that they deleted it on purpose: `update` leaves it absent
 /// and reports nothing.
 #[test]
-fn update_leaves_an_overridden_deleted_kit_owned_file_absent() {
+fn update_leaves_an_owned_deleted_kit_owned_file_absent() {
     let dir = seeded_repo();
     let file = ".claude/agents/implementer.md";
     fs::remove_file(dir.path().join(file)).expect("delete file");
@@ -514,7 +525,7 @@ fn update_leaves_an_overridden_deleted_kit_owned_file_absent() {
     let marker_path = dir.path().join(".houserules.json");
     let mut marker: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
-    marker["overrides"] = serde_json::json!([file]);
+    marker["ownedPaths"] = serde_json::json!([file]);
     fs::write(&marker_path, serde_json::to_string_pretty(&marker).unwrap()).unwrap();
 
     let output = houserules()
@@ -535,44 +546,300 @@ fn update_leaves_an_overridden_deleted_kit_owned_file_absent() {
     );
 }
 
-/// The one knowledge entry the entry-upsert tests below all exercise.
-const TEST_ENTRY_ID: &str = "process.ask-when-missing";
-const TEST_ENTRY_TOPIC_FILE: &str = "knowledge/process.json";
-
-/// Reads `dir`'s `topic_file` and returns its `entries` array, in on-disk
-/// order.
-fn read_topic_entries(dir: &Path, topic_file: &str) -> Vec<serde_json::Value> {
-    let content = fs::read_to_string(dir.join(topic_file)).expect("read topic file");
-    let value: serde_json::Value = serde_json::from_str(&content).expect("parse topic file");
-    value["entries"]
-        .as_array()
-        .expect("entries is an array")
-        .clone()
-}
-
-/// Rewrites `dir`'s `topic_file` with `entries` as its new `entries` array,
-/// in the same pretty-printed, trailing-newline shape `update` itself
-/// writes, so a later byte comparison against `update`'s own output stays
-/// meaningful.
-fn write_topic_entries(dir: &Path, topic_file: &str, entries: Vec<serde_json::Value>) {
-    let path = dir.join(topic_file);
-    let mut value: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
-    value["entries"] = serde_json::Value::Array(entries);
+/// Reads `dir`'s `.houserules.json`, applies `edit`, and writes it back in
+/// emit form.
+fn edit_marker(dir: &Path, edit: impl FnOnce(&mut serde_json::Value)) {
+    let path = dir.join(".houserules.json");
+    let mut marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).expect("read the marker"))
+            .expect("parse the marker");
+    edit(&mut marker);
     fs::write(
         &path,
-        format!("{}\n", serde_json::to_string_pretty(&value).unwrap()),
+        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
     )
-    .expect("write topic file");
+    .expect("write the marker");
 }
 
-/// The canonical bytes one knowledge entry hashes to -- this test file's own
-/// copy of `install::canonical_entry_bytes`: a plain `serde_json::to_vec`,
-/// deterministic for a given parsed `Value` because `serde_json`'s
-/// `preserve_order` feature (this crate's own `Cargo.toml`) keeps an
-/// object's key order exactly as parsed.
-fn canonical_entry_bytes(value: &serde_json::Value) -> Vec<u8> {
-    serde_json::to_vec(value).expect("a JSON Value always serializes")
+/// Runs `update --dir <dir>`, requires exit 0, and returns the stdout lines.
+fn update_lines(dir: &Path) -> Vec<String> {
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(dir)
+        .output()
+        .expect("run update");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout)
+        .expect("utf8 stdout")
+        .lines()
+        .map(str::to_string)
+        .collect()
+}
+
+/// Marks `dir` as a 2.0 install: the `schema` key `init` writes.
+fn mark_as_2_0(marker: &mut serde_json::Value) {
+    marker["schema"] = serde_json::json!("houserules/install@2.0.0");
+}
+
+/// A second `update` changes nothing and prints no `wrote` line.
+#[test]
+fn a_second_update_prints_no_wrote_line() {
+    let dir = init_seeded_repo();
+    update_lines(dir.path());
+    let second = update_lines(dir.path());
+    let wrote: Vec<&String> = second
+        .iter()
+        .filter(|line| line.starts_with("wrote "))
+        .collect();
+    assert!(wrote.is_empty(), "got: {second:?}");
+}
+
+/// A file in `ownedPaths` of a 2.0 install is never rewritten, present or
+/// absent, and `update` prints no line about it. A modified file that is not
+/// listed is kept and listed, as before.
+#[test]
+fn update_never_rewrites_a_file_in_owned_paths_of_a_2_0_install() {
+    let dir = seeded_repo();
+    let modified = ".githooks/commit-msg";
+    let deleted = ".claude/skills/orchestrating/SKILL.md";
+    let unlisted = ".claude/agents/implementer.md";
+    fs::write(dir.path().join(modified), b"the adopter's hook").expect("write the hook");
+    fs::remove_file(dir.path().join(deleted)).expect("delete the skill");
+    fs::write(dir.path().join(unlisted), b"edited").expect("write the agent");
+    edit_marker(dir.path(), |marker| {
+        mark_as_2_0(marker);
+        marker["ownedPaths"] = serde_json::json!([modified, deleted]);
+    });
+
+    let lines = update_lines(dir.path());
+
+    assert_eq!(
+        fs::read(dir.path().join(modified)).unwrap(),
+        b"the adopter's hook"
+    );
+    assert!(!dir.path().join(deleted).exists());
+    assert!(
+        !lines.iter().any(|line| line.contains(modified)),
+        "{lines:?}"
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains(deleted)),
+        "{lines:?}"
+    );
+    assert!(
+        lines.contains(&format!("kept {unlisted} (locally modified)")),
+        "{lines:?}"
+    );
+}
+
+/// The Claude Code files `init` leaves out without `--target claude`.
+const CLAUDE_FILES: [&str; 4] = [
+    "tools/claude-session-start.sh",
+    ".claude/agents/implementer.md",
+    ".claude/agents/task-reviewer.md",
+    ".claude/agents/branch-reviewer.md",
+];
+
+/// While `renderers` lacks `claude`, the sync writes none of the Claude
+/// files; a missing `renderers` key reads as `["claude"]`, the value the
+/// 1.x conversion writes, so the sync restores them.
+#[test]
+fn update_writes_the_claude_files_only_while_renderers_holds_claude() {
+    let cases: [(Option<serde_json::Value>, bool); 4] = [
+        (Some(serde_json::json!([])), false),
+        (Some(serde_json::json!(["other"])), false),
+        (Some(serde_json::json!(["claude"])), true),
+        (None, true),
+    ];
+    for (renderers, restored) in cases {
+        let dir = seeded_repo();
+        for file in CLAUDE_FILES {
+            fs::remove_file(dir.path().join(file)).expect("delete a Claude file");
+        }
+        edit_marker(dir.path(), |marker| {
+            mark_as_2_0(marker);
+            if let Some(renderers) = &renderers {
+                marker["renderers"] = renderers.clone();
+            }
+        });
+
+        let lines = update_lines(dir.path());
+
+        for file in CLAUDE_FILES {
+            assert_eq!(
+                dir.path().join(file).exists(),
+                restored,
+                "{file} with renderers {renderers:?}"
+            );
+            assert_eq!(
+                lines.contains(&format!("wrote {file}")),
+                restored,
+                "{file} with renderers {renderers:?}: {lines:?}"
+            );
+        }
+        assert!(
+            dir.path().join(".githooks/commit-msg").is_file(),
+            "the sync keeps every other kit-owned file"
+        );
+    }
+}
+
+/// The path of the seeded CI workflow and its baseline key (spec section 8:
+/// git's top-level pathspec form).
+const WORKFLOW: &str = ".github/workflows/knowledge.yml";
+const WORKFLOW_KEY: &str = ":/.github/workflows/knowledge.yml";
+
+/// The template's content of `file`.
+fn template_bytes(file: &str) -> Vec<u8> {
+    fs::read(repo_root().join("template").join(file)).expect("read the template file")
+}
+
+/// What an older release wrote to `file`: the template with one more blank
+/// line at its end. The bytes differ, and a schema stays a valid schema.
+fn older_release_bytes(file: &str) -> Vec<u8> {
+    let current = String::from_utf8(template_bytes(file)).expect("the template is UTF-8");
+    format!("{current}\n").into_bytes()
+}
+
+/// One scenario of the D3 sync: a seeded install marked as 2.0, `file`
+/// holding the older release's content, `baseline` recorded under `key`
+/// when it is `Some`, and `file` listed in `ownedPaths` when `owned`. Runs
+/// `update` and returns its lines and the content of `file` after it.
+fn d3_scenario(
+    file: &str,
+    key: &str,
+    baseline: Option<&[u8]>,
+    owned: bool,
+) -> (Vec<String>, Vec<u8>) {
+    let dir = seeded_repo();
+    let path = dir.path().join(file);
+    fs::create_dir_all(path.parent().unwrap()).expect("create the directory");
+    fs::write(&path, older_release_bytes(file)).expect("write the older content");
+    edit_marker(dir.path(), |marker| {
+        mark_as_2_0(marker);
+        match baseline {
+            Some(baseline) => marker["baselines"][key] = serde_json::json!(sha256_hex(baseline)),
+            None => {
+                marker["baselines"]
+                    .as_object_mut()
+                    .expect("baselines")
+                    .remove(key);
+            }
+        }
+        if owned {
+            marker["ownedPaths"] = serde_json::json!([file]);
+        }
+    });
+    let lines = update_lines(dir.path());
+    (lines, fs::read(&path).expect("read the file back"))
+}
+
+/// `knowledge/schema.json` and the seeded workflow are covered by the sync
+/// once they are baselined, and not before. At its baseline the file is
+/// written with the running kit's content; with no baseline it is left as
+/// found, with no line; with a baseline it no longer matches it is kept and
+/// listed; in `ownedPaths` it is never written.
+#[test]
+fn update_syncs_the_schema_and_the_workflow_once_they_are_baselined() {
+    for (file, key) in [
+        ("knowledge/schema.json", "knowledge/schema.json"),
+        (WORKFLOW, WORKFLOW_KEY),
+    ] {
+        let older = older_release_bytes(file);
+        let wrote = format!("wrote {file}");
+        let kept = format!("kept {file} (locally modified)");
+
+        let (lines, after) = d3_scenario(file, key, Some(&older), false);
+        assert!(lines.contains(&wrote), "{file} at its baseline: {lines:?}");
+        assert_eq!(after, template_bytes(file), "{file} at its baseline");
+
+        let (lines, after) = d3_scenario(file, key, None, false);
+        assert!(
+            !lines.iter().any(|line| line.contains(file)),
+            "{file} with no baseline: {lines:?}"
+        );
+        assert_eq!(after, older, "{file} with no baseline");
+
+        let (lines, after) = d3_scenario(file, key, Some(b"what the kit once wrote"), false);
+        assert!(lines.contains(&kept), "{file} modified: {lines:?}");
+        assert_eq!(after, older, "{file} modified");
+
+        let (lines, after) = d3_scenario(file, key, Some(&older), true);
+        assert!(
+            !lines.iter().any(|line| line.contains(file)),
+            "{file} owned: {lines:?}"
+        );
+        assert_eq!(after, older, "{file} owned");
+    }
+}
+
+/// The baseline of a D3 file that the sync writes is the hash of the
+/// content it wrote.
+#[test]
+fn update_restamps_the_baseline_of_a_d3_file_it_writes() {
+    let dir = seeded_repo();
+    let older = older_release_bytes(WORKFLOW);
+    fs::create_dir_all(dir.path().join(".github/workflows")).expect("create the directory");
+    fs::write(dir.path().join(WORKFLOW), &older).expect("write the older content");
+    edit_marker(dir.path(), |marker| {
+        mark_as_2_0(marker);
+        marker["baselines"][WORKFLOW_KEY] = serde_json::json!(sha256_hex(&older));
+    });
+
+    update_lines(dir.path());
+
+    let marker: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(dir.path().join(".houserules.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        marker["baselines"][WORKFLOW_KEY],
+        serde_json::json!(sha256_hex(&template_bytes(WORKFLOW)))
+    );
+}
+
+/// A baselined D3 file that is missing is restored, like a kit-owned file.
+#[test]
+fn update_restores_a_missing_baselined_workflow() {
+    let dir = seeded_repo();
+    edit_marker(dir.path(), |marker| {
+        mark_as_2_0(marker);
+        marker["baselines"][WORKFLOW_KEY] = serde_json::json!(sha256_hex(b"once written"));
+    });
+
+    let lines = update_lines(dir.path());
+
+    assert!(lines.contains(&format!("wrote {WORKFLOW}")), "{lines:?}");
+    assert_eq!(
+        fs::read(dir.path().join(WORKFLOW)).unwrap(),
+        template_bytes(WORKFLOW)
+    );
+}
+
+/// A kit-owned script whose bytes already match keeps its executable bit
+/// without a line: `update` repairs the mode and still lists nothing.
+#[cfg(unix)]
+#[test]
+fn update_repairs_a_lost_executable_bit_without_a_line() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = seeded_repo();
+    let hook = dir.path().join(".githooks/commit-msg");
+    fs::set_permissions(&hook, fs::Permissions::from_mode(0o644)).expect("chmod the hook");
+
+    let lines = update_lines(dir.path());
+
+    let mode = fs::metadata(&hook).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o755);
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains(".githooks/commit-msg")),
+        "{lines:?}"
+    );
 }
 
 /// Sets `dir`'s `.houserules.json` `baselines.<key>` to `hash`.
@@ -586,299 +853,6 @@ fn set_marker_baseline(dir: &Path, key: &str, hash: &str) {
         format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
     )
     .unwrap();
-}
-
-/// An entry the adopter has NOT changed since the kit last wrote it gets
-/// replaced with whatever the running kit ships now, even when that differs
-/// from the entry's current content -- the same hand-stamped-baseline proof
-/// `update_replaces_an_at_baseline_kit_owned_file_with_the_running_kits_
-/// content` runs for a whole `KIT_OWNED` file, here at one entry's
-/// granularity: the entry on disk is set to an "older release" shape, its
-/// recorded baseline stamped to that shape's own hash, and `update` is
-/// proven to replace it with the real, running `template/` content rather
-/// than leaving the older shape in place.
-#[test]
-fn update_replaces_an_at_baseline_knowledge_entry_with_the_running_kits_content() {
-    let dir = seeded_repo();
-    let mut entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
-    let index = entries
-        .iter()
-        .position(|entry| entry["id"] == TEST_ENTRY_ID)
-        .expect("test entry present in a fresh seed");
-    let running_entry = entries[index].clone();
-
-    let mut old_release_entry = running_entry.clone();
-    old_release_entry["summary"] = serde_json::json!("an older release's summary text");
-    entries[index] = old_release_entry.clone();
-    write_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE, entries);
-    set_marker_baseline(
-        dir.path(),
-        TEST_ENTRY_ID,
-        &sha256_hex(&canonical_entry_bytes(&old_release_entry)),
-    );
-
-    let output = houserules()
-        .args(["update", "--dir"])
-        .arg(dir.path())
-        .output()
-        .expect("run update");
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(!stdout.contains(TEST_ENTRY_ID), "got:\n{stdout}");
-    assert!(
-        stdout.contains(&format!(
-            "updated {TEST_ENTRY_TOPIC_FILE} (1 entry changed)\n"
-        )),
-        "got:\n{stdout}"
-    );
-
-    let entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
-    let entry = entries
-        .iter()
-        .find(|entry| entry["id"] == TEST_ENTRY_ID)
-        .expect("entry still present");
-    assert_eq!(
-        entry, &running_entry,
-        "an at-baseline entry was not replaced with the running kit's content"
-    );
-
-    let marker: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(dir.path().join(".houserules.json")).unwrap())
-            .unwrap();
-    assert_eq!(
-        marker["baselines"][TEST_ENTRY_ID],
-        serde_json::json!(sha256_hex(&canonical_entry_bytes(&running_entry)))
-    );
-}
-
-/// A knowledge entry already holding the running kit's exact content, but
-/// with a recorded baseline stamped to something else entirely, restamps
-/// silently: no `kept ... (locally modified)` line, no `updated ... entry
-/// changed` line either, since the entry's own content never actually
-/// changes -- only its stale baseline moves to match what is already on
-/// disk. The dogfood shape: a ruled wording change lands in both the kit's
-/// own template and this project's own root copy in the same turn, and
-/// only the restamp is still pending.
-#[test]
-fn update_restamps_a_knowledge_entry_already_at_the_running_content_despite_a_stale_baseline() {
-    let dir = seeded_repo();
-    let entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
-    let running_entry = entries
-        .iter()
-        .find(|entry| entry["id"] == TEST_ENTRY_ID)
-        .expect("test entry present in a fresh seed")
-        .clone();
-    let mut stale_release_entry = running_entry.clone();
-    stale_release_entry["summary"] = serde_json::json!("an older release's summary text");
-    set_marker_baseline(
-        dir.path(),
-        TEST_ENTRY_ID,
-        &sha256_hex(&canonical_entry_bytes(&stale_release_entry)),
-    );
-
-    let output = houserules()
-        .args(["update", "--dir"])
-        .arg(dir.path())
-        .output()
-        .expect("run update");
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(!stdout.contains(TEST_ENTRY_ID), "got:\n{stdout}");
-    assert!(
-        !stdout.contains(&format!("updated {TEST_ENTRY_TOPIC_FILE}")),
-        "got:\n{stdout}"
-    );
-
-    let entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
-    let entry = entries
-        .iter()
-        .find(|entry| entry["id"] == TEST_ENTRY_ID)
-        .expect("entry still present");
-    assert_eq!(
-        entry, &running_entry,
-        "update changed already-current content"
-    );
-
-    let marker: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(dir.path().join(".houserules.json")).unwrap())
-            .unwrap();
-    assert_eq!(
-        marker["baselines"][TEST_ENTRY_ID],
-        serde_json::json!(sha256_hex(&canonical_entry_bytes(&running_entry))),
-        "the stale baseline was never restamped to the running content's hash"
-    );
-}
-
-/// An entry the adopter edited diverges from its recorded baseline:
-/// `update` keeps the adopter's own content and reports it once, the same
-/// contract a `KIT_OWNED` file gets.
-#[test]
-fn update_keeps_a_locally_modified_knowledge_entry_and_reports_it_once() {
-    let dir = seeded_repo();
-    let mut entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
-    let index = entries
-        .iter()
-        .position(|entry| entry["id"] == TEST_ENTRY_ID)
-        .expect("test entry present");
-    entries[index]["summary"] = serde_json::json!("the adopter's own wording");
-    let modified = entries.clone();
-    write_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE, entries);
-
-    let output = houserules()
-        .args(["update", "--dir"])
-        .arg(dir.path())
-        .output()
-        .expect("run update");
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(
-        stdout.contains(&format!("kept {TEST_ENTRY_ID} (locally modified)\n")),
-        "got:\n{stdout}"
-    );
-
-    assert_eq!(
-        read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE),
-        modified
-    );
-}
-
-/// An entry the adopter deleted outright -- present at baseline, then
-/// removed from the file entirely -- is left absent and reported once;
-/// nothing restores it.
-#[test]
-fn update_respects_an_adopter_deleted_knowledge_entry_and_reports_it_once() {
-    let dir = seeded_repo();
-    let mut entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
-    entries.retain(|entry| entry["id"] != TEST_ENTRY_ID);
-    write_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE, entries);
-
-    let output = houserules()
-        .args(["update", "--dir"])
-        .arg(dir.path())
-        .output()
-        .expect("run update");
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(
-        stdout.contains(&format!("skipped {TEST_ENTRY_ID} (deleted)\n")),
-        "got:\n{stdout}"
-    );
-
-    let entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
-    assert!(!entries.iter().any(|entry| entry["id"] == TEST_ENTRY_ID));
-}
-
-/// An override on a deleted entry's id silences the report entirely; the
-/// entry stays absent either way.
-#[test]
-fn update_silences_an_adopter_deleted_knowledge_entry_listed_in_overrides() {
-    let dir = seeded_repo();
-    let mut entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
-    entries.retain(|entry| entry["id"] != TEST_ENTRY_ID);
-    write_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE, entries);
-
-    let marker_path = dir.path().join(".houserules.json");
-    let mut marker: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
-    marker["overrides"] = serde_json::json!([TEST_ENTRY_ID]);
-    fs::write(
-        &marker_path,
-        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
-    )
-    .unwrap();
-
-    let output = houserules()
-        .args(["update", "--dir"])
-        .arg(dir.path())
-        .output()
-        .expect("run update");
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(!stdout.contains(TEST_ENTRY_ID), "got:\n{stdout}");
-    assert!(
-        !read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE)
-            .iter()
-            .any(|entry| entry["id"] == TEST_ENTRY_ID)
-    );
-}
-
-/// An entry the install never had -- absent from the file, with no baseline
-/// ever recorded for its id -- is written for the first time and stamped,
-/// silently: the same shape a genuinely new entry a later kit release adds
-/// would take, simulated here by removing both the entry and its baseline
-/// from an already-seeded install.
-#[test]
-fn update_writes_a_knowledge_entry_the_install_never_had() {
-    let dir = seeded_repo();
-    let mut entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
-    let index = entries
-        .iter()
-        .position(|entry| entry["id"] == TEST_ENTRY_ID)
-        .expect("test entry present");
-    let expected_entry = entries.remove(index);
-    write_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE, entries);
-
-    let marker_path = dir.path().join(".houserules.json");
-    let mut marker: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
-    marker["baselines"]
-        .as_object_mut()
-        .unwrap()
-        .remove(TEST_ENTRY_ID);
-    fs::write(
-        &marker_path,
-        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
-    )
-    .unwrap();
-
-    let output = houserules()
-        .args(["update", "--dir"])
-        .arg(dir.path())
-        .output()
-        .expect("run update");
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(!stdout.contains(TEST_ENTRY_ID), "got:\n{stdout}");
-    assert!(
-        stdout.contains(&format!(
-            "updated {TEST_ENTRY_TOPIC_FILE} (1 entry changed)\n"
-        )),
-        "got:\n{stdout}"
-    );
-
-    let entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
-    assert!(entries.contains(&expected_entry), "got {entries:?}");
-
-    let marker: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
-    assert_eq!(
-        marker["baselines"][TEST_ENTRY_ID],
-        serde_json::json!(sha256_hex(&canonical_entry_bytes(&expected_entry)))
-    );
 }
 
 /// A `SEED_ONCE` path a later kit release adds is missing from an install
@@ -928,15 +902,28 @@ fn update_backfills_a_missing_agents_md_file() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("wrote AGENTS.md\n"), "got:\n{stdout}");
 
-    let backfilled = fs::read(dir.path().join("AGENTS.md")).unwrap();
-    let template = fs::read(repo_root().join("template/AGENTS.md")).unwrap();
-    assert_eq!(backfilled, template);
+    let backfilled = fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
+    let template = fs::read_to_string(repo_root().join("template/AGENTS.md")).unwrap();
+    let block = backfilled
+        .strip_prefix(&template)
+        .expect("the text of the seed comes first, byte for byte");
+    assert!(
+        block.starts_with("<!-- houserules:begin -->\n"),
+        "the render of update appends the block: {block:?}"
+    );
+    assert!(block.ends_with("\n<!-- houserules:end -->\n"), "{block:?}");
+    assert!(
+        stdout.contains("AGENTS.md: written\n"),
+        "the render of update reports the block, got:\n{stdout}"
+    );
 }
 
 /// A present `AGENTS.md` is `SEED_ONCE`: `init` seeds it, and `update`
-/// never rewrites it once it exists, exactly like `CLAUDE.md`.
+/// never rewrites its text once it exists, exactly like `CLAUDE.md`. The
+/// render that ends `update` appends the houserules block to a file with no
+/// markers and leaves the project's text byte for byte.
 #[test]
-fn update_keeps_an_existing_agents_md_file_untouched() {
+fn update_keeps_the_project_text_of_an_existing_agents_md_file() {
     let dir = seeded_repo();
     assert!(
         dir.path().join("AGENTS.md").is_file(),
@@ -956,12 +943,17 @@ fn update_keeps_an_existing_agents_md_file_untouched() {
     );
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(
-        !stdout.contains("AGENTS.md"),
-        "update reported AGENTS.md in:\n{stdout}"
+        !stdout.contains("wrote AGENTS.md") && !stdout.contains("kept AGENTS.md"),
+        "the sync reported AGENTS.md in:\n{stdout}"
     );
-    assert_eq!(
-        fs::read(dir.path().join("AGENTS.md")).unwrap(),
-        b"project notes"
+    assert!(
+        stdout.contains("AGENTS.md: written\n"),
+        "the render appends the block, got:\n{stdout}"
+    );
+    let written = fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
+    assert!(
+        written.starts_with("project notes\n<!-- houserules:begin -->\n"),
+        "got {written:?}"
     );
 }
 
@@ -1040,12 +1032,12 @@ fn update_backfills_the_github_hosted_only_file_once_origin_becomes_github_hoste
     }
 }
 
-/// An override on the still-absent `GITHUB_HOSTED_SEED_ONCE` path means
+/// A path in `ownedPaths` on the still-absent `GITHUB_HOSTED_SEED_ONCE` path means
 /// "deleted on purpose" even once the origin becomes GitHub-hosted: `update`
 /// leaves it absent and prints nothing about it, the same as any other
 /// overridden `SEED_ONCE` path.
 #[test]
-fn update_does_not_backfill_an_overridden_github_hosted_only_file() {
+fn update_does_not_backfill_an_owned_github_hosted_only_file() {
     let dir = seeded_repo();
     let status = Command::new("git")
         .args([
@@ -1062,7 +1054,7 @@ fn update_does_not_backfill_an_overridden_github_hosted_only_file() {
     let marker_path = dir.path().join(".houserules.json");
     let mut marker: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
-    marker["overrides"] = serde_json::json!(GITHUB_HOSTED_SEED_ONCE);
+    marker["ownedPaths"] = serde_json::json!(GITHUB_HOSTED_SEED_ONCE);
     fs::write(
         &marker_path,
         format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
@@ -1089,17 +1081,17 @@ fn update_does_not_backfill_an_overridden_github_hosted_only_file() {
     }
 }
 
-/// An override on a missing `SEED_ONCE` path means "deleted on purpose":
+/// A path in `ownedPaths` on a missing `SEED_ONCE` path means "deleted on purpose":
 /// `update` leaves it absent and prints nothing about it.
 #[test]
-fn update_does_not_backfill_an_overridden_seed_once_file() {
+fn update_does_not_backfill_an_owned_seed_once_file() {
     let dir = seeded_repo();
     fs::remove_file(dir.path().join("docs/README.md")).expect("remove docs/README.md");
 
     let marker_path = dir.path().join(".houserules.json");
     let mut marker: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
-    marker["overrides"] = serde_json::json!(["docs/README.md"]);
+    marker["ownedPaths"] = serde_json::json!(["docs/README.md"]);
     fs::write(
         &marker_path,
         format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
@@ -1119,128 +1111,6 @@ fn update_does_not_backfill_an_overridden_seed_once_file() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(!stdout.contains("docs/README.md"), "got:\n{stdout}");
     assert!(!dir.path().join("docs/README.md").exists());
-}
-
-/// A knowledge-topic file the adopter deleted outright is backfilled in
-/// full, the same "never arrived" contract every other missing `SEED_ONCE`
-/// path gets -- never a half-populated husk that reports every one of its
-/// entries deleted.
-#[test]
-fn update_backfills_a_missing_knowledge_topic_file_in_full() {
-    let dir = seeded_repo();
-    fs::remove_file(dir.path().join(TEST_ENTRY_TOPIC_FILE)).expect("remove topic file");
-
-    let output = houserules()
-        .args(["update", "--dir"])
-        .arg(dir.path())
-        .output()
-        .expect("run update");
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(
-        stdout.contains(&format!("wrote {TEST_ENTRY_TOPIC_FILE}\n")),
-        "got:\n{stdout}"
-    );
-    assert!(!stdout.contains("skipped"), "got:\n{stdout}");
-    assert!(!stdout.contains("deleted"), "got:\n{stdout}");
-
-    let backfilled = fs::read(dir.path().join(TEST_ENTRY_TOPIC_FILE)).unwrap();
-    let template = fs::read(repo_root().join("template").join(TEST_ENTRY_TOPIC_FILE)).unwrap();
-    assert_eq!(backfilled, template);
-
-    let entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
-    assert!(
-        entries.iter().any(|entry| entry["id"] == TEST_ENTRY_ID),
-        "the backfilled file is missing its own kit entries: {entries:?}"
-    );
-
-    let marker: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(dir.path().join(".houserules.json")).unwrap())
-            .unwrap();
-    assert!(
-        marker["baselines"][TEST_ENTRY_ID].is_string(),
-        "the backfilled file's entries were not stamped: {marker}"
-    );
-}
-
-/// An override on a knowledge-topic file's own path governs the whole file,
-/// not just one entry id: the file stays exactly as the adopter left it --
-/// absent, in this case -- and update prints nothing about it.
-#[test]
-fn update_leaves_an_overridden_missing_knowledge_topic_file_absent() {
-    let dir = seeded_repo();
-    fs::remove_file(dir.path().join(TEST_ENTRY_TOPIC_FILE)).expect("remove topic file");
-
-    let marker_path = dir.path().join(".houserules.json");
-    let mut marker: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
-    marker["overrides"] = serde_json::json!([TEST_ENTRY_TOPIC_FILE]);
-    fs::write(
-        &marker_path,
-        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
-    )
-    .unwrap();
-
-    let output = houserules()
-        .args(["update", "--dir"])
-        .arg(dir.path())
-        .output()
-        .expect("run update");
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(!stdout.contains(TEST_ENTRY_TOPIC_FILE), "got:\n{stdout}");
-    assert!(!dir.path().join(TEST_ENTRY_TOPIC_FILE).exists());
-}
-
-/// An override on a knowledge-topic file's own path also governs a file
-/// that is PRESENT but has locally modified entries: the whole file is left
-/// exactly as found, and no per-entry report line fires for it either.
-#[test]
-fn update_leaves_an_overridden_present_knowledge_topic_file_untouched() {
-    let dir = seeded_repo();
-    let mut entries = read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE);
-    let index = entries
-        .iter()
-        .position(|entry| entry["id"] == TEST_ENTRY_ID)
-        .expect("test entry present");
-    entries[index]["summary"] = serde_json::json!("the adopter's own wording");
-    write_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE, entries.clone());
-
-    let marker_path = dir.path().join(".houserules.json");
-    let mut marker: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
-    marker["overrides"] = serde_json::json!([TEST_ENTRY_TOPIC_FILE]);
-    fs::write(
-        &marker_path,
-        format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
-    )
-    .unwrap();
-
-    let output = houserules()
-        .args(["update", "--dir"])
-        .arg(dir.path())
-        .output()
-        .expect("run update");
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(!stdout.contains(TEST_ENTRY_ID), "got:\n{stdout}");
-    assert!(!stdout.contains(TEST_ENTRY_TOPIC_FILE), "got:\n{stdout}");
-    assert_eq!(
-        read_topic_entries(dir.path(), TEST_ENTRY_TOPIC_FILE),
-        entries
-    );
 }
 
 /// The `SEED_ONCE` backfill rewrites `PREFIXED` payload content with the
@@ -1302,8 +1172,9 @@ fn update_backfills_a_prefixed_file_with_the_installs_own_stamped_prefix() {
 /// against the current payload". This one run proves both of `baseline::
 /// classify`'s no-baseline arms at once, each on a different `KIT_OWNED`
 /// file: `.claude/agents/task-reviewer.md`, left exactly as `seeded_repo`
-/// wrote it, matches the payload and is silently written and stamped
-/// (`Status::AtBaseline`); `.claude/agents/implementer.md`, hand-corrupted
+/// wrote it, matches the payload and is stamped, neither written nor listed
+/// since its bytes would not change (`Status::AtBaseline`);
+/// `.claude/agents/implementer.md`, hand-corrupted
 /// below, diverges from the payload and is kept, reported once, and left
 /// unstamped for a later run to reconcile (`Status::Modified`). Nothing on
 /// disk is overwritten by the divergent file; both outcomes coexist in one
@@ -1341,10 +1212,7 @@ fn update_migration_run_reconciles_kit_owned_files_with_no_baselines_recorded() 
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(
-        stdout.contains(&format!("wrote {unmodified_file}\n")),
-        "got:\n{stdout}"
-    );
+    assert!(!stdout.contains(unmodified_file), "got:\n{stdout}");
     assert!(
         stdout.contains(&format!("kept {modified_file} (locally modified)\n")),
         "got:\n{stdout}"
@@ -1470,7 +1338,7 @@ fn update_leaves_seed_once_files_and_settings_untouched() {
 
 /// A fresh `init` never seeds `RETIRED`'s two paths (they are not in
 /// `KIT_OWNED`), so a plain `update` over a freshly seeded install finds
-/// neither present and reports no deletion (`install.rs`'s own "Deletion"
+/// neither present and reports no deletion (`install/mod.rs`'s own "Deletion"
 /// doc section); the mechanism itself is unit-tested there with an
 /// injected list, and `update_deletes_retired_shell_tools_from_an_old_
 /// install` below covers the shape where a `RETIRED` path IS present. This
@@ -1568,37 +1436,6 @@ fn walk_relative(root: &Path) -> Vec<PathBuf> {
     walk(root, root, &mut out);
     out.sort();
     out
-}
-
-#[test]
-fn update_renders_none_when_the_marker_file_is_missing() {
-    let dir = seeded_repo();
-    fs::remove_file(dir.path().join(".houserules.json")).expect("remove marker");
-
-    let output = houserules()
-        .args(["update", "--dir"])
-        .arg(dir.path())
-        .output()
-        .expect("run update");
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    let version = kit_version();
-    assert!(
-        stdout.contains(&format!("kit none -> {version}\n")),
-        "got:\n{stdout}"
-    );
-
-    let marker: serde_json::Value = serde_json::from_str(
-        &fs::read_to_string(dir.path().join(".houserules.json")).expect("read marker"),
-    )
-    .expect("parse marker");
-    assert_eq!(marker["version"], serde_json::json!(version));
-    assert_eq!(marker["idPrefix"], serde_json::json!("WI"));
-    assert!(marker["baselines"].is_object(), "got {marker:?}");
 }
 
 #[test]
@@ -1719,43 +1556,30 @@ fn update_into_a_missing_git_repo_is_a_named_usage_error_exit_2() {
     );
 }
 
-/// Asserts `stderr` is the subdirectory refusal for `target`, naming
-/// `top_level` as the directory above it that holds `.git` -- `install.rs`'s
-/// own copy of `assert_subdirectory_refusal`, whose doc has the account of
-/// what form of the paths the line prints. This file keeps its own copy
-/// because `mod common;` would make that module's other helpers warn as
-/// dead code in this binary (`check_commit.rs`'s own `houserules` helper
-/// doc has the account).
+/// Asserts `stderr` is the refusal of a directory below the git top level
+/// that holds no install, naming `target` and `top_level` in resolved form
+/// (every symlink followed, built one component at a time). This file keeps
+/// its own helpers because `mod common;` would make that module's other
+/// helpers warn as dead code in this binary (`check_commit.rs`'s own
+/// `houserules` helper doc has the account).
 fn assert_subdirectory_refusal(stderr: &str, target: &Path, top_level: &Path) {
-    let (printed_target, printed_top_level) = stderr
-        .strip_suffix(", not its top level; houserules installs at the repository root\n")
-        .and_then(|named_paths| named_paths.split_once(" is inside the git repository at "))
-        .unwrap_or_else(|| panic!("not the subdirectory refusal: {stderr:?}"));
+    let root = resolved(target);
+    let top = resolved(top_level);
     assert_eq!(
-        Path::new(printed_target)
-            .canonicalize()
-            .expect("canonicalize the printed target"),
-        target.canonicalize().expect("canonicalize target"),
-        "the line names the target"
-    );
-    assert!(
-        Path::new(printed_target).starts_with(printed_top_level)
-            && printed_target != printed_top_level,
-        "the target lies beneath the printed top level: {stderr:?}"
-    );
-    assert_eq!(
-        Path::new(printed_top_level)
-            .canonicalize()
-            .expect("canonicalize the printed top level"),
-        top_level.canonicalize().expect("canonicalize top level"),
-        "the line names the directory that holds .git"
+        stderr,
+        format!(
+            "{}: this directory is inside the git repository at {} and holds no .houserules.json; run houserules init --dir {} to install there\n",
+            root.display(),
+            top.display(),
+            root.display()
+        )
     );
 }
 
-/// A target inside a repository but not at its top level gets the same
-/// refusal `init` gives, naming the enclosing top level.
+/// A target inside a repository but not at its top level, with no install,
+/// is not an install root: `update` refuses it and names the enclosing top level.
 #[test]
-fn update_refuses_a_subdirectory_naming_the_top_level() {
+fn update_refuses_a_subdirectory_that_holds_no_install() {
     let repo = seeded_repo();
     let sub = repo.path().join("sub");
     fs::create_dir(&sub).expect("create subdirectory");
@@ -1803,7 +1627,7 @@ fn update_names_the_ancestor_that_holds_git_under_a_foreign_git_work_tree() {
 }
 
 /// A symlink to a repository subdirectory is inside the repository; the
-/// refusal names the repository root, as `init`'s does.
+/// refusal names the repository root, in resolved form.
 #[cfg(unix)]
 #[test]
 fn update_names_the_repository_for_a_symlinked_subdirectory_target() {
@@ -1894,7 +1718,7 @@ fn update_reports_a_markers_empty_version_as_a_named_error_exit_2() {
 
 /// A JSON `null` at `version` is present, not absent -- it fails the
 /// non-empty-string check rather than reading as a missing stamp
-/// (`install.rs`'s "update" doc section names this measured distinction
+/// (`install/mod.rs`'s "update" doc section names this measured distinction
 /// from the `none` drift arm).
 #[test]
 fn update_reports_a_markers_null_version_as_a_named_error_exit_2_not_as_none() {
@@ -1922,6 +1746,30 @@ fn update_reports_a_markers_overrides_array_with_a_non_string_element_as_a_named
         br#"{"overrides":["docs/README.md", 5]}"#,
         "overrides must be an array of strings\n",
     );
+}
+
+/// `ownedPaths` and `renderers` are hand-edited data of a 2.0 install: a
+/// present value that is not an array of strings is one named error, as
+/// `overrides` is. The `schema` key is one string.
+#[test]
+fn update_reports_a_malformed_2_0_key_as_a_named_error_exit_2() {
+    assert_named_error_before_any_write(
+        br#"{"ownedPaths":".githooks/commit-msg"}"#,
+        "ownedPaths must be an array of strings\n",
+    );
+    assert_named_error_before_any_write(
+        br#"{"ownedPaths":[".githooks/commit-msg", 5]}"#,
+        "ownedPaths must be an array of strings\n",
+    );
+    assert_named_error_before_any_write(
+        br#"{"renderers":"claude"}"#,
+        "renderers must be an array of strings\n",
+    );
+    assert_named_error_before_any_write(
+        br#"{"renderers":["claude", 5]}"#,
+        "renderers must be an array of strings\n",
+    );
+    assert_named_error_before_any_write(br#"{"schema":2}"#, "schema must be a string\n");
 }
 
 /// `baselines` is adopter-visible, hand-editable data too (documented at

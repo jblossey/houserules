@@ -4,6 +4,8 @@
 //! directory with no deliverables, and one normalized label for a path a
 //! shell glob hands over with a trailing separator.
 
+mod install_shape;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -32,6 +34,7 @@ fn scratch_root() -> TempDir {
     fs::create_dir_all(&knowledge).expect("create knowledge/");
     fs::write(knowledge.join("schema.json"), "{}").expect("write schema.json");
     fs::write(knowledge.join("areas.json"), "{}").expect("write areas.json");
+    install_shape::mark_2_0(root.path());
     fs::write(
         knowledge.join("test.json"),
         serde_json::to_string(&json!({"entries": [{

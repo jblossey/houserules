@@ -1,0 +1,22 @@
+name: knowledge
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - shell: bash
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jblossey/houserules/releases/latest/download/houserules-installer.sh | sh
+      - run: houserules check-knowledge
+      - run: houserules check-backlog
+      - if: github.event_name == 'pull_request'
+        run: >
+          houserules audit
+          --base ${{ github.event.pull_request.base.sha }}
+          --head ${{ github.event.pull_request.head.sha }}

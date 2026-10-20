@@ -62,12 +62,21 @@ pub(crate) fn read_json(path: &Path) -> Result<Value, String> {
 /// Serializes `value` through the shared emitter and writes it to `path`,
 /// creating `path`'s parent directory (`backlog/archive/` or
 /// `knowledge/archive/`, on a repository's first sweep) if it does not yet
-/// exist.
-fn write_json(path: &Path, value: &Value) -> Result<(), String> {
+/// exist. A file whose bytes already equal the emitted text is left alone,
+/// so its modification time stays.
+///
+/// `pub(crate)`: the `pack` commands write every knowledge file and the
+/// install marker through it, so each file keeps one format and no command
+/// writes a file whose content does not change.
+pub(crate) fn write_json(path: &Path, value: &Value) -> Result<(), String> {
+    let content = emit(value);
+    if fs::read(path).is_ok_and(|current| current == content.as_bytes()) {
+        return Ok(());
+    }
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
     }
-    fs::write(path, emit(value)).map_err(|error| format!("{}: {error}", path.display()))
+    fs::write(path, content).map_err(|error| format!("{}: {error}", path.display()))
 }
 
 /// Collects every `.json` file name from an already-opened `read_dir`,
@@ -97,7 +106,7 @@ fn collect_json_names(read_dir: fs::ReadDir, dir: &Path) -> Result<Vec<String>, 
 /// (`houserules.crash-paths-are-named`): the operator needs the real
 /// errno text, and absence is not tolerated here the way it is for an
 /// archive directory (`list_archive_json_files`, below).
-fn json_file_names(dir: &Path) -> Result<Vec<String>, String> {
+pub(crate) fn json_file_names(dir: &Path) -> Result<Vec<String>, String> {
     let read_dir = fs::read_dir(dir).map_err(|error| format!("{}: {error}", dir.display()))?;
     collect_json_names(read_dir, dir)
 }
@@ -272,19 +281,31 @@ fn archive_batches(root: &Path, lines: &mut Vec<String>) -> Result<usize, String
     Ok(moved.len())
 }
 
-/// Moves every `superseded`/`retired`-status entry out of each
-/// `knowledge/<topic>.json` file into its `knowledge/archive/<topic>.json`
-/// mirror; an absent `status` (or any value other than these two) stays
-/// active. `schema.json` and `areas.json` are not topic files and are
-/// never read here. Returns the number moved; appends one `archived <id>
-/// -> knowledge/archive/<topic>.json` line per move, in file-name then
+/// `true` when a knowledge entry's `status` takes it out of the active set:
+/// `superseded` or `retired`. An absent status, `active`, and any other
+/// value are active. `archive` moves a local entry with an inactive status
+/// out of its topic file, and the merged base (`rules::model`) leaves a pack
+/// entry with an inactive effective status out of every read. Both call this
+/// one predicate, so the two lists cannot drift.
+pub(crate) fn is_inactive_status(status: Option<&str>) -> bool {
+    matches!(status, Some("superseded" | "retired"))
+}
+
+/// Moves every entry with an inactive status (`is_inactive_status`) out of
+/// each `knowledge/<topic>.json` file into its
+/// `knowledge/archive/<topic>.json` mirror. The `RESERVED` files are not
+/// topic files and are never read here. Local entries only: a pack copy
+/// under `knowledge/packs/` is not read, because a pack entry with an
+/// inactive status stays in its copy, whether the pack ships the status or
+/// an override sets it. Returns the number moved; appends one `archived
+/// <id> -> knowledge/archive/<topic>.json` line per move, in file-name then
 /// in-file order.
 fn archive_knowledge_entries(root: &Path, lines: &mut Vec<String>) -> Result<usize, String> {
     let knowledge_dir = root.join("knowledge");
     let archive_dir = knowledge_dir.join("archive");
     let mut moved_count = 0;
     for name in json_file_names(&knowledge_dir)? {
-        if name == "schema.json" || name == "areas.json" {
+        if crate::rules::RESERVED.contains(&name.as_str()) {
             continue;
         }
         let path = knowledge_dir.join(&name);
@@ -293,10 +314,7 @@ fn archive_knowledge_entries(root: &Path, lines: &mut Vec<String>) -> Result<usi
             continue;
         };
         let (moved, keep) = partition(entries, |entry| {
-            matches!(
-                entry.get("status").and_then(Value::as_str),
-                Some("superseded") | Some("retired")
-            )
+            is_inactive_status(entry.get("status").and_then(Value::as_str))
         });
         if moved.is_empty() {
             continue;

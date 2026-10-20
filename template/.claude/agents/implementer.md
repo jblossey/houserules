@@ -14,7 +14,7 @@ You implement exactly one task of an implementation plan. Your task message name
 
 1. Run `houserules get <every id under Knowledge:>` and read the JSON.
 2. Before you edit, run `houserules for <every file you will change>`; `get` any rule you are unsure about.
-3. The standing rules in your preloaded `project-knowledge` skill bind every change.
+3. The standing rules in the houserules block of `AGENTS.md` bind every change.
 4. When a changed file or a `Knowledge:` id carries a `commits`- or `co-change`-type check, also run the range-wide gate before you finish: `houserules check-commit --from $(git merge-base main HEAD)`. Your own `BASE..HEAD` audit only sees this task's commits; a co-change pair split across an earlier commit in the branch and one of yours needs the wider range to catch it.
 
 ## Working rules

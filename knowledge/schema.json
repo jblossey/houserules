@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Knowledge topic file",
-  "description": "One file per topic. Entries are addressable by id (<topic>.<slug>). To add an area, extend $defs.area.enum here and knowledge/areas.json together.",
+  "description": "One file per topic. Entries are addressable by id (<topic>.<slug>). To add an area, add it to knowledge/areas.json.",
   "type": "object",
   "required": [
     "topic",
@@ -40,18 +40,6 @@
         "history"
       ]
     },
-    "area": {
-      "enum": [
-        "global",
-        "process",
-        "docs",
-        "tools",
-        "cli",
-        "template",
-        "tests",
-        "rust"
-      ]
-    },
     "glob": {
       "type": [
         "string",
@@ -77,6 +65,9 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          "agentsMd": {
+            "type": "boolean"
           }
         }
       }
@@ -169,7 +160,8 @@
           "$ref": "#/$defs/kind"
         },
         "area": {
-          "$ref": "#/$defs/area"
+          "type": "string",
+          "minLength": 1
         },
         "standing": {
           "type": "boolean"

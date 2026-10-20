@@ -100,6 +100,57 @@
         "by": "docs",
         "ref": "HR-054 task 4 fix round 1 (batch 16); task-4-review.json finding 4; mise exec -- pnpm test measured before and after"
       }
+    },
+    {
+      "id": "houserules.cli-changes-run-full-tier",
+      "kind": "rule",
+      "area": "cli",
+      "standing": false,
+      "summary": "A change under crates/houserules/src/** runs the full tier: the binary's commands, flags, and output are a contract that every adopter runs.",
+      "body": [
+        "This entry carries the tag `full-tier`, so `houserules for --full crates/houserules/src/<file>` returns it and selects the full tier of `process.risk-tiers`: the whole lifecycle of the orchestrating skill, with at most two re-reviews per task.",
+        "Every adopter runs the binary, and past 1.0 its CLI surface is frozen (`houserules.1-0-surface-is-frozen`). A defect here reaches every adopter's gates.",
+        "A schema file outside `crates/houserules/src/**` selects the full tier by the criterion that the change alters a schema."
+      ],
+      "tags": [
+        "full-tier",
+        "tiers"
+      ],
+      "source": {
+        "date": "2026-10-09",
+        "by": "user",
+        "ref": "owner ruling, batch 31 spec 2.1"
+      },
+      "see": [
+        "process.risk-tiers",
+        "houserules.1-0-surface-is-frozen"
+      ],
+      "status": "retired"
+    },
+    {
+      "id": "houserules.template-changes-run-full-tier",
+      "kind": "rule",
+      "area": "template",
+      "standing": false,
+      "summary": "A change under template/** runs the full tier: the payload is what every adopter receives through `init` and `update`.",
+      "body": [
+        "This entry carries the tag `full-tier`, so `houserules for --full template/<file>` returns it and selects the full tier of `process.risk-tiers`: the whole lifecycle of the orchestrating skill, with at most two re-reviews per task.",
+        "`template/` is embedded into the shipped binary (`houserules.payload-embeds-checkout-bytes`), and `init` and `update` write it into every adopter's repository. A defect here changes the process of every adopter."
+      ],
+      "tags": [
+        "full-tier",
+        "tiers"
+      ],
+      "source": {
+        "date": "2026-10-09",
+        "by": "user",
+        "ref": "owner ruling, batch 31 spec 2.1"
+      },
+      "see": [
+        "process.risk-tiers",
+        "houserules.payload-embeds-checkout-bytes"
+      ],
+      "status": "retired"
     }
   ]
 }

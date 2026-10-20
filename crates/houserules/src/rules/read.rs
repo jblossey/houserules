@@ -151,7 +151,9 @@ pub(crate) fn index_entries(base: &Base, opts: &IndexOpts) -> Result<Vec<Value>,
     Ok(filter_entries(base, opts)?.iter().map(index_row).collect())
 }
 
-/// `{topic, entries, title}` per loaded topic file, in load order.
+/// `{topic, entries, title}` per topic of the merged base, sorted by topic
+/// name. A topic sums the entries of every source that serves it
+/// (`model::TopicMeta` has the rules).
 pub(crate) fn topic_rows(base: &Base) -> Vec<Value> {
     base.topics
         .iter()
@@ -159,14 +161,27 @@ pub(crate) fn topic_rows(base: &Base) -> Vec<Value> {
         .collect()
 }
 
-/// The stored entries (raw JSON, `topic` field included, per
-/// [`Base::raw_entries`]) for the given ids, in the order given. Fails on
-/// the first unknown id; the crate-root `get` command is this function's
-/// only caller, reached only for an id shaped like a knowledge entry.
+/// The entries (raw JSON, `topic` field included, per
+/// [`Base::raw_entries`]) for the given ids, in the order given. An active
+/// id or an inactive pack id ([`Base::inactive`]) prints its effective entry,
+/// followed by `overridden` (the replaced field names, sorted) when a pack
+/// entry has an override. An excluded id prints the pack entry with
+/// `excluded` (the reason, or `true`), as [`Base::excluded`] holds it.
+/// Fails on the first unknown id; the crate-root `get` command is this
+/// function's only caller, reached only for an id shaped like a knowledge
+/// entry.
 pub(crate) fn get_entries(base: &Base, ids: &[String]) -> Result<Vec<Value>, String> {
     ids.iter()
         .map(|id| {
-            base.raw_entries
+            if let Some(effective) = base.raw_entries.get(id).or_else(|| base.inactive.get(id)) {
+                let mut printed = effective.clone();
+                if let (Value::Object(map), Some(fields)) = (&mut printed, base.overridden.get(id))
+                {
+                    map.insert("overridden".to_string(), json!(fields));
+                }
+                return Ok(printed);
+            }
+            base.excluded
                 .get(id)
                 .cloned()
                 .ok_or_else(|| format!("unknown id \"{id}\""))
@@ -281,8 +296,8 @@ pub(crate) fn standing_rows(base: &Base) -> Vec<Value> {
 
 /// Resolves `dir` (via `crate::root::resolve_root`) and loads the
 /// knowledge base there -- shared by every `cmd_*` wrapper below, since
-/// this file alone carries four of them (`check.rs`/`render.rs` only ever
-/// needed this pattern inline for one command each; `backlog::cli`'s own
+/// this file alone carries four of them (`check.rs` and `render/mod.rs` only
+/// ever needed this pattern inline for one command each; `backlog::cli`'s own
 /// `load` is the same idea for that module).
 fn load(dir: Option<PathBuf>) -> Result<Base, ExitCode> {
     let root = crate::root::resolve_root(dir)?;
@@ -708,6 +723,36 @@ mod tests {
 
         let error = get_entries(&base, &["nope.x".to_string()]).unwrap_err();
         assert_eq!(error, "unknown id \"nope.x\"");
+    }
+
+    /// Get prints an excluded pack entry with `excluded` set to `true`
+    /// (an exclusion with no reason) after its `topic`, an active pack
+    /// entry with no marker, and still rejects an id that no source ships.
+    #[test]
+    fn get_prints_an_excluded_pack_entry_and_still_rejects_an_unknown_id() {
+        use crate::rules::test_support::{base_with_packs, entry as pack_entry};
+
+        let (_guard, base) = base_with_packs(
+            &[],
+            &[(
+                "alpha",
+                &[
+                    pack_entry("alpha.kept", json!({})),
+                    pack_entry("alpha.gone", json!({})),
+                ],
+            )],
+            &["alpha.gone"],
+        );
+
+        let printed =
+            get_entries(&base, &["alpha.gone".to_string(), "alpha.kept".to_string()]).unwrap();
+
+        assert_eq!(printed[0]["excluded"], json!(true));
+        assert_eq!(printed[0]["topic"], json!("alpha"));
+        assert!(printed[1].get("excluded").is_none());
+        assert!(printed[1].get("overridden").is_none());
+        let error = get_entries(&base, &["alpha.none".to_string()]).unwrap_err();
+        assert_eq!(error, "unknown id \"alpha.none\"");
     }
 
     /// For resolves areas and lists rule, invariant, gotcha entries only.

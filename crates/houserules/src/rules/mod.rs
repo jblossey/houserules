@@ -2,15 +2,21 @@
 //! knowledge checks, and the deliverable-facing commands (`audit`,
 //! `validate`, `stats`).
 //!
-//! Owns reading and validating knowledge entries, rendering
-//! `.claude/rules/standing-rules.md` and the `project-knowledge` skill,
-//! `audit`, `validate`, `stats`, and the commands that read the
-//! generated files: the glob union matcher (`glob`), the knowledge
-//! loading `render` needs (`model`), `render_all`/`render` (`render`),
-//! `check_base` and `check-knowledge` (`check`), the kit-owned citation
-//! lint `check-knowledge` also runs (`kit_citations`), and `validate`/`stats`
-//! (`validate_deliverable`, `stats`) on tolerant `serde_json::Value`
-//! reads (see `deliverable.rs`'s and `validate_deliverable.rs`'s own
+//! Owns reading and validating knowledge entries, rendering the blocks of
+//! the `AGENTS.md` files and, where the install enables the Claude
+//! renderer, the area files `.claude/rules/<area>.md` and the
+//! `project-knowledge` skill, `audit`, `validate`, `stats`, and the
+//! commands that read the generated files: the glob union matcher
+//! (`glob`), the knowledge loading `render` needs (`model`), the render
+//! port and its two renderers (`render`), the size budgets of the generated
+//! files (`budget`), `check_base` and `check-knowledge` (`check`), the
+//! pack-layer checks that
+//! `check_base` calls (`check_packs`), the compression-marker gate that
+//! `check-knowledge`, `check-backlog`, and `validate` share (`markers`), the
+//! kit-owned citation lint `check-knowledge` also runs (`kit_citations`), and
+//! `validate`/`stats` (`validate_deliverable`, `stats`) on tolerant
+//! `serde_json::Value` reads (see `deliverable.rs`'s and
+//! `validate_deliverable.rs`'s own
 //! module docs for the data-layer reasoning). `check_shape::CheckDef`
 //! wires into `model::Entry.check` and the audit engine (`audit`).
 //! `stats` composes two more modules: `cost` (the measurements of one
@@ -24,10 +30,11 @@
 //! `crate::schema_pin`'s build tests use it as their oracle instead of
 //! duplicating schema semantics, `backlog::commands::check_backlog` is a
 //! second production caller, and `validate_deliverable` a third.
-//! `render::repo_root_from_cwd` is re-exported the same way and for the
+//! `render::git_location_from_cwd` is re-exported the same way and for the
 //! same reason: the `backlog` module's CLI wrappers, and `audit`'s,
-//! `validate`'s, and `stats`'s, all need the identical `--dir`-or-git-root
-//! resolution `render`/`check-knowledge` already use. `glob::areas_for`
+//! `validate`'s, and `stats`'s, all need the identical `--dir`-or-install-root
+//! resolution `render`/`check-knowledge` already use (`root::resolve_root`
+//! reads the git location). `glob::areas_for`
 //! wires into `for` (`glob.rs`'s own doc has the full account).
 //! `read::get_entries` and `model::{Base, load_base}` are re-exported
 //! too, for the crate-root `get` command (`crate::get`) that spans this
@@ -40,6 +47,12 @@
 //! command's full account, including the two real call sites -- the
 //! commit-msg hook, CI's commitlint job -- its CLI shape is derived
 //! from).
+//!
+//! `git_paths` is the one place git's path lists become install-root
+//! paths: `audit`'s `changed_files` and `tree_files`, and `check_commit`'s
+//! per-commit file read, all go through `InstallPrefix::map`, so a
+//! subdirectory install matches the paths it owns and drops the rest
+//! (`git_paths.rs`'s own doc has the account).
 //!
 //! `durable_sha` is `CheckType::DurableSha`'s own git-plumbing (a diff
 //! hunk's added lines, a hex-candidate scan, and the two `git`
@@ -61,14 +74,18 @@
 //! (`model::Entry.check`, `audit::run_check`).
 
 mod audit;
+mod budget;
 mod check;
 mod check_commit;
+mod check_packs;
 mod check_shape;
 mod cost;
 mod deliverable;
 mod durable_sha;
+mod git_paths;
 mod glob;
 mod kit_citations;
+mod markers;
 mod model;
 mod proposals;
 mod read;
@@ -79,13 +96,16 @@ mod test_support;
 mod validate_deliverable;
 
 pub(crate) use audit::cmd_audit;
-pub(crate) use check::{cmd_check_knowledge, validate};
+pub(crate) use check::{cmd_check_knowledge, skipped_path_line, tracked_tree_files, validate};
 pub(crate) use check_commit::cmd_check_commit;
+pub(crate) use check_packs::{imports_agents_md, pin_mismatch_line};
+pub(crate) use glob::compile;
 pub(crate) use kit_citations::KitScope;
 #[cfg(test)]
 pub(crate) use kit_citations::{Scan, kit_citation_findings, scan_kit_citations};
-pub(crate) use model::{Base, load_base};
+pub(crate) use markers::marker_findings;
+pub(crate) use model::{Base, RESERVED, load_base};
 pub(crate) use read::{IndexOpts, cmd_for, cmd_index, cmd_standing, cmd_topics, get_entries};
-pub(crate) use render::{cmd_render, render_and_report, repo_root_from_cwd};
+pub(crate) use render::{GitLocation, cmd_render, git_location_from_cwd, render_and_report};
 pub(crate) use stats::cmd_stats;
 pub(crate) use validate_deliverable::cmd_validate;

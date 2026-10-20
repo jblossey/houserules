@@ -9,18 +9,24 @@
 //! surface, which the frozen JS at `common::FROZEN_SHA` cannot produce.
 
 mod common;
+mod install_shape;
 
 use std::fs;
 
-use common::{FrozenWorktree, copy_dir_recursive, houserules, list_generated_files, repo_root};
+use common::{
+    FrozenWorktree, ROOT_WORKTREE_AGENTS_MD_STUB, ROOT_WORKTREE_CLAUDE_MD_STUB, copy_dir_recursive,
+    golden_file, houserules, list_generated_files, repo_root, text_before_block,
+};
 
 /// Renders against `tests/fixtures/mini/` and byte-compares every
 /// produced file against `tests/goldens/render/mini/**` — the exact file
 /// set both ways, the exact bytes.
 ///
-/// The fixture's own checked-in `.claude/rules/*.md` and skill file are
-/// already current (they are the source `renderAll` produced them from in
-/// the first place), so this deletes them before rendering: the byte
+/// The fixture's own checked-in generated files (the `.claude/rules/*.md`
+/// files, the skill file, and the `AGENTS.md` blocks) are already current
+/// (they are the source `render` produced them from in the first place),
+/// so this deletes them before rendering -- the block of the root
+/// `AGENTS.md` included, which leaves its project text -- and the byte
 /// compare below proves this run's output matches, not that the fixture's
 /// pre-existing files happened to already match.
 #[test]
@@ -30,6 +36,11 @@ fn renders_byte_identical_to_the_frozen_mini_corpus() {
     fs::remove_dir_all(dir.path().join(".claude/rules")).expect("remove .claude/rules");
     fs::remove_file(dir.path().join(".claude/skills/project-knowledge/SKILL.md"))
         .expect("remove the knowledge skill");
+    fs::remove_file(dir.path().join("mini-tools/AGENTS.md")).expect("remove the directory block");
+    let agents_md = dir.path().join("AGENTS.md");
+    let project_text =
+        text_before_block(&fs::read_to_string(&agents_md).expect("read the root AGENTS.md"));
+    fs::write(&agents_md, project_text).expect("remove the root block");
 
     let output = houserules()
         .args(["render", "--dir"])
@@ -46,7 +57,8 @@ fn renders_byte_identical_to_the_frozen_mini_corpus() {
         "mini render produced a different file set than the frozen corpus"
     );
     for relative in &expected_files {
-        let expected = fs::read(corpus_dir.join(relative)).expect("read frozen mini corpus file");
+        let expected =
+            fs::read(golden_file(&corpus_dir, relative)).expect("read frozen mini corpus file");
         let actual = fs::read(dir.path().join(relative)).expect("read rendered mini file");
         assert_eq!(
             actual, expected,
@@ -69,11 +81,24 @@ fn renders_byte_identical_to_the_frozen_mini_corpus() {
 /// file are already up to date — `render --check` there reports no stale
 /// files at all. The ordering proof needs a stale listing to read, so this
 /// deletes those generated files before checking: everything renders as
-/// new, in `render_all`'s order.
+/// new, in the order of the renderers: the AGENTS.md renderer first (the
+/// root block, then the directory blocks of `cli`, `template`, and `tests`
+/// in `areas.json`'s order), then the Claude renderer. The frozen sha has no
+/// `AGENTS.md`, so the test writes the stub that `gen-goldens` writes.
 #[test]
 fn renders_byte_identical_to_the_frozen_root_corpus_and_preserves_area_order() {
     let repo_root = repo_root();
     let worktree = FrozenWorktree::checkout(&repo_root, common::FROZEN_SHA);
+    fs::write(
+        worktree.path.join("AGENTS.md"),
+        ROOT_WORKTREE_AGENTS_MD_STUB,
+    )
+    .expect("write the AGENTS.md stub");
+    fs::write(
+        worktree.path.join("CLAUDE.md"),
+        ROOT_WORKTREE_CLAUDE_MD_STUB,
+    )
+    .expect("write the CLAUDE.md stub");
     fs::remove_dir_all(worktree.path.join(".claude/rules")).expect("remove .claude/rules");
     fs::remove_file(
         worktree
@@ -83,7 +108,8 @@ fn renders_byte_identical_to_the_frozen_root_corpus_and_preserves_area_order() {
     .expect("remove the knowledge skill");
 
     // Stale listing order, captured before anything is written, is the
-    // area order proof: render_all's Vec order, not an alphabetized one.
+    // area order proof: the plan of `rules::render` follows areas.json's order,
+    // not an alphabetized one.
     let check_output = houserules()
         .args(["render", "--check", "--dir"])
         .arg(&worktree.path)
@@ -102,7 +128,10 @@ fn renders_byte_identical_to_the_frozen_root_corpus_and_preserves_area_order() {
     assert_eq!(
         stale_order,
         vec![
-            ".claude/rules/standing-rules.md",
+            "AGENTS.md",
+            "crates/houserules/src/AGENTS.md",
+            "template/AGENTS.md",
+            "tests/AGENTS.md",
             ".claude/rules/docs.md",
             ".claude/rules/tools.md",
             ".claude/rules/cli.md",
@@ -111,7 +140,7 @@ fn renders_byte_identical_to_the_frozen_root_corpus_and_preserves_area_order() {
             ".claude/rules/rust.md",
             ".claude/skills/project-knowledge/SKILL.md",
         ],
-        "area file order must follow areas.json's declared order, not alphabetical"
+        "output order must follow areas.json's declared order, not alphabetical"
     );
 
     let output = houserules()
@@ -129,7 +158,8 @@ fn renders_byte_identical_to_the_frozen_root_corpus_and_preserves_area_order() {
         "root render produced a different file set than the frozen corpus"
     );
     for relative in &expected_files {
-        let expected = fs::read(corpus_dir.join(relative)).expect("read frozen root corpus file");
+        let expected =
+            fs::read(golden_file(&corpus_dir, relative)).expect("read frozen root corpus file");
         let actual = fs::read(worktree.path.join(relative)).expect("read rendered root file");
         assert_eq!(
             actual, expected,
@@ -159,11 +189,8 @@ fn render_check_reports_up_to_date_then_stale_once_dirtied_then_render_repairs_i
         "render: up to date\n"
     );
 
-    fs::write(
-        dir.path().join(".claude/rules/standing-rules.md"),
-        "dirtied\n",
-    )
-    .expect("dirty a generated file");
+    fs::write(dir.path().join(".claude/rules/tools.md"), "dirtied\n")
+        .expect("dirty a generated file");
     let output = houserules()
         .args(["render", "--check", "--dir"])
         .arg(dir.path())
@@ -171,7 +198,7 @@ fn render_check_reports_up_to_date_then_stale_once_dirtied_then_render_repairs_i
         .expect("run render --check");
     assert_eq!(output.status.code(), Some(1), "one file dirtied");
     let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
-    assert_eq!(stderr, ".claude/rules/standing-rules.md: would change\n");
+    assert_eq!(stderr, ".claude/rules/tools.md: would change\n");
 
     let output = houserules()
         .args(["render", "--dir"])
@@ -180,7 +207,7 @@ fn render_check_reports_up_to_date_then_stale_once_dirtied_then_render_repairs_i
         .expect("run render");
     assert_eq!(output.status.code(), Some(0));
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
-    assert_eq!(stdout, ".claude/rules/standing-rules.md: written\n");
+    assert_eq!(stdout, ".claude/rules/tools.md: written\n");
 
     let output = houserules()
         .args(["render", "--dir"])
@@ -226,6 +253,7 @@ fn render_outside_a_git_repository_prints_a_named_error_and_exits_2() {
 #[test]
 fn render_missing_knowledge_directory_prints_a_named_error_and_exits_2() {
     let dir = tempfile::tempdir().expect("tempdir");
+    install_shape::mark_2_0(dir.path());
 
     let output = houserules()
         .args(["render", "--dir"])

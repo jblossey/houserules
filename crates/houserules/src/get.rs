@@ -54,7 +54,7 @@ fn is_digit_run(s: &str, len: Option<usize>) -> bool {
 /// ever returns on a genuine match, never on a structural prefix match
 /// alone -- rather than the first matching literal prefix deciding the
 /// whole result: `item_prefix` is adopter-chosen (`is_id_prefix` in
-/// `install.rs` allows a single-letter prefix, `A` or `P` included), so a
+/// `install/marker.rs` allows a single-letter prefix, `A` or `P` included), so a
 /// project's own item shape can share a leading literal with the fixed
 /// `A-`/`PP-` shapes. Returning early on the item prefix's own digit-count
 /// mismatch would then wrongly refuse an id the fixed shape it collides
@@ -225,7 +225,7 @@ mod tests {
     }
 
     /// A project could validly stamp a single-letter `idPrefix` of `A`
-    /// (`install::is_id_prefix` allows it): its own 3-digit item ids must
+    /// (`install::marker::is_id_prefix` allows it): its own 3-digit item ids must
     /// not shadow the fixed 2-digit amendment shape, proving the
     /// independent-branch design load-bearing rather than an early return
     /// on the first literal prefix match.

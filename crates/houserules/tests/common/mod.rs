@@ -19,7 +19,7 @@ use std::sync::Mutex;
 /// resolves against. `check_parity.rs` and `render_parity.rs` check out a
 /// worktree at this commit because it is the point-in-time content their own
 /// goldens were captured against. The commit this constant names must carry no
-/// local, machine-specific path in any file `render_all` generates or
+/// local, machine-specific path in any file `render` generates or
 /// `check-knowledge` reads: a worktree checked out at a commit that does would
 /// leak that path into the checked-in goldens compared against it. Changing
 /// this value requires re-running `cargo run --quiet --bin gen-goldens` and
@@ -82,34 +82,94 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) {
     }
 }
 
-/// Every file `render_all` can produce under `root`: every
-/// `.claude/rules/*.md` file, sorted, then the knowledge skill. Applying
-/// this same order to both the golden directory and a freshly rendered
-/// one makes the two `list_generated_files` calls comparable. The skill
-/// path is checked against disk, not assumed -- listing every file under
-/// `.claude/skills/project-knowledge` (not just asserting `SKILL.md`'s
-/// existence) also catches a stray file render did not produce, the
-/// exact file set for the one file that carries the whole retrieval
-/// protocol. A caller comparing two `list_generated_files` results still
-/// gets a clear mismatch instead of a later, unrelated `fs::read` panic.
+/// The suffix of a golden copy of a generated `AGENTS.md`. A golden named
+/// `AGENTS.md` would be an `AGENTS.md` of this repository that holds a block
+/// the area rules of this repository do not write, and `render` removes
+/// such a block.
+pub const GOLDEN_SUFFIX: &str = ".golden";
+
+/// The path of the golden for the generated file `relative` in the corpus
+/// `corpus`: the file itself, or for an `AGENTS.md` its copy with the golden
+/// suffix.
+#[allow(dead_code)]
+pub fn golden_file(corpus: &Path, relative: &str) -> PathBuf {
+    let path = relative
+        .split('/')
+        .fold(corpus.to_path_buf(), |path, part| path.join(part));
+    if relative.rsplit('/').next() == Some("AGENTS.md") {
+        let mut named = path.into_os_string();
+        named.push(GOLDEN_SUFFIX);
+        PathBuf::from(named)
+    } else {
+        path
+    }
+}
+
+/// The `AGENTS.md` files below `dir` (a path relative to `root`, empty for
+/// the root itself), as `/`-separated paths relative to `root`, in directory
+/// order; a golden copy (`AGENTS.md.golden`) counts as the `AGENTS.md` it
+/// copies. A `.git` entry is skipped: it is a directory in a clone and a file
+/// in a worktree, and neither holds a project file.
+fn agents_md_files(root: &Path, relative: &str, found: &mut Vec<String>) {
+    let dir = relative
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .fold(root.to_path_buf(), |path, part| path.join(part));
+    let mut entries: Vec<_> = fs::read_dir(&dir)
+        .unwrap_or_else(|error| panic!("read {}: {error}", dir.display()))
+        .map(|entry| entry.expect("a directory entry"))
+        .collect();
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let name = entry.file_name().into_string().expect("utf8 filename");
+        let path = if relative.is_empty() {
+            name.clone()
+        } else {
+            format!("{relative}/{name}")
+        };
+        if entry.file_type().expect("a file type").is_dir() {
+            if name != ".git" {
+                agents_md_files(root, &path, found);
+            }
+        } else if name == "AGENTS.md" {
+            found.push(path);
+        } else if name == format!("AGENTS.md{GOLDEN_SUFFIX}") {
+            found.push(path.trim_end_matches(GOLDEN_SUFFIX).to_string());
+        }
+    }
+}
+
+/// Every file `render` can produce under `root`: every `AGENTS.md` below it,
+/// then every `.claude/rules/*.md` file, sorted, then the knowledge skill.
+/// Applying this same order to both the golden directory and a freshly
+/// rendered one makes the two `list_generated_files` calls comparable. The
+/// skill path is checked against disk, not assumed -- listing every file
+/// under `.claude/skills/project-knowledge` (not just asserting `SKILL.md`'s
+/// existence) also catches a stray file render did not produce. A caller
+/// comparing two `list_generated_files` results still gets a clear mismatch
+/// instead of a later, unrelated `fs::read` panic.
 ///
 /// Used by `render_parity.rs` only: `tests/common/mod.rs` compiles fresh
 /// into every integration-test binary that declares `mod common;` (Cargo's
 /// convention for a module shared without becoming its own test binary),
 /// so a helper only some binaries call reads as dead code from the ones
 /// that do not -- `check_parity.rs` is the second such binary and needs
-/// the module's other four helpers, not this one.
+/// the module's other helpers, not this one.
 #[allow(dead_code)]
 pub fn list_generated_files(root: &Path) -> Vec<String> {
+    let mut files = Vec::new();
+    agents_md_files(root, "", &mut files);
+
     let rules_dir = root.join(".claude/rules");
-    let mut files: Vec<String> = fs::read_dir(&rules_dir)
+    let mut rule_files: Vec<String> = fs::read_dir(&rules_dir)
         .expect("read .claude/rules")
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.file_name().into_string().expect("utf8 filename"))
         .filter(|name| name.ends_with(".md"))
         .map(|name| format!(".claude/rules/{name}"))
         .collect();
-    files.sort();
+    rule_files.sort();
+    files.extend(rule_files);
 
     let skill_dir = root.join(".claude/skills/project-knowledge");
     let mut skill_files: Vec<String> = fs::read_dir(&skill_dir)
@@ -124,6 +184,36 @@ pub fn list_generated_files(root: &Path) -> Vec<String> {
     files.extend(skill_files);
     files
 }
+
+/// The text before the begin marker line of a block: `text` without its
+/// block and without any text after it. The generated blocks of the fixtures
+/// sit at the end of their files, so this is the project text.
+#[allow(dead_code)]
+pub fn text_before_block(text: &str) -> String {
+    let mut kept = String::new();
+    for line in text.split_inclusive('\n') {
+        if line.trim() == "<!-- houserules:begin -->" {
+            break;
+        }
+        kept.push_str(line);
+    }
+    kept
+}
+
+/// The `AGENTS.md` that the frozen worktree gets before the `root` corpus
+/// renders: the frozen sha predates `AGENTS.md` joining `SEED_ONCE`
+/// (`houserules.agents-md-is-canonical`). Content is never asserted, only
+/// its project text, which `render` keeps. `gen-goldens.rs` keeps its own
+/// copy of this constant, for the reason its own doc gives (a `src/bin/*.rs`
+/// target cannot depend on `tests/*.rs` code).
+#[allow(dead_code)]
+pub const ROOT_WORKTREE_AGENTS_MD_STUB: &str = "# AGENTS.md stub\n\nWritten by the check-parity harness: the frozen sha this worktree checks out predates AGENTS.md joining SEED_ONCE. A real adopter's own checkout already has one.\n";
+
+/// The `CLAUDE.md` that the frozen worktree gets: the one-line import that
+/// `check-knowledge` requires of any `CLAUDE.md`. `gen-goldens.rs` keeps its
+/// own copy of this constant.
+#[allow(dead_code)]
+pub const ROOT_WORKTREE_CLAUDE_MD_STUB: &str = "@AGENTS.md\n";
 
 /// A detached git worktree at a frozen sha, created under a fresh temp
 /// path and removed with `git worktree remove --force` on drop — a Rust
@@ -184,11 +274,35 @@ impl FrozenWorktree {
                 .expect("run git worktree add")
         };
         assert!(status.success(), "git worktree add {sha} failed");
+        stamp_install_schema(&path);
         FrozenWorktree {
             repo_root: repo_root.to_path_buf(),
             path,
         }
     }
+}
+
+/// Adds the install `schema` key to the `.houserules.json` of the worktree at
+/// `path`, so that D4 (spec section 5) lets the commands under test read it.
+/// The frozen sha holds a marker of release 1.x, which D4 refuses. The key is
+/// the only change: no command whose output a golden pins reads it.
+fn stamp_install_schema(path: &Path) {
+    let marker = path.join(".houserules.json");
+    let mut stamp: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_str(&fs::read_to_string(&marker).unwrap_or_else(|_| "{}".to_string()))
+            .expect("the frozen marker is a JSON object");
+    stamp.insert(
+        "schema".to_string(),
+        serde_json::json!("houserules/install@2.0.0"),
+    );
+    fs::write(
+        &marker,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&stamp).expect("serialize the marker")
+        ),
+    )
+    .expect("write the marker");
 }
 
 impl Drop for FrozenWorktree {

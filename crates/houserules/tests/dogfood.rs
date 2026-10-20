@@ -14,7 +14,7 @@
 //! tests/install.rs`'s own `files_prints_the_kit_owned_and_seed_once_
 //! lists_as_json` already pins that command's exact output shape.
 //! `RETIRED` has no CLI-exposed form at all, so this file keeps its own
-//! small copy, cross-checked against `install.rs`'s own `RETIRED` via its
+//! small copy, cross-checked against `install/mod.rs`'s own `RETIRED` via its
 //! existing `retired_holds_the_shell_tools_and_the_js_engines_they_fronted`
 //! unit test rather than duplicating a second pin of the same fact here.
 
@@ -47,7 +47,7 @@ fn repo_root() -> PathBuf {
 }
 
 /// Paths the kit does not ship that `update` deletes from an install if
-/// present -- `install.rs`'s own private `RETIRED`, whose exact contents
+/// present -- `install/mod.rs`'s own private `RETIRED`, whose exact contents
 /// that module's own `retired_holds_the_shell_tools_and_the_js_engines_
 /// they_fronted` test already pins; duplicated here (not exported by the
 /// binary, and the CLI has no subcommand that echoes it) only so this
@@ -62,10 +62,17 @@ const RETIRED: &[&str] = &[
     "tools/lib/json-store.mjs",
 ];
 
-/// Runs `houserules files` and returns its `kitOwned`/`seedOnce`/
-/// `githubHostedSeedOnce` arrays as owned strings -- the one CLI-exposed
-/// form of the binary's own manifest.
-fn kit_files() -> (Vec<String>, Vec<String>, Vec<String>) {
+/// The file classes that `houserules files` prints.
+struct KitFiles {
+    kit_owned: Vec<String>,
+    seed_once: Vec<String>,
+    pack_copies: Vec<String>,
+    d3_files: Vec<String>,
+}
+
+/// Runs `houserules files` and returns its classes as owned strings -- the
+/// one CLI-exposed form of the binary's own manifest.
+fn kit_files() -> KitFiles {
     let output = houserules().arg("files").output().expect("run files");
     assert!(output.status.success());
     let value: serde_json::Value =
@@ -78,11 +85,12 @@ fn kit_files() -> (Vec<String>, Vec<String>, Vec<String>) {
             .map(|entry| entry.as_str().expect("array entry is a string").to_string())
             .collect()
     };
-    (
-        strings("kitOwned"),
-        strings("seedOnce"),
-        strings("githubHostedSeedOnce"),
-    )
+    KitFiles {
+        kit_owned: strings("kitOwned"),
+        seed_once: strings("seedOnce"),
+        pack_copies: strings("packCopies"),
+        d3_files: strings("d3Files"),
+    }
 }
 
 /// Every file under `root`, as `/`-joined paths relative to `root`, sorted --
@@ -92,7 +100,7 @@ fn kit_files() -> (Vec<String>, Vec<String>, Vec<String>) {
 /// declares directly). Built from explicit `/`-joined segments, not
 /// `Path::display()`, so the result is byte-identical on every OS in the 3-OS
 /// CI matrix regardless of the native path separator; `fs::read_dir` does not
-/// filter dot-entries (confirmed by `install.rs`'s own
+/// filter dot-entries (confirmed by `install/mod.rs`'s own
 /// `the_embedded_payload_carries_every_kit_owned_and_seed_once_path` test
 /// doc), matching Node's own `recursive: true` behavior this pins against.
 fn list_files_recursive(root: &Path) -> Vec<String> {
@@ -132,11 +140,12 @@ fn eval_scenarios(seed_once: &[String]) -> Vec<String> {
         .collect()
 }
 
-/// The two lists -- kit-owned machinery and seed-once project data --
-/// name their known members and never overlap.
+/// The classes -- kit-owned machinery, seed-once project data, the D3 files,
+/// and the pack copies -- name their known members, and the kit-owned and
+/// seed-once lists never overlap.
 #[test]
 fn kit_owned_manifest_separates_from_seed_once_and_has_no_overlap() {
-    let (kit_owned, seed_once, github_hosted_seed_once) = kit_files();
+    let files = kit_files();
     for expected in [
         "tools/claude-session-start.sh",
         ".claude/agents/implementer.md",
@@ -145,12 +154,12 @@ fn kit_owned_manifest_separates_from_seed_once_and_has_no_overlap() {
         ".githooks/commit-msg",
     ] {
         assert!(
-            kit_owned.iter().any(|file| file == expected),
+            files.kit_owned.iter().any(|file| file == expected),
             "kitOwned is missing {expected}"
         );
     }
     for expected in [
-        "knowledge/schema.json",
+        "knowledge/areas.json",
         "backlog/schema.json",
         ".claude/schemas/deliverables.json",
         ".claude/evals/record.json",
@@ -158,52 +167,61 @@ fn kit_owned_manifest_separates_from_seed_once_and_has_no_overlap() {
         "CLAUDE.md",
     ] {
         assert!(
-            seed_once.iter().any(|file| file == expected),
+            files.seed_once.iter().any(|file| file == expected),
             "seedOnce is missing {expected}"
         );
     }
-    let overlap: Vec<&String> = kit_owned
+    let overlap: Vec<&String> = files
+        .kit_owned
         .iter()
-        .filter(|file| seed_once.contains(file))
+        .filter(|file| files.seed_once.contains(file))
         .collect();
     assert!(
         overlap.is_empty(),
         "kitOwned and seedOnce overlap: {overlap:?}"
     );
-
-    assert!(
-        github_hosted_seed_once
-            .iter()
-            .any(|file| file == ".github/workflows/knowledge.yml"),
-        "githubHostedSeedOnce is missing .github/workflows/knowledge.yml"
+    assert_eq!(
+        files.d3_files,
+        ["knowledge/schema.json", ".github/workflows/knowledge.yml"]
     );
-    let github_hosted_overlap: Vec<&String> = github_hosted_seed_once
+    let other_classes: Vec<&String> = files
+        .kit_owned
         .iter()
-        .filter(|file| kit_owned.contains(file) || seed_once.contains(file))
+        .chain(&files.seed_once)
+        .filter(|file| files.d3_files.contains(file) || files.pack_copies.contains(file))
         .collect();
     assert!(
-        github_hosted_overlap.is_empty(),
-        "githubHostedSeedOnce overlaps kitOwned/seedOnce: {github_hosted_overlap:?}"
+        other_classes.is_empty(),
+        "a D3 file or a pack copy is in kitOwned or seedOnce too: {other_classes:?}"
     );
 }
 
 /// Every file under `template/` is exactly `kitOwned` (minus `RETIRED`,
 /// which this binary's own `KIT_OWNED` never carries, so the filter is a
-/// structural no-op today) plus `seedOnce` plus `githubHostedSeedOnce`
-/// plus `.claude/settings.json` (seeded or merged specially, never
-/// plain-copied).
+/// structural no-op today) plus `seedOnce` plus the D3 files plus
+/// `.claude/settings.json` (seeded or merged specially, never plain-copied)
+/// plus the pack files, which `packCopies` names by their path in an
+/// install (`knowledge/packs/<name>.json`) and `template/packs/<name>.json`
+/// holds.
 #[test]
 fn kit_owned_and_seed_once_account_for_every_template_file() {
-    let (kit_owned, seed_once, github_hosted_seed_once) = kit_files();
-    let mut expected: Vec<String> = kit_owned
+    let files = kit_files();
+    let mut expected: Vec<String> = files
+        .kit_owned
         .iter()
         .filter(|file| !RETIRED.contains(&file.as_str()))
         .cloned()
         .collect();
-    expected.extend(seed_once.iter().cloned());
-    expected.extend(github_hosted_seed_once.iter().cloned());
+    expected.extend(files.seed_once.iter().cloned());
+    expected.extend(files.d3_files.iter().cloned());
     expected.push(".claude/settings.json".to_string());
+    expected.extend(files.pack_copies.iter().map(|copy| {
+        copy.strip_prefix("knowledge/")
+            .unwrap_or_else(|| panic!("{copy} lies below knowledge/"))
+            .to_string()
+    }));
     expected.sort();
+    expected.dedup();
 
     let actual = list_files_recursive(&repo_root().join("template"));
     assert_eq!(actual, expected);
@@ -211,29 +229,29 @@ fn kit_owned_and_seed_once_account_for_every_template_file() {
 
 /// Every live `KIT_OWNED` root copy in this checkout is byte-identical to
 /// its `template/` source, except a path this repo's own `.houserules.json`
-/// `overrides` list declares its own (`.githooks/commit-msg`: this
-/// repository keeps its stricter, trailer-gating hook via the overrides
-/// model while the template's own copy drops that gate -- T2 review ruling
-/// 5.81). A hand edit to a non-overridden path fails here and is lost on
-/// the next `houserules update`.
+/// `ownedPaths` list declares its own (`.githooks/commit-msg`: this
+/// repository keeps its stricter, trailer-gating hook while the template's
+/// own copy drops that gate -- T2 review ruling 5.81). A hand edit to a
+/// non-owned path fails here and is lost on the next `houserules update`.
 #[test]
 fn root_kit_owned_files_equal_their_template_source_byte_for_byte() {
-    let (kit_owned, _seed_once, _github_hosted_seed_once) = kit_files();
+    let files = kit_files();
     let root = repo_root();
     let stamp: serde_json::Value = serde_json::from_str(
         &fs::read_to_string(root.join(".houserules.json")).expect("read .houserules.json"),
     )
     .expect("parse .houserules.json");
-    let overrides: Vec<&str> = stamp["overrides"]
+    let owned: Vec<&str> = stamp["ownedPaths"]
         .as_array()
-        .expect("overrides is an array")
+        .expect("ownedPaths is an array")
         .iter()
-        .map(|v| v.as_str().expect("override entry is a string"))
+        .map(|v| v.as_str().expect("ownedPaths entry is a string"))
         .collect();
-    for file in kit_owned
+    for file in files
+        .kit_owned
         .iter()
         .filter(|file| !RETIRED.contains(&file.as_str()))
-        .filter(|file| !overrides.contains(&file.as_str()))
+        .filter(|file| !owned.contains(&file.as_str()))
     {
         let root_path = root.join(file);
         assert!(
@@ -251,7 +269,7 @@ fn root_kit_owned_files_equal_their_template_source_byte_for_byte() {
     }
 }
 
-/// `install.rs`'s own `retired_holds_the_shell_tools_and_the_js_engines_
+/// `install/mod.rs`'s own `retired_holds_the_shell_tools_and_the_js_engines_
 /// they_fronted` already pins `RETIRED`'s exact contents
 /// (`houserules.template-is-the-source`'s own knowledge entry names it);
 /// this test confirms neither retired path lingers in this checkout's own
@@ -271,17 +289,15 @@ fn retired_paths_are_absent_from_both_root_and_template() {
     }
 }
 
-/// This repository's own `.houserules.json` names `env!("CARGO_PKG_VERSION")`
-/// and the `HR` backlog id prefix -- proof this repository dogfoods its own
-/// `init`/`update` output rather than a hand-written stamp. `baselines` is not
-/// pinned here byte-for-byte: it holds one hash per `KIT_OWNED` file and
-/// kit-shipped knowledge entry, which grows with the payload itself, so this
-/// only checks that `update` has stamped one at all; the two `install.rs` unit
-/// tests inject their own list directly and cover the stamping mechanism's own
-/// behavior.
+/// This repository's own `.houserules.json` names `env!("CARGO_PKG_VERSION")`,
+/// the `HR` backlog id prefix, and the 2.0 install schema -- proof this
+/// repository dogfoods its own `init`/`update` output rather than a
+/// hand-written stamp. `baselines` is not pinned here byte-for-byte: it holds
+/// one hash per `KIT_OWNED` path and per D3 file, which grows with the
+/// payload itself, so this only checks that `update` has stamped one at all.
 ///
-/// `overrides` IS pinned exactly. Its path entries are load-
-/// bearing: without them, `update --dir .` here would backfill each one.
+/// `ownedPaths` IS pinned exactly. Its entries are load-bearing: without
+/// them, `update --dir .` here would backfill or rewrite each one.
 /// `backlog/items/general.json` is absent because this repository's own
 /// backlog items live at `backlog/items/kit.json` instead. `.github/
 /// workflows/knowledge.yml` is absent because this repository's CI is its
@@ -289,10 +305,9 @@ fn retired_paths_are_absent_from_both_root_and_template() {
 /// `docs/README.md` is absent because this directory already holds this
 /// repository's real specs, plans, and design notes in place of the
 /// generic starter file. `.githooks/commit-msg` keeps this repository's
-/// trailer gate. Its entry ids are the kit-shipped entries this repository
-/// words in its own, fuller body. The test
-/// `update_keeps_no_knowledge_entry_of_this_repository` proves that `update`
-/// neither keeps nor rewrites any other kit-shipped entry.
+/// trailer gate. The entries this repository words in its own, fuller body
+/// are overrides in `knowledge/overrides.json`, which
+/// `check-knowledge` lists.
 #[test]
 fn houserules_json_stamps_the_installed_version_and_the_hr_id_prefix() {
     let root = repo_root();
@@ -305,47 +320,18 @@ fn houserules_json_stamps_the_installed_version_and_the_hr_id_prefix() {
         serde_json::json!(env!("CARGO_PKG_VERSION"))
     );
     assert_eq!(stamp["idPrefix"], serde_json::json!("HR"));
-    assert!(stamp["baselines"].is_object(), "got {stamp}");
     assert_eq!(
-        stamp["overrides"],
+        stamp["schema"],
+        serde_json::json!("houserules/install@2.0.0")
+    );
+    assert!(stamp["baselines"].is_object(), "got {stamp}");
+    assert!(stamp.get("overrides").is_none(), "got {stamp}");
+    assert_eq!(
+        stamp["ownedPaths"],
         serde_json::json!([
             "backlog/items/general.json",
             ".github/workflows/knowledge.yml",
             "docs/README.md",
-            "knowledge-base.ids-are-permanent",
-            "knowledge-base.rules-need-a-loading-path",
-            "knowledge-base.state-only-the-source",
-            "process.ask-when-missing",
-            "process.brainstorm-first",
-            "process.brief-carries-the-spec",
-            "process.claims-match-artifacts",
-            "process.closure-claims-carry-enumeration",
-            "process.contract-refresh-sweep",
-            "process.eval-fixture-procedure",
-            "process.evals-rerun",
-            "process.evidence-outlives-the-session",
-            "process.fix-proofs-extend-the-reviewers-run",
-            "process.fix-round-verification-record",
-            "process.gate-shell-chains",
-            "process.main-wins-backlog-collisions",
-            "process.model-policy",
-            "process.owner-content-mid-batch",
-            "process.owner-rulings-need-owner-supersession",
-            "process.review-findings-are-claims-too",
-            "process.rulings-to-file",
-            "process.skills-for-procedures",
-            "process.suggestions-are-unverified",
-            "process.tdd",
-            "process.verify-in-persisted-state",
-            "process.wiring-checks-run-the-resolution",
-            "quality.gates-derive-their-scope",
-            "quality.no-compat-softening",
-            "quality.pin-copies-byte-exact",
-            "quality.principles",
-            "quality.well-maintained-libraries",
-            "security-hygiene.exact-pins",
-            "writing-style.doc-comments",
-            "writing-style.instructions-cover-the-state-space",
             ".githooks/commit-msg",
         ]),
         "got {stamp}"
@@ -381,8 +367,7 @@ fn deliverables_schema_equals_template_source_with_the_id_prefix_rewrite() {
 /// vacuously empty.
 #[test]
 fn seed_once_derives_at_least_one_eval_scenario() {
-    let (_kit_owned, seed_once, _github_hosted_seed_once) = kit_files();
-    assert!(!eval_scenarios(&seed_once).is_empty());
+    assert!(!eval_scenarios(&kit_files().seed_once).is_empty());
 }
 
 /// Unlike the deliverables schema above, `.claude/evals/*.json` entries
@@ -390,9 +375,8 @@ fn seed_once_derives_at_least_one_eval_scenario() {
 /// plain byte equality, no transform.
 #[test]
 fn seed_once_eval_scenario_copies_equal_template_source_byte_for_byte() {
-    let (_kit_owned, seed_once, _github_hosted_seed_once) = kit_files();
     let root = repo_root();
-    for file in eval_scenarios(&seed_once) {
+    for file in eval_scenarios(&kit_files().seed_once) {
         let root_bytes =
             fs::read(root.join(&file)).unwrap_or_else(|error| panic!("read {file}: {error}"));
         let template_bytes = fs::read(root.join("template").join(&file))
@@ -428,70 +412,6 @@ fn generated_files_are_fresh_relative_to_knowledge() {
         String::from_utf8(output.stdout).expect("utf8 stdout"),
         "render: up to date\n"
     );
-}
-
-/// `houserules update` over this repository's stamp and knowledge files keeps no
-/// kit-shipped entry as `kept (locally modified)` and rewrites none (no
-/// `updated knowledge/` line). An entry this repository words in its own body is
-/// listed in `overrides`, so `update` stays silent about it
-/// (`process.knowledge-earns-its-place`). Every other kit-shipped entry equals
-/// the kit's text: a kept line means a rewritten entry that is missing from
-/// `overrides`, and an updated line means an entry that lags the kit.
-#[test]
-fn update_keeps_no_knowledge_entry_of_this_repository() {
-    let root = repo_root();
-    let scratch = tempfile::tempdir().expect("tempdir");
-    let init = Command::new("git")
-        .args(["init", "-q", "-b", "main"])
-        .current_dir(scratch.path())
-        .output()
-        .expect("run git init");
-    assert!(init.status.success());
-    fs::copy(
-        root.join(".houserules.json"),
-        scratch.path().join(".houserules.json"),
-    )
-    .expect("copy .houserules.json");
-    fs::create_dir(scratch.path().join("knowledge")).expect("create knowledge/");
-    for entry in fs::read_dir(root.join("knowledge")).expect("read knowledge/") {
-        let path = entry.expect("read directory entry").path();
-        if path
-            .extension()
-            .is_some_and(|extension| extension == "json")
-        {
-            fs::copy(
-                &path,
-                scratch
-                    .path()
-                    .join("knowledge")
-                    .join(path.file_name().unwrap()),
-            )
-            .expect("copy a knowledge topic file");
-        }
-    }
-
-    let output = houserules()
-        .args(["update", "--dir"])
-        .arg(scratch.path())
-        .output()
-        .expect("run update");
-
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
-    let kept: Vec<&str> = stdout
-        .lines()
-        .filter(|line| line.starts_with("kept "))
-        .collect();
-    assert!(kept.is_empty(), "update kept: {kept:?}");
-    let rewritten: Vec<&str> = stdout
-        .lines()
-        .filter(|line| line.starts_with("updated knowledge/"))
-        .collect();
-    assert!(rewritten.is_empty(), "update rewrote: {rewritten:?}");
 }
 
 /// An install seeded before 1.3.0 keeps its old `AGENTS.md` parallel-dispatch

@@ -12,6 +12,7 @@
 //! every slice here.
 
 mod common;
+mod install_shape;
 
 use std::fs;
 use std::path::Path;
@@ -203,6 +204,7 @@ fn for_full_matches_the_frozen_corpus_on_the_mini_fixture() {
 #[test]
 fn get_with_no_ids_in_a_repository_with_neither_domain_prints_the_usage_message_and_exits_2() {
     let dir = tempfile::tempdir().expect("tempdir");
+    install_shape::mark_2_0(dir.path());
     std::process::Command::new("git")
         .args(["init", "--quiet"])
         .arg(dir.path())
@@ -241,6 +243,7 @@ fn for_with_no_paths_prints_the_frozen_usage_message_and_exits_2() {
 #[test]
 fn a_missing_knowledge_directory_prints_a_named_error_and_exits_2() {
     let dir = tempfile::tempdir().expect("tempdir");
+    install_shape::mark_2_0(dir.path());
     let output = houserules()
         .args(["topics", "--dir"])
         .arg(dir.path())

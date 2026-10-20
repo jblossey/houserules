@@ -664,7 +664,7 @@ mod tests {
             ("alpha".to_string(), 0),
             ("beta".to_string(), 0),
             (
-                "crates/houserules/src/install.rs (RETIRED's own doc/test only)".to_string(),
+                "crates/houserules/src/install/mod.rs (RETIRED's own doc/test only)".to_string(),
                 4,
             ),
         ];

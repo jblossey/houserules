@@ -24,19 +24,19 @@ fn repo_root() -> PathBuf {
 }
 
 /// The `security-hygiene.exact-pins` entry's own `check.pattern` and
-/// `check.flags`, read live from the shipped `template/knowledge/
+/// `check.flags`, read live from the shipped `template/packs/
 /// security-hygiene.json` since this file has no knowledge-base loader of
 /// its own to reuse. `flags` defaults to an empty string when absent,
 /// matching `compile_check_regex`'s own `&str` parameter (never `Option`).
 fn exact_pins_check_pattern() -> (String, String) {
-    let path = repo_root().join("template/knowledge/security-hygiene.json");
+    let path = repo_root().join("template/packs/security-hygiene.json");
     let text = std::fs::read_to_string(&path)
         .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
-    let topic: serde_json::Value = serde_json::from_str(&text)
+    let pack: serde_json::Value = serde_json::from_str(&text)
         .unwrap_or_else(|error| panic!("parse {}: {error}", path.display()));
-    let entries = topic["entries"]
+    let entries = pack["entries"]
         .as_array()
-        .expect("security-hygiene.json has an entries array");
+        .expect("the security-hygiene pack has an entries array");
     let entry = entries
         .iter()
         .find(|entry| entry["id"] == "security-hygiene.exact-pins")

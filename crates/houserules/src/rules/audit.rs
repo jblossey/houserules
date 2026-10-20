@@ -76,6 +76,7 @@ use crate::emit::emit;
 
 use super::check_shape::{CheckDef, CheckType, Glob, Scope};
 use super::deliverable::{read_deliverable_value, workspace_files};
+use super::git_paths::InstallPrefix;
 use super::glob::{area_files, glob_match};
 use super::model::{Base, Entry, load_base, raw_entry_has_tag};
 use super::render::RULE_KINDS;
@@ -145,14 +146,6 @@ pub(super) fn range(base: &str, head: &str) -> String {
     format!("{base}...{head}")
 }
 
-/// Splits `text` into non-empty lines.
-fn lines(text: &str) -> Vec<String> {
-    text.lines()
-        .filter(|l| !l.is_empty())
-        .map(str::to_string)
-        .collect()
-}
-
 /// Runs `git diff` with `args` (everything after `diff`). A shared merge
 /// base miss between `base` and `head` reports
 /// the fixed `no merge base between "<base>" and "<head>"` message; any
@@ -178,30 +171,52 @@ pub(super) fn git_diff(
 }
 
 /// Every file added, copied, modified, or renamed between `base` and
-/// `head`'s merge base and `head`.
-fn changed_files(root: &Path, base: &str, head: &str) -> Result<Vec<String>, String> {
+/// `head`'s merge base and `head`, as install-root paths
+/// (`InstallPrefix::map`).
+fn changed_files(
+    root: &Path,
+    prefix: &InstallPrefix,
+    base: &str,
+    head: &str,
+) -> Result<Vec<String>, String> {
     let output = git_diff(
         root,
         base,
         head,
-        &["--name-only", "--diff-filter=ACMR", &range(base, head)],
+        &[
+            "--name-only",
+            "-z",
+            "--diff-filter=ACMR",
+            &range(base, head),
+        ],
     )?;
-    Ok(lines(&output))
+    Ok(prefix.map(&output))
 }
 
-/// Every file in `head`'s tree. `pub(super)`: `check_commit`'s own
+/// Every file in `head`'s tree, as install-root paths. `--full-tree` lists
+/// the whole tree, not only the directory `root`: `InstallPrefix::map`
+/// drops the paths outside the install. `pub(super)`: `check_commit`'s own
 /// per-commit `co-change` retroactivity guard reads a commit's PARENT
 /// tree through this same function, not a second `git ls-tree`
 /// invocation of its own.
-pub(super) fn tree_files(root: &Path, head: &str) -> Result<Vec<String>, String> {
-    let output =
-        run_git(root, &["ls-tree", "-r", "--name-only", head]).map_err(|e| stderr_headline(&e))?;
-    Ok(lines(&output))
+pub(super) fn tree_files(
+    root: &Path,
+    prefix: &InstallPrefix,
+    head: &str,
+) -> Result<Vec<String>, String> {
+    let output = run_git(
+        root,
+        &["ls-tree", "-r", "--name-only", "-z", "--full-tree", head],
+    )
+    .map_err(|e| stderr_headline(&e))?;
+    Ok(prefix.map(&output))
 }
 
-/// `path`'s content as it exists in `head`.
+/// `path`'s content as it exists in `head`. `path` is an install-root
+/// path: the `./` makes git read it from the directory `root` rather than
+/// from the git top level.
 fn show_file(root: &Path, head: &str, path: &str) -> Result<String, String> {
-    run_git(root, &["show", &format!("{head}:{path}")]).map_err(|e| stderr_headline(&e))
+    run_git(root, &["show", &format!("{head}:./{path}")]).map_err(|e| stderr_headline(&e))
 }
 
 /// One commit as the `commits` checks read it: its subject, its body, and
@@ -291,15 +306,50 @@ pub(super) fn commits_in(root: &Path, base: &str, head: &str) -> Result<Vec<Comm
 /// needs on one -- `filter_matching` over an empty slice never matches
 /// `if_changed`, so the check simply does not trigger, never a false
 /// violation. `pub(super)`: `check_commit`'s own per-commit `co-change`
-/// evaluation is the only caller. An unresolvable `sha` or a failing
-/// `git` is a named `Err`, never a panic (`houserules.crash-paths-are-named`).
-pub(super) fn changed_files_for(root: &Path, sha: &str) -> Result<Vec<String>, String> {
+/// evaluation is the only caller. The paths are install-root paths
+/// (`InstallPrefix::map`). An unresolvable `sha` or a failing `git` is a
+/// named `Err`, never a panic (`houserules.crash-paths-are-named`).
+pub(super) fn changed_files_for(
+    root: &Path,
+    prefix: &InstallPrefix,
+    sha: &str,
+) -> Result<Vec<String>, String> {
     let output = run_git(
         root,
-        &["diff-tree", "--no-commit-id", "--name-only", "-r", sha],
+        &[
+            "diff-tree",
+            "--no-commit-id",
+            "--name-only",
+            "-r",
+            "-z",
+            sha,
+        ],
     )
     .map_err(|e| stderr_headline(&e))?;
-    Ok(lines(&output))
+    Ok(prefix.map(&output))
+}
+
+/// Every top-level path one commit (`sha`) changed against any of its
+/// parents, NUL-separated and not mapped: `git diff-tree -m` prints the
+/// diff against each parent of a merge, and the same paths as plain
+/// `diff-tree` for a commit with one parent. `check_commit`'s skip decision
+/// reads it through `InstallPrefix::changes_only_outside`, so a merge that
+/// brings a path below the install root is not skipped. A failing `git` is
+/// a named `Err` (`houserules.crash-paths-are-named`).
+pub(super) fn paths_changed_against_any_parent(root: &Path, sha: &str) -> Result<String, String> {
+    run_git(
+        root,
+        &[
+            "diff-tree",
+            "--no-commit-id",
+            "--name-only",
+            "-r",
+            "-m",
+            "-z",
+            sha,
+        ],
+    )
+    .map_err(|e| stderr_headline(&e))
 }
 
 /// Every removed (`-`-prefixed, excluding the `---` file header) line in
@@ -557,6 +607,7 @@ fn self_audit_is_present(report: &Value, field: &str) -> bool {
 /// immutable `&AuditContext` while still mutating the cache on first use.
 struct AuditContext<'a> {
     root: &'a Path,
+    prefix: &'a InstallPrefix,
     base_sha: String,
     head_sha: String,
     changed: &'a [String],
@@ -583,7 +634,7 @@ impl AuditContext<'_> {
         if let Some(cached) = self.tree_cache.borrow().as_ref() {
             return Ok(cached.clone());
         }
-        let files = tree_files(self.root, &self.head_sha)?;
+        let files = tree_files(self.root, self.prefix, &self.head_sha)?;
         *self.tree_cache.borrow_mut() = Some(files.clone());
         Ok(files)
     }
@@ -891,14 +942,38 @@ fn is_controller_entry(base: &Base, id: &str) -> bool {
     raw_entry_has_tag(base, id, CONTROLLER_TAG)
 }
 
+/// The named error for an id that `--ids` or `--sanctioned` names while the
+/// base holds no active entry for it. A pack entry with an inactive status
+/// (`retired` or `superseded`) and an excluded pack entry are in the pack
+/// copy but out of the base, and each message names its cause, led by
+/// `lead`. `unknown` is the message for an id that no source ships.
+fn inactive_id_error(base: &Base, id: &str, lead: &str, unknown: String) -> String {
+    if base.inactive.contains_key(id) {
+        format!(
+            "{lead} \"{id}\" is a pack entry with status `retired` or `superseded`, \
+             which audit leaves out"
+        )
+    } else if base.excluded.contains_key(id) {
+        format!("{lead} \"{id}\" is excluded in knowledge/overrides.json, which audit leaves out")
+    } else {
+        unknown
+    }
+}
+
 /// The named error for a `--sanctioned` rule that is no row of the
-/// package. `unknown id` is for an id the knowledge base lacks, as for
-/// `--ids`. A known id is outside this audit's package, and `--ids` brings
-/// it in; the message says so, and for an entry tagged `controller` in a
-/// task audit it names the tag.
+/// package. An id with no active entry is `inactive_id_error`, which keeps
+/// `unknown id` for an id that no source ships, as for `--ids`. A known id
+/// is outside this audit's package, and `--ids` brings it in; the message
+/// says so, and for an entry tagged `controller` in a task audit it names
+/// the tag.
 fn sanctioned_outside_package_error(base: &Base, rule: &str, is_task_audit: bool) -> String {
     if !base.entries.contains_key(rule) {
-        format!("unknown id \"{rule}\" for --sanctioned")
+        inactive_id_error(
+            base,
+            rule,
+            "--sanctioned",
+            format!("unknown id \"{rule}\" for --sanctioned"),
+        )
     } else if is_task_audit && is_controller_entry(base, rule) {
         format!(
             "--sanctioned \"{rule}\" is tagged controller, so a task audit leaves it out of \
@@ -923,7 +998,8 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
     let root = &base.root;
     let base_sha = rev(root, &base_ref)?;
     let head_sha = rev(root, opts.head_ref.as_deref().unwrap_or("HEAD"))?;
-    let changed = changed_files(root, &base_sha, &head_sha)?;
+    let prefix = InstallPrefix::of(root)?;
+    let changed = changed_files(root, &prefix, &base_sha, &head_sha)?;
     let changed_refs: Vec<&str> = changed.iter().map(String::as_str).collect();
     let area_file_map =
         area_files(&changed_refs, &base.areas).map_err(|error| error.to_string())?;
@@ -953,7 +1029,7 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
         let entry = base
             .entries
             .get(id)
-            .ok_or_else(|| format!("unknown id \"{id}\""))?;
+            .ok_or_else(|| inactive_id_error(base, id, "id", format!("unknown id \"{id}\"")))?;
         package.insert(id.clone(), entry);
     }
 
@@ -976,6 +1052,7 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
 
     let ctx = AuditContext {
         root,
+        prefix: &prefix,
         base_sha: base_sha.clone(),
         head_sha: head_sha.clone(),
         changed: &changed,
@@ -1160,8 +1237,8 @@ fn parse_sanctioned(raw: Vec<String>) -> Result<Vec<(String, String)>, String> {
     Ok(pairs)
 }
 
-/// Runs the `audit` subcommand: resolves `root` (`--dir`, or the enclosing
-/// git repository's top level), loads the knowledge base there, parses
+/// Runs the `audit` subcommand: resolves `root` (`--dir`, or the nearest
+/// install root), loads the knowledge base there, parses
 /// `--ids` as a comma-separated, trimmed, non-empty list and
 /// `--sanctioned` per `parse_sanctioned`, and prints the JSON result.
 #[allow(clippy::too_many_arguments)]
@@ -1313,15 +1390,11 @@ mod tests {
         base
     }
 
+    /// The knowledge schema as the kit ships it.
     fn seed_schema() -> Value {
         let path =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../template/knowledge/schema.json");
-        let mut schema: Value =
-            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-        schema["$defs"]["area"]["enum"] = json!([
-            "global", "process", "rust", "webview", "api", "schemas", "infra", "docs"
-        ]);
-        schema
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
     }
 
     fn areas_json() -> Value {

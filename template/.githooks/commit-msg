@@ -7,12 +7,56 @@
 # that, the hook skips the check, so it never blocks a commit, and prints one
 # stderr line that names the condition it tested, never an inferred cause: a
 # skipped gate must not look like a passed one.
+# The install root is the parent of the directory that holds this hook, found
+# through the hook's own symlinks: git runs a hook that a project links into
+# `.git/hooks` by the link's path. The hook passes the root to `check-commit`
+# as `--dir`, so an install below the git top level checks its own knowledge
+# base. A parent that holds no `.houserules.json` is no install root, and a
+# root the hook cannot resolve is none either: the hook skips the check and
+# says so, as it does for a missing binary.
 set -eu
 
 msg_file="$1"
 
+# Prints the target of the symlink `$1`, byte for byte.
+read_link() {
+  if command -v readlink >/dev/null 2>&1; then
+    readlink -- "$1"
+  else
+    # Not every supported environment ships readlink. The listing ends in
+    # `<link> -> <target>`; GNU ls quotes the target unless QUOTING_STYLE is
+    # literal, and honors that variable even when its output is no terminal.
+    # shellcheck disable=SC2012
+    listing=$(QUOTING_STYLE=literal ls -ld -- "$1")
+    printf '%s\n' "${listing#* -> }"
+  fi
+}
+
+# Prints the install root of this hook; fails when it cannot resolve one.
+resolve_install_root() {
+  hook_path="$0"
+  hops=0
+  while [ -h "$hook_path" ] && [ "$hops" -lt 40 ]; do
+    link_target=$(read_link "$hook_path") || return 1
+    case "$link_target" in
+      /*) hook_path="$link_target" ;;
+      *) hook_path="$(dirname -- "$hook_path")/$link_target" ;;
+    esac
+    hops=$((hops + 1))
+  done
+  (CDPATH='' cd -- "$(dirname -- "$hook_path")/.." 2>/dev/null && pwd)
+}
+
 if houserules check-commit --help >/dev/null 2>&1; then
-  exec houserules check-commit "$msg_file"
+  if ! install_root=$(resolve_install_root); then
+    echo "commit-msg: cannot resolve the install root of the hook; check-commit skipped" >&2
+    exit 0
+  fi
+  if [ ! -f "$install_root/.houserules.json" ]; then
+    echo "commit-msg: no .houserules.json in the parent of the hook directory; check-commit skipped" >&2
+    exit 0
+  fi
+  exec houserules check-commit --dir "$install_root" "$msg_file"
 fi
 
 if command -v houserules >/dev/null 2>&1; then

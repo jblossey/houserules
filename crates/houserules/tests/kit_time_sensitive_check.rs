@@ -76,20 +76,62 @@ fn commit(root: &Path, message: &str) -> String {
     git(root, &["rev-parse", "HEAD"]).trim().to_string()
 }
 
-/// A scratch repository holding the kit that `houserules init` installs, in one
-/// base commit. Returns the directory and the base commit id.
+/// The local topic file of the scratch install: one entry whose summary and
+/// tags the tests edit. The text is fixed, so the tests can replace a piece
+/// of it.
+const TEAM_TOPIC: &str = r#"{
+  "topic": "team",
+  "title": "Team",
+  "entries": [
+    {
+      "id": "team.test-first",
+      "kind": "rule",
+      "area": "global",
+      "standing": false,
+      "summary": "Test-driven development.",
+      "body": [
+        "Write the test first."
+      ],
+      "tags": [
+        "authoring"
+      ],
+      "source": {
+        "date": "2026-10-19",
+        "by": "user"
+      }
+    }
+  ]
+}
+"#;
+
+/// A scratch repository that `houserules init` installed, with the local
+/// topic file `knowledge/team.json` (`TEAM_TOPIC`), in one base commit.
+/// Returns the directory and the base commit id.
 fn install() -> (tempfile::TempDir, String) {
     let dir = tempfile::tempdir().expect("tempdir");
     git(dir.path(), &["init", "-q", "-b", "main"]);
-    let output = houserules()
-        .args(["init", "--dir"])
+    let init = houserules()
+        .arg("init")
+        .arg("--dir")
         .arg(dir.path())
         .output()
         .expect("run init");
     assert!(
-        output.status.success(),
+        init.status.success(),
         "init failed: {}",
-        String::from_utf8_lossy(&output.stderr)
+        String::from_utf8_lossy(&init.stderr)
+    );
+    fs::write(dir.path().join("knowledge/team.json"), TEAM_TOPIC).expect("write the topic file");
+    let render = houserules()
+        .arg("render")
+        .arg("--dir")
+        .arg(dir.path())
+        .output()
+        .expect("run render");
+    assert!(
+        render.status.success(),
+        "render failed: {}",
+        String::from_utf8_lossy(&render.stderr)
     );
     let base = commit(dir.path(), "chore: init");
     (dir, base)
@@ -131,7 +173,7 @@ fn a_time_sensitive_phrase_in_a_changed_knowledge_file_draws_a_warn_row() {
         let (dir, base) = install();
         replace_in(
             dir.path(),
-            "knowledge/process.json",
+            "knowledge/team.json",
             "\"summary\": \"Test-driven",
             &format!("\"summary\": \"{phrase} test-driven"),
         );
@@ -144,7 +186,7 @@ fn a_time_sensitive_phrase_in_a_changed_knowledge_file_draws_a_warn_row() {
         assert_eq!(row["result"], "warn", "{phrase}: {row}");
         let evidence = row["evidence"].as_str().expect("evidence is a string");
         assert!(
-            evidence.starts_with("knowledge/process.json:"),
+            evidence.starts_with("knowledge/team.json:"),
             "{phrase}: {row}"
         );
     }
@@ -193,7 +235,7 @@ fn a_change_without_such_phrasing_passes_even_in_the_file_that_holds_the_pattern
     let (dir, base) = install();
     replace_in(
         dir.path(),
-        "knowledge/knowledge-base.json",
+        "knowledge/packs/knowledge-base.json",
         "\"authoring\"",
         "\"authoring\",\n        \"wording\"",
     );

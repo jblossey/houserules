@@ -5,7 +5,7 @@
 //! working tree and fails when it disagrees with the recorded one.
 //!
 //! `template/` is embedded into the shipped `houserules` binary at compile
-//! time (`houserules.payload-embeds-checkout-bytes`, `install.rs`'s
+//! time (`houserules.payload-embeds-checkout-bytes`, `install/mod.rs`'s
 //! `Payload`), so any change under it is a real product change, and
 //! release-please's own commit-to-package attribution
 //! (`CommitSplit.split`, keyed on a commit's changed file paths) only ever
@@ -42,7 +42,7 @@ use std::process::{Command, ExitCode};
 /// inside `template/` itself so it never ships to adopters.
 const STAMP_PATH: &str = "crates/houserules/payload.stamp";
 
-/// The directory this gate watches: the one payload `install.rs` embeds.
+/// The directory this gate watches: the one payload `install/mod.rs` embeds.
 const PAYLOAD_DIR: &str = "template";
 
 /// This checkout's repository root, resolved at compile time -- this

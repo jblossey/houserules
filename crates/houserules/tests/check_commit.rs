@@ -8,6 +8,8 @@
 //! pattern (a scratch git repo, the compiled binary run as a real
 //! subprocess) without claiming any parity contract.
 
+mod install_shape;
+
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -117,6 +119,7 @@ fn make_repo() -> tempfile::TempDir {
         }"#,
     );
     write_file(root, "CLAUDE.md", "# Test\n");
+    install_shape::mark_2_0(root);
     commit(root, "chore: init");
     dir
 }
