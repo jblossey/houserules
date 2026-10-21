@@ -10,8 +10,8 @@
       "standing": true,
       "summary": "Edit the kit in `template/`, then run `houserules update --dir .`; never hand-edit the root copies or the generated rules and skill.",
       "body": [
-        "This repository runs its own kit. The root copies of every `KIT_OWNED` path — `tools/`, `.claude/agents/`, and the kit skills — are the installed copy; `template/` is the source that `init` and `update` ship to every project.",
-        "`crates/houserules/tests/dogfood.rs` pins every root copy to its template source byte for byte (ported from `tests/dogfood.test.mjs`, retired at batch 20 T3, HR-047); a hand edit fails the test and is lost on the next update. `update` runs through the compiled `houserules` binary (batch 18 T6, docs/specs/2026-09-05-batch-18-phase3.md §4); `bin/houserules.mjs` retired outright at batch 20 T3 along with the rest of the JS toolchain (`houserules.payload-runs-on-builtins`).",
+        "This repository runs its own kit. The root copies of the kit-owned files and of the reference workflow's files are the installed copy; `template/` is the source that `init` and `update` ship to every project.",
+        "`crates/houserules/tests/dogfood.rs` pins every root copy to its template source byte for byte (ported from `tests/dogfood.test.mjs`, retired at batch 20 T3, HR-047); a hand edit fails the test; `update` keeps a locally modified copy and prints `kept <file> (locally modified)`, so the edit stays until the source carries it. `update` runs through the compiled `houserules` binary (batch 18 T6, docs/specs/2026-09-05-batch-18-phase3.md §4); `bin/houserules.mjs` retired outright at batch 20 T3 along with the rest of the JS toolchain (`houserules.payload-runs-on-builtins`).",
         "`houserules render` generates from `knowledge/` the houserules block of the root `AGENTS.md` and of each directory `AGENTS.md` of an area, and, with the Claude renderer enabled, `.claude/rules/*.md` and `.claude/skills/project-knowledge/SKILL.md`."
       ],
       "tags": [
@@ -490,8 +490,9 @@
       "body": [
         "Batch 21 T1 fix rounds 3-4 added three tests using std::os::unix::ffi::OsStrExt ungated; cargo check --target x86_64-pc-windows-gnu --all-targets failed E0433 in both affected test targets, so windows-latest clippy and test could not compile. The defect survived five review rounds and two controller gate sweeps because every proof ran on Linux.",
         "The crate's own precedent is the gate: install.rs, commit_msg_hook.rs, and validate_stats_audit_parity.rs all cfg-gate their os::unix uses, with a #[cfg(windows)] arm where the behavior needs a Windows equivalent.",
-        "The cheap local proxy runs in mise run lint since batch 21: cargo check --target x86_64-pc-windows-gnu --all-targets --locked, with the target provisioned by mise.toml's rust targets option. The host's green cargo test proves one OS of three.",
-        "Second layer, found on PR #14's real macos-latest run after #[cfg(unix)] shipped (the same three tests then panicked at an fs::write unwrap, Os error 92 Illegal byte sequence, since APFS rejects a non-UTF-8 filename at creation): a cfg gate names one CAPABILITY at a time, so #[cfg(unix)] covering the compiler capability (OsStrExt exists) does not cover a distinct filesystem capability (writing that name succeeds) the same test also needs and Linux alone has both of; the fix (seed via git's byte-oriented index -- git hash-object -w --stdin, git update-index --add --cacheinfo -- never a real file write) is recorded at its call site, `crates/houserules/src/rules/check.rs`'s `seed_undecodable_tracked_path`."
+        "The cheap local proxy runs in mise run lint since batch 21: cargo clippy --target x86_64-pc-windows-gnu --all-targets --locked -- -D warnings (a compile check until batch 34, when a dead-code warning passed it that the windows-latest clippy fails), with the target provisioned by mise.toml's rust targets option. The host's green cargo test proves one OS of three.",
+        "Second layer, found on PR #14's real macos-latest run after #[cfg(unix)] shipped (the same three tests then panicked at an fs::write unwrap, Os error 92 Illegal byte sequence, since APFS rejects a non-UTF-8 filename at creation): a cfg gate names one CAPABILITY at a time, so #[cfg(unix)] covering the compiler capability (OsStrExt exists) does not cover a distinct filesystem capability (writing that name succeeds) the same test also needs and Linux alone has both of; the fix (seed via git's byte-oriented index -- git hash-object -w --stdin, git update-index --add --cacheinfo -- never a real file write) is recorded at its call site, `crates/houserules/src/rules/check.rs`'s `seed_undecodable_tracked_path`.",
+        "A test that runs a shell script on Windows starts `sh`, not `bash`: `Command::new` on Windows searches the system directory before PATH, so `bash` is C:\\Windows\\System32\\bash.exe, the WSL launcher, which exits 1 with no distribution; `sh` is only on PATH, from Git for Windows (doc.rust-lang.org std::process::Command, Platform-specific behavior; batch 34 PR #84 CI)."
       ],
       "tags": [
         "tests",
@@ -511,7 +512,7 @@
       "standing": false,
       "summary": "A task-end gate run includes every check CI runs on push or pull request; a local gate list that omits a CI check is stale.",
       "body": [
-        "The contract surface is the gate list that CI runs: the jobs in `.github/workflows/ci.yml` and the `lint` and `test` tasks in `mise.toml`. A task-end gate run covers every check on it: a mingw-w64 C compiler installed first (`gcc-mingw-w64-x86-64`, needed once a `-sys` crate landed, houserules.c-toolchain-crates-need-ci-mingw), cargo fmt --check, the full suite, clippy, the cross-target check, the lint chain (shellcheck, cargo deny, both knowledge gates, render --check, the residue gate, the vacuous-exception gate, the payload-stamp gate, the dist-generate-check gate), and -- pull-request only -- a check-commit range pass (`houserules check-commit --from $(git merge-base main HEAD) --to HEAD`, ci.yml's own check-commit job) and a knowledge-base audit of the diff (`mise run audit -- --base <PR base> --head <PR head>`).",
+        "The contract surface is the gate list that CI runs: the jobs in `.github/workflows/ci.yml` and the `lint` and `test` tasks in `mise.toml`. A task-end gate run covers every check on it: a mingw-w64 C compiler installed first (`gcc-mingw-w64-x86-64`, needed once a `-sys` crate landed, houserules.c-toolchain-crates-need-ci-mingw), cargo fmt --check, the full suite, clippy, the windows-gnu cross-target clippy with `-D warnings`, the lint chain (shellcheck, cargo deny, both knowledge gates, render --check, the residue gate, the vacuous-exception gate, the payload-stamp gate, the dist-generate-check gate), and -- pull-request only -- a check-commit range pass (`houserules check-commit --from $(git merge-base main HEAD) --to HEAD`, ci.yml's own check-commit job) and a knowledge-base audit of the diff (`mise run audit -- --base <PR base> --head <PR head>`).",
         "Derive the list from .github/workflows and mise.toml, not from memory and not from an earlier report's account of the gates; when CI gains a check, the task-end list gains it in the same change. How a report narrates the gates it ran is a deliverable matter outside this rule: judge it under process.claims-match-artifacts.",
         "The check-commit range pass matters most for a per-commit knowledge check: it judges every commit back to the real merge base with main, never only a fix round's own diff, so an omission here is exactly how a per-commit check ships unrun against the range CI actually judges (batch 24 T1 fix round 6: a per-commit co-change check went unrun at CI's own --from until this entry named the job).",
         "Origin: batch 22 T1 - three review rounds closed with cargo fmt --check red at HEAD because no round's gate list named it; CI would have failed the first push."
@@ -527,6 +528,9 @@
       ],
       "see": [
         "houserules.c-toolchain-crates-need-ci-mingw"
+      ],
+      "verify": [
+        "crates/houserules/tests/ci_gate_parity.rs"
       ]
     },
     {
@@ -764,7 +768,7 @@
       "area": "tools",
       "summary": "A dependency with a C build script (a `-sys` crate) breaks the windows-gnu cross check unless ci.yml installs a mingw-w64 C compiler first.",
       "body": [
-        "Every dependency before axoupdater (HR-133, batch 27 T2) was pure Rust, so `cargo check --target x86_64-pc-windows-gnu --all-targets --locked` (houserules.platform-gated-tests' cheap proxy) never invoked a C compiler and passed on a bare ubuntu-latest runner.",
+        "Every dependency before axoupdater (HR-133, batch 27 T2) was pure Rust, so the windows-gnu cross-target build (houserules.platform-gated-tests' cheap proxy, at that time a `cargo check` of that target) never invoked a C compiler and passed on a bare ubuntu-latest runner.",
         "axoupdater's github_releases/blocking features pull in aws-lc-sys (rustls' crypto provider via reqwest): its `cc`-crate build script compiles plain C sources (jitterentropy, s2n-bignum's wrapper, BoringSSL C files) on every target it builds for, windows-gnu included, and needs a real `x86_64-w64-mingw32-gcc` on PATH to cross-compile those from ubuntu. GitHub's ubuntu-latest runner-images manifest carries no mingw-w64 package by default (checked against actions/runner-images' Ubuntu 24.04 README, 2026-09-15). Without it the build fails `error occurred in cc-rs: failed to find tool \"x86_64-w64-mingw32-gcc\": No such file or directory (os error 2)` (captured against this exact aws-lc-sys 0.45.0 before any mingw toolchain was on PATH).",
         "A separate, unrelated fact about the same crate: its windows x86_64 assembly ships as pre-generated NASM (`.asm`) objects one directory (`win-x86_64`), shared byte-for-byte by the MSVC and GNU ABIs; building them from source needs a real `nasm` executable unless the opt-in `prebuilt-nasm` feature (or `AWS_LC_SYS_PREBUILT_NASM`) is set, in which case the crate copies its own bundled `.obj` files instead. This tree already carries `prebuilt-nasm` -- not from aws-lc-sys's own default (`all-bindings`), but because rustls's and rustls-webpki's own `aws-lc-rs` feature each forward `aws-lc-rs/prebuilt-nasm` once the aws-lc-rs crypto provider is selected (confirmed with `cargo tree -e features -p aws-lc-sys`, and by rustc receiving `--cfg 'feature=\"prebuilt-nasm\"'` in a verbose `x86_64-pc-windows-gnu` build) -- so no leg anywhere in this repository ever needs a real `nasm` install; the mingw-w64 package above is for the plain C sources only.",
         "Every other target already has (or dist itself provisions) a working C compiler without any ci.yml change: macOS runners ship Xcode's command-line tools, GitHub's windows runners ship MSVC, and `dist plan --output-format=json`'s own `artifacts_matrix` runs the two musl release legs un-containerized on ubuntu-22.04(-arm) with `packages_install: apt-get install musl-tools` -- dist's own provisioning, never ci.yml's. Only houserules' own additional windows-gnu cross-check proxy (a job no other target needs, since it exists solely as a cheap Linux-hosted stand-in for a real Windows build) needed the new step.",
@@ -1045,7 +1049,8 @@
       "summary": "A multi-write migration orders its writes so that a stop between any two leaves a tree the next run finishes; the completion marker is written last.",
       "body": [
         "update's 1.x conversion writes the schema key last and tests every step's state on each run (spec C20).",
-        "Prove it with a fault at every writing syscall and a clean rerun, as batch 33 task 7's reviews did (41 of 41 stops)."
+        "Prove it with a fault at every writing syscall and a clean rerun, as batch 33 task 7's reviews did (41 of 41 stops).",
+        "The suite's proof shape is a stop-and-rerun helper, `assert_finishes_after_a_stop_at` (crates/houserules/tests/conversion.rs and crates/houserules/tests/pack_moves.rs): a new multi-write command gets the same test."
       ],
       "tags": [
         "migration",
@@ -1076,6 +1081,28 @@
         "date": "2026-10-20",
         "by": "review",
         "ref": "batch 33 task 7 implementer concern; branch review recommendation"
+      }
+    },
+    {
+      "id": "houserules.bd-runs-isolated",
+      "kind": "gotcha",
+      "area": "rust",
+      "summary": "Run every bd with its own HOME and USERPROFILE, BD_DISABLE_METRICS=1, DO_NOT_TRACK=1, and no origin remote before bd init.",
+      "body": [
+        "bd 1.3.1 reads <home>/.config/bd/config.yaml before XDG_CONFIG_HOME, writes ~/.beads, ~/.dolt and that config on its first run, and queues usage events for a vendor endpoint unless metrics are off.",
+        "bd init contacts an origin remote: with an ssh remote it can stop on a host-key prompt. Add the remote after bd init.",
+        "The rule covers every houserules command that starts bd on a Beads install (init --tracker beads, update, list, get, set, defer, archive, check-backlog, audit): give the houserules call the same HOME and USERPROFILE, because houserules passes them on.",
+        "Start bd in the scratch repository. `mise exec -C <checkout> -- bd` changes the working directory to the checkout, so bd writes its store and `[beads] role` into the checkout. Resolve the pinned binary once (`mise -C <checkout> which bd`) and call that path from the scratch repository (batch 34 live run, case 8)."
+      ],
+      "tags": [
+        "beads",
+        "testing",
+        "privacy"
+      ],
+      "source": {
+        "date": "2026-10-20",
+        "by": "review",
+        "ref": "batch 34 task 3 implementer concern 8; task 3 review issues 3 and 13"
       }
     }
   ]

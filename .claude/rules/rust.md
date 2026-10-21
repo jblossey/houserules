@@ -21,6 +21,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 ## Gotchas
 
+- [houserules.bd-runs-isolated] Run every bd with its own HOME and USERPROFILE, BD_DISABLE_METRICS=1, DO_NOT_TRACK=1, and no origin remote before bd init.
 - [houserules.clones-need-their-own-cargo-target] A scratch clone built into the same cargo target directory as its worktree overwrites the worktree's test binaries; give every clone its own CARGO_TARGET_DIR.
 - [houserules.commit-type-under-the-crate-path-decides-a-release] A feat or fix commit that touches crates/houserules/** makes release-please propose a release; a CI change or its tests use ci, test, refactor, or chore.
 - [houserules.path-pins-mirror-the-code] A test that pins a path the binary prints builds it component by component: Path::join keeps an embedded slash, and Windows alone shows the divergence.

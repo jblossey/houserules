@@ -2582,3 +2582,212 @@ Each item records the ruling with its date, or stays marked open.
     9 are those solutions. The narrowing of `process.evidence-outlives-the-session`,
     `process.tdd`, and `quality.principles` is refused. Source: owner,
     2026-10-20.
+178. **The design review repeats until no Critical finding is left -
+    ruled 2026-10-20, clarifies 5.159.** The owner, verbatim: "If the
+    reviewer returns with critical reviews, you have to fix these and
+    then dispatch another reviewer again. This repeats until no
+    criticals are left." (1) After each design review that holds a
+    Critical finding, the author fixes every finding, and a fresh
+    reviewer reviews the spec again. (2) The loop has no cap: it ends
+    with the first review that holds no Critical finding. (3) Important
+    and Minor findings are folded into the spec without a further review
+    (5.159). (4) It holds for this repository's batches and for the
+    reference workflow's designing skill (HR-144). Source: owner,
+    2026-10-20.
+179. **`process.rulings-to-file` narrows - ruled 2026-10-20 (batch-34
+    spec Q1, HR-172).** The owner chose "Narrow, refuse clause
+    (Recommended)". (1) Only a decision that changes what the spec states
+    amends the spec in the same turn; a decision inside the spec's intent
+    is recorded in the task brief or the task report, where the branch
+    review reads it. (2) HR-153's clause (a brief amendment that adds or
+    drops a test, a file, or a gate against the plan is a ruling for the
+    spec's outcomes section) is refused. (3) HR-204 item 5's batch-close
+    warn fires only for a decision that changes what the spec states.
+    177(5) ruled the stats proposals and does not cover this item, which
+    5.147(2) scheduled for this spec review. Source: owner, 2026-10-20.
+180. **Scratch GitHub repositories for live runs - ruled 2026-10-20
+    (batch-34 spec Q2).** The owner, verbatim: "You are allowed to
+    create scratch repos as long as they are private and as long as you
+    remind me to delete them." (1) The controller may create a GitHub
+    repository for a live run, such as the GitHub tracker's proof and a
+    run of the seeded CI; it is private. (2) Every report that follows
+    its creation names each such repository and reminds the owner to
+    delete it, until the owner says it is gone; houserules never deletes
+    a repository itself. (3) Batch 34's live run proves the GitHub
+    adapter and the seeded CI on such a repository. Source: owner,
+    2026-10-20.
+181. **Three plugin skills stay uncovered - ruled 2026-10-20 (batch-34
+    spec Q3, HR-199, 5.161(4)).** The owner chose "Leave all three
+    uncovered (Recommended)". The reference workflow covers no
+    counterpart of the superpowers plugin's systematic-debugging,
+    writing-skills, and diagnosing-superpowers skills: none is a
+    lifecycle phase. The migrating-knowledge skill says so; a project
+    that wants them keeps the plugin, which nothing in the kit asks for
+    or breaks. Source: owner, 2026-10-20.
+182. **Issue 38's design-phase rules ship - ruled 2026-10-20 (batch-34
+    spec Q4, HR-144).** The owner chose "Ship all four (Recommended)".
+    The process pack gains four non-standing entries that the
+    spec-reviewer template cites, so they join the reference workflow's
+    required ids: (a) a decision that rejects a library or departs from
+    the source research or an approved spec carries a captured probe,
+    the rejected option's best case, and a reversal condition; (b) each
+    supporting claim is labelled run, read, or assumed, and an assumed
+    claim is never the sole reason for a rejection; (c) a spec lists
+    every concept it takes from its sources, with the source's status
+    and a check against the goal; (d) every decision the owner or a
+    reviewer overturns is a `Reversal:` ledger line, counted at the
+    retrospective. Source: owner, 2026-10-20.
+183. **HR-153's clauses for standing rules - ruled 2026-10-20 (batch-34
+    spec Q5).** The owner ruled the nine clauses on a review page; the
+    rulings are copied in `.superpowers/sdd/2026-10-20-batch-34/clause-rulings.json`.
+    Approved, each joining its entry's body: `process.claims-match-artifacts`
+    (a fix round that re-runs or re-pins earlier evidence says so, and a
+    line citation into a regenerated evidence file is re-derived; a
+    documentation claim quotes every bearing passage and says which one
+    the measurement supports, and a duration is recomputed from its two
+    timestamps), `process.closure-claims-carry-enumeration` (a corpus of
+    deliverables is selected by content, never by file name; an
+    exception list is a closure with its own script),
+    `process.gates-cover-generated-commits` (a check added to a shipped
+    gate is walked through the installed populations and run over the
+    template at each release tag), `writing-style.code-comments` (a
+    comment on measured or third-party behavior names an openable
+    source; a doc comment written in a fix round is swept for the
+    round's vocabulary, and the fix-round dispatch names the sweep),
+    `writing-style.doc-comments` (a new caller re-opens the callee's doc
+    comment), and `process.tdd` (a RED against a stub of an
+    implementation already drafted is a `mutation` entry). Refused: the
+    code-comments clause that the controller files the knowledge entry
+    before the dispatch. Source: owner, 2026-10-20.
+184. **Issue 61's workflow-agnostic step is core - ruled 2026-10-20
+    (batch-34 spec Q6, HR-181).** The owner chose "Core step, no recipes
+    (Recommended)". (1) The step (read the rules for the files to
+    change, implement, audit, write the report) ships as a core skill,
+    `houserules-step`, that every install gets, and a core hook script
+    any workflow can call. (2) No recipe for another workflow ships:
+    issue 61's point 5 is not adopted, because naming other workflows
+    rots with their releases and a Superpowers recipe would break 5.161.
+    Source: owner, 2026-10-20.
+185. **HR-194's convenience criterion with two tiers - ruled 2026-10-20
+    (batch-34 spec Q7, amends 5.128).** The owner chose "Doesn't make a
+    task critical (Recommended)". An open deferral is a convenient
+    candidate when its files overlap the batch's planned files and
+    folding it in does not turn a non-critical task into a critical task
+    (173(1)). This replaces 5.128's "does not raise the batch's tier",
+    which no longer separates candidates once only the light and the
+    standard tier exist (172). Source: owner, 2026-10-20.
+186. **Release commits pass the every-commit entry by subject - ruled
+    2026-10-20 (batch-34 spec Q8, extends 5.138(3)).** The owner chose
+    "Also exempt by subject (Recommended)". The every-commit `Work-Item:`
+    entry exempts a commit whose subject matches `exempt_subjects`
+    (default `^chore\(.+\): release `) beside the bot-author list of
+    5.138(3), because release-please's commits are authored by whoever
+    owns its token: six of this repository's seven release commits are
+    authored by the PAT's owner. Dependabot stays exempt by author.
+    Source: owner, 2026-10-20.
+187. **The batch-34 spec is approved - ruled 2026-10-20.** The owner,
+    verbatim: "approved. write the plan, let it be reviewed until no
+    critical issues are left, then proceed to the implementation
+    autonomously for this batch." (1) The spec
+    `docs/specs/2026-10-20-batch-34-workflow-and-work-items.md`
+    (revision 4, with rulings 179 to 186) is approved with its
+    controller calls C1 to C27 and the hook commands of its section
+    4.4a. (2) The batch-34 plan is reviewed as 178 rules for a spec: a
+    fresh reviewer after each round that holds a Critical finding,
+    until a round holds none. (3) The controller then runs the batch's
+    implementation without a further owner gate: the tasks, their
+    reviews, the eval run, the live run, and the branch review. The
+    merge to main still waits for the owner's word. Source: owner,
+    2026-10-20.
+188. **houserules turns bd's usage metrics off for the bd calls it
+    makes - ruled 2026-10-20 (batch-34 Task 3 review, issue 6).** The
+    owner chose "Turn them off (Recommended)". bd 1.3.1 queues a usage
+    event (command name, bd version, platform, a machine-derived id)
+    for its vendor's endpoint on every call unless metrics are off.
+    houserules sets `BD_DISABLE_METRICS=1` and `DO_NOT_TRACK=1` on
+    every `bd` it starts, in a project and in its CI, so an adopter
+    never sends events through houserules; the Beads adapter docs say
+    so. A user's own `bd` calls keep bd's own setting. Source: owner,
+    2026-10-20.
+189. **process.skills-for-procedures drops its plugin-skill hint - ruled
+    2026-10-21 (batch-34 Task 9 review).** The owner chose "Drop the
+    sentence (Recommended)". The summary's sentence "Author it with the
+    writing-skills skill when available" names a skill of the
+    superpowers plugin, which spec 6.4 forbids; the rule stays: a
+    repeatable procedure becomes a project skill. The test that guards
+    live case 20 matches every plugin skill name of spec 6.4's table,
+    not only the plugin's name. Source: owner, 2026-10-21.
+190. **Batch 34 may merge to main without a further owner word; no
+    release - ruled 2026-10-21.** The owner, verbatim: "permission
+    granted. make sure you adhere to how we planned through the specs
+    and branches and that you don't release a version." (1) The
+    controller merges batch 34 to main, fast-forward only from the CLI,
+    once the planned lifecycle has run: every task and its review, the
+    controller steps of the plan, the eval run, the live run, the
+    branch review and its fix wave, the batch-close knowledge commit,
+    the aggregation into one to five commits, and a pull request whose
+    checks pass on all three systems. No step is skipped or reordered to
+    reach the merge. (2) No version is released: release PR #83 stays
+    unmerged until batch 37 is on main (5.99), no tag is pushed, and no
+    release workflow is run. Source: owner, 2026-10-21.
+191. **OpenSpec support ships in 2.0.0; Spec Kit follows in a minor
+    release - ruled 2026-10-21 (HR-209).** The owner, verbatim: "I want
+    support for openspec in v2.0.0 and spec kit can follow as a minor
+    release later. I want to shift to quick answers to reduce time."
+    (1) HR-209 covers OpenSpec and is part of 2.0.0; the levels of
+    compatibility and the batch it lands in are still to be ruled.
+    (2) Spec Kit support is HR-210, a minor release after 2.0.0.
+    Source: owner, 2026-10-21.
+192. **2.0.0 ships its breaking core and OpenSpec; the rest of batches
+    35 to 37 moves to 2.x minors - ruled 2026-10-21, amends 5.98, 5.101,
+    and 5.102.** The owner chose "Yes (Recommended)" for: "Ship 2.0.0
+    with the core above (HR-138, HR-152, HR-175, HR-171/197/057, HR-187
+    schema IDs, HR-176) plus OpenSpec, and move every other item of
+    batches 35-37 to 2.x minors", after a plain-language table of every
+    item's content. (1) Batch 35 is the 2.0 contract batch: HR-138,
+    HR-152, HR-175, HR-176, HR-171, HR-197, HR-057, and HR-187's schema
+    ids (versioned schemas for the documents 2.0 emits). (2) Batch 36 is
+    OpenSpec (HR-209) and carries the upgrade-path live proof that batch
+    37 held; it is the last batch of 2.0.0, and release PR #83 stays held
+    until it is on main. Batch 37 is dropped. (3) The other items keep
+    their bodies, leave their batch, and take milestone `2.x`: HR-042,
+    HR-139, HR-163, HR-164, HR-173, HR-183, HR-188, HR-072, HR-141,
+    HR-148, HR-158, HR-174, HR-179, HR-185, HR-186, HR-189, HR-190,
+    HR-192, HR-193, and HR-211 (HR-187's MCP server and recipes). Nothing
+    is lost (5.100): each stays open in the backlog. The GitHub issues of
+    the moved items stay open past 2.0.0. Source: owner, 2026-10-21.
+193. **The 2.0.0 cut, revised by the owner - ruled 2026-10-21, amends
+    192.** The owner, verbatim: "HR-188, 183, 158, 141 (because it is in
+    progress), 148, 185, 179, 186, 190 (because it fits openspec), 192 must
+    be v2.0.0. The rest is accepted as recommended as the new cut. Upon
+    release of 2.0.0 i want the github issues to be commented on with what
+    part is covered and what follows." (1) 2.0.0 holds 192's core
+    (HR-138, HR-152, HR-175, HR-176, HR-171, HR-197, HR-057, HR-187's
+    versioned schemas), OpenSpec (HR-209), and HR-188, HR-183, HR-158,
+    HR-141, HR-148, HR-185, HR-179, HR-186, HR-190, HR-192. (2) 2.x keeps
+    HR-042, HR-139, HR-163, HR-164, HR-173, HR-072, HR-174, HR-189,
+    HR-193, and HR-211. (3) At the 2.0.0 release, each GitHub issue that a
+    2.0.0 or 2.x item names gets a comment stating which part 2.0.0
+    covers and which part follows, and in which item (HR-212). (4) The
+    controller lays the 2.0.0 items into batches by theme (5.101's
+    method): 35 audit and checks, 36 evidence and report claims, 37 the
+    per-change review layer, 38 OpenSpec with HR-190 and the
+    upgrade-path live proof, the last batch of 2.0.0; release PR #83 stays
+    held until batch 38 is on main. Source: owner, 2026-10-21.
+194. **HR-173 joins 2.0.0 by itself when HR-183 needs it - ruled
+    2026-10-21.** The owner, verbatim: "If it can't be tested without the
+    runner, the runner should automatically join v2.0.0." When batch 35's
+    spec or plan finds that HR-183's runner contract cannot be tested
+    without the exit-code runner of HR-173, HR-173 moves into batch 35
+    with no further owner ruling; the spec records the finding and its
+    probe. Otherwise HR-173 stays 2.x. Source: owner, 2026-10-21.
+195. **An adopter's batch workspaces are gitignored from the start -
+    ruled 2026-10-21.** The owner, verbatim: "workspaces should be
+    gitignored from the start in adopters." Context: adopters report that
+    the workspaces grow large and that check-knowledge in CI fails a
+    `verify` path into a gitignored workspace (HR-213, batch 35). The kit
+    gives the workspaces a gitignored home from the first install, the way
+    this repository keeps `.superpowers/` out of git; batch 35's spec names
+    the location, how `init` and `update` write the ignore line, how an
+    install that tracks its workspaces today moves, and what a `verify`
+    path into a workspace becomes. Source: owner, 2026-10-21.

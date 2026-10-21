@@ -53,26 +53,6 @@
       }
     },
     {
-      "id": "knowledge-base.state-only-the-source",
-      "fields": {
-        "body": [
-          "Invented claims read plausibly; that is what makes them dangerous.",
-          "When two sources disagree, read the code and record which one the entry follows.",
-          "A shipped template or seed names no root-only id, path, or command; verify every reference resolves in a fresh install before syncing the root copy (batch 7 task 3).",
-          "Run every command block you ship exactly as printed, top to bottom, in the environment the reader will have (a fresh directory for a quick start). A block that needs unstated context, or that resolves differently than printed (an unpinned git spec), fails this rule (batch 13: a quick start that exited 1 as printed, an install form floating to the default branch, a kit-only mechanism shipped as generic).",
-          "The walk includes a control: when a line looks optional, re-run the block without it and confirm the block then fails — that proves the line load-bearing instead of decorative (batch 18 T6 r2: the quick start's `houserules update --dir .` line was proven load-bearing by exactly this control). Sweeps keyed on deleted-tool names miss claims keyed on surviving names (batch 18 branch review: a design-doc aside naming `bin/houserules.mjs` escaped a sweep that grepped for the deleted wrappers); sweep for the claim's subject too.",
-          "A corrected measurement sweeps its dependents: when a sentence is corrected, re-open every sentence that cites, paraphrases, or leans on it — not only the lines the round edited; antecedents drift when their referent is repaired (batch 19 T2 r2, README:110).",
-          "An amendment re-derives the entry's summary from the amended body before filing - the summary is the half that renders into the loaded rules files, so a stale summary ships wider than the body it contradicts (batch 20 T3: two amended entries kept summaries their own new bodies had overturned; batch 20 T4: two shipped doc comments stated non-facts their own commits made false).",
-          "Before shipping a uniqueness or attribution sentence ('the only', 'caused by'), run the enumeration that would falsify it against the tree at HEAD - batch 21's two instances (a misattributed gate failure; a false only-bin-that-walks claim) were each falsifiable by one grep the writer did not run.",
-          "A rewritten doc comment is teaching prose under this rule: re-derive caller counts, uniqueness claims, and cross-references from the tree at the revision under edit, never from the pre-rewrite text or another agent's summary (batch 22 T3a/T3c).",
-          "Prose stating an invariant about commit history ('always', 'never', 'by the time it reaches main') enumerates every author class that writes such commits - bot-authored release and dependency commits included; a release-please extra-files commit falsified one such 'always' in batch 24.",
-          "When a commit closes an item, grep the tracked docs for that item's id in the same commit: the closing commit owns every sentence that scheduled the work (batch 24 close, three occurrences of the same forward-reading class).",
-          "A premise in a spec or a brief about what another module does is a claim: open that module's doc or code before a doc comment or a dispatch restates it (batch 28 task 6: 'update overwrites kit-owned files' went from the spec into the brief, a module doc, and the README, while `update` keeps a locally modified file).",
-          "One quoted message for two runs is two claims: copy the text from the log of each run (batch 28: the CodeQL message of PR 34 has its two versions in the other order than the quote taken from PR 33)."
-        ]
-      }
-    },
-    {
       "id": "knowledge-base.summary-is-the-rule",
       "fields": {
         "check": {
@@ -83,7 +63,7 @@
             "template/knowledge/**/*.json",
             "template/packs/**/*.json"
           ],
-          "pattern": "\\b(toda[y]|curren[t]ly|for no[w]|at the mo[m]ent)\\b|\\bunti[l]\\b[^.;:]{0,40}\\b(ships?|lands?)\\b",
+          "pattern": "\\b(toda[y]|curren[t]ly|for no[w]|at the mo[m]ent)\\b|\\bunti[l]\\b(?:[^.;:]|\\.\\d){0,40}\\b(ships?|lands?)\\b",
           "flags": "i",
           "scope": "changed"
         }
@@ -131,19 +111,6 @@
     {
       "id": "process.claims-match-artifacts",
       "fields": {
-        "body": [
-          "The recurring failure is not fabrication but drift: the work is right while the sentence describing it cites a capture that is not there, quotes a line the capture lost, or keeps a rationale a later verification overturned (batch 16 tasks 2 and 5).",
-          "The check is mechanical: for each named file, open it; for each quoted line, grep it; for each number, recompute it from the artifact. A reviewer does exactly this, so a report that skips it converts Minor findings into review rounds.",
-          "A reversed trend is worth recording too: name the pattern in the review when it appears, and name its reversal when a later round demonstrates it (batch 16 task 2 round 2).",
-          "A SHIPPED doc or comment sentence stating a measurement is a claim like a report sentence (ruled batch 18): it cites a retained capture at a durable path, and a fix round's sweep re-opens every doc sentence the round touched. The report-claims checker cannot see shipped files — the manual sweep is the only net there.",
-          "A command field is the literal command copied from the terminal — never retyped, never annotated inline; labels and notes go beside the field (ruled batch 19: the class failed four review rounds). A reviewer paste-runs command fields; a field that cannot paste-run is a finding by itself.",
-          "Close every report by running the report-claims checker (`houserules check-report-claims <REPORT_FILE>`) over the report file after the last edit, and paste its clean run as the final tests entry. The checker is a floor, not a substitute for the manual sweep: its Limits section (crates/houserules/src/report_claims.rs, reachable only where this kit's own source lives) names what only the sweep catches; an adopter repo carries no such source, so there a false positive is disclosed per report and reported upstream instead. It ships as a `houserules` subcommand (HR-066, batch 20 T2), so the closing act runs in every adopter repo, not only the one that built it. The checker gates gitignored workspace reports, never a tracked artifact a CI job could see, so it carries no CI job of its own -- the implementer template's closing-act mandate (HR-060) is the whole mechanism.",
-          "A commit message body is a claim like a report sentence: recompute its counts from the artifact before committing; a wrong count found post-commit is recorded in the report for aggregation to carry, never amended and never left silent (batch 20 carried five such corrections; commit prose was the largest surviving drift surface once the checker gated reports).",
-          "After any world-changing event - a fix round, an interruption, a rebase - re-derive every count and summary-scope field (implemented, self_review, doc comments citing measurements) from the tree at HEAD before re-submitting; a carried-forward sentence is a new claim, never trusted (batch 21: all four tasks failed this at least once; the interruption seam cost a full review round).",
-          "A claim about a failure names whether it was OBSERVED or INFERRED - a commit body keeps the same observed-vs-reconstructed split its report keeps (batch 21 branch-fix 2: the report drew the split correctly while a local-history commit body collapsed it into one 'panicked').",
-          "Five drift classes, each caught only by re-derivation across batch 22's five tasks: a rewritten command string that was never run as written; a count not re-measured after the change; a citation carrying a stream index where a file line belongs; a false universal ('every', 'all') no enumeration was run for; and a transcription of another agent's wording whose particulars were never checked against the tree.",
-          "Re-derive every sentence from the tree at the final HEAD immediately before the report ships; a sentence carried from a draft, a review, or a dispatch is re-derived before it lands."
-        ],
         "source": {
           "date": "2026-09-04",
           "by": "review",
@@ -154,14 +121,6 @@
     {
       "id": "process.closure-claims-carry-enumeration",
       "fields": {
-        "body": [
-          "Born from the batch 17 argv-closure arc: every unenumerated closure sentence was false in at least one direction, and each fix was a script whose output the sentence could then cite.",
-          "The enumeration lives at a path that outlives the session and reruns cleanly; its own summary line states the counts the claim cites, so a reader checks the artifact, not the prose.",
-          "A migration or flip closure names its zero-hit sweep of the RETIRED form (the grep pattern and its variants), rerunnable at HEAD; the enumeration is of the old form's residue, not the new form's presence (ruled batch 19: presence enumerations confirm known work, only residue sweeps falsify closure — batch 18 T6 and batch 19 T2 both failed this way).",
-          "The enumeration artifact is executable: a script whose own run prints the counts the claim cites, not a static dump or a hand-asserted mapping (batch 20: an asserted mapping hid a live coverage drop; grep dumps matched no command at HEAD until an executable sweep replaced them; a /tmp list failed durability until the comparison reran from git history).",
-          "The enumeration's pattern derives from the claim's SUBJECT, widened to every spelling the corpus itself uses - run a spelling-discovery probe first and retain it - never from one artifact's name (batch 21: a name-keyed sweep missed six subject-spelling lines; a /tmp-only regex missed six scratchpad citations; a hand-asserted home list omitted a live home).",
-          "The enumeration names its corpus AND its pattern classes, and the pattern set derives from the corpus's own spellings: run a spelling-discovery probe first and retain it beside the verification script. Batch 22 hit all three failure sub-shapes - a spelling the pattern never tested for, an assigned file absent from the file list, and a marker class the script's own header claimed but did not encode."
-        ],
         "source": {
           "date": "2026-09-05",
           "by": "user",
@@ -438,21 +397,6 @@
       }
     },
     {
-      "id": "process.tdd",
-      "fields": {
-        "body": [
-          "Data-only and docs-only changes carry no RED/GREEN. The report's `tests` names the gates that ran instead (`kb check`, `backlog check`, `validate`, render drift, lint); the reviewer judges their sufficiency.",
-          "A data change with a testable consumer — a check pattern with a regression test, a rendered artifact a test pins — is a code change for this rule: the consumer test comes first.",
-          "A new test for behavior that is already correct proves it can fail through a deliberate, disclosed mutation, not a natural RED.",
-          "Never fabricate a cycle: an empty `tdd` with named gates is honest evidence; a manufactured RED is not.",
-          "A fix round that narrows or widens matching behavior carries its own RED or counter-example test. A cycle captured after the commit says so in the report's tdd entry and presents the runs in the order they really happened.",
-          "When no assertion can change (an output-noise or report-only fix), disclosed before/after captures of the observable difference are the honest evidence, presented in the order they ran.",
-          "The `mode` label follows when the shown run happened, not the failure's flavor: `natural` only when the shown RED ran pre-commit; a post-hoc recapture is `reconstructed` and the tdd entry says so; a disclosed-mutation proof is `mutation`.",
-          "Two label failures are ruled (batch 18): a mutation proof's RED shows the test FAILING under the mutation — a capture showing the tests passing proves nothing; and a post-commit recapture is `reconstructed` regardless of what also ran earlier — the label follows the shown run, and one report uses one label for one procedure."
-        ]
-      }
-    },
-    {
       "id": "process.verify-in-persisted-state",
       "fields": {
         "body": [
@@ -530,10 +474,7 @@
           "date": "2026-09-02",
           "by": "user",
           "ref": "owner instruction of 2026-09-02, batch 7"
-        },
-        "see": [
-          "process.no-tech-debt"
-        ]
+        }
       }
     },
     {
@@ -573,10 +514,6 @@
           "A dedicated compliance pass over the existing codebase is its own backlog item; new code complies immediately.",
           "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test; an auto-restore setting covers only spies, so a mock created in a module-mock factory gets its own explicit afterEach reset.",
           "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided (batch 16: the glob translator missed nested braces and panicked; the regex scan flipped four verdicts against V8)."
-        ],
-        "see": [
-          "process.no-tech-debt",
-          "security-hygiene.dependency-vetting"
         ]
       }
     },
@@ -615,19 +552,6 @@
       }
     },
     {
-      "id": "writing-style.doc-comments",
-      "fields": {
-        "body": [
-          "A doc comment states what the item is for, its invariants, and what it returns or raises when the signature does not say so. It never restates the signature.",
-          "Conventions: TSDoc in TypeScript, JSDoc in JavaScript, rustdoc in Rust, docstrings in Python — the language's standard form.",
-          "Self-documenting code first: full words, verbs for functions, `is`/`has` for booleans, no abbreviation a newcomer must decode, one meaning per name. A comment that explains a name means the name is wrong.",
-          "Comments inside a body still follow writing-style.code-comments: only for a constraint the code cannot show.",
-          "A doc comment stating a behavior ('returns tracked files', 'exits 0 on clean') is a claim under process.claims-match-artifacts - re-read it against the symbol at HEAD in the same pass that edits the symbol (batch 21 T1: a function documented as the tracked-file list walked the whole disk).",
-          "A rewrite re-resolves, in the same commit, every cross-reference to a section, file, or symbol it deletes or renames; the dangling-cross-reference class recurred in three of batch 22's five tasks."
-        ]
-      }
-    },
-    {
       "id": "writing-style.instructions-cover-the-state-space",
       "fields": {
         "area": "template",
@@ -659,5 +583,10 @@
       }
     }
   ],
-  "exclusions": []
+  "exclusions": [
+    {
+      "id": "process.every-commit-names-a-work-item",
+      "reason": "opt-in"
+    }
+  ]
 }

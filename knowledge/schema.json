@@ -124,6 +124,26 @@
           "type": "integer",
           "minimum": 1
         },
+        "require_trailer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exempt_authors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "exempt_subjects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
         "if": {
           "$ref": "#/$defs/glob"
         },

@@ -56,7 +56,8 @@
       "body": [
         "Batch 24 shipped a payload-stamp mechanism (tree gate + per-commit co-change + range co-change) proven against 40 human-authored commits, while release-please-config.json's own extra-files entry scheduled a bot commit to template/** that trips all three, plus the dogfood version-stamp test -- discovered only at the branch review.",
         "The walk is cheap: enumerate the automation that writes commits to this repository (release-please, Dependabot, the restamp step), list the exact files each writes, and run the new check's predicate against those file sets.",
-        "Extended 2026-09-13 (owner, design.md 5.78): the walk covers generated RESOURCES too -- releases, tags, PRs -- with one named owner per resource. The T2 create-collision (design.md 5.77) was two automations both creating the v0.3.0 release object; the commit-class walk alone missed it the same day this rule shipped."
+        "Extended 2026-09-13 (owner, design.md 5.78): the walk covers generated RESOURCES too -- releases, tags, PRs -- with one named owner per resource. The T2 create-collision (design.md 5.77) was two automations both creating the v0.3.0 release object; the commit-class walk alone missed it the same day this rule shipped.",
+        "A check added to a shipped gate is walked through the installed populations, and the new predicate runs over the template at each release tag (design.md 183)."
       ],
       "tags": [
         "gates",
@@ -90,7 +91,11 @@
         "date": "2026-10-19",
         "by": "user",
         "ref": "design.md 170, 172(6)"
-      }
+      },
+      "status": "retired",
+      "see": [
+        "process.batches-measure-cost"
+      ]
     },
     {
       "id": "process.critical-tasks-test-first",
@@ -116,7 +121,8 @@
         "process.no-full-tier",
         "process.tdd",
         "process.fix-round-verification-record"
-      ]
+      ],
+      "status": "retired"
     },
     {
       "id": "process.no-full-tier",
@@ -144,7 +150,8 @@
         "process.bounded-review-loop",
         "process.full-tier-measures-cost",
         "process.critical-tasks-test-first"
-      ]
+      ],
+      "status": "retired"
     },
     {
       "id": "process.fresh-fix-round-implementers",
@@ -163,6 +170,139 @@
         "date": "2026-10-20",
         "by": "review",
         "ref": "batch 33 branch review recommendation; progress.md usage rows"
+      },
+      "see": [
+        "process.full-tier-measures-cost"
+      ]
+    },
+    {
+      "id": "process.release-pr-held-until-the-last-batch",
+      "kind": "rule",
+      "area": "process",
+      "summary": "When a release spans several batches, its release-please PR stays unmerged until the last batch is on main; never offer it as a merge before then.",
+      "body": [
+        "release-please opens the release PR as soon as main holds a release-worthy commit, so the PR exists from the first batch on and grows with each one.",
+        "The owner rules the hold in the release's meta-spec (design.md 5.99 for 2.0.0): the held PR is the only gate on adopters, and the last batch's branch review re-checks the release's coverage before it merges.",
+        "A batch close report lists the open release PR as held, with the batch that releases it; it never lists it as a merge to decide."
+      ],
+      "tags": [
+        "release",
+        "git",
+        "controller"
+      ],
+      "source": {
+        "date": "2026-10-20",
+        "by": "user",
+        "ref": "owner correction at the batch-33 close; design.md 5.99"
+      },
+      "verify": [
+        "docs/specs/2026-10-15-release-2-0-0-meta-spec.md"
+      ]
+    },
+    {
+      "id": "process.design-review-until-no-critical",
+      "kind": "rule",
+      "area": "process",
+      "summary": "A spec's design review repeats with a fresh reviewer after each round that holds a Critical finding, until a round holds none.",
+      "body": [
+        "Fix every finding of the round first. Important and Minor findings are folded into the spec without a further review (design.md 5.159).",
+        "The loop has no cap; the owner sees the spec only after a round with no Critical finding (design.md 178)."
+      ],
+      "tags": [
+        "review",
+        "design",
+        "controller"
+      ],
+      "source": {
+        "date": "2026-10-20",
+        "by": "user",
+        "ref": "design.md 178"
+      }
+    },
+    {
+      "id": "process.scratch-repos-are-private-and-reported",
+      "kind": "rule",
+      "area": "process",
+      "summary": "A GitHub repository created for a live run is private, and every later report names it with a reminder to delete it until the owner says it is gone.",
+      "body": [
+        "The owner allows scratch repositories for live runs on these two conditions (design.md 180).",
+        "houserules and its agents never delete a repository; deleting is the owner's step. Record each repository's name and creation in the batch ledger."
+      ],
+      "tags": [
+        "live-run",
+        "github",
+        "controller"
+      ],
+      "source": {
+        "date": "2026-10-20",
+        "by": "user",
+        "ref": "design.md 180"
+      }
+    },
+    {
+      "id": "process.refused-commands-hand-back",
+      "kind": "rule",
+      "area": "process",
+      "summary": "A command the harness refuses is never run another way: no script, no wrapper. The agent stops that step, names it in its report, and hands it back.",
+      "body": [
+        "The person who runs the work then runs the step in their own session, or asks the owner. A live run that needs a refused command, such as git in a scratch repository, goes back the same way.",
+        "Every brief carries this rule. A report that discloses a wrapped refused command is a review finding, and its captures count as unverified until the step is re-run by the person who runs the work.",
+        "One handed-back step the controller takes over: a `git commit` that the harness refused an agent in the agent's own worktree. The controller commits the agent's staged change with the message the agent wrote, then lets the agent finish its step (owner, 2026-10-21: \"you should take over the committing because you are allowed to\")."
+      ],
+      "tags": [
+        "permissions",
+        "dispatch"
+      ],
+      "source": {
+        "date": "2026-10-21",
+        "by": "user",
+        "ref": "owner ruling in chat, batch 34 (refused commands)"
+      }
+    },
+    {
+      "id": "process.implementer-model-per-task",
+      "kind": "rule",
+      "area": "process",
+      "summary": "Watch whether haiku implementers draw extra review rounds; when haiku is not a good fit, pick per task: haiku for a simple task, sonnet otherwise.",
+      "body": [
+        "Watch: the ledger row of every implementer dispatch names its model, and its close line states the review's findings by severity, the fix rounds, and the re-reviews. A haiku task that draws a Critical or Important finding, or a fix round that a sonnet task of the same kind would not need, counts against haiku.",
+        "Decide per task, at dispatch time: a simple task (few files, a spec that fixes the exact output, no interface that other tasks consume) may run on haiku; every other task runs on sonnet. Record the choice and its reason in the dispatch's ledger row.",
+        "Report the haiku observations to the owner at batch close.",
+        "Owner, 2026-10-21: \"I want you to keep an eye on whether haiku brings enough quality as an implementer or if haiku provokes many review rounds. If Haiku is not a good fit, decide case-by-case if the task is simple enough for haiku or is sonnet should be used.\""
+      ],
+      "tags": [
+        "dispatch",
+        "models",
+        "controller"
+      ],
+      "see": [
+        "process.model-policy"
+      ],
+      "source": {
+        "date": "2026-10-21",
+        "by": "user",
+        "ref": "owner ruling in chat, batch 34 (haiku implementer)"
+      }
+    },
+    {
+      "id": "process.batches-measure-cost",
+      "kind": "procedure",
+      "area": "process",
+      "summary": "Every batch measures its token and time cost per phase and per dispatch, so a later process change can be compared with an earlier batch.",
+      "body": [
+        "Keep `<workspace>/efficiency-windows.json` current: one window (`phase`, `start`, `end`, UTC) per phase: spec, plan, each task wave with its reviews and fix rounds, the live run, and the branch review.",
+        "Run `python3 -I .superpowers/sdd/2026-10-10-batch-33/efficiency.py <workspace>` at each phase end and save the output as `<workspace>/efficiency.json`. It sums the controller's model usage (main-session assistant messages, each message id once) and the subagent dispatches that finished in each window (tokens, tool uses, duration), plus wall-clock time.",
+        "Record every dispatch's tokens, tool uses, and duration from its completion notification in the ledger row that closes it.",
+        "The baseline is batch 33, the first full-tier batch measured this way, and `efficiency-baseline.json` (every dispatch of batches 28 to 33 that the transcripts hold; a dispatch whose call the transcripts lost has no role). Compare a later batch per phase and per dispatch with it, never as one total."
+      ],
+      "tags": [
+        "controller",
+        "cost"
+      ],
+      "source": {
+        "date": "2026-10-21",
+        "by": "user",
+        "ref": "design.md 172(6); replaces process.full-tier-measures-cost"
       },
       "see": [
         "process.full-tier-measures-cost"

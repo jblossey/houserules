@@ -94,8 +94,8 @@
       "summary": "2.0.0, batch 1 of 5: the knowledge layer - packs and upstream packs, render targets, the subdirectory install, the seed and default-branch fixes, and the start of the upgrade machinery.",
       "kickoff": "docs/specs/2026-10-19-batch-33-knowledge-layer.md",
       "status": {
-        "state": "in-progress",
-        "text": "Built and reviewed 2026-10-20 under the approved spec and plan (design.md 5.169, 5.170): nine tasks, the eval run (15 of 15), a live run of every spec 16 case (20 of 20, case 17 with its accepted red), and the branch review on opus with its fix wave. The owner purged the full tier mid-batch (172, 173); Task 9 and the batch close ran the standard tier. HR-182 stays partial (5.152 ships in batch 34). The merge to main waits for the owner."
+        "state": "done",
+        "text": "Built and reviewed 2026-10-20 under the approved spec and plan (design.md 5.169, 5.170): nine tasks, the eval run (15 of 15), a live run of every spec 16 case (20 of 20, case 17 with its accepted red), and the branch review on opus with its fix wave. The owner purged the full tier mid-batch (172, 173); Task 9 and the batch close ran the standard tier. HR-182 stays partial (5.152 ships in batch 34). Merged to main 2026-10-20 through PR #82 after four Windows CI fix rounds; the release PR (#83) stays held until batch 37 (5.99)."
       }
     },
     {
@@ -115,71 +115,87 @@
         "HR-198",
         "HR-199"
       ],
-      "summary": "2.0.0, batch 2 of 5: the workflow and work items - the reference workflow, the work-item contract, the design-phase review gate, and the template and skill riders.",
-      "kickoff": "the owner's rulings of 2026-10-15 (design.md 5.97 to 5.102) and the meta-spec docs/specs/2026-10-15-release-2-0-0-meta-spec.md",
+      "summary": "2.0.0, batch 2 of 6: the workflow and work items - the reference workflow, the work-item contract, the design-phase review gate, and the template and skill riders.",
+      "kickoff": "docs/specs/2026-10-20-batch-34-workflow-and-work-items.md",
       "status": {
-        "state": "planned",
-        "text": "Rows ruled 2026-10-15 (design.md 5.102); HR-194 added 2026-10-16 (design.md 5.127); HR-196 added 2026-10-16 (design.md 5.137). HR-172 added 2026-10-16 (design.md 5.147). HR-198 added 2026-10-19 (design.md 5.154); HR-199 added 2026-10-19 (design.md 5.161). Its spec starts after batch 33 merges."
+        "state": "done",
+        "text": "Merged ff-only after the planned lifecycle, with no release (design.md 190); acceptance by the owner follows the rollout."
       }
     },
     {
       "number": 35,
       "items": [
         "HR-183",
-        "HR-173",
-        "HR-163",
+        "HR-188",
         "HR-175",
-        "HR-139",
         "HR-176",
         "HR-138",
         "HR-152",
-        "HR-164",
-        "HR-188",
-        "HR-042"
+        "HR-213",
+        "HR-214",
+        "HR-215",
+        "HR-216",
+        "HR-218",
+        "HR-219",
+        "HR-220",
+        "HR-221",
+        "HR-222",
+        "HR-224"
       ],
-      "summary": "2.0.0, batch 3 of 5: audit and its checks - the check runner contract, the mechanized rules, report-field content checks, and the audit and stats fixes.",
+      "summary": "2.0.0: audit and its checks - the runner contract for external tools, promotion proposals, report-field content checks, the self_audit comparison, and the stats and evidence fixes.",
       "kickoff": "the owner's rulings of 2026-10-15 (design.md 5.97 to 5.102) and the meta-spec docs/specs/2026-10-15-release-2-0-0-meta-spec.md",
       "status": {
         "state": "planned",
-        "text": "Rows ruled 2026-10-15 (design.md 5.102). HR-042 added 2026-10-16 (design.md 5.147). Its spec starts after batch 34 merges."
+        "text": "Rows ruled 2026-10-21 (design.md 193). Its spec starts after batch 34 merges."
       }
     },
     {
       "number": 36,
       "items": [
         "HR-171",
+        "HR-197",
         "HR-057",
         "HR-158",
-        "HR-174",
-        "HR-148",
-        "HR-072",
         "HR-141",
-        "HR-197"
+        "HR-148"
       ],
-      "summary": "2.0.0, batch 4 of 5: evidence and report claims - capture and evidence by reference, and the check-report-claims fixes.",
+      "summary": "2.0.0: evidence and report claims - capture and evidence by reference with byte-exact excerpts, generated report facts, and the citation checks.",
       "kickoff": "the owner's rulings of 2026-10-15 (design.md 5.97 to 5.102) and the meta-spec docs/specs/2026-10-15-release-2-0-0-meta-spec.md",
       "status": {
         "state": "planned",
-        "text": "Rows ruled 2026-10-15 (design.md 5.102); HR-197 added 2026-10-16 (design.md 5.137). Its spec starts after batch 35 merges."
+        "text": "Rows ruled 2026-10-21 (design.md 193). Its spec starts after batch 35 merges."
       }
     },
     {
       "number": 37,
       "items": [
-        "HR-193",
         "HR-179",
         "HR-185",
-        "HR-190",
         "HR-186",
         "HR-192",
-        "HR-189",
         "HR-187"
       ],
-      "summary": "2.0.0, batch 5 of 5: the per-change review layer - merge-base rules and protected paths, the evidence bundle and packet, links, review tiers, the change record, escapes, and interop; the upgrade-path live proof.",
+      "summary": "2.0.0: the per-change review layer - the PR evidence bundle and packet, review tiers, the change record, and versioned schemas for the documents 2.0 emits.",
       "kickoff": "the owner's rulings of 2026-10-15 (design.md 5.97 to 5.102) and the meta-spec docs/specs/2026-10-15-release-2-0-0-meta-spec.md",
       "status": {
         "state": "planned",
-        "text": "Rows ruled 2026-10-15 (design.md 5.102). Its spec starts after batch 36 merges."
+        "text": "Rows ruled 2026-10-21 (design.md 193). Its spec starts after batch 36 merges."
+      }
+    },
+    {
+      "number": 38,
+      "items": [
+        "HR-209",
+        "HR-190",
+        "HR-212",
+        "HR-217",
+        "HR-223"
+      ],
+      "summary": "2.0.0, the last batch: OpenSpec support (HR-209) with spec and session links in the audit (HR-190), the upgrade-path live proof, and the issue comments of the release (HR-212).",
+      "kickoff": "the owner's rulings of 2026-10-15 (design.md 5.97 to 5.102) and the meta-spec docs/specs/2026-10-15-release-2-0-0-meta-spec.md",
+      "status": {
+        "state": "planned",
+        "text": "Rows ruled 2026-10-21 (design.md 193). Its spec starts after batch 37 merges."
       }
     }
   ]

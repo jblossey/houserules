@@ -13,16 +13,17 @@
         "The security-hygiene.dependency-vetting deterministic trigger keys on package manifests only, so a diff adding googleapis/release-please-action@v5.0.0 — third-party code running with contents:write — showed 'not triggered' and the batch 11 T3 reviewer had to file the missing vetting record by hand.",
         "Fix: extend the trigger — a diff that adds or changes a `uses:` reference under .github/workflows/ requires dependency_vetting with the workflow file in manifests and the action reference in dependencies. Requires the owner's ruling first: the check lives on a STANDING entry (both knowledge copies) and the runner change lives in crates/houserules/src/rules/audit.rs's `run_check` (batch 20 T3 retired template/tools/kb.mjs, the runner's pre-rewrite home).",
         "Source: batch 11 branch review, violated_rules 2 and template_defects 2 (2026-09-03). Standing-entry change: OWNER RULING PENDING, listed in the batch 11 report.",
-        "Owner ruling 2026-10-16 (design.md 5.147, meta-spec O13): joins batch 35 (2.0.0, batch 3 of 5); the trigger change ships as a security-hygiene pack version through the runner port, and its standing-entry ruling is taken at the batch-35 spec review (D10)."
+        "Owner ruling 2026-10-16 (design.md 5.147, meta-spec O13): joins batch 35 (2.0.0, batch 3 of 5); the trigger change ships as a security-hygiene pack version through the runner port, and its standing-entry ruling is taken at the batch-35 spec review (D10).",
+        "Moved out of 2.0.0 to a 2.x minor release by the owner's ruling of 2026-10-21 (design.md 192)."
       ],
       "tags": [
         "tools",
         "audit",
         "standing"
       ],
-      "milestone": null,
+      "milestone": "2.x",
       "status": "open",
-      "batch": 35
+      "batch": null
     },
     {
       "id": "HR-053",
@@ -100,11 +101,12 @@
       "title": "Narrow check-report-claims' paste-run lint: quote-aware placeholder, $(...)-aware tokenizer",
       "body": [
         "Batch 20 T2 fix round 1 review, important findings 3-4: the paste-run lint (HR-071) ships with two measured false-positive vehicles, both disclosed as Limits bullets in crates/houserules/src/report_claims.rs rather than narrowed. (1) The appended-annotation check's subshell exemption only covers a `(...)` wrapping the WHOLE command; a chained `cmd1 && (cmd2)` reads as an appended annotation instead — .superpowers/sdd/2026-09-04-batch-17/task-2-report.json live_run[8] is a real instance the shipped checker flags. (2) The placeholder check ignores quote_mask's state entirely, so a quoted angle-bracket literal that is command DATA (an HTML-comment probe, or a `Co-Authored-By: ... <email>` trailer this repository's own standing no-coauthor rule guarantees will keep generating) misreads as a placeholder — the lint's most frequent false positive at filing time: 5 instances across 4 workspace reports.",
-        "The narrowing: (a) a quote-aware placeholder arm in find_placeholder, skipping any span quote_mask already marks as inside a quoted string; (b) a $(...)-aware tokenizer arm in quote_mask, tracking that a same-character quote re-opened inside a `$(...)`/`` `...` `` command substitution starts a fresh, independent quoted region rather than closing the one around the whole substitution (the vehicle report_claims.rs's own Limits section discloses from batch 20 T2's first pass, 2 instances in that same review's own corpus sweep). Deferred per process.no-tech-debt: both are bounded, well-scoped engineering — quote_mask already carries the byte-level state the placeholder check would need to consult, and the $(...) arm needs a small quote-context stack, not a rewrite — not a correctness blocker for HR-071's shipped form, which already discloses both gaps with their measured instances rather than shipping them silently."
+        "The narrowing: (a) a quote-aware placeholder arm in find_placeholder, skipping any span quote_mask already marks as inside a quoted string; (b) a $(...)-aware tokenizer arm in quote_mask, tracking that a same-character quote re-opened inside a `$(...)`/`` `...` `` command substitution starts a fresh, independent quoted region rather than closing the one around the whole substitution (the vehicle report_claims.rs's own Limits section discloses from batch 20 T2's first pass, 2 instances in that same review's own corpus sweep). Deferred per process.no-tech-debt: both are bounded, well-scoped engineering — quote_mask already carries the byte-level state the placeholder check would need to consult, and the $(...) arm needs a small quote-context stack, not a rewrite — not a correctness blocker for HR-071's shipped form, which already discloses both gaps with their measured instances rather than shipping them silently.",
+        "Moved out of 2.0.0 to a 2.x minor release by the owner's ruling of 2026-10-21 (design.md 192)."
       ],
-      "milestone": null,
+      "milestone": "2.x",
       "status": "open",
-      "batch": 36,
+      "batch": null,
       "see": [
         "HR-071"
       ]
@@ -158,7 +160,15 @@
       "milestone": null,
       "status": "open",
       "batch": null,
-      "see": []
+      "see": [],
+      "deferral": {
+        "reason": "1.0 shipped unsigned macOS binaries",
+        "origin": "batch-25 gate (owner, design.md 5.79)",
+        "files": [
+          "dist-workspace.toml",
+          ".github/workflows/release.yml"
+        ]
+      }
     },
     {
       "id": "HR-123",
@@ -191,7 +201,14 @@
       "batch": null,
       "see": [
         "HR-111"
-      ]
+      ],
+      "deferral": {
+        "reason": "the multi-file sweep case was left as a report concern",
+        "origin": "batch 25 task 3a (HR-111)",
+        "files": [
+          "crates/houserules/src/report_claims.rs"
+        ]
+      }
     },
     {
       "id": "HR-126",
@@ -240,7 +257,7 @@
         "Four defects for the next template-touching batch. (1) task-reviewer template: an issue that cites a rule flips that rule's rule_adherence row to fail in the same review - or stats additionally tallies issues[].rule and new_breakage[].rule (this batch: stats reports 13 violated ids where the 14 reviews yield 20). (2) deliverables schema (both copies, parity-pinned): an optional fix_rounds[].gates_run field so the audit can flag a fix round that never re-ran the full mirror set (3 shrunken-gate-list instances this batch). (3) the orchestrating skill's dispatch checklist: a brief that forbids tree changes names the controller as the homing path for deferrals (T1's structural rulings-to-file breach). (4) task-reviewer fix-round section: a fix round records the FULL mirror set; a shrunken tests list is an automatic re-review finding."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 34,
       "see": []
     },
@@ -288,11 +305,12 @@
       "type": "feat",
       "title": "live-run-recipe: a check that requires named command patterns, not just a set field",
       "body": [
-        "Batch-27 branch review: houserules.live-run-recipe's check (type report-field, field live_run) proves the field is set, not that the recipe's required entries exist - T2 passed every audit while missing the scratch-repo check-knowledge/check-backlog entries the entry's own body requires. Add a check variant that requires named command patterns among a report list-field's entries, or fold the requirement into the summary so a judging reviewer reads it without opening the body."
+        "Batch-27 branch review: houserules.live-run-recipe's check (type report-field, field live_run) proves the field is set, not that the recipe's required entries exist - T2 passed every audit while missing the scratch-repo check-knowledge/check-backlog entries the entry's own body requires. Add a check variant that requires named command patterns among a report list-field's entries, or fold the requirement into the summary so a judging reviewer reads it without opening the body.",
+        "Moved out of 2.0.0 to a 2.x minor release by the owner's ruling of 2026-10-21 (design.md 192)."
       ],
-      "milestone": null,
+      "milestone": "2.x",
       "status": "open",
-      "batch": 35,
+      "batch": null,
       "see": []
     },
     {
@@ -307,7 +325,8 @@
         "Notes for that later spec, from the batch-28 task: (a) a sentence boundary of `.`, `!`, or `?` plus whitespace splits wrongly at `...` inside a backtick span; (b) the classification rests on pre-aggregation commit states, most of them reachable from no ref, so a `git gc` can remove them and the corpus run must be repeated on states that still exist; (c) the tests of the two narrowed variants in the unwired module still expect the finding text of the unnarrowed rule.",
         "Status after batch 28: partial. The template step shipped (with its failure branch) and the range fix of the existing check shipped; the checker rule stays open, as the paragraph above records.",
         "On 2026-10-15 the owner ruled that every open GitHub issue ships in 2.0.0 (design.md 5.98): this item moves to batch 33 (issue 35).",
-        "Owner ruling 2026-10-15 (design.md 5.118, meta-spec M12): part 2 ships exact in batch 36 - a citation a claim rests on uses a recorded form a tool fills in at report time (path, line or range, the line's text or hash), and check-report-claims compares it with HEAD; free-prose citations keep the 1.4.0 checks; the unwired batch-28 heuristic module is not wired. Batch 36 holds this item (design.md 5.102)."
+        "Owner ruling 2026-10-15 (design.md 5.118, meta-spec M12): part 2 ships exact in batch 36 - a citation a claim rests on uses a recorded form a tool fills in at report time (path, line or range, the line's text or hash), and check-report-claims compares it with HEAD; free-prose citations keep the 1.4.0 checks; the unwired batch-28 heuristic module is not wired. Batch 36 holds this item (design.md 5.102).",
+        "Back in 2.0.0 by the owner's ruling of 2026-10-21 (design.md 193)."
       ],
       "milestone": null,
       "status": "partial",
@@ -329,10 +348,12 @@
         "On 2026-10-15 the owner ruled that every open GitHub issue ships in 2.0.0 (design.md 5.98): this item moves to batch 33; this supersedes D5's batch-29 placement.",
         "Owner ruling 2026-10-15 (design.md 5.102, meta-spec M1): its row is in batch 34, because the spec reviewer edits the files HR-181 moves (the same-files rule of D1).",
         "Owner ruling 2026-10-19 (design.md 5.159, meta-spec O24), delivered with this item: the design review runs in the standard and the full tier of the reference workflow, before the human sees the spec; in the standard tier a design re-review runs only for a Critical finding, and every other finding is folded into the spec directly after the review, then the batch proceeds through the decision gate to the plan.",
-        "Owner ruling 2026-10-19 (design.md 5.160, meta-spec O24a), delivered with this item: in the full tier a design re-review runs for a Critical or an Important finding, at most once, and a Minor finding is folded in; the spec reviewer's default model is opus, a value of the workflow's configuration (5.119)."
+        "Owner ruling 2026-10-19 (design.md 5.160, meta-spec O24a), delivered with this item: in the full tier a design re-review runs for a Critical or an Important finding, at most once, and a Minor finding is folded in; the spec reviewer's default model is opus, a value of the workflow's configuration (5.119).",
+        "Owner ruling 2026-10-20 (design.md 178), delivered with this item: after each design review that holds a Critical finding, the author fixes every finding and a fresh reviewer reviews again; the loop repeats until a review holds no Critical finding; Important and Minor findings are folded in without a further review.",
+        "Owner ruling 2026-10-20 (design.md 182, batch-34 spec Q4): part 3's four design-phase rules ship as non-standing process-pack entries cited by the spec-reviewer template."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 34,
       "see": [
         "HR-140"
@@ -366,7 +387,8 @@
       "title": "check-report-claims: a comma-list citation's later line numbers are never checked",
       "body": [
         "Found in batch 28 task 5 (HR-141). `check_citation_lines` reads a citation such as `file.rs:23,24,41` for its first number only; the later numbers are not compared with the file's line count. Batch 28 ruled the invariant for a single line and for a range: every line number a citation names fits the file it names. The comma-list form is outside that fix, and only a Limits bullet in the module doc of crates/houserules/src/report_claims.rs names the gap.",
-        "Scope for the fix: parse each number of a comma list, compare each with the file's line count, and keep the existing finding shape. Measure the retained task reports first for how often the form occurs."
+        "Scope for the fix: parse each number of a comma list, compare each with the file's line count, and keep the existing finding shape. Measure the retained task reports first for how often the form occurs.",
+        "Back in 2.0.0 by the owner's ruling of 2026-10-21 (design.md 193)."
       ],
       "milestone": null,
       "status": "open",
@@ -399,7 +421,7 @@
         "Added by the batch-28 branch review: the same closing sequence has a second gap. The closing act says 'Not clean: fix the report and re-run'. That fix can edit a cited sentence after the citation step ran, and no step sends the implementer back. Add one sentence: after a fix to the report, repeat the citation step, then the closing run. Both edits share one eval rerun."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 34,
       "see": [
         "HR-143"
@@ -442,10 +464,13 @@
       "body": [
         "Deferred from batch 28 into batch 29, which redesigns the review mechanism and these same templates (HR-144, HR-140, HR-129). Template defects, each with the reviewer's fix: (1) orchestrating skill: a task that adds or tightens a check in check-knowledge, check-backlog, or audit carries a paper walk in its brief (a fresh install, an install on each released kit under the new binary, an install with kept or overridden kit-owned files), and the report states each accepted red. (2) orchestrating skill, the rule that a brief's claims are measured: a brief that dictates a message reads it once for each state that prints it; a brief that dictates an enumeration derives it from the subject, never from a file name; a brief that dictates a mechanism a reviewer proposed has run it against the reviewer's own counter-example first (eight of the 31 task-review findings of batch 28 were plan-mandated). (3) branch-reviewer template: compare BASE with the remote default branch through a read-only call; list the commits in BASE..HEAD that no task report lists and review each. (4) finishing-a-feature skill, the aggregation step: fetch first; if main moved, rebuild the branch on it before the soft reset.",
         "Clauses the review proposes for standing entries; only the owner rules these: process.claims-match-artifacts (a fix round that re-runs or re-pins an earlier round's evidence says so; a line citation into a generated evidence file is re-derived after each regeneration); process.closure-claims-carry-enumeration (a corpus of deliverables is selected by content, never by file name; an exception list is a closure with its own script); process.gates-cover-generated-commits (a check added to a shipped gate is walked through the installed populations, and the new predicate runs over the template at each release tag); process.rulings-to-file (a brief amendment that adds or drops a test, a file, or a gate against the plan is a ruling for the spec's outcomes section); writing-style.code-comments (a comment on measured or third-party behavior names an openable source; the controller files the knowledge entry before the dispatch); writing-style.doc-comments (a new caller re-opens the callee's doc comment); process.tdd (a RED against a stub of an implementation already drafted is a `mutation` entry).",
-        "Added from the batch-30 branch review (2026-10-02), deferred because batch 30 changes nothing under template/. Clauses for the kit-shipped entry knowledge-base.state-only-the-source: a premise about a third-party platform is quoted from the page's own sentence before a brief or an entry restates it; the sweep for a corrected fact is a grep for its key nouns over the tracked tree and the batch documents, in the commit that corrects it. Clauses for standing entries, which only the owner rules: process.claims-match-artifacts (a claim about a documentation page quotes every passage of the page that bears on it, and says which one the measurement supports when two disagree; a duration is recomputed from its two timestamps before the sentence ships, a rounded word included); writing-style.code-comments (a doc comment written in a fix round is swept for the round's own vocabulary before the commit, and the fix-round dispatch names the sweep). Template defects: (1) orchestrating skill, the fix-round closing rule: say which default wins for a prose-only round that closes a finding that is critical by rule class. (2) orchestrating skill and branch-reviewer template: no text covers a branch rebuilt on a moved main (the sha map, the old history, what the reviewer checks) or a loaded template that is older than the file at HEAD. (3) task-reviewer and branch-reviewer templates: 'real severity' conflicts with 'standing rule critical' for a one-word prose mismatch; a finding whose severity comes from the rule class says so first and states the size of the repair. (4) deliverables schema and implementer template: a task report of batch 30 is 267 KB, 154 KB of it pasted output in `tests`; allowing an output file with a line count for a long output needs an owner ruling, because the schema is frozen."
+        "Added from the batch-30 branch review (2026-10-02), deferred because batch 30 changes nothing under template/. Clauses for the kit-shipped entry knowledge-base.state-only-the-source: a premise about a third-party platform is quoted from the page's own sentence before a brief or an entry restates it; the sweep for a corrected fact is a grep for its key nouns over the tracked tree and the batch documents, in the commit that corrects it. Clauses for standing entries, which only the owner rules: process.claims-match-artifacts (a claim about a documentation page quotes every passage of the page that bears on it, and says which one the measurement supports when two disagree; a duration is recomputed from its two timestamps before the sentence ships, a rounded word included); writing-style.code-comments (a doc comment written in a fix round is swept for the round's own vocabulary before the commit, and the fix-round dispatch names the sweep). Template defects: (1) orchestrating skill, the fix-round closing rule: say which default wins for a prose-only round that closes a finding that is critical by rule class. (2) orchestrating skill and branch-reviewer template: no text covers a branch rebuilt on a moved main (the sha map, the old history, what the reviewer checks) or a loaded template that is older than the file at HEAD. (3) task-reviewer and branch-reviewer templates: 'real severity' conflicts with 'standing rule critical' for a one-word prose mismatch; a finding whose severity comes from the rule class says so first and states the size of the repair. (4) deliverables schema and implementer template: a task report of batch 30 is 267 KB, 154 KB of it pasted output in `tests`; allowing an output file with a line count for a long output needs an owner ruling, because the schema is frozen.",
+        "Owner ruling 2026-10-20 (design.md 179): the clause for process.rulings-to-file is refused.",
+        "Owner ruling 2026-10-20 (design.md 183, batch-34 spec Q5): eight standing-entry clauses approved; the writing-style.code-comments clause 'the controller files the knowledge entry before the dispatch' refused.",
+        "Batch 34 record: its two defects that assume severity by rule class close as superseded by process.severity-by-impact (batch-34 spec C13, 9.1); its long-output question goes to HR-171 in batch 36. The other defects and the clauses of design.md 183 shipped in batch 34."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 34,
       "see": [
         "HR-129",
@@ -476,7 +501,8 @@
       "body": [
         "Owner (2026-10-09, design.md 5.90): filed as a backlog item, not built in batch 31. The cost analysis of 2026-10-09 measured task reports growing from about 55 KB (batch 2) to 316-635 KB (batches 28 and 30). About half of all 633 review findings across 26 batch workspaces target reports, evidence files, or prose, and the three rules cited most in findings are claim rules (knowledge-base.state-only-the-source 50, process.claims-match-artifacts 35, process.closure-claims-carry-enumeration 21).",
         "Shape for a spec: `houserules` generates the fact fields of a task report (commits, test commands with exit codes, audit rows) instead of the implementer assembling them by hand; command output goes to capture files the report cites by path and hash instead of being pasted verbatim; the free-prose fields shrink to what a reviewer needs. Fewer prose claims leave less for claim rules to check.",
-        "Surface: the change edits `.claude/schemas/deliverables.json` and its template copy, a frozen surface (houserules.1-0-surface-is-frozen): a major-version bump and an adopter migration path for existing workspaces."
+        "Surface: the change edits `.claude/schemas/deliverables.json` and its template copy, a frozen surface (houserules.1-0-surface-is-frozen): a major-version bump and an adopter migration path for existing workspaces.",
+        "Back in 2.0.0 by the owner's ruling of 2026-10-21 (design.md 193)."
       ],
       "milestone": null,
       "status": "open",
@@ -509,11 +535,12 @@
       "body": [
         "Filed by the batch-31 batch-close loop (process.knowledge-earns-its-place): `houserules stats` over the five most recent workspaces (batches 24 to 30; .superpowers/sdd/2026-10-09-batch-31/stats-t4-batches-24-30.json) proposes `mechanize` without an owner gate for houserules.crash-paths-are-named (2 workspaces), houserules.task-gates-mirror-ci (2), knowledge-base.state-only-the-source (4), process.wiring-checks-run-the-resolution (3), quality.user-facing-text-is-contract (2), and writing-style.instructions-cover-the-state-space (4).",
         "For each entry a spec decides one of two outcomes: a deterministic `check` that catches the class the findings show (task-gates-mirror-ci: compare the report's gate list with .github/workflows and mise.toml; crash-paths-are-named: a lint for unwrap/expect on the named input paths), or the owner tags the entry `ruled-keep` because the rule is judged by design, so the loop stops proposing it.",
-        "The batch-32 batch-close run (.superpowers/sdd/2026-10-10-batch-32/stats.json, batches 27 to 32) proposed `mechanize` without an owner gate again for knowledge-base.state-only-the-source, process.wiring-checks-run-the-resolution, quality.user-facing-text-is-contract, and writing-style.instructions-cover-the-state-space; this item covers them, so no new item was filed."
+        "The batch-32 batch-close run (.superpowers/sdd/2026-10-10-batch-32/stats.json, batches 27 to 32) proposed `mechanize` without an owner gate again for knowledge-base.state-only-the-source, process.wiring-checks-run-the-resolution, quality.user-facing-text-is-contract, and writing-style.instructions-cover-the-state-space; this item covers them, so no new item was filed.",
+        "Moved out of 2.0.0 to a 2.x minor release by the owner's ruling of 2026-10-21 (design.md 192)."
       ],
-      "milestone": null,
+      "milestone": "2.x",
       "status": "open",
-      "batch": 35,
+      "batch": null,
       "see": [
         "HR-160"
       ]
@@ -526,15 +553,23 @@
         "Deferred at the re-review cap of batch 31 task 1 (process.bounded-review-loop: re-review 2 of 2 on a full-tier task; task-1-review-r2.json in the batch-31 workspace). Reason for deferral: the cap, not a judgment that the findings are wrong.",
         "1 (Important): the `budget` reason always ends 'Demote the others that catch the least.' With every standing entry tagged `ruled-keep` it says so while `candidates` is empty, and with more kept entries than the budget no demotion of the candidates reaches the budget (reproduced in rr2-t1-budget-reason-states.txt). Fix: when `ruled_keep` exceeds the budget, the reason says the kept entries alone exceed it and that lifting a tag is the remedy; tests pin the reason in each state.",
         "2 (Minor): README's sample `narrow` row still prints 'minor or hit a deliverable or prose'; the binary prints 'minor or hit a deliverable'.",
-        "3 (Minor): the doc comment of `is_soft` (crates/houserules/src/rules/cost.rs) conditions the prose rule on 'a repository whose docs are its product'; the code applies it everywhere."
+        "3 (Minor): the doc comment of `is_soft` (crates/houserules/src/rules/cost.rs) conditions the prose rule on 'a repository whose docs are its product'; the code applies it everywhere.",
+        "Moved out of 2.0.0 to a 2.x minor release by the owner's ruling of 2026-10-21 (design.md 192)."
       ],
-      "milestone": null,
+      "milestone": "2.x",
       "status": "open",
-      "batch": 35,
+      "batch": null,
       "see": [
         "HR-161",
         "HR-160"
-      ]
+      ],
+      "deferral": {
+        "reason": "filed at the re-review cap, not a judgment of the findings",
+        "origin": "batch 31 task 1 re-review cap",
+        "files": [
+          "crates/houserules/src/rules/stats.rs"
+        ]
+      }
     },
     {
       "id": "HR-165",
@@ -543,10 +578,11 @@
       "body": [
         "From the batch-31 branch review retrospective (.superpowers/sdd/2026-10-09-batch-31/branch-review.json, violated_rules). Deferred out of batch 31 because each changes executable code or the implementer or task-reviewer template, which re-opens the eval run (process.evals-rerun) for a batch already past it.",
         "1. Generate README's sample `stats` output as a frozen slice and assert the README block equals it (quality.user-facing-text-is-contract). 2. Enable rustdoc missing_docs for the crate's public items (writing-style.doc-comments). 3. check-report-claims reads backlog items and specs: a cited workspace path exists, and a cited stats run names the file that holds its window (process.claims-match-artifacts). 4. Implementer template, TDD step: a pin of existing behavior runs at BASE first and records the passing exit beside its disclosed mutation (process.tdd). 5. Task-reviewer template: a closure probe derives from the claim's subject, and an instruction keyed to a tier, count, or version is read once per value of that field (process.closure-claims-carry-enumeration, writing-style.instructions-cover-the-state-space). 6. The finishing-a-feature skill's Finish step runs `houserules check-commit --from <merge base>` with the tree binary when the batch changes the binary, since the commit-msg hook skips the check when no houserules is on PATH (batch-31 branch review, template defect 4, second half).",
-        "7. From the batch-32 branch review retrospective (process.tdd): the implementer template's fix-round contract gains one sentence. A test the fix round adds that passes before the fix gets a `mutation` tdd row in that round, with the mutation diff captured. The re-reviewer checks that every such test has one."
+        "7. From the batch-32 branch review retrospective (process.tdd): the implementer template's fix-round contract gains one sentence. A test the fix round adds that passes before the fix gets a `mutation` tdd row in that round, with the mutation diff captured. The re-reviewer checks that every such test has one.",
+        "Batch 34 record: point 2's missing_docs scope is the crate's public items: crates/houserules/src/main.rs sets #![warn(missing_docs)]. That also delivers HR-204 item 9 (batch-34 spec 9.1)."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 34,
       "see": [
         "HR-160",
@@ -559,10 +595,11 @@
       "title": "Four Minor findings left at the batch-31 fix-wave cap: the until clause, two texts, one report citation",
       "body": [
         "Deferred at the re-review cap of batch 31's branch fix wave (process.bounded-review-loop; branch-fix-1-review-r2.json in the batch-31 workspace). Reason: the cap, not a judgment that the findings are wrong.",
-        "1. The summary-is-the-rule check's until clause stops at any period, so 'until 1.3.0 ships' escapes it; use (?:[^.;:]|\\.\\d){0,40} in both copies and add the phrase to the test's PHRASES. 2. The entry body and the test module doc say each word carries a bracketed letter; each branch of the pattern does. 3. The orchestrating skill tells a 1.0.0 install to delete the whole old CLAUDE.md line, which also carries the dispatch-template and Knowledge/BASE instructions; name only the sequential sentence, or point CLAUDE.md at AGENTS.md; the doc comment of orchestrating_skill_carries_the_agents_md_parallel_line_verbatim names only the AGENTS.md population. 4. The wave report's author-class walk cites a check-knowledge capture for 'init writes clean kit text'; cite r2-probe-widened-after-fix.txt."
+        "1. The summary-is-the-rule check's until clause stops at any period, so 'until 1.3.0 ships' escapes it; use (?:[^.;:]|\\.\\d){0,40} in both copies and add the phrase to the test's PHRASES. 2. The entry body and the test module doc say each word carries a bracketed letter; each branch of the pattern does. 3. The orchestrating skill tells a 1.0.0 install to delete the whole old CLAUDE.md line, which also carries the dispatch-template and Knowledge/BASE instructions; name only the sequential sentence, or point CLAUDE.md at AGENTS.md; the doc comment of orchestrating_skill_carries_the_agents_md_parallel_line_verbatim names only the AGENTS.md population. 4. The wave report's author-class walk cites a check-knowledge capture for 'init writes clean kit text'; cite r2-probe-widened-after-fix.txt.",
+        "Batch 34 record: the fourth point (a closed batch's report) closes by this note, and no closed deliverable is edited (batch-34 spec C14). Points 1 to 3 shipped in batch 34."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 34,
       "see": [
         "HR-160",
@@ -663,10 +700,11 @@
         "Source: an adopter's lead-time audit of its batch 3 under houserules 1.2.0 (2026-10-10; design.md 5.94). Root cause 9.",
         "process.rulings-to-file counts every dispatch deviation from the spec as a ruling to amend in the same turn. The adopter's controller made nine plan-sync docs commits for decisions such as a status code or a tuple type.",
         "Proposal: only a decision that changes what the spec states amends the spec; a decision inside the spec's intent is recorded in the task brief or the task report, and the branch review reads it there. The entry is standing and owner-seeded: it needs the owner's ruling before any build (process.owner-rulings-need-owner-supersession).",
-        "Owner ruling 2026-10-16 (design.md 5.147, meta-spec O13): joins batch 34 (2.0.0, batch 2 of 5); its standing-entry ruling is taken at the batch-34 spec review, with HR-153's standing clauses (D10)."
+        "Owner ruling 2026-10-16 (design.md 5.147, meta-spec O13): joins batch 34 (2.0.0, batch 2 of 5); its standing-entry ruling is taken at the batch-34 spec review, with HR-153's standing clauses (D10).",
+        "Owner ruling 2026-10-20 (design.md 179, batch-34 spec Q1): narrow as proposed; only a decision that changes what the spec states amends the spec; a decision inside the spec's intent goes to the brief or report."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 34,
       "see": []
     },
@@ -678,11 +716,13 @@
         "Source: an adopter's lead-time audit of its batch 3 under houserules 1.2.0 (2026-10-10; design.md 5.94). Issue 6, second half.",
         "writing-style.doc-comments was judged 264 times in this repository's task reviews; the adopter's five doc-comment criticals are what a linter catches (rustdoc missing_docs, ruff D, eslint jsdoc). No check type runs a command, so a lint-backed rule stays a judged row.",
         "Change: a knowledge check type that runs a named project command over the changed files and reads its exit status, plus recipes in the migrating-knowledge skill. A new check type changes the knowledge schema: batch 33, 2.0.0. Continues the mechanize proposals of HR-163.",
-        "Owner ruling 2026-10-15 (design.md 5.121, meta-spec M14): ships as the exit-code runner of HR-183's runner port, with migrating-knowledge recipes (rustdoc missing_docs, ruff D, eslint jsdoc). writing-style.doc-comments splits: the id keeps the presence clause (linter-backed, proven); a new judged entry holds the content and naming clauses. Acceptance: the presence rule leaves the judged set; the content rule stays judged."
+        "Owner ruling 2026-10-15 (design.md 5.121, meta-spec M14): ships as the exit-code runner of HR-183's runner port, with migrating-knowledge recipes (rustdoc missing_docs, ruff D, eslint jsdoc). writing-style.doc-comments splits: the id keeps the presence clause (linter-backed, proven); a new judged entry holds the content and naming clauses. Acceptance: the presence rule leaves the judged set; the content rule stays judged.",
+        "Moved out of 2.0.0 to a 2.x minor release by the owner's ruling of 2026-10-21 (design.md 192).",
+        "Conditional (design.md 194): if batch 35 finds that HR-183's runner contract cannot be tested without this exit-code runner, this item joins batch 35 and 2.0.0 with no further ruling; the batch-35 spec records the finding and its probe."
       ],
-      "milestone": null,
+      "milestone": "2.x",
       "status": "open",
-      "batch": 35,
+      "batch": null,
       "see": [
         "HR-163"
       ]
@@ -693,11 +733,12 @@
       "title": "check-report-claims flags evidence cited at a session scratchpad or /tmp path",
       "body": [
         "From the batch-32 branch review retrospective (.superpowers/sdd/2026-10-10-batch-32/branch-review.json). process.evidence-outlives-the-session failed twice in batch 32 (task 2 round 0: a docs_verified source with no capture; the ledger: a scratchpad path).",
-        "Change: a report `source`, `output`, or evidence string that names a path under the session scratchpad or /tmp is a claim mismatch unless a workspace capture is cited beside it. A knowledge check cannot read report strings today; the checker can (crates/houserules/src/report_claims.rs)."
+        "Change: a report `source`, `output`, or evidence string that names a path under the session scratchpad or /tmp is a claim mismatch unless a workspace capture is cited beside it. A knowledge check cannot read report strings today; the checker can (crates/houserules/src/report_claims.rs).",
+        "Moved out of 2.0.0 to a 2.x minor release by the owner's ruling of 2026-10-21 (design.md 192)."
       ],
-      "milestone": null,
+      "milestone": "2.x",
       "status": "open",
-      "batch": 36,
+      "batch": null,
       "see": [
         "HR-165"
       ]
@@ -802,7 +843,8 @@
       "body": [
         "Issue 58 asks for an evidence contract on a pull request: the purpose, the backlog ids it closes, the risk tier and its criterion, and each verification run (command, exit code, output) at the head SHA. The seeded CI gate fails the pull request before review when a part is missing or a run names another SHA; each project sets a diff-size budget per risk tier; a seed rule and a seed-once pull request template ask for the same parts.",
         "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 58 on the 2.0.0 release.",
-        "Owner ruling 2026-10-15 (design.md 5.116, meta-spec M10), governs this item: its commands produce files, Markdown, JSON, and exit codes and never call a host API; only the seeded GitHub workflow posts the PR comment, sets the commit status and label, and pushes the record ref; the migrating-knowledge skill gets one section for this function saying which command output to wire up on another host."
+        "Owner ruling 2026-10-15 (design.md 5.116, meta-spec M10), governs this item: its commands produce files, Markdown, JSON, and exit codes and never call a host API; only the seeded GitHub workflow posts the PR comment, sets the commit status and label, and pushes the record ref; the migrating-knowledge skill gets one section for this function saying which command output to wire up on another host.",
+        "Back in 2.0.0 by the owner's ruling of 2026-10-21 (design.md 193)."
       ],
       "milestone": null,
       "status": "open",
@@ -825,10 +867,11 @@
         "Owner ruling 2026-10-16 (design.md 5.144, meta-spec O11), delivered with this item: on an install with no tracker, check-backlog exits 0 with one line naming --tracker, and fails with one line naming --tracker json when a backlog/ directory exists; list, batch, set, and get of a backlog id exit non-zero with the --tracker line; the seeded CI keeps its unconditional check-backlog step.",
         "Owner ruling 2026-10-16 (design.md 5.145, meta-spec O11a, amends 5.144), delivered with this item: on an install with no tracker and no backlog/ directory, archive moves the superseded and retired knowledge entries, skips the backlog half with one line naming --tracker, and exits 0; with a backlog/ directory it fails before moving anything, with check-backlog's line naming --tracker json; archive is not among the commands that exit non-zero there.",
         "Owner ruling 2026-10-16 (design.md 5.149, meta-spec O15), delivered with this item: on an install with no tracker, audit resolves no Work-Item: or Deferred: trailer, prints one line naming how many it skipped and --tracker, and fails with one line naming --tracker json when a backlog/ directory exists; 5.103(2)'s 'never a pass' stays for an installed tracker that cannot be reached.",
-        "Owner ruling 2026-10-16 (design.md 5.150, meta-spec O16), delivered with the get routing of this item: an unresolved knowledge-shaped id whose first part names a pack the binary carries but the install lacks gets one line naming the pack and houserules pack add <pack>; with no tracker it replaces the --tracker line, with a tracker it follows the adapter's not-found line; get exits non-zero; only the binary's own pack names trigger it."
+        "Owner ruling 2026-10-16 (design.md 5.150, meta-spec O16), delivered with the get routing of this item: an unresolved knowledge-shaped id whose first part names a pack the binary carries but the install lacks gets one line naming the pack and houserules pack add <pack>; with no tracker it replaces the --tracker line, with a tracker it follows the adapter's not-found line; get exits non-zero; only the binary's own pack names trigger it.",
+        "Owner ruling 2026-10-20 (design.md 186, batch-34 spec Q8, extends 5.138(3)): the every-commit entry also exempts commits whose subject matches exempt_subjects (default '^chore\\(.+\\): release '), because release-please's commits carry the token owner as author."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 34
     },
     {
@@ -849,10 +892,11 @@
         "Owner ruling 2026-10-16 (design.md 5.140, meta-spec O6), delivered with this item: a workflow package has a name and a version, pinned in .houserules.json with one SHA-256 per file (the 1.4.0 baseline mechanism); the reference workflow ships in the binary and update moves its pin; update writes each file that matches its pin and moves the pin; a locally edited file is kept, nothing is written, and one line names the file and the new package version; a path in overrides stays project-owned and unreported; after an upgrade check-knowledge checks the new version's required rule ids.",
         "Owner ruling 2026-10-16 (design.md 5.141, meta-spec O8), delivered with this item in batch 34: the dispatch steps (Knowledge:, REPORT_FILE, audit --base <BASE>, 'as a dispatched subagent') move from the core project-knowledge skill into the reference-workflow package's agent templates; the core skill keeps the generic protocol (for, get) and the topic list, and its description becomes 'Use before reading or changing any file in this repository'.",
         "Owner ruling 2026-10-16 (design.md 5.142, meta-spec O9): .claude/evals/record.json is the project's own data; it moves with the workflow package, and update never pins, replaces, or reports it.",
-        "Third meta-spec re-review T1 (2026-10-16): when this item moves the workflow files out of core, init's default becomes the knowledge-base pack alone (HR-182), and batch 34's live run proves that a minimal init passes every gate; batch 34's rewrite also moves knowledge-base.controller-rules-are-tagged's verify path off the orchestrating skill (meta-spec 6.4)."
+        "Third meta-spec re-review T1 (2026-10-16): when this item moves the workflow files out of core, init's default becomes the knowledge-base pack alone (HR-182), and batch 34's live run proves that a minimal init passes every gate; batch 34's rewrite also moves knowledge-base.controller-rules-are-tagged's verify path off the orchestrating skill (meta-spec 6.4).",
+        "Owner ruling 2026-10-20 (design.md 184, batch-34 spec Q6): issue 61's step ships as the core skill houserules-step and a core hook script tools/houserules-step.sh; no recipes for other workflows (point 5 not adopted)."
       ],
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 34,
       "see": [
         "HR-144"
@@ -880,8 +924,8 @@
         "Status after batch 33: partial. Batch 33 shipped the five kit packs, upstream packs, overrides and exclusions, the pack commands, and the 1.x conversion. The process pack's deferral-rule rewording of design.md 5.152 is delivered in batch 34, with the tracker (HR-180)."
       ],
       "milestone": null,
-      "status": "partial",
-      "batch": 33,
+      "status": "done",
+      "batch": 34,
       "see": [
         "HR-178"
       ]
@@ -893,7 +937,8 @@
       "body": [
         "Issue 63 asks to standardize the check field on a runner contract (command, arguments, output parser: exit code, SARIF, or JSON), ship parsers for Semgrep, ast-grep, and SARIF, and re-implement seed checks that duplicate a tool by calling it; a built-in check stays only where no tool exists. A rule entry states how to install each tool, and audit reports a missing tool as a setup error. Acceptance: a rule with a Semgrep check passes or fails in audit with line-level findings; existing built-in checks keep working through the same contract.",
         "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 63 on the 2.0.0 release.",
-        "Owner ruling 2026-10-15 (design.md 5.107, meta-spec M5): the runner contract is a port; the six built-in check types are runners inside the binary that need no other tool; external tools are runners a project or pack chooses; the kit's packs keep the built-ins; point 3 does not apply and point 4 is replaced (a built-in stays where a tool exists); a missing external tool is a setup error naming the tool and its install step."
+        "Owner ruling 2026-10-15 (design.md 5.107, meta-spec M5): the runner contract is a port; the six built-in check types are runners inside the binary that need no other tool; external tools are runners a project or pack chooses; the kit's packs keep the built-ins; point 3 does not apply and point 4 is replaced (a built-in stays where a tool exists); a missing external tool is a setup error naming the tool and its install step.",
+        "Back in 2.0.0 by the owner's ruling of 2026-10-21 (design.md 193)."
       ],
       "milestone": null,
       "status": "open",
@@ -929,7 +974,8 @@
       "body": [
         "Issue 65 asks for houserules evidence <range>: Markdown for the PR body or a comment that lists first the changed files and line ranges no rule covers, then the rules a deterministic check passed, the rules only an LLM judged (with verdicts), and the failed rules, then diff size and links to the work item, spec, and agent session. The seeded CI workflow posts or updates one comment per PR. Acceptance: output is deterministic for the same range and rule set; a change with no rule coverage lists every changed hunk as uncovered.",
         "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 65 on the 2.0.0 release.",
-        "Owner ruling 2026-10-15 (design.md 5.116, meta-spec M10), governs this item: its commands produce files, Markdown, JSON, and exit codes and never call a host API; only the seeded GitHub workflow posts the PR comment, sets the commit status and label, and pushes the record ref; the migrating-knowledge skill gets one section for this function saying which command output to wire up on another host."
+        "Owner ruling 2026-10-15 (design.md 5.116, meta-spec M10), governs this item: its commands produce files, Markdown, JSON, and exit codes and never call a host API; only the seeded GitHub workflow posts the PR comment, sets the commit status and label, and pushes the record ref; the migrating-knowledge skill gets one section for this function saying which command output to wire up on another host.",
+        "Back in 2.0.0 by the owner's ruling of 2026-10-21 (design.md 193)."
       ],
       "milestone": null,
       "status": "open",
@@ -943,7 +989,8 @@
         "Issue 66 asks for a review tier per PR (auto-merge-eligible, owner-review, senior-review) computed from rule severity, areas and paths touched, the share of uncovered surface, diff size, and an optional external score, written as a commit status and a label, with thresholds per area; every auto-merge-eligible decision is logged and a configurable sample is audited after merge. Acceptance: a docs-only change with full coverage is auto-merge-eligible; a change in a high-severity area gets at least owner-review; the decision record names every input and the threshold that applied.",
         "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 66 on the 2.0.0 release.",
         "Owner ruling 2026-10-15 (design.md 5.116, meta-spec M10), governs this item: its commands produce files, Markdown, JSON, and exit codes and never call a host API; only the seeded GitHub workflow posts the PR comment, sets the commit status and label, and pushes the record ref; the migrating-knowledge skill gets one section for this function saying which command output to wire up on another host.",
-        "Owner ruling 2026-10-16 (design.md 5.151(3), meta-spec O17): the 2.0 upgrade pull request touches protected paths, so it gets the highest tier and goes to human review."
+        "Owner ruling 2026-10-16 (design.md 5.151(3), meta-spec O17): the 2.0 upgrade pull request touches protected paths, so it gets the highest tier and goes to human review.",
+        "Back in 2.0.0 by the owner's ruling of 2026-10-21 (design.md 193)."
       ],
       "milestone": null,
       "status": "open",
@@ -961,7 +1008,8 @@
         "Issue 67 asks for versioned JSON schemas for the rule package (for output), the audit result, and the evidence packet, versioned apart from the CLI and under the stability contract; a houserules mcp server exposing get, for, audit, and evidence; and recipes for a Continue check and a PR-Agent configuration. Acceptance: a Continue check fails a PR that breaks a rule from for, with the rule id in the output; schema changes follow the major-version rule.",
         "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 67 on the 2.0.0 release.",
         "Owner ruling 2026-10-15 (design.md 5.117, meta-spec M11): every published document carries its schema id and version; each schema has its own semver under D2; the CLI's major rises only when a default-emitted schema takes a major change; the MCP server serves the same documents; the frozen-surface standing entry is rewritten, its wording ruled at the batch-37 spec review.",
-        "Owner ruling 2026-10-16 (design.md 5.146, meta-spec O12), clarifies 5.117: the 'only' governs the published documents alone, and a published schema's major raises the CLI's major only when the CLI emits that version by default; D2 keeps removing, renaming, or tightening a subcommand, a flag, or a schema the CLI reads (knowledge, the JSON adapter's backlog, deliverables, the install layout) a major change and an addition minor; the batch-37 rewrite of houserules.1-0-surface-is-frozen names the three surfaces."
+        "Owner ruling 2026-10-16 (design.md 5.146, meta-spec O12), clarifies 5.117: the 'only' governs the published documents alone, and a published schema's major raises the CLI's major only when the CLI emits that version by default; D2 keeps removing, renaming, or tightening a subcommand, a flag, or a schema the CLI reads (knowledge, the JSON adapter's backlog, deliverables, the install layout) a major change and an addition minor; the batch-37 rewrite of houserules.1-0-surface-is-frozen names the three surfaces.",
+        "Re-cut 2026-10-21 (design.md 192): 2.0.0 delivers the versioned schemas of the documents 2.0 emits, each carrying its schema id and version (5.117); the MCP server and the Continue and PR-Agent recipes move to HR-211 (2.x)."
       ],
       "milestone": null,
       "status": "open",
@@ -976,7 +1024,8 @@
       "title": "Propose promotion of judged rules to deterministic checks (issue 68)",
       "body": [
         "Issue 68 asks that the deliverables record human overrides of judged verdicts, and that stats report per judged rule the verdict count, fail count, override rate, and cost, flagging promotion candidates (low override rate, repeated similar findings, with sample findings) and retirement candidates (high cost, zero fails over a configurable window). Acceptance: stats lists promotion and retirement candidates with the evidence for each.",
-        "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 68 on the 2.0.0 release."
+        "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 68 on the 2.0.0 release.",
+        "Back in 2.0.0 by the owner's ruling of 2026-10-21 (design.md 193)."
       ],
       "milestone": null,
       "status": "open",
@@ -988,11 +1037,12 @@
       "title": "Propose rules from escaped defects (issue 69)",
       "body": [
         "Issue 69 asks for houserules learn <commit> for a revert or a fix commit with a trailer such as Fixes-Escape: <sha>: it traces the original change to its audit report and proposes a new or tighter rule as a draft knowledge entry with the escape as source; stats counts escapes per rule and per area. Acceptance: for a revert of an audited commit, learn names the uncovered hunk or the passed rule the defect slipped through; the draft passes check-knowledge.",
-        "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 69 on the 2.0.0 release."
+        "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 69 on the 2.0.0 release.",
+        "Moved out of 2.0.0 to a 2.x minor release by the owner's ruling of 2026-10-21 (design.md 192)."
       ],
-      "milestone": null,
+      "milestone": "2.x",
       "status": "open",
-      "batch": 37,
+      "batch": null,
       "see": [
         "HR-192"
       ]
@@ -1003,11 +1053,12 @@
       "title": "Link specs and agent sessions into the audit (issue 70)",
       "body": [
         "Issue 70 asks that audit and evidence read optional commit trailers and PR links for a spec reference (Spec Kit, OpenSpec, or a plan file) and an agent session reference (for example Entire-Checkpoint), show them in the evidence packet, and offer two optional rules: changes in configured areas reference a spec, and a referenced spec file exists. Acceptance: trailers are optional unless a rule requires them; houserules has no dependency on any spec or session tool.",
-        "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 70 on the 2.0.0 release."
+        "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 70 on the 2.0.0 release.",
+        "Back in 2.0.0 by the owner's ruling of 2026-10-21 (design.md 193)."
       ],
       "milestone": null,
       "status": "open",
-      "batch": 37,
+      "batch": 38,
       "see": [
         "HR-185"
       ]
@@ -1038,7 +1089,8 @@
       "body": [
         "Issue 72 asks for a versioned change-record schema keyed by commit SHA (rule package version and merge-base rules hash, audit results, uncovered surface, evidence packet, tier decision with inputs, reviewers, links), stored in git notes or a dedicated ref outside the main history, written by the seeded CI workflow at merge and by record write, read with record show and record list, and read by stats for review coverage; each record has a size budget. Acceptance: for any merged commit, record show returns the rules, results, tier, and links that applied at merge; a record cannot claim a rule package other than the merge-base package; records survive clone and fetch.",
         "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 72 on the 2.0.0 release.",
-        "Owner ruling 2026-10-15 (design.md 5.116, meta-spec M10), governs this item: its commands produce files, Markdown, JSON, and exit codes and never call a host API; only the seeded GitHub workflow posts the PR comment, sets the commit status and label, and pushes the record ref; the migrating-knowledge skill gets one section for this function saying which command output to wire up on another host."
+        "Owner ruling 2026-10-15 (design.md 5.116, meta-spec M10), governs this item: its commands produce files, Markdown, JSON, and exit codes and never call a host API; only the seeded GitHub workflow posts the PR comment, sets the commit status and label, and pushes the record ref; the migrating-knowledge skill gets one section for this function saying which command output to wire up on another host.",
+        "Back in 2.0.0 by the owner's ruling of 2026-10-21 (design.md 193)."
       ],
       "milestone": null,
       "status": "open",
@@ -1062,11 +1114,12 @@
         "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 73 on the 2.0.0 release.",
         "Owner ruling 2026-10-16 (design.md 5.126, meta-spec review F6): the merge-base rules are read from git at the merge base (knowledge/, the copied packs, .houserules.json) with their checksums checked, with no network and no old binary.",
         "Owner ruling 2026-10-16 (design.md 5.151, meta-spec O17), delivered with this item: when the merge base has no install schema, audit reads its rules through the 1.x conversion in memory (no write, no network, no old binary) and prints one line saying so; D4 applies to HEAD only; the upgrade pull request is audited against the converted merge-base rules and HEAD's rules, both results reported, and gets the highest tier; the batch-37 live run shows this for an install from each released tag.",
-        "Owner ruling 2026-10-19 (design.md 5.153, meta-spec O19), delivered with this item: the in-memory 1.x conversion of the merge base maps the layout only (packs, local pack, overrides, exclusions, the area model), reads every entry's text from the merge base, and pins nothing to the binary's packs; the merge-base audit applies the 1.x rules as written, and the HEAD audit the 2.0 rules."
+        "Owner ruling 2026-10-19 (design.md 5.153, meta-spec O19), delivered with this item: the in-memory 1.x conversion of the merge base maps the layout only (packs, local pack, overrides, exclusions, the area model), reads every entry's text from the merge base, and pins nothing to the binary's packs; the merge-base audit applies the 1.x rules as written, and the HEAD audit the 2.0 rules.",
+        "Moved out of 2.0.0 to a 2.x minor release by the owner's ruling of 2026-10-21 (design.md 192)."
       ],
-      "milestone": null,
+      "milestone": "2.x",
       "status": "open",
-      "batch": 37,
+      "batch": null,
       "see": [
         "HR-179",
         "HR-186",
@@ -1078,7 +1131,7 @@
       "type": "feat",
       "title": "Spec and plan steps fold technical-debt candidates into the batch",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 34,
       "see": [
         "HR-181",
@@ -1087,7 +1140,8 @@
       "body": [
         "Owner, verbatim, 2026-10-16: \"In the reference workflow, I want the spec/plan steps - when a new feature or a bigger rework is worked on - to check the tech debt items in the backlog and automatically include convenient candidates for tech debt reduction.\"",
         "The technical-debt items are the open items that carry the deferral marker of design.md 5.103. The reference workflow's spec and plan steps query them through the backlog contract (design.md 5.104), so the step works on the JSON backlog, Beads, and GitHub Issues alike, and fold the convenient candidates into the batch. Ruled in design.md 5.127.",
-        "Owner ruling 2026-10-16 (design.md 5.128): the step runs at the spec and plan steps of a standard-tier or full-tier batch; a candidate is an open deferral whose files overlap the batch's planned files and whose inclusion does not raise the batch's tier; the spec lists each folded candidate with the overlapping files and each overlapping item left out with the reason; the owner's spec approval stays the gate."
+        "Owner ruling 2026-10-16 (design.md 5.128): the step runs at the spec and plan steps of a standard-tier or full-tier batch; a candidate is an open deferral whose files overlap the batch's planned files and whose inclusion does not raise the batch's tier; the spec lists each folded candidate with the overlapping files and each overlapping item left out with the reason; the owner's spec approval stays the gate.",
+        "Owner ruling 2026-10-20 (design.md 185, batch-34 spec Q7, amends 5.128): a candidate is convenient when its files overlap and folding it in does not turn a non-critical task critical."
       ]
     },
     {
@@ -1116,7 +1170,7 @@
       "type": "fix",
       "title": "The reference workflow reads houserules output through files",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 34,
       "see": [
         "HR-195",
@@ -1148,7 +1202,7 @@
       "type": "feat",
       "title": "The reference workflow drops the full tier; a critical task gets a faster check of quality",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 34,
       "see": [
         "HR-181",
@@ -1176,7 +1230,7 @@
       "type": "feat",
       "title": "The reference workflow covers what the superpowers plugin adds, so it no longer depends on the plugin",
       "milestone": null,
-      "status": "open",
+      "status": "done",
       "batch": 34,
       "see": [
         "HR-181",
@@ -1186,7 +1240,8 @@
       "body": [
         "Owner ruling 2026-10-19 (design.md 5.161): the reference workflow becomes independent of the superpowers plugin. Adopters are not blocked from using the plugin with houserules, but it adds no value, because the reference workflow covers every area the plugin adds to the workflow. Trigger: the plugin's brainstorming skill opens with an open question, which fits a start from scratch but irritates on a project that already holds its design.",
         "Deliver: the kit names no superpowers skill (today: the Design, Plan, and Build rows of the orchestrating skill, and the superpowers sentence of process.brainstorm-first); the reference workflow covers each area of the plugin's skills (7.0.0: brainstorming, writing-plans, executing-plans, subagent-driven-development, dispatching-parallel-agents, test-driven-development, systematic-debugging, verification-before-completion, requesting-code-review, receiving-code-review, using-git-worktrees, finishing-a-development-branch, writing-skills, and the plugin's own using-superpowers and diagnosing-superpowers); its design step starts from what the project already holds (its backlog item, rulings, and specs) and asks the human only what they leave open.",
-        "Batch 34's spec maps each plugin skill to the reference-workflow skill, template, or entry that covers it; the owner rules any skill the map leaves uncovered. Acceptance: a session of the reference workflow without the plugin runs every lifecycle phase; with the plugin installed, nothing in the kit asks for it or breaks."
+        "Batch 34's spec maps each plugin skill to the reference-workflow skill, template, or entry that covers it; the owner rules any skill the map leaves uncovered. Acceptance: a session of the reference workflow without the plugin runs every lifecycle phase; with the plugin installed, nothing in the kit asks for it or breaks.",
+        "Owner ruling 2026-10-20 (design.md 181, batch-34 spec Q3): systematic-debugging, writing-skills, and diagnosing-superpowers stay uncovered; the migrating-knowledge skill says so."
       ]
     },
     {
@@ -1267,7 +1322,9 @@
         "6. process.tdd: check-report-claims fails a tdd row whose RED output holds no FAILED or panicked line and no disclosed-mutation label.",
         "7. quality.principles: a lint test that only rules::git_paths and rules::render::location run git ls-files (the recurring DRY slip).",
         "8. writing-style.code-comments: a warn grep-absent check over changed Rust files for history narration (batch N, task N review, fix round N). The rule stays judged as a whole; the check does not replace it.",
-        "9. writing-style.doc-comments: rustc's missing_docs lint where the crate exposes a library surface, and the history-narration check of item 8 over doc comments."
+        "9. writing-style.doc-comments: rustc's missing_docs lint where the crate exposes a library surface, and the history-narration check of item 8 over doc comments.",
+        "Owner ruling 2026-10-20 (design.md 179): item 5 warns only for a decision that changes what the spec states.",
+        "Batch 34 record: item 9 is delivered by HR-165 point 2 (#![warn(missing_docs)] in crates/houserules/src/main.rs); items 1 to 8 stay open."
       ],
       "milestone": null,
       "status": "open",
@@ -1275,6 +1332,365 @@
       "see": [
         "HR-202"
       ]
+    },
+    {
+      "id": "HR-205",
+      "type": "feat",
+      "title": "check-report-claims: a cited stats run names the file that holds its window",
+      "body": [
+        "Deferred from batch 34 (spec revision 4, round-3 design review T25): HR-165 point 3's second half. The rule needs a detection pattern for a cited stats run, and houserules.plan-semantics-run-on-the-corpus requires that pattern to run over the real corpus before a plan fixes it. Batch 34 ships the first half (a cited workspace path must exist).",
+        "Scope: define how check-report-claims recognizes a cited stats run in a report, a spec, or a backlog item; run the pattern over the deliverables of batches 28 to 34; give the finding line; check that the cited run names its stats-batches-<a>-<b>.json window file."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-165"
+      ],
+      "deferral": {
+        "reason": "the detection rule needs a corpus run before a plan fixes it",
+        "origin": "batch-34 spec round-3 review T25",
+        "files": [
+          "crates/houserules/src/report_claims.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-206",
+      "type": "fix",
+      "title": "pack upgrade and pack remove: an optIn id that a new version keeps but no longer lists",
+      "body": [
+        "Deferred from batch 34 (Task 4 fix round 1, concerns 2 and 3). A pack version that keeps an entry but drops its id from optIn leaves the opt-in exclusion in place, and pack remove then refuses with the exclusion line. The untaken offer is houserules' own data, as it is for a dropped entry, so upgrade should withdraw it. Separately, a pack remove that stops after it withdraws an offer and before it removes the copy leaves the entry live until the rerun finishes the removal.",
+        "Reason for the deferral: in 2.0 no kit pack lists optIn but the process pack, whose one optIn id ships in batch 34, so no released version can drop it yet. Scope: withdraw an untaken offer whose id leaves optIn on upgrade; order pack remove so that no stop leaves an untaken opt-in entry live; a locked-file stop test for each."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-180"
+      ],
+      "deferral": {
+        "reason": "no released kit pack can drop an optIn id in 2.0; only the process pack lists one",
+        "origin": "batch 34 task 4 fix round 1",
+        "files": [
+          "crates/houserules/src/pack/mod.rs",
+          "crates/houserules/src/pack/opt_in.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-207",
+      "type": "fix",
+      "title": "dependency-vetting: trigger on mise tool files",
+      "body": [
+        "Found by the batch 34 Task 3 review. The security-hygiene.dependency-vetting check's if globs list package, Cargo, Python, Go, Ruby, and PHP manifests, but not mise.toml, .mise.toml, mise.*.toml, or .tool-versions, so a change that adds a tool through mise passes the row without vetting.",
+        "Scope: the check's if globs cover every project config file that mise reads, at any depth (mise docs, configuration.md 'Config file locations'): **/mise.toml, **/.mise.toml, **/mise.*.toml, **/.tool-versions, **/mise/config.toml, **/mise/conf.d/**/*.toml, **/.mise/config.toml, **/.mise/conf.d/**/*.toml, **/.config/mise.toml, **/.config/mise/*.toml, **/.config/mise/conf.d/**/*.toml; with a regression test per location (an audit of a commit that adds a mise tool without dependency_vetting fails the row). The Task 9 review widened the first four-glob scope. Delivered by batch 34 Task 9."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-180"
+      ]
+    },
+    {
+      "id": "HR-208",
+      "type": "fix",
+      "title": "Task 9 findings left at the standard tier's re-review cap",
+      "body": [
+        "Filed at the cap of batch 34 Task 9 (task-9-review-r1.json): finding 4 (Important) stays open, the mise globs miss the local and environment config files (.mise.local.toml, .mise.<env>.toml, .mise.<env>.local.toml, and the config.local.toml, config.<env>.toml, config.<env>.local.toml forms under mise/ and .mise/; t9-review-r1-probe-mise-gaps.txt), and ten Minor findings of the re-review's new_breakage (three assertions with no RED; an unguarded skip in pack_texts.rs; the MISE_GLOBS closure claim; concern 7's list; the security-hygiene version under C41; 'the source research' in process.design-decisions-carry-probes; the live-run record of the GitHub steps; the wrapped refused git commands; build noise in tdd[1]; the self_audit note counted as a finding), plus the duplicate '## Workflow' heading of AGENTS.md (task-7-review.json).",
+        "Reason for the item: the standard tier allows one re-review per task, and an open finding at the cap becomes a backlog item (process.bounded-review-loop). Delivered in batch 34 by Task 9 fix round 2, closed by the controller's verification note."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 34,
+      "see": [
+        "HR-207",
+        "HR-181"
+      ]
+    },
+    {
+      "id": "HR-209",
+      "type": "feat",
+      "title": "Compatibility with OpenSpec in 2.0.0",
+      "body": [
+        "Owner, 2026-10-21, verbatim: \"I just caught a gap in the meta-spec: we need to be compatible in some way with openspec and github spec kit (openspec has preference).\"",
+        "Research so far (controller, 2026-10-21, against the current docs: OpenSpec v1.14.3, docs/agent-contract.md, docs/customization.md, docs/supported-tools.md; Spec Kit v1.2.2, docs/reference/agentic-sdd.md, docs/reference/extensions.md): OpenSpec keeps specs and changes under openspec/ (changes/<id>/proposal.md, design.md, tasks.md, delta specs; archive/), has a JSON agent contract (list, show, status, validate, archive --json), and takes project context, per-artifact rules, and apply/archive guidance from openspec/config.yaml. Spec Kit keeps .specify/ and per-feature spec.md, plan.md, tasks.md, and has an extension system with before_<command> and after_<command> hooks registered in .specify/extensions.yml.",
+        "Open: the owner rules what compatible means (coexistence, the houserules step inside their implement phase, their changes as work items, houserules rules rendered into their context), the release it lands in, and whether it supersedes design.md 184(2) (no recipe for another workflow ships).",
+        "Ruled 2026-10-21 (design.md 191): OpenSpec support ships in 2.0.0; Spec Kit moves to HR-210, a minor release after 2.0.0."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 38,
+      "see": [
+        "HR-180",
+        "HR-181",
+        "HR-210"
+      ]
+    },
+    {
+      "id": "HR-210",
+      "type": "feat",
+      "title": "Compatibility with GitHub Spec Kit in a minor release after 2.0.0",
+      "body": [
+        "Split from HR-209 by the owner's ruling of 2026-10-21 (design.md 191): \"spec kit can follow as a minor release later.\"",
+        "Research: Spec Kit v1.2.2 keeps .specify/ and per-feature spec.md, plan.md, tasks.md, and has an extension system with before_<command> and after_<command> hooks registered in .specify/extensions.yml (batch-34 workspace hr-209-research/). The levels of compatibility are ruled when it is scheduled."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-209"
+      ]
+    },
+    {
+      "id": "HR-211",
+      "type": "feat",
+      "title": "An MCP server and Continue and PR-Agent recipes over the versioned schemas (issue 67, rest)",
+      "body": [
+        "Split from HR-187 by the owner's ruling of 2026-10-21 (design.md 192): a houserules mcp server exposing get, for, audit, and evidence, and recipes for a Continue check and a PR-Agent configuration (issue 67). 2.0.0 ships the versioned schemas these build on. Close issue 67 with this item."
+      ],
+      "milestone": "2.x",
+      "status": "open",
+      "batch": null,
+      "see": [
+        "HR-187",
+        "HR-185"
+      ]
+    },
+    {
+      "id": "HR-212",
+      "type": "chore",
+      "title": "Comment on each GitHub issue at the 2.0.0 release: the part 2.0.0 covers and the part that follows",
+      "body": [
+        "Owner, 2026-10-21 (design.md 193), verbatim: \"Upon release of 2.0.0 i want the github issues to be commented on with what part is covered and what follows.\"",
+        "Scope: at the 2.0.0 release, for every GitHub issue that a 2.0.0 or 2.x item names, post one comment stating what 2.0.0 delivers for the issue and what follows in which 2.x item; close an issue that 2.0.0 delivers whole. Enumerate the issues from the item bodies at release time (a saved script and its output in the release batch's workspace); the owner reviews the comment texts before they are posted."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 38,
+      "see": [
+        "HR-211",
+        "HR-210"
+      ]
+    },
+    {
+      "id": "HR-213",
+      "type": "fix",
+      "title": "Let adopters keep the batch workspaces out of git without failing the knowledge CI job",
+      "body": [
+        "Owner, 2026-10-21, verbatim: \"Adopters report that the workspaces directory grows very large and can't be gitignored because otherwise the ci knowledge job fails.\"",
+        "Owner, 2026-10-21, verbatim: \"the ci check that fails is check-knowledge that has files that point into the verify path. 2.0.0, batch 35\". So check-knowledge fails an entry whose `verify` path names a workspace file that git does not hold (crates/houserules/src/rules/check.rs, the `verify path ... does not exist` finding); process.evidence-outlives-the-session tells authors to cite captures in the deliverables folder. Reproduce it first: an install of the reference workflow with a gitignored workspace and an entry whose `verify` names a workspace file, run through the seeded workflow's three gates in a fresh clone.",
+        "Scope: the workspace can be gitignored, or kept small, and the knowledge job stays green; the evidence rule and the stats, audit --workspace, and branch-review reads that use the workspace keep working on the machine that holds it.",
+        "Why the kit repository never failed: it gitignores its workspace `.superpowers/` (since f7f8baf), and all 43 `verify` paths of its knowledge name tracked files, none under `.superpowers/` (measured 2026-10-21 over knowledge/*.json and knowledge/packs/*.json). Where a test needed workspace content, the content was committed as a fixture copy and the entry verifies the copy (houserules.corpus-batch14-fixtures-are-committed). The kit states this practice nowhere for adopters.",
+        "Owner, 2026-10-21 (design.md 195), verbatim: \"workspaces should be gitignored from the start in adopters.\" So the fix gives the workspaces a gitignored home from the first install; batch 35's spec names the location, the ignore line that init and update write, the move of an install that tracks its workspaces today, and what a verify path into a workspace becomes."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 35
+    },
+    {
+      "id": "HR-214",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "The exact-pins gate flags a bare Cargo version and a mise tool pin that is not a full version",
+      "body": [
+        "Owner ruling 2026-10-21 (batch 34 fix wave): an old gap of the gate, not made by batch 34; batch 35 holds the audit and check work. Reproduction: branch-review issue 4 (a Cargo.toml serde = \"1.0.200\" and a mise.toml bd = \"latest\" pass)."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Owner ruling 2026-10-21 (batch 34 fix wave): an old gap of the gate, not made by batch 34; batch 35 holds the audit and check work. Reproduction: branch-review issue 4 (a Cargo.toml serde = \"1.0.200\" and a mise.toml bd = \"latest\" pass).",
+        "origin": "batch 34 branch review (owner ruling 2026-10-21: defer to batch 35), issue 4",
+        "files": [
+          "template/packs/security-hygiene.json"
+        ]
+      }
+    },
+    {
+      "id": "HR-215",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "Agent templates record the dispatch's Model: value verbatim, with the eval run the template change needs",
+      "body": [
+        "Owner ruling 2026-10-21 (batch 34 fix wave): the template change forces a re-run of every eval scenario; batch 34 makes stats group an alias with its model id instead. Branch-review issue 2: deliverables record opus and claude-opus-5-5 for one role.",
+        "Same eval run (branch re-review r1, issue 5): implementer.md step 1 says to fix every fail row and every line of references.failures; task-reviewer.md step 5 says that a line in references.failures, or a self_audit.summary.reference_fail that differs from the audit, is a finding."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Owner ruling 2026-10-21 (batch 34 fix wave): the template change forces a re-run of every eval scenario; batch 34 makes stats group an alias with its model id instead. Branch-review issue 2: deliverables record opus and claude-opus-5-5 for one role.",
+        "origin": "batch 34 branch review (owner ruling 2026-10-21: defer to batch 35), issue 2",
+        "files": [
+          "template/workflows/reference/.claude/agents/implementer.md",
+          "template/workflows/reference/.claude/agents/task-reviewer.md"
+        ]
+      }
+    },
+    {
+      "id": "HR-216",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "update in a git repository with no install stops with a raw OS error and leaves a broken marker",
+      "body": [
+        "Owner ruling 2026-10-21 (batch 34 fix wave): the defect is older than batch 34 (measured at fcc342d); batch 35 holds it. Branch-review issue 5: knowledge/schema.json: No such file or directory (os error 2)."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Owner ruling 2026-10-21 (batch 34 fix wave): the defect is older than batch 34 (measured at fcc342d); batch 35 holds it. Branch-review issue 5: knowledge/schema.json: No such file or directory (os error 2).",
+        "origin": "batch 34 branch review (owner ruling 2026-10-21: defer to batch 35), issue 5",
+        "files": [
+          "crates/houserules/src/install/mod.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-217",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "Run live case 24's GitHub half: the seeded knowledge workflow on GitHub after the 2.0.0 release",
+      "body": [
+        "Spec C44: the seeded workflow installs the release that .houserules.json names, and v1.4.0 cannot read a 2.0 install, so the run can pass only at the 2.0.0 rollout (batch 38). Branch-review issue 3."
+      ],
+      "batch": 38,
+      "deferral": {
+        "reason": "Spec C44: the seeded workflow installs the release that .houserules.json names, and v1.4.0 cannot read a 2.0 install, so the run can pass only at the 2.0.0 rollout (batch 38). Branch-review issue 3.",
+        "origin": "batch 34 live run, case 24, C44",
+        "files": [
+          "template/.github/workflows/knowledge.yml",
+          "crates/houserules/src/install/ci_workflow.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-218",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "The durable-sha check reads docs/plans/** and .claude/evals/record.json too",
+      "body": [
+        "Owner ruling 2026-10-21 (batch 34 fix wave, checks go to batch 35): the check missed interim shas in the plan and the eval record. Batch 34 restates both shas at aggregation. Branch-review issue 7.",
+        "The check's scope is the files list of the knowledge-base.cite-durable-refs check in template/packs/knowledge-base.json (durable_sha.rs holds no glob); the pack's version moves with the change (branch re-review r1, issue 3)."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Owner ruling 2026-10-21 (batch 34 fix wave, checks go to batch 35): the check missed interim shas in the plan and the eval record. Batch 34 restates both shas at aggregation. Branch-review issue 7.",
+        "origin": "batch 34 branch review (owner ruling 2026-10-21: defer to batch 35), issue 7",
+        "files": [
+          "template/packs/knowledge-base.json"
+        ]
+      }
+    },
+    {
+      "id": "HR-219",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "Apply the check and template proposals of the batch-34 retrospective",
+      "body": [
+        "Batch 34 batch close: each proposal changes a check, an agent template (a full eval run), or a kit pack, the work of batch 35. Items: (1) stats mechanize rows with owner_gate false for houserules.crash-paths-are-named, knowledge-base.state-only-the-source, quality.exclusive-pins-are-mutation-proven, quality.gates-derive-their-scope, quality.user-facing-text-is-contract, writing-style.instructions-cover-the-state-space (the branch review judges that each needs judgment no grep or co-change check holds; decide per row); (2) a co-change check crates/houserules/src/install/classes.rs -> README.md for houserules.readme-mirrors-kit-owned; (3) a grep-absent warn check for history phrases in crates/**/*.rs for writing-style.code-comments; (4) check-report-claims checks commit-body counts against the capture they name, warns on closure words without an enumeration, and flags a cited scratchpad or /tmp path; (5) the implementer template carries the refused-commands rule; (6) the task-reviewer template scopes its rule_adherence flip to judged rows; (7) the docs-edit eval brief names the binary; (8) stats reads Reversal: lines; (9) the orchestrating skill names efficiency.json before the branch review. Source: branch-review.json retrospective and recommendations."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Batch 34 batch close: each proposal changes a check, an agent template (a full eval run), or a kit pack, the work of batch 35. Items: (1) stats mechanize rows with owner_gate false for houserules.crash-paths-are-named, knowledge-base.state-only-the-source, quality.exclusive-pins-are-mutation-proven, quality.gates-derive-their-scope, quality.user-facing-text-is-contract, writing-style.instructions-cover-the-state-space (the branch review judges that each needs judgment no grep or co-change check holds; decide per row); (2) a co-change check crates/houserules/src/install/classes.rs -> README.md for houserules.readme-mirrors-kit-owned; (3) a grep-absent warn check for history phrases in crates/**/*.rs for writing-style.code-comments; (4) check-report-claims checks commit-body counts against the capture they name, warns on closure words without an enumeration, and flags a cited scratchpad or /tmp path; (5) the implementer template carries the refused-commands rule; (6) the task-reviewer template scopes its rule_adherence flip to judged rows; (7) the docs-edit eval brief names the binary; (8) stats reads Reversal: lines; (9) the orchestrating skill names efficiency.json before the branch review. Source: branch-review.json retrospective and recommendations.",
+        "origin": "batch 34 branch review, retrospective",
+        "files": [
+          "knowledge/houserules.json",
+          "template/workflows/reference/.claude/agents/implementer.md"
+        ]
+      }
+    },
+    {
+      "id": "HR-220",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "init with no --tracker on an install that has a tracker rewrites a lost deliverables schema with the any-token pattern",
+      "body": [
+        "Batch 34 made this gap: it made the deliverables schema's default pattern the any-token one and the backlogId pattern a tracker's (spec 3.9); at fcc342d the template schema held the prefix pattern. Found by batch 34 Task 12 (concern 7) and the branch re-review (issue 2). A later update restores the right pattern. Owner ruling 2026-10-21 (the re-review's last Minors): deferred to batch 35. Fix direction: for the JSON and GitHub adapters, seed takes the installed tracker's pattern with no backend call, as install_backlog_id_pattern does for a new tracker; Beads keeps the C38 handling of an unreachable bd."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Batch 34 made this gap: it made the deliverables schema's default pattern the any-token one and the backlogId pattern a tracker's (spec 3.9); at fcc342d the template schema held the prefix pattern. Found by batch 34 Task 12 (concern 7) and the branch re-review (issue 2). A later update restores the right pattern. Owner ruling 2026-10-21 (the re-review's last Minors): deferred to batch 35. Fix direction: for the JSON and GitHub adapters, seed takes the installed tracker's pattern with no backend call, as install_backlog_id_pattern does for a new tracker; Beads keeps the C38 handling of an unreachable bd.",
+        "origin": "batch 34 Task 12, concern 7; branch re-review r1, issue 2",
+        "files": [
+          "crates/houserules/src/install/mod.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-221",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "The audit JSON's references.resolved counts failed references too: rename it or count only passes",
+      "body": [
+        "Owner ruling 2026-10-21 (the re-review's last Minors): deferred to batch 35, the audit and checks batch; the key ships first in 2.0.0 (batch 38). Reproduction: branch-rr1-probe-audit-json-vs-exit.txt (resolved 2 with two failures). Update audit --help, README, the upgrade guide, the Verdict doc comment, and the tests."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Owner ruling 2026-10-21 (the re-review's last Minors): deferred to batch 35, the audit and checks batch; the key ships first in 2.0.0 (batch 38). Reproduction: branch-rr1-probe-audit-json-vs-exit.txt (resolved 2 with two failures). Update audit --help, README, the upgrade guide, the Verdict doc comment, and the tests.",
+        "origin": "batch 34 branch re-review r1 (owner ruling 2026-10-21: defer to batch 35), issue 1; Task 12 review",
+        "files": [
+          "crates/houserules/src/rules/trailers.rs",
+          "crates/houserules/src/main.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-222",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "check-report-claims --doc and --item treat a tool's output path under .houserules/step/ as a workspace citation",
+      "body": [
+        "Owner ruling 2026-10-21 (the re-review's last Minors; checks go to batch 35). The batch-34 spec names the step script's outputs .houserules/step/rules.json and audit.json (4.4a), and the check fails when the checkout has not run the step (branch-rr1-probe-spec-claims.txt)."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Owner ruling 2026-10-21 (the re-review's last Minors; checks go to batch 35). The batch-34 spec names the step script's outputs .houserules/step/rules.json and audit.json (4.4a), and the check fails when the checkout has not run the step (branch-rr1-probe-spec-claims.txt).",
+        "origin": "batch 34 branch re-review r1 (owner ruling 2026-10-21: defer to batch 35), issue 6",
+        "files": [
+          "crates/houserules/src/report_claims/doc.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-223",
+      "type": "chore",
+      "title": "Rewrite README for 2.0.0: when and why houserules fits, the consistency layer, and its clean integration",
+      "body": [
+        "Owner, 2026-10-21, verbatim: \"Make sure that you rewrite the readme when we publish v2. Users must know at a glance when and why houserules is the right solution for them and they must know that houserules can be the central layer that keeps their ai-native coding consistent instead of diverging into whatever agents deem correct in the moment with their limited knowledge of a session. Adhere to the best-practices of README writing that you have once researched and make sure to research beforehand, what makes houserules unique and strong against other solutions and make those advantages clear.\"",
+        "Owner, 2026-10-21, verbatim: \"Also make clear that it integrates cleanly with the other solutions (which in and of itself is a big strength of houserules v2).\"",
+        "Scope: (1) Research first, at spec time, with sources recorded in the batch workspace: current README practice (re-checked against the batch-26 research of design.md 84 and writing-style.readme-is-an-adopter-funnel), and what makes houserules unique and strong against the other solutions that adopters weigh (for example per-harness rule files such as AGENTS.md, CLAUDE.md, Cursor rules, and Copilot instructions; rule-sync tools; spec-driven toolkits such as OpenSpec and Spec Kit; agent memory banks); each claimed advantage is verified against the tree and the sources, never assumed. (2) The README's first screen says when and why houserules is the right solution, and that it can be the central layer that keeps AI-native coding consistent across agents, harnesses, and sessions, instead of each agent deciding in the moment from a session's limited knowledge. (3) The rest follows the adopter funnel: value, install, runnable usage, then depth; no process history, no claims that rot with releases. (4) The README makes clear that houserules integrates cleanly with those other solutions, a strength of 2.0 in its own right: it renders into the harnesses' own rule files, reads work items through the adopter's tracker, and works under OpenSpec and other workflows; each integration claim is shown by a run, not asserted. (5) The owner reviews the rewrite before the release is cut."
+      ],
+      "milestone": null,
+      "status": "open",
+      "batch": 38,
+      "see": [
+        "HR-212",
+        "HR-209"
+      ]
+    },
+    {
+      "id": "HR-224",
+      "type": "chore",
+      "milestone": null,
+      "status": "open",
+      "title": "check-report-claims fails a citation through an in-root symlink with git's beyond-a-symbolic-link error",
+      "body": [
+        "Found by batch 34 Task 13 (fix round 1): a relative or absolute citation through an in-root symlink, such as a .superpowers workspace symlinked into each worktree, makes git check-ignore abort the run (exit 2) instead of a named verdict. Older than Task 13 for the relative form; batch 35 holds the checks (owner ruling 2026-10-21 on the fix wave)."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Found by batch 34 Task 13 (fix round 1): a relative or absolute citation through an in-root symlink, such as a .superpowers workspace symlinked into each worktree, makes git check-ignore abort the run (exit 2) instead of a named verdict. Older than Task 13 for the relative form; batch 35 holds the checks (owner ruling 2026-10-21 on the fix wave).",
+        "origin": "batch 34 Task 13, concern 4 and fix round 1",
+        "files": [
+          "crates/houserules/src/report_claims/doc.rs"
+        ]
+      }
     }
   ]
 }
