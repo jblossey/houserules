@@ -11,13 +11,203 @@
 //! of its steps. Each value is a YAML single-quoted scalar.
 //!
 //! The file lies outside the install root, so its baseline key is its path
-//! in git's top-level pathspec form (`:/<path>`), which does not depend on
-//! the install root.
+//! in the top-level pathspec form of `git` (`:/<path>`), which does not
+//! depend on the install root.
+//!
+//! The steps of the file depend on the tracker of the install (spec 4.8). JSON
+//! and no tracker keep the steps of the template. GitHub adds a job-level
+//! `permissions` block and the token to the steps that run `check-backlog` and
+//! `audit`, because `gh` reads the issues of the repository. Beads adds a step
+//! that installs `bd` at the release that `mise.toml` pins and a step that
+//! runs `bd bootstrap`, because a fresh clone has no Beads store.
+//! [`template_for`] builds the text from the template, and [`write_for`] keeps
+//! the file of an install at the content that its tracker calls for: every
+//! command that sets `tracker` calls it, and so does `update`.
 
-use super::location::Placement;
+use std::path::Path;
+
+use super::hand_steps;
+use super::location::{self, Placement};
+use super::marker::Marker;
+use super::sync::sync_file;
+use super::{is_overridden, payload_content};
+use crate::tracker::Adapter;
+use crate::tracker::beads::BD_VERSION;
 
 /// The template's own path, below the git top level.
 pub(super) const TEMPLATE_PATH: &str = ".github/workflows/knowledge.yml";
+
+/// The step of the template that runs `check-backlog`.
+const CHECK_BACKLOG_LINE: &str = "      - run: houserules check-backlog";
+
+/// The last line of the step of the template that runs `audit`.
+const AUDIT_LAST_LINE: &str = "          --head ${{ github.event.pull_request.head.sha }}";
+
+/// The job-level permissions of the GitHub form: `gh` reads the issues.
+const GITHUB_PERMISSIONS: &str = "    permissions:\n      contents: read\n      issues: read";
+
+/// The env of a step of the GitHub form that runs a gate: `gh` takes its token
+/// from `GH_TOKEN`.
+const GITHUB_TOKEN_ENV: &str = "        env:\n          GH_TOKEN: ${{ github.token }}";
+
+/// The text that the project must hold for the GitHub form: the read of the
+/// issues and the token. A kept workflow that holds both needs no hand step.
+const GITHUB_MARKERS: [&str; 2] = ["issues: read", "GH_TOKEN: ${{ github.token }}"];
+
+/// The text that the project must hold for the Beads form.
+const BEADS_MARKER: &str = "bd bootstrap";
+
+/// The steps of the Beads form, which go before the step that runs
+/// `check-backlog`: the release of `bd` that `mise.toml` pins is downloaded
+/// with its checksums and verified, and the store is bootstrapped from the
+/// Dolt data of the origin. The usage metrics of `bd` are off (ruling 188).
+fn beads_steps() -> String {
+    format!(
+        r#"      - name: Install bd
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=beads_{BD_VERSION}_linux_amd64.tar.gz
+          base=https://github.com/gastownhall/beads/releases/download/v{BD_VERSION}
+          mkdir -p "$RUNNER_TEMP/bd"
+          cd "$RUNNER_TEMP/bd"
+          curl --proto '=https' --tlsv1.2 -fsSLO "$base/$archive"
+          curl --proto '=https' --tlsv1.2 -fsSLO "$base/checksums.txt"
+          sha256sum --check --ignore-missing checksums.txt
+          tar -xzf "$archive"
+          echo "$RUNNER_TEMP/bd" >> "$GITHUB_PATH"
+      - name: Bootstrap the Beads store
+        shell: bash
+        env:
+          BD_DISABLE_METRICS: '1'
+          DO_NOT_TRACK: '1'
+        run: bd bootstrap --yes"#
+    )
+}
+
+/// `template` with `addition` after (`after`) or before the one line that equals
+/// `anchor`. A template that lacks the line, or holds it twice, is a defect of
+/// the kit, named in one line.
+fn insert_at_line(
+    template: &str,
+    anchor: &str,
+    addition: &str,
+    after: bool,
+    adapter: Adapter,
+) -> Result<String, String> {
+    if template.lines().filter(|line| *line == anchor).count() != 1 {
+        return Err(format!(
+            "{TEMPLATE_PATH}: the line {anchor:?} must occur once for the workflow of the {} tracker",
+            adapter.as_str()
+        ));
+    }
+    let mut lines = Vec::new();
+    for line in template.lines() {
+        if line == anchor && !after {
+            lines.push(addition);
+        }
+        lines.push(line);
+        if line == anchor && after {
+            lines.push(addition);
+        }
+    }
+    let mut text = lines.join("\n");
+    if template.ends_with('\n') {
+        text.push('\n');
+    }
+    Ok(text)
+}
+
+/// The seeded CI workflow of an install with the tracker `adapter` (or none) and
+/// the id prefix `prefix`, before the subdirectory form: the template, with the
+/// lines of the adapter (the module doc has them).
+pub(super) fn template_for(adapter: Option<Adapter>, prefix: &str) -> Result<Vec<u8>, String> {
+    let template = payload_content(TEMPLATE_PATH, prefix)?;
+    let text =
+        std::str::from_utf8(&template).map_err(|_| format!("{TEMPLATE_PATH}: not valid UTF-8"))?;
+    let form = match adapter {
+        None | Some(Adapter::Json) => return Ok(template),
+        Some(Adapter::Github) => {
+            let github = Adapter::Github;
+            let text = insert_at_line(text, RUNS_ON_LINE, GITHUB_PERMISSIONS, true, github)?;
+            let text = insert_at_line(&text, CHECK_BACKLOG_LINE, GITHUB_TOKEN_ENV, true, github)?;
+            insert_at_line(&text, AUDIT_LAST_LINE, GITHUB_TOKEN_ENV, true, github)?
+        }
+        Some(Adapter::Beads) => insert_at_line(
+            text,
+            CHECK_BACKLOG_LINE,
+            &beads_steps(),
+            false,
+            Adapter::Beads,
+        )?,
+    };
+    Ok(form.into_bytes())
+}
+
+/// The hand step for a seeded CI workflow that the project changed and that
+/// `update` kept (spec 4.8), or `None`. The file at `path` holds the bytes
+/// `current`. The hand step names the lines that the tracker `adapter` needs when
+/// the text lacks them. JSON, no tracker, and a file that holds the lines of its
+/// adapter get none.
+pub(super) fn hand_step_for_kept(
+    adapter: Option<Adapter>,
+    path: &str,
+    current: &[u8],
+) -> Option<String> {
+    let text = String::from_utf8_lossy(current);
+    match adapter {
+        Some(Adapter::Github) if GITHUB_MARKERS.iter().any(|needle| !text.contains(needle)) => {
+            Some(hand_steps::ci_lacks_the_github_lines(path))
+        }
+        Some(Adapter::Beads) if !text.contains(BEADS_MARKER) => {
+            Some(hand_steps::ci_lacks_the_beads_steps(path, BD_VERSION))
+        }
+        _ => None,
+    }
+}
+
+/// Brings the seeded CI workflow of the install at `root` to the content that
+/// the tracker `adapter` (or none) calls for, as `update` keeps a D3 file: a
+/// workflow that `marker` baselines, and that the project neither changed nor
+/// owns, is written when its bytes would change, and the baseline moves with
+/// it. A workflow with no baseline (an install that has none, or one that
+/// `init` skipped for a host other than GitHub) is left as found. Returns the
+/// lines that name each file written or kept, and the hand step of a kept file.
+pub(super) fn write_for(
+    root: &Path,
+    marker: &mut Marker,
+    adapter: Option<Adapter>,
+) -> Result<Vec<String>, String> {
+    let placement = location::locate(root)?;
+    let template = template_for(adapter, &marker.id_prefix_or("WI"))?;
+    let workflow = Workflow::for_install(&placement, &template)?;
+    let mut lines = Vec::new();
+    if is_overridden(&marker.owned_paths(), &workflow.path) {
+        return Ok(lines);
+    }
+    let mut baselines = marker.baselines();
+    if baselines.contains_key(&workflow.key) {
+        let kept = sync_file(
+            &placement.top_level,
+            &workflow.path,
+            &workflow.key,
+            &workflow.content,
+            &[],
+            &mut baselines,
+            &mut lines,
+        )?;
+        marker.set_baselines(baselines);
+        if kept {
+            let current = std::fs::read(placement.top_level.join(&workflow.path))
+                .map_err(|error| format!("{}: {error}", workflow.path))?;
+            lines.extend(
+                hand_step_for_kept(adapter, &workflow.path, &current)
+                    .map(|step| format!("{}{step}", hand_steps::PREFIX)),
+            );
+        }
+    }
+    Ok(lines)
+}
 
 /// The characters that a GitHub path filter reads as a pattern: a folder name
 /// that holds one would give a filter that never matches the folder.
@@ -360,5 +550,89 @@ mod tests {
                 .content,
             bytes
         );
+    }
+
+    /// JSON and no tracker keep the template as it is.
+    #[test]
+    fn json_and_no_tracker_keep_the_template() {
+        for adapter in [None, Some(Adapter::Json)] {
+            assert_eq!(
+                template_for(adapter, "WI").expect("a template"),
+                template().as_bytes()
+            );
+        }
+    }
+
+    /// The GitHub form adds the permissions once and the token to the two gate
+    /// steps; the Beads form adds the two steps before the `check-backlog`
+    /// step, which stays, and no token.
+    #[test]
+    fn the_forms_of_github_and_beads_add_only_their_lines() {
+        let github = String::from_utf8(template_for(Some(Adapter::Github), "WI").expect("form"))
+            .expect("UTF-8");
+        assert_eq!(github.matches(GITHUB_PERMISSIONS).count(), 1);
+        assert_eq!(github.matches(GITHUB_TOKEN_ENV).count(), 2);
+        let without: String = github
+            .replace(&format!("\n{GITHUB_PERMISSIONS}"), "")
+            .replace(&format!("\n{GITHUB_TOKEN_ENV}"), "");
+        assert_eq!(without, template());
+
+        let beads = String::from_utf8(template_for(Some(Adapter::Beads), "WI").expect("form"))
+            .expect("UTF-8");
+        let added = format!("{}\n", beads_steps());
+        assert_eq!(beads.replace(&added, ""), template());
+        assert!(beads.contains(&format!("beads_{BD_VERSION}_linux_amd64.tar.gz")));
+    }
+
+    /// A template that lacks the line of an anchor, or holds it twice, is a
+    /// defect of the kit, named in one line.
+    #[test]
+    fn an_anchor_that_does_not_occur_once_is_named() {
+        let expected = format!(
+            "{TEMPLATE_PATH}: the line {CHECK_BACKLOG_LINE:?} must occur once for the workflow of the beads tracker"
+        );
+        let lost: String = template()
+            .lines()
+            .filter(|line| *line != CHECK_BACKLOG_LINE)
+            .map(|line| format!("{line}\n"))
+            .collect();
+        let doubled = format!("{}{CHECK_BACKLOG_LINE}\n", template());
+
+        for text in [lost, doubled] {
+            assert_eq!(
+                insert_at_line(&text, CHECK_BACKLOG_LINE, "x", false, Adapter::Beads),
+                Err(expected.clone())
+            );
+        }
+    }
+
+    /// A kept workflow gets the hand step of its adapter only while it lacks
+    /// what the adapter needs.
+    #[test]
+    fn a_kept_workflow_gets_the_hand_step_of_its_adapter_while_it_lacks_the_lines() {
+        let path = "w.yml";
+        assert_eq!(
+            hand_step_for_kept(Some(Adapter::Github), path, b"name: mine\n"),
+            Some(hand_steps::ci_lacks_the_github_lines(path))
+        );
+        assert_eq!(
+            hand_step_for_kept(
+                Some(Adapter::Github),
+                path,
+                b"permissions: issues: read\nGH_TOKEN: ${{ github.token }}\n"
+            ),
+            None
+        );
+        assert_eq!(
+            hand_step_for_kept(Some(Adapter::Beads), path, b"name: mine\n"),
+            Some(hand_steps::ci_lacks_the_beads_steps(path, BD_VERSION))
+        );
+        assert_eq!(
+            hand_step_for_kept(Some(Adapter::Beads), path, b"run: bd bootstrap --yes\n"),
+            None
+        );
+        for adapter in [None, Some(Adapter::Json)] {
+            assert_eq!(hand_step_for_kept(adapter, path, b"name: mine\n"), None);
+        }
     }
 }

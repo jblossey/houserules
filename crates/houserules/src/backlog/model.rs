@@ -7,12 +7,12 @@
 //! pin test, which is why this file holds one type, not the fifteen
 //! `$defs` entries `backlog/schema.json` declares.
 //!
-//! `ItemStatus` (`$defs/status`) is `backlog::commands::set_item`'s one
-//! caller: it validates a `set status=<value>` assignment against this
-//! schema-pinned enum instead of a hand-typed string array that could
-//! drift from `backlog/schema.json` unnoticed, and a rejected `set` never
-//! writes anything back, so a parse failure here is the correct, final
-//! outcome. Every other `$defs` entry (`item`, `batch`, `amendment`,
+//! `ItemStatus` (`$defs/status`) is `tracker::parse_set`'s one caller, the
+//! one reader of `set` that every adapter uses: it validates a
+//! `set status=<value>` assignment against this schema-pinned enum instead
+//! of a hand-typed string array that could drift from `backlog/schema.json`
+//! unnoticed, and a rejected `set` never writes anything back, so a parse
+//! failure here is the correct, final outcome. Every other `$defs` entry (`item`, `batch`, `amendment`,
 //! `decision`, `parkedItem`, and their file wrappers) stays untyped here:
 //! `backlog::commands::get_items`/`set_item` must reproduce each item's
 //! own on-disk key order byte-for-byte, which a struct's fixed
@@ -22,8 +22,8 @@
 //! way `rules::model`'s loader tolerates one for the knowledge base,
 //! which a `#[serde(deny_unknown_fields)]` round-trip cannot; see
 //! `load.rs`'s module doc for the fuller account. Neither constraint
-//! applies to `ItemStatus`: `set_item` reads it as a bare string, never
-//! round-trips a whole `Item`, and correctly refuses malformed input.
+//! applies to `ItemStatus`: `tracker::parse_set` reads it as a bare string,
+//! never round-trips a whole `Item`, and correctly refuses malformed input.
 
 use serde::{Deserialize, Serialize};
 

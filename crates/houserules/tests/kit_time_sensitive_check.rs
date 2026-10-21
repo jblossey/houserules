@@ -3,7 +3,7 @@
 //! `houserules audit` over the range. The check is a `warn` row that names a
 //! changed knowledge file holding time-sensitive wording. The check reads the
 //! knowledge base and its kit source only, never product data that sits under
-//! another directory named `knowledge`. The pattern spells each word with one
+//! another directory named `knowledge`. Each branch of the pattern carries a
 //! bracketed letter, so the knowledge file that holds the pattern never matches
 //! it.
 
@@ -17,9 +17,9 @@ use serde_json::Value;
 const RULE: &str = "knowledge-base.summary-is-the-rule";
 
 /// The wording the check names, as a writer types it: every spelling that the
-/// tracked knowledge files or a reviewer's probe showed, a curly apostrophe and
-/// a bare "today" included.
-const PHRASES: [&str; 8] = [
+/// tracked knowledge files or a reviewer's probe showed, a curly apostrophe,
+/// a bare "today", and a release clause with a version number included.
+const PHRASES: [&str; 9] = [
     "Currently",
     "for now",
     "at the moment",
@@ -28,6 +28,7 @@ const PHRASES: [&str; 8] = [
     "Today\u{2019}s",
     "The list today",
     "until HR-048 ships a distribution channel",
+    "until 1.3.0 ships",
 ];
 
 /// A `Command` for the compiled `houserules` binary under test.

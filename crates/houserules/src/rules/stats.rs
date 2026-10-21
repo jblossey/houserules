@@ -6,8 +6,8 @@
 //!
 //! This module reads the files and keeps the four original keys
 //! (`violations`, `unused_ids`, `audits`, `reviews`). `cost.rs` renders
-//! the `workspaces` and `cost` keys; `proposals.rs` renders `rules`,
-//! `packs`, and `proposals`.
+//! the `workspaces`, `models`, and `cost` keys; `proposals.rs` renders
+//! `rules`, `packs`, and `proposals`.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
@@ -18,8 +18,10 @@ use serde_json::{Value, json};
 
 use crate::emit::emit;
 
-use super::cost::{self, AdherenceRow, Finding, Workspace};
-use super::deliverable::{array_field, read_deliverable_value, workspace_files};
+use super::cost::{self, AdherenceRow, Finding, ModelCost, Workspace};
+use super::deliverable::{
+    BRANCH_REVIEW_FILE, array_field, read_deliverable_value, stats_reads_phrase, workspace_files,
+};
 use super::model::{Base, load_base};
 use super::proposals;
 
@@ -55,22 +57,58 @@ fn tasks_json(tasks: &BTreeSet<String>) -> Value {
 
 /// What `stats` tells a person whose workspace holds a file it cannot
 /// read as a deliverable. `stats` aborts on such a file
-/// (`quality.gates-derive-their-scope`); this text names the way out.
-const UNREADABLE_DELIVERABLE_REMEDY: &str = "stats reads every task-*-audit*.json, \
-    task-*-review*.json, task-*-report.json, and branch-review.json in the workspace \
-    as a deliverable; rename the file or repair it";
+/// (`quality.gates-derive-their-scope`); this text names the way out. It
+/// names the files from the one list in `deliverable.rs`.
+fn unreadable_deliverable_remedy() -> String {
+    format!(
+        "stats reads every {} in the workspace as a deliverable; rename the file or repair it",
+        stats_reads_phrase()
+    )
+}
 
 /// Reads one workspace deliverable with `read_deliverable_value`, then
-/// appends `UNREADABLE_DELIVERABLE_REMEDY` to a failure. The shared reader
+/// appends `unreadable_deliverable_remedy` to a failure. The shared reader
 /// keeps its own text: `validate` and `audit` read through it too.
 fn read_workspace_deliverable(path: &Path) -> Result<Value, String> {
     read_deliverable_value(path)
-        .map_err(|error| format!("{error}. {UNREADABLE_DELIVERABLE_REMEDY}"))
+        .map_err(|error| format!("{error}. {}", unreadable_deliverable_remedy()))
 }
 
-/// The deliverable of a whole branch, which `workspace_files` does not
-/// list because it carries no task id.
-const BRANCH_REVIEW: &str = "branch-review.json";
+/// The model families that `models` rows group by.
+const MODEL_FAMILIES: [&str; 4] = ["fable", "haiku", "opus", "sonnet"];
+
+/// The `models` row of the `model` value `model`: the name of its family when
+/// it names exactly one as a whole word, whether it is the alias (`opus`) or an
+/// id (`claude-opus-5-5`, `us.anthropic.claude-opus-5-5-v1:0`), whatever its
+/// case. A value that names no family, or two, keeps its own row, as `human`,
+/// `unknown`, and `pre-2.0` do. A dispatch that names the alias and one that
+/// names an id then count one model in one row.
+fn model_row(model: &str) -> String {
+    let lowered = model.to_ascii_lowercase();
+    let mut named = MODEL_FAMILIES.iter().filter(|family| {
+        lowered
+            .split(|character: char| !character.is_ascii_alphanumeric())
+            .any(|word| word == **family)
+    });
+    match (named.next(), named.next()) {
+        (Some(family), None) => (*family).to_string(),
+        _ => model.to_string(),
+    }
+}
+
+/// The `models` row of the model that wrote the deliverable `data`
+/// (`model_row` of its `model` string), or `cost::PRE_2_0` when the field is
+/// absent or `null`. A `model` that is no non-empty string is a named error
+/// with `name`, as a field of the wrong type is everywhere else in `stats`:
+/// reading it as `pre-2.0` would hide the fault
+/// (`houserules.crash-paths-are-named`).
+fn model_of(data: &Value, name: &str) -> Result<String, String> {
+    match data.get("model") {
+        None | Some(Value::Null) => Ok(cost::PRE_2_0.to_string()),
+        Some(Value::String(model)) if !model.is_empty() => Ok(model_row(model)),
+        Some(_) => Err(format!("{name}: model is not a non-empty string")),
+    }
+}
 
 /// One workspace directory named on the command line, with the label that
 /// prefixes its task ids when several workspaces are read.
@@ -178,16 +216,16 @@ fn rows_of<'a>(data: &'a Value, field: &str, name: &str) -> Result<Vec<Row<'a>>,
         .collect())
 }
 
-/// Appends the findings of `data[field]` to `workspace`.
+/// Appends the findings of `data[field]` to `cost`.
 fn read_findings(
     data: &Value,
     field: &str,
     name: &str,
     label: &str,
-    workspace: &mut Workspace,
+    cost: &mut ModelCost,
 ) -> Result<(), String> {
     let issues = array_field(data, field).map_err(|error| format!("{name}: {error}"))?;
-    workspace.findings.extend(
+    cost.findings.extend(
         issues
             .into_iter()
             .map(|issue| Finding::from_issue(issue, label)),
@@ -226,22 +264,31 @@ fn read_audits(
     Ok(())
 }
 
-/// Reads the review fields every review kind shares -- `rule_adherence`
-/// and the findings -- into `workspace`. The findings of a `re-review`
-/// are its `new_breakage` rows; those of any other review are its
-/// `issues`. Returns the judged failed rows, which only a task review
-/// counts as violations.
+/// The review files `read_review` reads; the kind decides the field that holds
+/// the findings.
+#[derive(Clone, Copy)]
+enum ReviewFile {
+    /// A task review, a re-review, or the branch review.
+    Task,
+    /// A spec review: its findings are its `findings` rows.
+    Spec,
+}
+
+/// Reads the review fields every review kind shares -- `rule_adherence`,
+/// the findings, and the model that wrote the file -- into `workspace`. The
+/// findings of a spec review are its `findings` rows; those of a `re-review`
+/// are its `new_breakage` rows; those of any other review are its `issues`.
+/// Returns the judged failed rows, which only a task review counts as
+/// violations.
 fn read_review<'a>(
     reader: &Reader,
     name: &str,
     data: &'a Value,
+    file: ReviewFile,
     workspace: &mut Workspace,
 ) -> Result<Vec<Row<'a>>, String> {
-    workspace.reviews += 1;
+    let model = model_of(data, name)?;
     let re_review = data.get("kind").and_then(Value::as_str) == Some("re-review");
-    if re_review {
-        workspace.re_reviews += 1;
-    }
     let rows = rows_of(data, "rule_adherence", name)?;
     for row in &rows {
         workspace.rows.push(AdherenceRow {
@@ -250,8 +297,17 @@ fn read_review<'a>(
             counted: row.judged,
         });
     }
-    let findings = if re_review { "new_breakage" } else { "issues" };
-    read_findings(data, findings, name, reader.label, workspace)?;
+    let findings = match file {
+        ReviewFile::Spec => "findings",
+        ReviewFile::Task if re_review => "new_breakage",
+        ReviewFile::Task => "issues",
+    };
+    let cost = workspace.model(&model);
+    cost.reviews += 1;
+    if re_review {
+        cost.re_reviews += 1;
+    }
+    read_findings(data, findings, name, reader.label, cost)?;
     Ok(rows)
 }
 
@@ -266,7 +322,7 @@ fn read_reviews(
         let data = reader.read(name)?;
         let task = reader.task(name);
         tally.review_files += 1;
-        for row in read_review(reader, name, &data, workspace)? {
+        for row in read_review(reader, name, &data, ReviewFile::Task, workspace)? {
             if row.judged && row.failed {
                 stats_hit(&mut tally.violations, row.id, &task);
             }
@@ -278,34 +334,53 @@ fn read_reviews(
 /// Reads `branch-review.json` when the workspace holds it. Its rows and
 /// findings join the workspace; it feeds no original key.
 fn read_branch_review(reader: &Reader, workspace: &mut Workspace) -> Result<(), String> {
-    let path = reader.dir.join(BRANCH_REVIEW);
+    let path = reader.dir.join(BRANCH_REVIEW_FILE);
     let present = path
         .try_exists()
         .map_err(|error| format!("{}: {error}", path.display()))?;
     if !present {
         return Ok(());
     }
-    let data = reader.read(BRANCH_REVIEW)?;
-    read_review(reader, BRANCH_REVIEW, &data, workspace)?;
+    let data = reader.read(BRANCH_REVIEW_FILE)?;
+    read_review(
+        reader,
+        BRANCH_REVIEW_FILE,
+        &data,
+        ReviewFile::Task,
+        workspace,
+    )?;
     Ok(())
 }
 
-/// Reads the reports: cited ids, fix rounds, and file sizes.
+/// Reads the spec reviews. Each counts as a review, with its findings; none
+/// feeds an original key, since a spec review names no task.
+fn read_spec_reviews(
+    reader: &Reader,
+    names: &[String],
+    workspace: &mut Workspace,
+) -> Result<(), String> {
+    for name in names {
+        let data = reader.read(name)?;
+        read_review(reader, name, &data, ReviewFile::Spec, workspace)?;
+    }
+    Ok(())
+}
+
+/// Reads the reports: cited ids, fix rounds, file sizes, and the model that
+/// wrote each.
 fn read_reports(
     reader: &Reader,
     names: &[String],
     tally: &mut Tally,
     workspace: &mut Workspace,
 ) -> Result<(), String> {
-    let mut tasks: HashSet<String> = HashSet::new();
     for name in names {
         let data = reader.read(name)?;
         let path = reader.dir.join(name);
         let size = fs::metadata(&path)
             .map_err(|error| format!("{}: {error}", path.display()))?
             .len();
-        tasks.insert(reader.task(name));
-        workspace.report_bytes += size;
+        let model = model_of(&data, name)?;
         let knowledge_used =
             array_field(&data, "knowledge_used").map_err(|error| format!("{name}: {error}"))?;
         let cited_here: BTreeSet<&str> = knowledge_used
@@ -318,15 +393,18 @@ fn read_reports(
         }
         let fix_rounds =
             array_field(&data, "fix_rounds").map_err(|error| format!("{name}: {error}"))?;
-        workspace.fix_rounds += fix_rounds.len();
+        let cost = workspace.model(&model);
+        cost.tasks += 1;
+        cost.report_bytes += size;
+        cost.fix_rounds += fix_rounds.len();
     }
-    workspace.tasks = tasks.len();
     Ok(())
 }
 
-/// Reads one workspace: audits, task reviews, the branch review, then
-/// reports, each in this order so a malformed file is named the way it
-/// always was.
+/// Reads one workspace: audits, task reviews, the branch review, spec
+/// reviews, then reports, each in this order so a malformed file is named
+/// the way it always was. The counters of the whole workspace are the sums
+/// over its models (`Workspace::sum_models`).
 fn read_workspace(
     source: &Source,
     prefix_tasks: bool,
@@ -345,16 +423,20 @@ fn read_workspace(
     read_audits(&reader, &files.audits, tally, &mut workspace)?;
     read_reviews(&reader, &files.reviews, tally, &mut workspace)?;
     read_branch_review(&reader, &mut workspace)?;
+    read_spec_reviews(&reader, &files.spec_reviews, &mut workspace)?;
     read_reports(&reader, &files.reports, tally, &mut workspace)?;
+    workspace.sum_models();
     Ok(workspace)
 }
 
 /// Aggregates the JSON deliverables of `dirs`: `task-*-audit*.json` for
 /// injected ids and deterministic failures, `task-*-review*.json` and
 /// `branch-review.json` for judged failures and findings,
-/// `task-*-report.json` for the ids a report cites as used and for the
-/// fix rounds. The knowledge base `base` decides which entries get a
-/// `rules` row.
+/// `spec-review.json` and `spec-review-r<n>.json` for findings,
+/// `task-*-report.json` for the ids a report cites as used and for the fix
+/// rounds. The `models` key groups the cost of every deliverable but an audit
+/// by the `model` that wrote it. The knowledge base `base` decides which
+/// entries get a `rules` row.
 ///
 /// With one workspace a task label is the task id; with several it is
 /// `<workspace directory name>/<task id>`. A directory named twice, by
@@ -387,6 +469,7 @@ pub(super) fn stats(dirs: &[PathBuf], base: &Base) -> Result<Value, String> {
         "audits": {"files": tally.audit_files, "tasks": tally.audit_tasks.len()},
         "reviews": {"files": tally.review_files},
         "workspaces": cost::workspace_rows(&workspaces),
+        "models": cost::model_rows(&workspaces),
         "cost": cost::cost(&workspaces),
         "rules": proposals::rules_json(&rows),
         "packs": proposals::packs_json(base, &rows, &tally.violations),
@@ -549,8 +632,8 @@ mod tests {
         );
     }
 
-    /// The four old keys come first, then `workspaces`, `cost`, `rules`,
-    /// `packs`, and `proposals`, in this order.
+    /// The four old keys come first, then `workspaces`, `models`, `cost`,
+    /// `rules`, `packs`, and `proposals`, in this order.
     #[test]
     fn the_new_keys_follow_the_four_old_keys() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -569,6 +652,7 @@ mod tests {
                 "audits",
                 "reviews",
                 "workspaces",
+                "models",
                 "cost",
                 "rules",
                 "packs",
@@ -631,14 +715,10 @@ mod tests {
         assert!(error.contains("task-3-audit.json"), "{error}");
     }
 
-    /// The remedy `stats` appends to an unreadable deliverable's error,
-    /// spelled out here so a change to the contract text fails a test.
-    const REMEDY: &str = "stats reads every task-*-audit*.json, task-*-review*.json, \
-        task-*-report.json, and branch-review.json in the workspace as a deliverable; \
-        rename the file or repair it";
-
     /// Asserts that `stats` aborts on `name` holding non-JSON text with
-    /// the shared reader's own first part, then the remedy.
+    /// the shared reader's own first part, then the remedy. The remedy comes
+    /// from the one list of the files `stats` reads; the sentence as printed
+    /// is pinned byte for byte in `tests/stats_models.rs`.
     fn assert_names_the_remedy_for_a_non_json(name: &str) {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join(name);
@@ -649,7 +729,16 @@ mod tests {
             error.starts_with(&format!("{}: invalid JSON (", path.display())),
             "{error}"
         );
-        assert!(error.ends_with(&format!(". {REMEDY}")), "{error}");
+        assert!(
+            error.ends_with(&format!(". {}", unreadable_deliverable_remedy())),
+            "{error}"
+        );
+    }
+
+    /// A non-JSON `spec-review.json` aborts `stats` the same way.
+    #[test]
+    fn stats_names_the_remedy_for_a_non_json_spec_review() {
+        assert_names_the_remedy_for_a_non_json("spec-review.json");
     }
 
     /// A non-JSON `task-*-audit*.json` aborts `stats` and names the remedy.
@@ -776,6 +865,82 @@ mod tests {
         }
     }
 
+    /// A deliverable with no `model`, or a `null` one, counts as `pre-2.0`;
+    /// a non-empty string is the model.
+    #[test]
+    fn model_of_reads_the_field_and_names_an_absent_one_pre_2_0() {
+        assert_eq!(model_of(&json!({}), "f.json").unwrap(), "pre-2.0");
+        assert_eq!(
+            model_of(&json!({"model": null}), "f.json").unwrap(),
+            "pre-2.0"
+        );
+        assert_eq!(
+            model_of(&json!({"model": "human"}), "f.json").unwrap(),
+            "human"
+        );
+    }
+
+    /// A `model` that names one family as a whole token counts in the row of
+    /// the family, whether it is the alias or an id, with a version, a date,
+    /// a provider prefix, or a context suffix; the case of the family does not
+    /// matter.
+    #[test]
+    fn model_of_groups_an_alias_and_every_id_of_a_family_in_one_row() {
+        for (given, row) in [
+            ("opus", "opus"),
+            ("claude-opus-5-5", "opus"),
+            ("claude-opus-5-5[1m]", "opus"),
+            ("Opus", "opus"),
+            ("claude-sonnet-5-5", "sonnet"),
+            ("us.anthropic.claude-sonnet-4-5-v1:0", "sonnet"),
+            ("claude-3-5-haiku-20241022", "haiku"),
+            ("haiku", "haiku"),
+            ("claude-fable-1", "fable"),
+            ("fable", "fable"),
+        ] {
+            assert_eq!(
+                model_of(&json!({"model": given}), "f.json").unwrap(),
+                row,
+                "{given}"
+            );
+        }
+    }
+
+    /// A `model` that names no family, or two, or a family only as a part of
+    /// another word, keeps its own row, as `human`, `unknown`, and `pre-2.0`
+    /// do.
+    #[test]
+    fn model_of_keeps_the_row_of_a_value_that_names_no_single_family() {
+        for given in [
+            "human",
+            "unknown",
+            "pre-2.0",
+            "gpt-5",
+            "opus-or-sonnet",
+            "opusculum",
+            "sonnet4",
+        ] {
+            assert_eq!(
+                model_of(&json!({"model": given}), "f.json").unwrap(),
+                given,
+                "{given}"
+            );
+        }
+    }
+
+    /// A `model` that is no non-empty string is a named error, never a silent
+    /// `pre-2.0`.
+    #[test]
+    fn model_of_names_a_field_that_is_no_non_empty_string() {
+        for bad in [json!(7), json!(""), json!(["a"]), json!({"id": "a"})] {
+            assert_eq!(
+                model_of(&json!({"model": bad}), "f.json").unwrap_err(),
+                "f.json: model is not a non-empty string",
+                "{bad}"
+            );
+        }
+    }
+
     /// A missing workspace is a named error that starts with the path as
     /// given (`houserules.path-pins-mirror-the-code`).
     #[test]
@@ -810,14 +975,17 @@ mod tests {
     fn a_directory_named_branch_review_is_a_named_error() {
         let parent = tempfile::tempdir().expect("tempdir");
         let dir = workspace_dir(parent.path(), "batch-9");
-        let branch_review = workspace_dir(&dir, BRANCH_REVIEW);
+        let branch_review = workspace_dir(&dir, BRANCH_REVIEW_FILE);
         let (_guard, base) = empty_base();
         let error = stats(std::slice::from_ref(&dir), &base).unwrap_err();
         assert!(
             error.starts_with(&format!("{}: ", branch_review.display())),
             "{error}"
         );
-        assert!(error.ends_with(&format!(". {REMEDY}")), "{error}");
+        assert!(
+            error.ends_with(&format!(". {}", unreadable_deliverable_remedy())),
+            "{error}"
+        );
     }
 
     /// A `branch-review.json` that cannot be inspected is a named error,
@@ -828,8 +996,8 @@ mod tests {
     fn a_branch_review_that_cannot_be_inspected_is_a_named_error() {
         let parent = tempfile::tempdir().expect("tempdir");
         let dir = workspace_dir(parent.path(), "looped");
-        let branch_review = dir.join(BRANCH_REVIEW);
-        std::os::unix::fs::symlink(BRANCH_REVIEW, &branch_review).unwrap();
+        let branch_review = dir.join(BRANCH_REVIEW_FILE);
+        std::os::unix::fs::symlink(BRANCH_REVIEW_FILE, &branch_review).unwrap();
         let inspected = fs::metadata(&branch_review).unwrap_err();
         let (_guard, base) = empty_base();
         let error = stats(std::slice::from_ref(&dir), &base).unwrap_err();

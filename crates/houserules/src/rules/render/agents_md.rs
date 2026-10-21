@@ -1,7 +1,10 @@
 //! The AGENTS.md renderer: always on. In each `AGENTS.md` it writes to, it
 //! owns the block between the markers of [`block`] and nothing else.
 //!
-//! The root `AGENTS.md` holds the standing rules and one section for each
+//! The root `AGENTS.md` holds the standing rules, a session section while the
+//! install has a tracker (the commands that open and close a session on it),
+//! a `## Reference workflow` section while the install has a workflow (the
+//! pointer that the manifest of the workflow names), and one section for each
 //! area that has globs. A section names the globs and the command
 //! `houserules for <path>`; it never carries the text of an area rule, so the
 //! block has one shape whatever renderers are enabled. An area whose globs
@@ -21,7 +24,10 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use crate::install::marker::RenderInputs;
 use crate::root::INSTALL_MARKER;
+use crate::tracker::{Adapter, session_commands};
+use crate::workflow::reference;
 
 use super::super::model::{AreaDef, Base};
 use super::block::{BEGIN, END, locate};
@@ -87,11 +93,42 @@ pub(super) fn placement(def: &AreaDef) -> Placement {
     }
 }
 
+/// The session section of the root block (spec 3.10): the commands that open
+/// and close a session on the tracker `adapter`, and the advice to write the
+/// output of those commands to a file (spec 6.3). It starts with a blank line,
+/// so that it follows the section before it.
+fn session_section(adapter: Adapter) -> Vec<String> {
+    let (start, end) = session_commands(adapter);
+    vec![
+        String::new(),
+        "## Session".to_string(),
+        String::new(),
+        format!("- Start: run `{start}`."),
+        format!("- End: run `{end}`."),
+        "- Write houserules output to a file and read the file; treat a `<<` marker or a \"more items\" note as a lost read.".to_string(),
+    ]
+}
+
+/// The workflow section of the root block: the pointer that the manifest of
+/// the installed workflow names (spec 4.1). It starts with a blank line. Its
+/// heading is `## Reference workflow`, because the seeded `AGENTS.md` keeps
+/// its own `## Workflow` and a file holds one section for each heading.
+fn workflow_section(agents_block: &str) -> Vec<String> {
+    vec![
+        String::new(),
+        "## Reference workflow".to_string(),
+        String::new(),
+        agents_block.to_string(),
+    ]
+}
+
 /// The block of the root `AGENTS.md`, and the length of its standing section.
-/// The standing rules come first. One section for each area that has globs
-/// names the globs and the command that prints the rules of the area; no
-/// section carries the text of a rule.
-fn root_block(base: &Base) -> (String, usize) {
+/// The standing rules come first. Then come the session section, when the
+/// install has a tracker, and the workflow section, when it has a workflow
+/// (`inputs` says). One section for each area that has globs names the globs
+/// and the command that prints the rules of the area; no section carries the
+/// text of a rule.
+fn root_block(base: &Base, inputs: &RenderInputs) -> (String, usize) {
     let mut standing = vec!["## Standing rules".to_string(), String::new()];
     let rules = standing_lines(base);
     if rules.is_empty() {
@@ -102,6 +139,12 @@ fn root_block(base: &Base) -> (String, usize) {
     let standing_len = standing.len();
     let mut lines = vec![BEGIN.to_string(), GENERATED.to_string(), String::new()];
     lines.extend(standing);
+    if let Some(adapter) = inputs.adapter {
+        lines.extend(session_section(adapter));
+    }
+    if inputs.workflow {
+        lines.extend(workflow_section(&reference().agents_block));
+    }
     let mut first = true;
     for (name, def) in &base.areas {
         if placement(def) == Placement::NoSection {
@@ -281,8 +324,8 @@ fn holds_block(root: &Path, path: &str) -> Result<bool, RenderError> {
 /// The outputs of the AGENTS.md renderer: the block of the root `AGENTS.md`,
 /// the block of each directory that gets one, and the removal of every block
 /// that the renderer no longer writes.
-pub(super) fn plan(base: &Base) -> Result<Vec<Output>, RenderError> {
-    let (text, standing_lines) = root_block(base);
+pub(super) fn plan(base: &Base, inputs: &RenderInputs) -> Result<Vec<Output>, RenderError> {
+    let (text, standing_lines) = root_block(base, inputs);
     let mut outputs = vec![Output::Block {
         path: AGENTS_MD.to_string(),
         block: text,
@@ -419,6 +462,63 @@ mod tests {
         }
     }
 
+    /// The inputs of an install with no tracker and no workflow.
+    fn bare() -> RenderInputs {
+        RenderInputs {
+            claude: false,
+            adapter: None,
+            workflow: false,
+        }
+    }
+
+    /// With a tracker, the block names the session commands of the adapter
+    /// and the advice of spec 6.3 between the standing rules and the areas.
+    /// With the workflow, it also carries the pointer of the manifest. The
+    /// standing section keeps its length.
+    #[test]
+    fn the_session_and_workflow_sections_follow_the_standing_rules() {
+        let base = fixture_base();
+        let advice = "- Write houserules output to a file and read the file; treat a `<<` marker or a \"more items\" note as a lost read.";
+        for (adapter, start, end) in [
+            (
+                Adapter::Json,
+                "houserules list --open",
+                "houserules check-backlog",
+            ),
+            (
+                Adapter::Github,
+                "gh issue list --label houserules:batch --state open",
+                "houserules check-backlog",
+            ),
+            (Adapter::Beads, "bd ready", "bd dolt push"),
+        ] {
+            let inputs = RenderInputs {
+                adapter: Some(adapter),
+                ..bare()
+            };
+            let (text, standing) = root_block(&base, &inputs);
+            let section = format!(
+                "## Standing rules\n\n- [process.sequential] Run agents sequentially.\n- [process.ask] Ask when unsure.\n\n## Session\n\n- Start: run `{start}`.\n- End: run `{end}`.\n{advice}\n\n## Area rules\n"
+            );
+            assert!(text.contains(&section), "{text}");
+            assert!(!text.contains("## Reference workflow"), "{text}");
+            assert_eq!(standing, 4);
+        }
+        let inputs = RenderInputs {
+            adapter: Some(Adapter::Json),
+            workflow: true,
+            ..bare()
+        };
+        let (text, _) = root_block(&base, &inputs);
+        let pointer = reference().agents_block;
+        assert!(
+            text.contains(&format!(
+                "{advice}\n\n## Reference workflow\n\n{pointer}\n\n## Area rules\n"
+            )),
+            "{text}"
+        );
+    }
+
     /// The root block of a base: the standing rules, then one section for each
     /// area that has globs, none for an area without globs, none with a rule
     /// text.
@@ -426,7 +526,7 @@ mod tests {
     fn the_root_block_holds_the_standing_rules_and_a_section_for_each_area_with_globs() {
         let base = fixture_base();
 
-        let (text, standing) = root_block(&base);
+        let (text, standing) = root_block(&base, &bare());
 
         assert_eq!(
             text,
@@ -445,7 +545,7 @@ mod tests {
         base.entries.retain(|_, entry| !entry.standing);
         base.areas.retain(|(_, def)| def.paths.is_empty());
 
-        let (text, standing) = root_block(&base);
+        let (text, standing) = root_block(&base, &bare());
 
         assert_eq!(
             text,

@@ -119,6 +119,11 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[path = "../dev_support/cargo_target.rs"]
+mod cargo_target;
+
+use cargo_target::{metadata_command, target_directory_of};
+
 /// The gate binaries this checker inspects -- this module's own doc names
 /// the enumeration that bounds the claim this is *every* exception list
 /// the tree carries.
@@ -192,7 +197,9 @@ fn run_gate(root: &Path, name: &str) -> String {
         .unwrap_or_else(|error| panic!("run cargo build --bin {name}: {error}"));
     assert!(status.success(), "cargo build --bin {name} failed");
     let suffix = std::env::consts::EXE_SUFFIX;
-    let exe = root.join(format!("target/debug/{name}{suffix}"));
+    let exe = target_directory_of(metadata_command(root))
+        .join("debug")
+        .join(format!("{name}{suffix}"));
     let output = Command::new(&exe)
         .output()
         .unwrap_or_else(|error| panic!("run {}: {error}", exe.display()));

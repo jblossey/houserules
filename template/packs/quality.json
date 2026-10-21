@@ -1,6 +1,6 @@
 {
   "name": "quality",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "schema": "houserules/pack@1.0.0",
   "topics": {
     "quality": {
@@ -28,12 +28,12 @@
       "standing": true,
       "summary": "YAGNI, KISS, DRY; prefer a well-maintained library to custom code; one responsibility per unit; tests assert behavior; a11y and i18n are part of done.",
       "body": [
-        "YAGNI: build only what the current backlog item needs.",
+        "YAGNI: build only what the current requirement needs.",
         "KISS: choose the simplest design that meets the requirement. No abstraction for one caller, no option without a second use, no layer that only forwards.",
         "DRY once logic has two real call sites: never leave a copy that can drift (shared constants, option factories, one write path). One call site is not yet duplication.",
         "Prefer a well-maintained library (vetted, exact-pinned) to a custom implementation of a solved problem: parsing, validation, globbing, dates, retries. A standing project decision may rule an exception; record it as an entry.",
         "One responsibility per file and per function. Each unit boundary is one a reader can understand without its internals.",
-        "A dedicated compliance pass over the existing codebase is its own backlog item; new code complies immediately.",
+        "A dedicated compliance pass over the existing codebase is its own piece of planned work; new code complies immediately.",
         "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test; an auto-restore setting covers only spies, so a mock created in a module-mock factory gets its own explicit afterEach reset.",
         "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided."
       ],
@@ -54,7 +54,7 @@
       "summary": "Never soften a design for backward compatibility. Make the correct change and migrate everything it breaks; the codebase is not built on compromises.",
       "body": [
         "When a better contract, field, or shape exists, adopt it and update every consumer, fixture, report, and document in the same change.",
-        "Do not keep a deprecated field, alias, fallback, or optional-for-compat setting alive for old callers; the migration is part of the change, not a later batch.",
+        "Do not keep a deprecated field, alias, fallback, or optional-for-compat setting alive for old callers; the migration is part of the change, not later work.",
         "A genuinely optional concept stays optional on its merits; optionality is never a compatibility device."
       ],
       "tags": [
@@ -72,11 +72,11 @@
       "kind": "rule",
       "area": "process",
       "standing": true,
-      "summary": "Use well-maintained libraries over custom code. The orchestrator researches candidates at spec time; the owner rules the choice; refactors fold into specs.",
+      "summary": "Use well-maintained libraries over custom code. Research candidates at spec time; the owner rules the choice; refactors fold into specs.",
       "body": [
-        "The orchestrator researches candidate libraries or packages AT SPEC TIME with maintenance evidence, and presents them for the owner's ruling - never delegated to implementers, never deferred to plan time. The choice is ultimately the owner's.",
-        "Wherever the codebase is touched, existing custom code that a well-maintained library should replace is refactored in that batch: the refactor folds into the spec and plan. Deferring the rewrite is not an option.",
-        "A whole-codebase sweep can conclude 'named but not adopted this batch': record the candidate and the reason adoption waits (a competing spec priority, a not-yet-ruled owner decision), rather than silently dropping the finding. The next batch that touches the same code re-reads the record before repeating the search.",
+        "The person who writes the spec researches candidate libraries or packages AT SPEC TIME with maintenance evidence, and presents them for the owner's ruling - never delegated to the authors of the changes, never put off to plan time. The choice is ultimately the owner's.",
+        "Wherever the codebase is touched, existing custom code that a well-maintained library should replace is refactored in that piece of work: the refactor folds into the spec and plan. Putting the rewrite off is not an option.",
+        "A whole-codebase sweep can conclude 'named but not adopted in this change': record the candidate and the reason adoption waits (a competing spec priority, a not-yet-ruled owner decision), rather than silently dropping the finding. The next change that touches the same code re-reads the record before repeating the search.",
         "quality.principles carries the underlying preference; security-hygiene.dependency-vetting and exact-pins govern each adoption."
       ],
       "tags": [

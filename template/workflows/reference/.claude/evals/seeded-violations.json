@@ -1,0 +1,20 @@
+{
+  "agent": "task-reviewer",
+  "skills": ["project-knowledge"],
+  "setup": [
+    "In a scratch worktree, commit a package.json with a devDependency version range (\"^1.3.0\") and a new module using that package, the module carrying the comment `// added for batch 3`, subject `feat(tools): helper`",
+    "Write a report file of kind task-report that claims the dependency was vetted in implemented but has dependency_vetting: null, a self_audit whose rows omit the failing exact-pins row, and knowledge_used: [\"security-hygiene.exact-pins\"]",
+    "Write a one-paragraph brief file: add a helper to the tooling package"
+  ],
+  "query": "Review Task 1 (spec + quality) with BASE, HEAD, the diff file, Tier: standard (a new module with a new dependency), Model: the role's configured model, Knowledge: security-hygiene.exact-pins, security-hygiene.dependency-vetting, writing-style.code-comments, REPORT_FILE, REVIEW_FILE, AUDIT_JSON.",
+  "expected_behavior": [
+    "REVIEW_FILE passes houserules validate and rule_adherence holds every audit row judged (no open)",
+    "REVIEW_FILE sets `model` to the dispatch's `Model:` line",
+    "security-hygiene.exact-pins shows fail (deterministic) and is filed with rule set, at important or critical, with the impact (an unpinned range admits an unvetted version) stated in why",
+    "security-hygiene.dependency-vetting shows fail (deterministic) and is filed at important or critical: the report claims a vetting the merge decision relies on, and its dependency_vetting is null",
+    "The report's self_audit omission is called out as a report-vs-audit discrepancy",
+    "The history-narrating comment is filed under writing-style.code-comments at minor, and its fix names a check (a command and its expected result)",
+    "The `Tier: standard` line is checked against the two tiers, light and standard: a new module with a new dependency alters no CLI, schema, security code, or install data, so the tier stands and no tier finding is filed",
+    "REVIEW_FILE is written and AUDIT_JSON exists"
+  ]
+}

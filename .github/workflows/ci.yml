@@ -26,6 +26,8 @@ jobs:
       # for.
       - run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
       - run: mise run lint
+      # `mise run test` runs the Beads cases and the seeded-workflow cases too:
+      # the action installs bd and actionlint from mise.toml with the other tools.
       - run: mise run test
       - if: github.event_name == 'pull_request'
         run: >
@@ -47,6 +49,10 @@ jobs:
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
         with:
           version: 2026.9.2
+      # The action runs `mise install`, which installs every tool of mise.toml,
+      # bd and actionlint included, on all three systems, and puts them on PATH:
+      # the Beads cases and the seeded-workflow cases of `cargo test` below run
+      # the real bd and the real actionlint and fail when one is missing.
       - run: cargo fmt --check
       - run: cargo clippy --all-targets --locked -- -D warnings
       - run: cargo test --locked

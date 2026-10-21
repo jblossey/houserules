@@ -9,6 +9,13 @@
         "1.3.0",
         "1.4.0"
       ]
+    },
+    {
+      "file": "knowledge-schema-batch-33.json",
+      "versions": [],
+      "commits": [
+        "fcc342d"
+      ]
     }
   ],
   ".github/workflows/knowledge.yml": [
@@ -25,6 +32,323 @@
         "1.2.0",
         "1.3.0",
         "1.4.0"
+      ],
+      "commits": [
+        "fcc342d"
+      ]
+    }
+  ],
+  "tools/claude-session-start.sh": [
+    {
+      "file": "tools-claude-session-start-1.0.0.sh",
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "commits": [
+        "fcc342d"
+      ]
+    }
+  ],
+  ".githooks/commit-msg": [
+    {
+      "file": "githooks-commit-msg-1.0.0",
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0"
+      ]
+    },
+    {
+      "file": "githooks-commit-msg-1.3.0",
+      "versions": [
+        "1.3.0",
+        "1.4.0"
+      ]
+    },
+    {
+      "file": "githooks-commit-msg-batch-33",
+      "versions": [],
+      "commits": [
+        "fcc342d"
+      ]
+    }
+  ],
+  ".claude/agents/implementer.md": [
+    {
+      "file": "claude-agents-implementer-1.0.0.md",
+      "versions": [
+        "1.0.0",
+        "1.1.0"
+      ]
+    },
+    {
+      "file": "claude-agents-implementer-1.2.0.md",
+      "versions": [
+        "1.2.0",
+        "1.3.0"
+      ]
+    },
+    {
+      "file": "claude-agents-implementer-1.4.0.md",
+      "versions": [
+        "1.4.0"
+      ]
+    },
+    {
+      "file": "claude-agents-implementer-batch-33.md",
+      "versions": [],
+      "commits": [
+        "fcc342d"
+      ]
+    }
+  ],
+  ".claude/agents/task-reviewer.md": [
+    {
+      "file": "claude-agents-task-reviewer-1.0.0.md",
+      "versions": [
+        "1.0.0",
+        "1.1.0"
+      ]
+    },
+    {
+      "file": "claude-agents-task-reviewer-1.2.0.md",
+      "versions": [
+        "1.2.0"
+      ]
+    },
+    {
+      "file": "claude-agents-task-reviewer-1.3.0.md",
+      "versions": [
+        "1.3.0"
+      ]
+    },
+    {
+      "file": "claude-agents-task-reviewer-1.4.0.md",
+      "versions": [
+        "1.4.0"
+      ],
+      "commits": [
+        "fcc342d"
+      ]
+    }
+  ],
+  ".claude/agents/branch-reviewer.md": [
+    {
+      "file": "claude-agents-branch-reviewer-1.0.0.md",
+      "versions": [
+        "1.0.0",
+        "1.1.0"
+      ]
+    },
+    {
+      "file": "claude-agents-branch-reviewer-1.2.0.md",
+      "versions": [
+        "1.2.0"
+      ]
+    },
+    {
+      "file": "claude-agents-branch-reviewer-1.3.0.md",
+      "versions": [
+        "1.3.0"
+      ]
+    },
+    {
+      "file": "claude-agents-branch-reviewer-1.4.0.md",
+      "versions": [
+        "1.4.0"
+      ],
+      "commits": [
+        "fcc342d"
+      ]
+    }
+  ],
+  ".claude/skills/orchestrating/SKILL.md": [
+    {
+      "file": "claude-skills-orchestrating-skill-1.0.0.md",
+      "versions": [
+        "1.0.0",
+        "1.1.0"
+      ]
+    },
+    {
+      "file": "claude-skills-orchestrating-skill-1.2.0.md",
+      "versions": [
+        "1.2.0"
+      ]
+    },
+    {
+      "file": "claude-skills-orchestrating-skill-1.3.0.md",
+      "versions": [
+        "1.3.0"
+      ]
+    },
+    {
+      "file": "claude-skills-orchestrating-skill-1.4.0.md",
+      "versions": [
+        "1.4.0"
+      ]
+    },
+    {
+      "file": "claude-skills-orchestrating-skill-batch-33.md",
+      "versions": [],
+      "commits": [
+        "fcc342d"
+      ]
+    }
+  ],
+  ".claude/skills/finishing-a-feature/SKILL.md": [
+    {
+      "file": "claude-skills-finishing-a-feature-skill-1.0.0.md",
+      "versions": [
+        "1.0.0",
+        "1.1.0"
+      ]
+    },
+    {
+      "file": "claude-skills-finishing-a-feature-skill-1.2.0.md",
+      "versions": [
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ]
+    },
+    {
+      "file": "claude-skills-finishing-a-feature-skill-batch-33.md",
+      "versions": [],
+      "commits": [
+        "fcc342d"
+      ]
+    }
+  ],
+  ".claude/skills/migrating-knowledge/SKILL.md": [
+    {
+      "file": "claude-skills-migrating-knowledge-skill-1.0.0.md",
+      "versions": [
+        "1.0.0"
+      ]
+    },
+    {
+      "file": "claude-skills-migrating-knowledge-skill-1.1.0.md",
+      "versions": [
+        "1.1.0"
+      ]
+    },
+    {
+      "file": "claude-skills-migrating-knowledge-skill-1.2.0.md",
+      "versions": [
+        "1.2.0"
+      ]
+    },
+    {
+      "file": "claude-skills-migrating-knowledge-skill-1.3.0.md",
+      "versions": [
+        "1.3.0"
+      ]
+    },
+    {
+      "file": "claude-skills-migrating-knowledge-skill-1.4.0.md",
+      "versions": [
+        "1.4.0"
+      ]
+    },
+    {
+      "file": "claude-skills-migrating-knowledge-skill-batch-33.md",
+      "versions": [],
+      "commits": [
+        "fcc342d"
+      ]
+    }
+  ],
+  ".claude/evals/dependency-add.json": [
+    {
+      "file": "claude-evals-dependency-add-1.0.0.json",
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "commits": [
+        "fcc342d"
+      ]
+    }
+  ],
+  ".claude/evals/docs-edit.json": [
+    {
+      "file": "claude-evals-docs-edit-1.0.0.json",
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "commits": [
+        "fcc342d"
+      ]
+    }
+  ],
+  ".claude/evals/seeded-violations.json": [
+    {
+      "file": "claude-evals-seeded-violations-1.0.0.json",
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0"
+      ]
+    },
+    {
+      "file": "claude-evals-seeded-violations-1.3.0.json",
+      "versions": [
+        "1.3.0"
+      ]
+    },
+    {
+      "file": "claude-evals-seeded-violations-1.4.0.json",
+      "versions": [
+        "1.4.0"
+      ],
+      "commits": [
+        "fcc342d"
+      ]
+    }
+  ],
+  ".claude/schemas/deliverables.json": [
+    {
+      "file": "claude-schemas-deliverables-1.0.0.json",
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ]
+    },
+    {
+      "file": "claude-schemas-deliverables-batch-33.json",
+      "versions": [],
+      "commits": [
+        "fcc342d"
+      ]
+    }
+  ],
+  "backlog/schema.json": [
+    {
+      "file": "backlog-schema-1.0.0.json",
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "commits": [
+        "fcc342d"
       ]
     }
   ]

@@ -11,6 +11,10 @@
 //! unresolvable sha -- and a hand re-check tends to miss exactly this
 //! shape. This tool exists to catch that class mechanically.
 //!
+//! With `--doc <path>` or `--item <id>` in place of a report, the command
+//! reads a spec or a backlog item and names each cited workspace path that
+//! does not exist (`doc.rs`, `ClaimsSource`).
+//!
 //! Limits (every doc comment below that says "see the module doc's
 //! limits" means this list): this tool narrows deliberately, in favour of
 //! a low false-positive rate over completeness, and a description of it
@@ -296,6 +300,43 @@
 //!   It recognizes a tracked file by its root-relative path, compared
 //!   lexically, so a spelling with a `..` segment, or one through a
 //!   symlinked directory, reads as untracked and is compared.
+//! - `doc::check_doc` and `doc::check_item` (`--doc` and `--item`, HR-165
+//!   (3)) check one thing: a cited workspace path exists. A workspace path is
+//!   a cited path that `git check-ignore` reports as ignored, so a project
+//!   whose workspace git does not ignore gets no finding from either mode, and
+//!   a path that git tracks is never checked, because a spec cites files that
+//!   the batch has yet to write. A checkout that lacks the workspace (a linked
+//!   git worktree keeps its ignored files apart from the main checkout) reads
+//!   every citation of it as missing: run the check where the workspace lives.
+//!   Reading every citation as a path to find would flag nearly all of them:
+//!   in this repository's specs, plans, and backlog item bodies the citations
+//!   that name no existing file outnumber the workspace citations by far.
+//! - The two modes read citations through `find_citations`, so they carry its
+//!   limits, and add their own. A token with a glob, set, or placeholder
+//!   character (`*`, `?`, `[`, `]`, `{`, `}`, `<`, `>`) or an ellipsis names a
+//!   set of paths, not one, and is skipped; so is a markdown link's target,
+//!   which reaches the walk glued to its link text (`[probe](.superpowers/x.txt)`
+//!   holds `[`). A path with a `..` segment is skipped as well, and so is an
+//!   absolute path outside the install root: git cannot classify either from
+//!   the root. An absolute path inside the root is checked as a relative one
+//!   is. Inside means that an ancestor of the path has the real path of the
+//!   root (`doc::root_relative`), so a symlinked directory, the real path that
+//!   git prints, and a Windows short name all name the same root. The names
+//!   below that ancestor reach git as the text spells them, so a symlink below
+//!   the root, to a directory outside it or inside it, makes git refuse the
+//!   path and fail the run with its own line (exit 2), as for a relative
+//!   citation of the same names.
+//!   A file cited in two spellings is named once, in the first spelling. A
+//!   token that starts with a letter, a colon, and a slash or backslash reads
+//!   as a Windows drive (`drive_prefix_len`), so its colon stays in the path
+//!   whether or not a drive of that letter exists. A
+//!   bare basename names no workspace path and is never resolved against the
+//!   workspace. Only the existence of the path is checked: its line numbers
+//!   and the sentence that cites it are not (`check_citation_lines` reads the
+//!   line numbers of a report).
+//! - `--item` reads every string of the record that the tracker returns, in
+//!   document order, as one text, so a path cited in any field counts. A
+//!   record that holds no string is a clean run.
 //!
 //! Further constraints (this tool carries no frozen-corpus parity
 //! contract, unlike the flat command surface, so these are simply its own
@@ -312,6 +353,7 @@
 //!   is likewise a named error rather than an uncaught crash
 //!   (`houserules.crash-paths-are-named`).
 
+mod doc;
 mod natural_red;
 
 use std::path::{Path, PathBuf};
@@ -1227,12 +1269,21 @@ struct Citation {
     range: std::ops::Range<usize>,
 }
 
+/// The byte length of the Windows drive prefix that starts `token` (a letter,
+/// a colon, then `/` or `\`: `C:/`, `C:\`), or 0 when the token has none.
+fn drive_prefix_len(token: &str) -> usize {
+    match token.as_bytes() {
+        [letter, b':', b'/' | b'\\', ..] if letter.is_ascii_alphabetic() => 2,
+        _ => 0,
+    }
+}
+
 /// Splits a trimmed citation token's optional `:NNN`/`:NNN-MMM` suffix off
-/// its path, at the FIRST `:` rather than the last: a path itself never
-/// carries a colon, so the first one always marks the line suffix's
-/// start, and a Rust-panic-style `file:NNN:MM` column citation (a real
-/// shape this task's own corpus run found) keeps `NNN` as its line and
-/// drops the trailing `:MM` rather than reading `NNN:MM` as YET more path.
+/// its path, at the FIRST `:` rather than the last: a path itself carries no
+/// colon but a Windows drive letter's (`drive_prefix_len`), so the first
+/// other one always marks the line suffix's start. A `file:NNN:MM` column
+/// citation keeps `NNN` as its line and drops the trailing `:MM` rather than
+/// reading `NNN:MM` as YET more path.
 /// Falls back to treating the whole token as a bare path (no line fields)
 /// when the text right after that `:` has no leading digit at all -- a
 /// citation with a genuinely non-numeric trailing colon (none observed in
@@ -1241,7 +1292,8 @@ struct Citation {
 /// still keeps the first number: `path:170` alone is already a valid
 /// citation this function found by construction.
 fn split_line_suffix(token: &str) -> (&str, Option<u64>, Option<u64>) {
-    let Some(colon) = token.find(':') else {
+    let drive = drive_prefix_len(token);
+    let Some(colon) = token[drive..].find(':').map(|offset| drive + offset) else {
         return (token, None, None);
     };
     let path = &token[..colon];
@@ -1760,33 +1812,57 @@ fn check_report_claims(report_path: &Path, root: &Path) -> Result<Vec<String>, S
     Ok(errors)
 }
 
+/// What `check-report-claims` reads the claims of: a deliverable report, a
+/// spec, or a backlog item. Exactly one is given on the command line.
+pub(crate) enum ClaimsSource {
+    /// The report file at this path.
+    Report(PathBuf),
+    /// The spec at this path (`--doc`).
+    Doc(PathBuf),
+    /// The backlog item with this id, read through the installed tracker
+    /// (`--item`).
+    Item(String),
+}
+
+/// Checks the report at `report_path` against `root`: resolves the path
+/// against the real working directory, then runs `check_report_claims`. An
+/// error is the line to print, with the path named.
+fn check_report_file(report_path: &Path, root: &Path) -> Result<Vec<String>, String> {
+    let resolved = crate::node_path::resolve_like_node(report_path)
+        .map_err(|error| format!("{}: {error}", report_path.display()))?;
+    check_report_claims(&resolved, root)
+}
+
 /// The `check-report-claims` subcommand (`crate::main`'s dispatch):
 /// `dir`/`--dir` resolves the artifact-and-git root the same way every
 /// other flat-surface command does (`crate::root::resolve_root`), and
-/// `report_path` resolves against the real process working directory the
-/// way `validate`'s own file arguments do (`crate::node_path::
+/// a report or doc path resolves against the real process working directory
+/// the way `validate`'s own file arguments do (`crate::node_path::
 /// resolve_like_node`) -- the two are independent by design, since a
 /// report can live under a subdirectory `--dir` has no reason to name.
-/// Exit 0 (clean; prints `no claim mismatches found`), 1 (one line per
-/// mismatch on stderr), or 2 (the root could not be resolved, or
-/// `report_path` could not be resolved, read, or parsed as JSON). A
-/// missing `report_path` argument is clap's own required-positional
+/// Exit 0 (clean; prints `<source>: no claim mismatches found`, the report
+/// or doc path as given, or the item id), 1 (one line per mismatch on
+/// stderr), or 2 (the root could not be resolved, the report or doc could not
+/// be resolved or read, a report could not be parsed as JSON, or an item
+/// could not be read: no tracker, an id the tracker does not hold, a tracker
+/// that cannot be reached). A missing source is clap's own required-argument
 /// check; this function never sees that case.
-pub(crate) fn cmd_check_report_claims(dir: Option<PathBuf>, report_path: PathBuf) -> ExitCode {
+pub(crate) fn cmd_check_report_claims(dir: Option<PathBuf>, source: ClaimsSource) -> ExitCode {
     let root = match crate::root::resolve_root(dir) {
         Ok(root) => root,
         Err(code) => return code,
     };
-    let resolved = match crate::node_path::resolve_like_node(&report_path) {
-        Ok(path) => path,
-        Err(error) => {
-            eprintln!("{}: {error}", report_path.display());
-            return ExitCode::from(2);
+    let (label, outcome) = match source {
+        ClaimsSource::Report(path) => (path.display().to_string(), check_report_file(&path, &root)),
+        ClaimsSource::Doc(path) => (path.display().to_string(), doc::check_doc(&path, &root)),
+        ClaimsSource::Item(id) => {
+            let outcome = doc::check_item(&id, &root);
+            (id, outcome)
         }
     };
-    match check_report_claims(&resolved, &root) {
+    match outcome {
         Ok(errors) if errors.is_empty() => {
-            println!("{}: no claim mismatches found", report_path.display());
+            println!("{label}: no claim mismatches found");
             ExitCode::SUCCESS
         }
         Ok(errors) => {
@@ -2994,5 +3070,40 @@ mod tests {
         write_json(&report_path, &report);
         let errors = check_report_claims(&report_path, dir.path()).expect("report loads");
         assert_eq!(errors, Vec::<String>::new());
+    }
+
+    /// A Windows drive letter's colon belongs to the path: the line suffix
+    /// starts at the next colon. A path with no drive letter splits at its
+    /// first colon, as before, and keeps the line and drops the column.
+    #[test]
+    fn find_citations_keeps_a_drive_letter_in_the_path() {
+        let cases = [
+            (
+                "See C:/Users/x/probe.txt:1 for the run.",
+                "C:/Users/x/probe.txt",
+                Some(1),
+                None,
+            ),
+            (
+                r"See C:\Users\x\probe.txt:12-14 for the run.",
+                r"C:\Users\x\probe.txt",
+                Some(12),
+                Some(14),
+            ),
+            (
+                "See C:/Users/x/probe.txt for the run.",
+                "C:/Users/x/probe.txt",
+                None,
+                None,
+            ),
+            ("See src/x.rs:7:3 for the run.", "src/x.rs", Some(7), None),
+        ];
+        for (text, path, line, line_end) in cases {
+            let citations = find_citations(text);
+            assert_eq!(citations.len(), 1, "{text}");
+            assert_eq!(citations[0].path, path, "{text}");
+            assert_eq!(citations[0].line, line, "{text}");
+            assert_eq!(citations[0].line_end, line_end, "{text}");
+        }
     }
 }

@@ -157,13 +157,9 @@ fn update_over_a_never_init_ed_target_is_a_named_error_exit_2() {
 /// are not in this list -- they joined `RETIRED` instead.
 const KIT_OWNED: &[&str] = &[
     "tools/claude-session-start.sh",
-    ".githooks/commit-msg",
-    ".claude/agents/implementer.md",
-    ".claude/agents/task-reviewer.md",
-    ".claude/agents/branch-reviewer.md",
-    ".claude/skills/orchestrating/SKILL.md",
-    ".claude/skills/finishing-a-feature/SKILL.md",
     ".claude/skills/migrating-knowledge/SKILL.md",
+    ".claude/skills/houserules-step/SKILL.md",
+    "tools/houserules-step.sh",
 ];
 
 /// Every `SEED_ONCE` path -- `install/mod.rs`'s own copy.
@@ -248,10 +244,10 @@ fn update_right_after_init_writes_and_lists_no_file_and_leaves_adopter_files_alo
 fn update_keeps_a_locally_modified_kit_owned_file_and_reports_it_once() {
     let dir = seeded_repo();
     fs::write(
-        dir.path().join(".claude/agents/implementer.md"),
+        dir.path().join(".claude/skills/houserules-step/SKILL.md"),
         b"corrupted",
     )
-    .expect("corrupt .claude/agents/implementer.md");
+    .expect("corrupt .claude/skills/houserules-step/SKILL.md");
 
     let output = houserules()
         .args(["update", "--dir"])
@@ -265,16 +261,16 @@ fn update_keeps_a_locally_modified_kit_owned_file_and_reports_it_once() {
     );
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(
-        stdout.contains("kept .claude/agents/implementer.md (locally modified)\n"),
+        stdout.contains("kept .claude/skills/houserules-step/SKILL.md (locally modified)\n"),
         "got:\n{stdout}"
     );
     assert!(
-        !stdout.contains("wrote .claude/agents/implementer.md\n"),
+        !stdout.contains("wrote .claude/skills/houserules-step/SKILL.md\n"),
         "got:\n{stdout}"
     );
 
     assert_eq!(
-        fs::read(dir.path().join(".claude/agents/implementer.md")).unwrap(),
+        fs::read(dir.path().join(".claude/skills/houserules-step/SKILL.md")).unwrap(),
         b"corrupted",
         "update overwrote the adopter's own change"
     );
@@ -291,7 +287,7 @@ fn update_keeps_a_locally_modified_kit_owned_file_and_reports_it_once() {
 #[test]
 fn update_replaces_an_at_baseline_kit_owned_file_with_the_running_kits_content() {
     let dir = seeded_repo();
-    let file = ".claude/agents/implementer.md";
+    let file = ".claude/skills/houserules-step/SKILL.md";
     let old_kit_content = b"content from an older kit release\n";
     fs::write(dir.path().join(file), old_kit_content).expect("write old kit content");
 
@@ -343,7 +339,7 @@ fn update_replaces_an_at_baseline_kit_owned_file_with_the_running_kits_content()
 #[test]
 fn update_restamps_a_kit_owned_file_already_at_the_running_content_despite_a_stale_baseline() {
     let dir = seeded_repo();
-    let file = ".claude/agents/implementer.md";
+    let file = ".claude/skills/houserules-step/SKILL.md";
     let running_content = fs::read(repo_root().join("template").join(file)).unwrap();
     set_marker_baseline(
         dir.path(),
@@ -389,7 +385,7 @@ fn update_restamps_a_kit_owned_file_already_at_the_running_content_despite_a_sta
 #[test]
 fn update_silences_a_locally_modified_kit_owned_file_listed_in_owned_paths() {
     let dir = seeded_repo();
-    let file = ".claude/agents/implementer.md";
+    let file = ".claude/skills/houserules-step/SKILL.md";
     fs::write(dir.path().join(file), b"adopter owns this now").expect("corrupt file");
 
     let marker_path = dir.path().join(".houserules.json");
@@ -431,7 +427,7 @@ fn update_silences_a_locally_modified_kit_owned_file_listed_in_owned_paths() {
 #[test]
 fn update_restores_a_deleted_kit_owned_file() {
     let dir = seeded_repo();
-    let file = ".claude/agents/implementer.md";
+    let file = ".claude/skills/houserules-step/SKILL.md";
     fs::remove_file(dir.path().join(file)).expect("delete file");
 
     let output = houserules()
@@ -480,7 +476,7 @@ fn update_reports_a_named_error_instead_of_silently_overwriting_an_unreadable_ki
     use std::os::unix::fs::PermissionsExt;
 
     let dir = seeded_repo();
-    let file = ".githooks/commit-msg";
+    let file = "tools/houserules-step.sh";
     let path = dir.path().join(file);
     let original = fs::read(&path).expect("read the seeded file before restricting it");
     fs::set_permissions(&path, fs::Permissions::from_mode(0o200))
@@ -519,7 +515,7 @@ fn update_reports_a_named_error_instead_of_silently_overwriting_an_unreadable_ki
 #[test]
 fn update_leaves_an_owned_deleted_kit_owned_file_absent() {
     let dir = seeded_repo();
-    let file = ".claude/agents/implementer.md";
+    let file = ".claude/skills/houserules-step/SKILL.md";
     fs::remove_file(dir.path().join(file)).expect("delete file");
 
     let marker_path = dir.path().join(".houserules.json");
@@ -604,9 +600,9 @@ fn a_second_update_prints_no_wrote_line() {
 #[test]
 fn update_never_rewrites_a_file_in_owned_paths_of_a_2_0_install() {
     let dir = seeded_repo();
-    let modified = ".githooks/commit-msg";
-    let deleted = ".claude/skills/orchestrating/SKILL.md";
-    let unlisted = ".claude/agents/implementer.md";
+    let modified = "tools/houserules-step.sh";
+    let deleted = ".claude/skills/migrating-knowledge/SKILL.md";
+    let unlisted = ".claude/skills/houserules-step/SKILL.md";
     fs::write(dir.path().join(modified), b"the adopter's hook").expect("write the hook");
     fs::remove_file(dir.path().join(deleted)).expect("delete the skill");
     fs::write(dir.path().join(unlisted), b"edited").expect("write the agent");
@@ -637,12 +633,7 @@ fn update_never_rewrites_a_file_in_owned_paths_of_a_2_0_install() {
 }
 
 /// The Claude Code files `init` leaves out without `--target claude`.
-const CLAUDE_FILES: [&str; 4] = [
-    "tools/claude-session-start.sh",
-    ".claude/agents/implementer.md",
-    ".claude/agents/task-reviewer.md",
-    ".claude/agents/branch-reviewer.md",
-];
+const CLAUDE_FILES: [&str; 1] = ["tools/claude-session-start.sh"];
 
 /// While `renderers` lacks `claude`, the sync writes none of the Claude
 /// files; a missing `renderers` key reads as `["claude"]`, the value the
@@ -682,7 +673,7 @@ fn update_writes_the_claude_files_only_while_renderers_holds_claude() {
             );
         }
         assert!(
-            dir.path().join(".githooks/commit-msg").is_file(),
+            dir.path().join("tools/houserules-step.sh").is_file(),
             "the sync keeps every other kit-owned file"
         );
     }
@@ -827,7 +818,7 @@ fn update_repairs_a_lost_executable_bit_without_a_line() {
     use std::os::unix::fs::PermissionsExt;
 
     let dir = seeded_repo();
-    let hook = dir.path().join(".githooks/commit-msg");
+    let hook = dir.path().join("tools/houserules-step.sh");
     fs::set_permissions(&hook, fs::Permissions::from_mode(0o644)).expect("chmod the hook");
 
     let lines = update_lines(dir.path());
@@ -837,7 +828,7 @@ fn update_repairs_a_lost_executable_bit_without_a_line() {
     assert!(
         !lines
             .iter()
-            .any(|line| line.contains(".githooks/commit-msg")),
+            .any(|line| line.contains("tools/houserules-step.sh")),
         "{lines:?}"
     );
 }
@@ -1113,15 +1104,15 @@ fn update_does_not_backfill_an_owned_seed_once_file() {
     assert!(!dir.path().join("docs/README.md").exists());
 }
 
-/// The `SEED_ONCE` backfill rewrites `PREFIXED` payload content with the
-/// install's own stamped `idPrefix`, never the `--id-prefix` flag's value
-/// (which defaults to `WI`): backfilling into a non-`WI` install must not
-/// hand it ids `check-backlog` then rejects.
+/// The backfill of the JSON tracker's data files rewrites `PREFIXED` payload
+/// content with the install's own stamped `idPrefix`, never the `--id-prefix`
+/// flag's value (which defaults to `WI`): backfilling into a non-`WI` install
+/// must not hand it ids `check-backlog` then rejects.
 #[test]
 fn update_backfills_a_prefixed_file_with_the_installs_own_stamped_prefix() {
     let dir = scratch_git_repo();
     let init = houserules()
-        .args(["init", "--dir"])
+        .args(["init", "--tracker", "json", "--dir"])
         .arg(dir.path())
         .args(["--id-prefix", "FOO"])
         .output()
@@ -1171,10 +1162,10 @@ fn update_backfills_a_prefixed_file_with_the_installs_own_stamped_prefix() {
 /// `update` treats every item's unrecorded baseline as "compare directly
 /// against the current payload". This one run proves both of `baseline::
 /// classify`'s no-baseline arms at once, each on a different `KIT_OWNED`
-/// file: `.claude/agents/task-reviewer.md`, left exactly as `seeded_repo`
+/// file: `.claude/skills/migrating-knowledge/SKILL.md`, left exactly as `seeded_repo`
 /// wrote it, matches the payload and is stamped, neither written nor listed
 /// since its bytes would not change (`Status::AtBaseline`);
-/// `.claude/agents/implementer.md`, hand-corrupted
+/// `.claude/skills/houserules-step/SKILL.md`, hand-corrupted
 /// below, diverges from the payload and is kept, reported once, and left
 /// unstamped for a later run to reconcile (`Status::Modified`). Nothing on
 /// disk is overwritten by the divergent file; both outcomes coexist in one
@@ -1182,8 +1173,8 @@ fn update_backfills_a_prefixed_file_with_the_installs_own_stamped_prefix() {
 #[test]
 fn update_migration_run_reconciles_kit_owned_files_with_no_baselines_recorded() {
     let dir = seeded_repo();
-    let unmodified_file = ".claude/agents/task-reviewer.md";
-    let modified_file = ".claude/agents/implementer.md";
+    let unmodified_file = ".claude/skills/migrating-knowledge/SKILL.md";
+    let modified_file = ".claude/skills/houserules-step/SKILL.md";
     fs::write(dir.path().join(modified_file), b"pre-baseline adopter edit")
         .expect("corrupt modified_file");
 
@@ -1754,11 +1745,11 @@ fn update_reports_a_markers_overrides_array_with_a_non_string_element_as_a_named
 #[test]
 fn update_reports_a_malformed_2_0_key_as_a_named_error_exit_2() {
     assert_named_error_before_any_write(
-        br#"{"ownedPaths":".githooks/commit-msg"}"#,
+        br#"{"ownedPaths":"tools/houserules-step.sh"}"#,
         "ownedPaths must be an array of strings\n",
     );
     assert_named_error_before_any_write(
-        br#"{"ownedPaths":[".githooks/commit-msg", 5]}"#,
+        br#"{"ownedPaths":["tools/houserules-step.sh", 5]}"#,
         "ownedPaths must be an array of strings\n",
     );
     assert_named_error_before_any_write(

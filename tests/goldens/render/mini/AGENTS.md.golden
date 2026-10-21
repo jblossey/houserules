@@ -10,6 +10,12 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 - [mini.standing-example] Always run the mini fixture's own regeneration before trusting its output.
 
+## Session
+
+- Start: run `houserules list --open`.
+- End: run `houserules check-backlog`.
+- Write houserules output to a file and read the file; treat a `<<` marker or a "more items" note as a lost read.
+
 ## Area rules
 
 ### tools

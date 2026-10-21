@@ -34,7 +34,8 @@ use std::process::Command;
 /// APIs resolve `..` while opening a file, so `sh` (and every other
 /// non-Rust reader) still finds it.
 fn hook_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../template/.githooks/commit-msg")
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../template/workflows/reference/.githooks/commit-msg")
 }
 
 /// `true` when `dir` holds a file named `houserules` (`houserules.exe` on

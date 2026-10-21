@@ -39,6 +39,12 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [writing-style.doc-comments] Document every exported symbol with the language's doc-comment convention. Name things so the code reads without comments.
 - [writing-style.principles] Write docs, comments, commit messages, and reports in ASD-STE100 style: short sentences, active voice, one instruction per sentence, concise.
 
+## Session
+
+- Start: run `houserules list --open`.
+- End: run `houserules check-backlog`.
+- Write houserules output to a file and read the file; treat a `<<` marker or a "more items" note as a lost read.
+
 ## Area rules
 
 ### docs

@@ -18,8 +18,8 @@ use serde_json::{Value, json};
 pub(crate) use crate::emit::emit;
 
 use super::load::{LoadedBacklog, read_json_value};
-use super::model::ItemStatus;
 use crate::rules::marker_findings;
+use crate::tracker::{ListOpts, changes_map, lines, parse_set};
 
 /// One backlog command's usage or runtime failure: printed as a single
 /// stderr line, exit 2. Three arms, all rendering identically: (1) a
@@ -32,45 +32,6 @@ use crate::rules::marker_findings;
 /// panic (`houserules.crash-paths-are-named`).
 #[derive(Debug)]
 pub(crate) struct CommandError(pub String);
-
-/// Valid `set status=<value>` values, in the schema's own declared
-/// order, expressed here as `model::ItemStatus`'s own variants
-/// (schema-pinned by `model.rs`'s build test, `item_status_is_pinned`)
-/// rather than a second hand-typed array that could drift from
-/// `backlog/schema.json`'s `$defs/status` enum unnoticed. This is the
-/// one place `set_item` validates a raw CLI string against a closed set
-/// of values, so it is `model::ItemStatus`'s one caller and the only
-/// type `backlog::model` still holds: `get`/`set` need each item's own
-/// on-disk key order, and `check-backlog` needs to tolerate malformed
-/// data, neither of which a typed struct can do -- so `backlog::model`
-/// holds no type for any other `$defs` entry (see `load.rs`'s module doc
-/// for the full reasoning).
-const STATUS_VALUES: [ItemStatus; 4] = [
-    ItemStatus::Open,
-    ItemStatus::Partial,
-    ItemStatus::Done,
-    ItemStatus::Dropped,
-];
-
-/// `status`'s lowercase schema name, via `ItemStatus`'s own `Serialize`
-/// impl (`#[serde(rename_all = "lowercase")]`) -- avoids a second
-/// hand-written name table that could drift out of step with the derive.
-fn status_name(status: ItemStatus) -> String {
-    match serde_json::to_value(status).expect("ItemStatus always serializes") {
-        Value::String(name) => name,
-        other => unreachable!("ItemStatus serializes as a JSON string, got {other:?}"),
-    }
-}
-
-/// `/^[1-9]\d*$/`: one or more ASCII digits, the first not `0` -- the shape
-/// `set batch=<value>` requires.
-fn is_positive_integer(value: &str) -> bool {
-    let mut chars = value.chars();
-    match chars.next() {
-        Some(first) if first.is_ascii_digit() && first != '0' => chars.all(|c| c.is_ascii_digit()),
-        _ => false,
-    }
-}
 
 /// `{id, status, milestone, batch, title}`, in that key order.
 /// `milestone`/`batch` substitute `null` for a missing key; the others
@@ -457,30 +418,29 @@ pub(crate) fn get_items(b: &LoadedBacklog, ids: &[String]) -> Result<Vec<Value>,
                 }
                 return Ok(merged);
             }
-            Err(CommandError(format!("unknown id \"{id}\"")))
+            Err(CommandError(lines::unknown_id(id)))
         })
         .collect()
 }
 
-/// Every filter `list` accepts, typed. Each field uses the same loose
-/// comparison `item_matches`'s own doc describes, not a stricter
-/// Rust-native one.
-pub(crate) struct ListOpts {
-    pub open: bool,
-    pub status: Option<String>,
-    pub milestone: Option<String>,
-    pub section: Option<String>,
-    pub item_type: Option<String>,
-    pub batch: Option<String>,
-}
-
-/// List rows for items matching every given filter.
+/// List rows for items matching every given filter. With `opts.deferred`
+/// the rows are those of the items that carry a deferral, and each row ends
+/// with that `deferral` object.
 pub(crate) fn list_items(b: &LoadedBacklog, opts: &ListOpts) -> Vec<Value> {
     b.items
         .iter()
         .map(|(_, item)| item)
         .filter(|item| item_matches(item, opts))
-        .map(list_row)
+        .map(|item| {
+            let mut row = list_row(item);
+            if let (true, Value::Object(map)) = (opts.deferred, &mut row) {
+                map.insert(
+                    "deferral".to_string(),
+                    item.get("deferral").cloned().unwrap_or(Value::Null),
+                );
+            }
+            row
+        })
         .collect()
 }
 
@@ -491,6 +451,9 @@ pub(crate) fn list_items(b: &LoadedBacklog, opts: &ListOpts) -> Vec<Value> {
 /// (unreachable for schema-valid data) never matches a CLI-supplied
 /// string filter.
 fn item_matches(item: &Value, opts: &ListOpts) -> bool {
+    if opts.deferred && !item.get("deferral").is_some_and(Value::is_object) {
+        return false;
+    }
     if opts.open {
         let status = item
             .get("status")
@@ -600,66 +563,19 @@ fn display_change(value: &Value) -> String {
     }
 }
 
-/// Applies `field=value` assignments to an item's file on disk and
-/// reports what changed. Re-reads the items file fresh from disk, not
-/// reusing `b`'s in-memory copy, merges `changes` into the target item's
-/// own `serde_json::Map` (an `IndexMap` under the crate-wide
-/// `preserve_order` feature: `.insert` updates an existing key in place
-/// and appends a new one at the end), and writes the whole file back
-/// through `emit` -- see `load.rs`'s module doc for why this, not a
-/// typed-struct round-trip (`backlog::model` has no such type), keeps
-/// each item's own on-disk key order.
-pub(crate) fn set_item(
+/// Rewrites the items file of `item` (an indexed item of `b`, with its
+/// `file` attached) with `edit` applied to the object of the item `id`.
+/// Re-reads the file fresh from disk, not reusing `b`'s in-memory copy, and
+/// writes the whole file back through `emit`, so every other item keeps its
+/// own on-disk key order. An item that vanished from the file since the
+/// load is a named `CommandError`, never a panic
+/// (`houserules.crash-paths-are-named`).
+pub(super) fn rewrite_item(
     b: &LoadedBacklog,
-    id: Option<&str>,
-    assignments: &[String],
-) -> Result<String, CommandError> {
-    let id = id.filter(|s| !s.is_empty());
-    if id.is_none() || assignments.is_empty() {
-        return Err(CommandError(
-            "set needs <id> and at least one field=value".to_string(),
-        ));
-    }
-    let id = id.expect("checked above");
-    let (_, item) = b
-        .items
-        .iter()
-        .find(|(item_id, _)| item_id == id)
-        .ok_or_else(|| CommandError(format!("unknown item \"{id}\"")))?;
-
-    let mut changes = serde_json::Map::new();
-    for assignment in assignments {
-        let mut parts = assignment.split('=');
-        let field = parts.next().unwrap_or_default();
-        let value = parts.next();
-        match field {
-            "status" => {
-                let status = value
-                    .and_then(|v| serde_json::from_value::<ItemStatus>(json!(v)).ok())
-                    .ok_or_else(|| {
-                        let names = STATUS_VALUES
-                            .iter()
-                            .map(|s| status_name(*s))
-                            .collect::<Vec<_>>()
-                            .join(", ");
-                        CommandError(format!("status must be one of {names}"))
-                    })?;
-                changes.insert("status".to_string(), Value::String(status_name(status)));
-            }
-            "batch" => {
-                let value = value.unwrap_or_default();
-                if !is_positive_integer(value) {
-                    return Err(CommandError("batch must be a positive integer".to_string()));
-                }
-                let number: i64 = value
-                    .parse()
-                    .map_err(|_| CommandError("batch must be a positive integer".to_string()))?;
-                changes.insert("batch".to_string(), Value::Number(number.into()));
-            }
-            _ => return Err(CommandError(format!("unknown field \"{field}\""))),
-        }
-    }
-
+    item: &Value,
+    id: &str,
+    edit: impl FnOnce(&mut serde_json::Map<String, Value>),
+) -> Result<(), CommandError> {
     let file_relative = item
         .get("file")
         .and_then(Value::as_str)
@@ -680,19 +596,58 @@ pub(crate) fn set_item(
             ))
         })?;
     if let Value::Object(map) = target {
+        edit(map);
+    }
+    std::fs::write(&path, emit(&file_value))
+        .map_err(|error| CommandError(format!("{}: {error}", path.display())))
+}
+
+/// Applies `field=value` assignments to an item's file on disk and
+/// returns the changes it made, in assignment order. The assignments are read
+/// by `tracker::parse_set`, the one reader that every adapter calls, after
+/// the item is found. Re-reads the items file fresh from disk, not reusing
+/// `b`'s in-memory copy, merges `changes` into the target item's own
+/// `serde_json::Map` (an `IndexMap` under the crate-wide `preserve_order`
+/// feature: `.insert` updates an existing key in place and appends a new one
+/// at the end), and writes the whole file back through `emit` -- see
+/// `load.rs`'s module doc for why this, not a typed-struct round-trip
+/// (`backlog::model` has no such type), keeps each item's own on-disk key
+/// order. The caller has checked that `id` and `assignments` are not empty.
+pub(crate) fn set_item(
+    b: &LoadedBacklog,
+    id: &str,
+    assignments: &[String],
+) -> Result<serde_json::Map<String, Value>, CommandError> {
+    let (_, item) = b
+        .items
+        .iter()
+        .find(|(item_id, _)| item_id == id)
+        .ok_or_else(|| CommandError(lines::unknown_item(id)))?;
+    let changes = changes_map(&parse_set(assignments).map_err(CommandError)?);
+
+    rewrite_item(b, item, id, |map| {
         for (key, value) in &changes {
             map.insert(key.clone(), value.clone());
         }
-    }
-    std::fs::write(&path, emit(&file_value))
-        .map_err(|error| CommandError(format!("{}: {error}", path.display())))?;
+    })?;
 
-    let rendered = changes
-        .iter()
+    Ok(changes)
+}
+
+/// The line that `set` prints for the result of `Tracker::set`
+/// (`{"id": <id>, "changes": {<field>: <value>}}`): the id, a colon, and each
+/// change as `field=value`, in order.
+pub(crate) fn set_line(result: &Value) -> String {
+    let id = result.get("id").and_then(Value::as_str).unwrap_or_default();
+    let rendered = result
+        .get("changes")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
         .map(|(key, value)| format!("{key}={}", display_change(value)))
         .collect::<Vec<_>>()
         .join(" ");
-    Ok(format!("{id}: {rendered}\n"))
+    format!("{id}: {rendered}\n")
 }
 
 #[cfg(test)]
@@ -789,6 +744,7 @@ mod tests {
             section: Some("E01".to_string()),
             item_type: Some("feat".to_string()),
             batch: Some("1".to_string()),
+            deferred: false,
         };
         assert_eq!(
             list_items(&b, &combined),
@@ -831,7 +787,47 @@ mod tests {
             section: None,
             item_type: None,
             batch: None,
+            deferred: false,
         }
+    }
+
+    /// `list` with `deferred` lists the items that carry a deferral object,
+    /// each row ending with that object; the other filters combine with it.
+    #[test]
+    fn list_deferred_keeps_the_deferred_items_and_ends_each_row_with_the_deferral() {
+        let deferral = json!({"reason": "Waits.", "origin": "batch 1", "files": ["a.rs"]});
+        let dir = make_repo(vec![
+            item(json!({"deferral": deferral})),
+            item(json!({"id": "WI-002", "status": "done", "deferral": deferral})),
+            item(json!({"id": "WI-003"})),
+        ]);
+        let b = load_backlog(dir.path()).expect("loads");
+        let deferred = ListOpts {
+            deferred: true,
+            ..no_opts_template()
+        };
+        let rows = list_items(&b, &deferred);
+        let ids: Vec<&str> = rows.iter().map(|row| row["id"].as_str().unwrap()).collect();
+        assert_eq!(ids, ["WI-001", "WI-002"]);
+        let keys: Vec<&String> = rows[0].as_object().unwrap().keys().collect();
+        assert_eq!(
+            keys,
+            ["id", "status", "milestone", "batch", "title", "deferral"]
+        );
+        assert_eq!(rows[0]["deferral"], deferral);
+
+        let open_deferred = ListOpts {
+            open: true,
+            deferred: true,
+            ..no_opts_template()
+        };
+        assert_eq!(list_items(&b, &open_deferred).len(), 1);
+        assert_eq!(list_items(&b, &no_opts_template()).len(), 3);
+        assert!(
+            list_items(&b, &no_opts_template())
+                .iter()
+                .all(|row| row.get("deferral").is_none())
+        );
     }
 
     /// `batch` returns the record and its item rows.
@@ -856,20 +852,27 @@ mod tests {
         assert!(batch_record(&b, "x").is_err());
     }
 
-    /// `set` updates status and batch in the item file, keeping the file
-    /// formatting.
+    /// `set` updates status, batch, and milestone in the item file, keeping
+    /// the file formatting.
     #[test]
-    fn set_updates_status_and_batch_keeping_the_file_formatting() {
+    fn set_updates_status_batch_and_milestone_keeping_the_file_formatting() {
         let dir = make_repo(default_items());
         let root = dir.path();
         let b = load_backlog(root).expect("loads");
-        let message = set_item(
+        let changes = set_item(
             &b,
-            Some("WI-001"),
-            &["status=done".to_string(), "batch=3".to_string()],
+            "WI-001",
+            &[
+                "status=done".to_string(),
+                "batch=3".to_string(),
+                "milestone=v2".to_string(),
+            ],
         )
         .unwrap();
-        assert_eq!(message, "WI-001: status=done batch=3\n");
+        assert_eq!(
+            set_line(&json!({"id": "WI-001", "changes": changes})),
+            "WI-001: status=done batch=3 milestone=v2\n"
+        );
 
         let text = fs::read_to_string(root.join("backlog/items/E01.json")).unwrap();
         assert!(text.ends_with('\n'));
@@ -877,6 +880,7 @@ mod tests {
         let saved_item = &saved["items"][0];
         assert_eq!(saved_item["status"], "done");
         assert_eq!(saved_item["batch"], 3);
+        assert_eq!(saved_item["milestone"], "v2");
         let keys: Vec<&String> = saved_item.as_object().unwrap().keys().collect();
         assert_eq!(
             keys,
@@ -892,14 +896,17 @@ mod tests {
         );
 
         let b2 = load_backlog(root).expect("reloads");
-        let status_error = set_item(&b2, Some("WI-001"), &["status=nope".to_string()]).unwrap_err();
+        let status_error = set_item(&b2, "WI-001", &["status=nope".to_string()]).unwrap_err();
         assert!(
             status_error.0.contains("status must be one of"),
             "{}",
             status_error.0
         );
 
-        let batch_error = set_item(&b2, Some("WI-001"), &["batch=x".to_string()]).unwrap_err();
+        let milestone_error = set_item(&b2, "WI-001", &["milestone=a b".to_string()]).unwrap_err();
+        assert_eq!(milestone_error.0, lines::MILESTONE_FORMAT);
+
+        let batch_error = set_item(&b2, "WI-001", &["batch=x".to_string()]).unwrap_err();
         assert!(
             batch_error.0.contains("batch must be a positive integer"),
             "{}",
@@ -908,24 +915,21 @@ mod tests {
 
         // Covers the `value ?? ''` fallback in the batch check: an
         // assignment with no `=` at all leaves `value` `None`.
-        let batch_bare_error = set_item(&b2, Some("WI-001"), &["batch".to_string()]).unwrap_err();
+        let batch_bare_error = set_item(&b2, "WI-001", &["batch".to_string()]).unwrap_err();
         assert!(
             batch_bare_error
                 .0
                 .contains("batch must be a positive integer")
         );
 
-        let unknown_field = set_item(&b2, Some("WI-001"), &["title=x".to_string()]).unwrap_err();
+        let unknown_field = set_item(&b2, "WI-001", &["title=x".to_string()]).unwrap_err();
         assert!(
             unknown_field.0.contains("unknown field \"title\""),
             "{}",
             unknown_field.0
         );
 
-        let no_assignments = set_item(&b2, Some("WI-001"), &[]).unwrap_err();
-        assert!(no_assignments.0.contains("set needs"));
-
-        let unknown_item = set_item(&b2, Some("WI-404"), &["status=done".to_string()]).unwrap_err();
+        let unknown_item = set_item(&b2, "WI-404", &["status=done".to_string()]).unwrap_err();
         assert!(unknown_item.0.contains("unknown item"));
     }
 
@@ -943,7 +947,7 @@ mod tests {
         ]);
         let root = dir.path();
         let b = load_backlog(root).expect("loads");
-        set_item(&b, Some("WI-001"), &["status=done".to_string()]).expect("set");
+        set_item(&b, "WI-001", &["status=done".to_string()]).expect("set");
 
         let text = fs::read_to_string(root.join("backlog/items/E01.json")).unwrap();
         assert!(
@@ -974,7 +978,7 @@ mod tests {
                 item(json!({"id": "WI-002"})),
             ]}),
         );
-        let error = set_item(&b, Some("WI-001"), &["status=done".to_string()]).unwrap_err();
+        let error = set_item(&b, "WI-001", &["status=done".to_string()]).unwrap_err();
         assert!(error.0.contains("WI-001"), "{}", error.0);
         assert!(error.0.contains("no longer exists"), "{}", error.0);
     }

@@ -1,6 +1,7 @@
-//! `init` writes the 2.0 install (batch 33, spec sections 3, 7, and 9): the
-//! marker `houserules/install@2.0.0`, the five kit packs with their pins,
-//! no topic file, and the Claude Code files only with `--target claude`.
+//! `init` writes the 2.0 install (batch 33, spec sections 3, 7, and 9; batch 34,
+//! spec 4.6): the marker `houserules/install@2.1.0`, the `knowledge-base` pack
+//! with its pin, no other pack, no topic file, and the Claude Code files only
+//! with `--target claude`.
 //! Each case runs the compiled binary against a scratch git repository.
 
 use std::fs;
@@ -97,29 +98,21 @@ fn keys(value: &Value) -> Vec<String> {
         .collect()
 }
 
-/// The five kit packs under `template/packs/`.
-const PACKS: [&str; 5] = [
-    "knowledge-base",
-    "process",
-    "quality",
-    "security-hygiene",
-    "writing-style",
-];
+/// The kit packs that a plain `init` installs.
+const PACKS: [&str; 1] = ["knowledge-base"];
+
+/// The kit packs under `template/packs/` that a plain `init` leaves out: `pack
+/// add` brings them.
+const OTHER_PACKS: [&str; 4] = ["process", "quality", "security-hygiene", "writing-style"];
 
 /// The Claude Code files that `init` leaves out without `--target claude`.
-const CLAUDE_FILES: [&str; 4] = [
-    "tools/claude-session-start.sh",
-    ".claude/agents/implementer.md",
-    ".claude/agents/task-reviewer.md",
-    ".claude/agents/branch-reviewer.md",
-];
+const CLAUDE_FILES: [&str; 1] = ["tools/claude-session-start.sh"];
 
 /// The `KIT_OWNED` files that every install gets.
-const OTHER_KIT_OWNED: [&str; 4] = [
-    ".githooks/commit-msg",
-    ".claude/skills/orchestrating/SKILL.md",
-    ".claude/skills/finishing-a-feature/SKILL.md",
+const OTHER_KIT_OWNED: [&str; 3] = [
     ".claude/skills/migrating-knowledge/SKILL.md",
+    ".claude/skills/houserules-step/SKILL.md",
+    "tools/houserules-step.sh",
 ];
 
 /// The one line `init` prints for a Claude Code user, when the Claude
@@ -203,7 +196,7 @@ fn init_writes_the_2_0_marker() {
             "baselines"
         ]
     );
-    assert_eq!(marker["schema"], json!("houserules/install@2.0.0"));
+    assert_eq!(marker["schema"], json!("houserules/install@2.1.0"));
     assert_eq!(marker["version"], json!(env!("CARGO_PKG_VERSION")));
     assert_eq!(marker["idPrefix"], json!("WI"));
     assert_eq!(marker["renderers"], json!([]));
@@ -228,7 +221,7 @@ fn init_writes_the_2_0_marker() {
     baselines.sort();
     let mut expected: Vec<String> = OTHER_KIT_OWNED
         .iter()
-        .chain(["knowledge/schema.json"].iter())
+        .chain(["knowledge/schema.json", ".claude/schemas/deliverables.json"].iter())
         .map(|file| file.to_string())
         .collect();
     expected.sort();
@@ -292,11 +285,21 @@ fn init_records_no_area_of_an_areas_file_the_project_already_holds() {
 }
 
 /// Each pack copy is the template's pack file, byte for byte (emit form,
-/// HR-162), and `init` writes none of the five 1.x topic files.
+/// HR-162), `init` writes the copy of the default packs only, and it writes
+/// none of the five 1.x topic files.
 #[test]
-fn init_writes_the_five_pack_copies_and_no_topic_file() {
+fn init_writes_the_default_pack_copies_and_no_topic_file() {
     let dir = scratch_git_repo();
     let lines = init_lines(dir.path(), &[]);
+
+    for pack in OTHER_PACKS {
+        assert!(
+            !dir.path()
+                .join(format!("knowledge/packs/{pack}.json"))
+                .exists(),
+            "{pack} is no default pack"
+        );
+    }
 
     for pack in PACKS {
         let copy = format!("knowledge/packs/{pack}.json");
@@ -340,9 +343,7 @@ fn init_without_target_claude_leaves_out_the_claude_files() {
     for file in [
         "knowledge/schema.json",
         "knowledge/areas.json",
-        "backlog/schema.json",
         ".claude/schemas/deliverables.json",
-        ".claude/evals/record.json",
         "AGENTS.md",
         "CLAUDE.md",
     ] {
@@ -383,7 +384,7 @@ fn init_target_claude_writes_every_claude_file_and_the_hook_entry() {
         .iter()
         .map(|entry| entry["matcher"].as_str().expect("a matcher"))
         .collect();
-    assert_eq!(matchers, ["compact", "startup|resume|clear|fork"]);
+    assert_eq!(matchers, ["compact"]);
     let marker = marker(dir.path());
     assert_eq!(marker["renderers"], json!(["claude"]));
     let baselines = marker["baselines"].as_object().expect("baselines");
@@ -394,25 +395,29 @@ fn init_target_claude_writes_every_claude_file_and_the_hook_entry() {
 }
 
 /// `init --target claude` on an existing install adds `claude` to
-/// `renderers`, seeds the Claude files that are missing, keeps every file
-/// that exists (a modified agent template, a modified skill, a modified file
-/// that `ownedPaths` lists, and the other keys of `.claude/settings.json`
-/// included), keeps the baseline of each file it kept, and renders.
+/// `renderers`, keeps every file that exists (a modified session-start script,
+/// a modified skill, a modified file that `ownedPaths` lists, and the other
+/// keys of `.claude/settings.json` included), keeps the baseline of each file
+/// it kept, and renders the Claude files.
 #[test]
 fn init_target_claude_on_an_existing_install_seeds_what_is_missing_and_keeps_the_rest() {
     let dir = scratch_git_repo();
     init_lines(dir.path(), &[]);
-    let changed_skill = ".claude/skills/orchestrating/SKILL.md";
-    let owned_hook = ".githooks/commit-msg";
+    let changed_skill = ".claude/skills/migrating-knowledge/SKILL.md";
+    let owned_script = "tools/houserules-step.sh";
     fs::write(dir.path().join(changed_skill), b"the project's own skill").expect("write the skill");
-    fs::write(dir.path().join(owned_hook), b"the project's own hook").expect("write the hook");
+    fs::write(dir.path().join(owned_script), b"the project's own script")
+        .expect("write the script");
     let mut stamp = marker(dir.path());
-    stamp["ownedPaths"] = json!([owned_hook]);
+    stamp["ownedPaths"] = json!([owned_script]);
     write_marker(dir.path(), &stamp);
     let baselines = marker(dir.path())["baselines"].clone();
-    let agent = ".claude/agents/implementer.md";
-    fs::create_dir_all(dir.path().join(".claude/agents")).expect("create the directory");
-    fs::write(dir.path().join(agent), b"the project's own agent").expect("write the agent");
+    let session = "tools/claude-session-start.sh";
+    fs::write(
+        dir.path().join(session),
+        b"the project's own session script",
+    )
+    .expect("write the session script");
     fs::write(
         dir.path().join(".claude/settings.json"),
         "{\n  \"permissions\": {\"allow\": [\"Bash(git status)\"]}\n}\n",
@@ -427,14 +432,12 @@ fn init_target_claude_on_an_existing_install_seeds_what_is_missing_and_keeps_the
     let lines = init_lines(dir.path(), &["--target", "claude"]);
 
     assert_eq!(marker(dir.path())["renderers"], json!(["claude"]));
-    assert_file_holds(dir.path(), agent, b"the project's own agent");
-    assert!(lines.contains(&format!("kept {agent}")), "{lines:?}");
-    for file in [
-        "tools/claude-session-start.sh",
-        ".claude/agents/task-reviewer.md",
-    ] {
-        assert!(lines.contains(&format!("wrote {file}")), "{lines:?}");
-    }
+    assert_file_holds(dir.path(), session, b"the project's own session script");
+    assert!(lines.contains(&format!("kept {session}")), "{lines:?}");
+    assert!(
+        lines.contains(&".claude/rules/docs.md: written".to_string()),
+        "{lines:?}"
+    );
     let settings: Value = serde_json::from_str(
         &fs::read_to_string(dir.path().join(".claude/settings.json")).expect("read settings"),
     )
@@ -448,7 +451,8 @@ fn init_target_claude_on_an_existing_install_seeds_what_is_missing_and_keeps_the
             .as_array()
             .expect("SessionStart")
             .len(),
-        2
+        1,
+        "the compaction entry is the only core hook entry"
     );
     assert!(skill.is_file(), "init did not render");
     assert!(
@@ -457,7 +461,7 @@ fn init_target_claude_on_an_existing_install_seeds_what_is_missing_and_keeps_the
     );
     for (file, content) in [
         (changed_skill, &b"the project's own skill"[..]),
-        (owned_hook, &b"the project's own hook"[..]),
+        (owned_script, &b"the project's own script"[..]),
     ] {
         assert_file_holds(dir.path(), file, content);
         assert!(lines.contains(&format!("kept {file}")), "{lines:?}");
@@ -479,7 +483,7 @@ fn init_keeps_a_kit_owned_file_the_project_changed_and_its_baseline() {
     for extra in [&[][..], &["--target", "claude"][..]] {
         let dir = scratch_git_repo();
         init_lines(dir.path(), &[]);
-        let skill = ".claude/skills/orchestrating/SKILL.md";
+        let skill = ".claude/skills/migrating-knowledge/SKILL.md";
         fs::write(dir.path().join(skill), b"the project's own skill").expect("write the skill");
         let baseline = marker(dir.path())["baselines"][skill].clone();
         assert!(baseline.is_string(), "init baselines {skill}");
@@ -523,21 +527,22 @@ fn init_never_touches_a_path_the_project_owns() {
         .expect("add the remote");
     assert!(status.success(), "adding the remote failed");
     init_lines(dir.path(), &["--target", "claude"]);
-    let changed_hook = ".githooks/commit-msg";
+    let changed_script = "tools/houserules-step.sh";
     let own_settings = ".claude/settings.json";
     let deleted = [
         ".claude/skills/migrating-knowledge/SKILL.md",
         "docs/README.md",
         ".github/workflows/knowledge.yml",
     ];
-    fs::write(dir.path().join(changed_hook), b"the project's own hook").expect("write the hook");
+    fs::write(dir.path().join(changed_script), b"the project's own script")
+        .expect("write the script");
     fs::write(dir.path().join(own_settings), "{\"permissions\": {}}\n").expect("write settings");
     for file in deleted {
         fs::remove_file(dir.path().join(file)).expect("remove an owned file");
     }
     let mut stamp = marker(dir.path());
     stamp["ownedPaths"] = json!([
-        changed_hook,
+        changed_script,
         own_settings,
         deleted[0],
         deleted[1],
@@ -557,7 +562,7 @@ fn init_never_touches_a_path_the_project_owns() {
     let after = marker(dir.path());
     assert_eq!(after["ownedPaths"], stamped["ownedPaths"]);
     assert_eq!(after["baselines"], stamped["baselines"]);
-    for file in [changed_hook, own_settings] {
+    for file in [changed_script, own_settings] {
         assert!(lines.contains(&format!("kept {file}")), "{lines:?}");
     }
     for file in deleted {
@@ -628,6 +633,7 @@ fn init_then_update_leaves_every_file_byte_identical() {
 fn init_leaves_a_pack_copy_of_an_existing_install_as_it_is() {
     let dir = scratch_git_repo();
     init_lines(dir.path(), &[]);
+    add_pack(dir.path(), "quality");
     let copy = dir.path().join("knowledge/packs/quality.json");
     let edited = [fs::read(&copy).expect("read the copy"), b"\n".to_vec()].concat();
     fs::write(&copy, &edited).expect("hand-edit the copy");
@@ -650,9 +656,10 @@ fn init_leaves_a_pack_copy_of_an_existing_install_as_it_is() {
 #[test]
 fn init_keeps_a_pack_copy_that_exists_on_a_new_install() {
     let dir = scratch_git_repo();
-    let copy = dir.path().join("knowledge/packs/quality.json");
+    let copy = dir.path().join("knowledge/packs/knowledge-base.json");
     let edited = [
-        fs::read(repo_root().join("template/packs/quality.json")).expect("read the template pack"),
+        fs::read(repo_root().join("template/packs/knowledge-base.json"))
+            .expect("read the template pack"),
         b"\n".to_vec(),
     ]
     .concat();
@@ -663,7 +670,7 @@ fn init_keeps_a_pack_copy_that_exists_on_a_new_install() {
 
     assert_eq!(fs::read(&copy).unwrap(), edited);
     assert!(
-        lines.contains(&"kept knowledge/packs/quality.json".to_string()),
+        lines.contains(&"kept knowledge/packs/knowledge-base.json".to_string()),
         "{lines:?}"
     );
 }
@@ -714,19 +721,24 @@ fn init_adds_the_areas_a_pack_declares_and_records_them_in_the_pins() {
         &fs::read_to_string(dir.path().join("knowledge/areas.json")).expect("read areas.json"),
     )
     .expect("parse areas.json");
-    assert_eq!(keys(&areas), ["global", "docs", "process", "tools"]);
-    assert_eq!(areas["tools"], json!({"paths": ["tools/**"]}));
+    assert_eq!(keys(&areas), ["global", "docs"]);
+    assert_eq!(
+        areas["docs"],
+        json!({"paths": ["docs/**", "AGENTS.md", "knowledge/**", "backlog/**", ".claude/**"]})
+    );
     let marker = marker(dir.path());
-    let added = |pack: &str| marker["packs"][pack]["addedAreas"].clone();
-    assert_eq!(added("knowledge-base"), json!(["docs"]));
-    assert_eq!(added("process"), json!(["process"]));
-    assert_eq!(added("quality"), json!(["tools"]));
-    assert_eq!(added("security-hygiene"), json!([]));
-    assert_eq!(added("writing-style"), json!([]));
+    assert_eq!(
+        keys(&marker["packs"]),
+        ["knowledge-base"],
+        "a plain init pins the default pack alone"
+    );
+    assert_eq!(
+        marker["packs"]["knowledge-base"]["addedAreas"],
+        json!(["docs"])
+    );
     assert!(
-        lines.contains(
-            &"added area \"tools\" to knowledge/areas.json with the globs tools/**".to_string()
-        ),
+        lines.iter().any(|line| line
+            .starts_with("added area \"docs\" to knowledge/areas.json with the globs docs/**")),
         "{lines:?}"
     );
 }
@@ -736,6 +748,20 @@ fn init_adds_the_areas_a_pack_declares_and_records_them_in_the_pins() {
 fn without_marker(mut tree: tree_snapshot::Tree) -> tree_snapshot::Tree {
     tree.remove(".houserules.json");
     tree
+}
+
+/// Runs `pack add <name>` in the install at `dir` and requires exit 0.
+fn add_pack(dir: &Path, name: &str) {
+    let output = houserules()
+        .args(["pack", "add", name, "--dir"])
+        .arg(dir)
+        .output()
+        .expect("run pack add");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 /// Runs `pack remove <name>` in the install at `dir` and requires exit 0.
@@ -762,12 +788,13 @@ fn assert_installs_no_pack_and_adds_no_area(lines: &[String]) {
     assert!(offenders.is_empty(), "{offenders:?}");
 }
 
-/// A fresh install from which `pack remove quality` took the pack out: its
-/// copy and pin are gone, and so is its area `tools`. When `owned` is not
-/// empty, the marker lists those paths in `ownedPaths`.
+/// A fresh install to which `pack add quality` added the pack and from which
+/// `pack remove quality` took it out again: its copy and pin are gone. When
+/// `owned` is not empty, the marker lists those paths in `ownedPaths`.
 fn install_without_the_quality_pack(owned: &[&str]) -> TempDir {
     let dir = scratch_git_repo();
     init_lines(dir.path(), &[]);
+    add_pack(dir.path(), "quality");
     remove_pack(dir.path(), "quality");
     if !owned.is_empty() {
         let mut stamp = marker(dir.path());
@@ -808,7 +835,7 @@ fn init_leaves_an_absent_renderers_key_absent() {
             "init {extra:?}"
         );
         assert!(
-            lines.contains(&"kept .claude/agents/implementer.md".to_string()),
+            lines.contains(&"kept tools/claude-session-start.sh".to_string()),
             "init {extra:?}: {lines:?}"
         );
         assert!(!lines.iter().any(|line| line == ENABLE_LINE), "{lines:?}");
@@ -852,9 +879,11 @@ fn init_names_a_kit_owned_file_that_cannot_be_read_and_leaves_it_alone() {
     use std::os::unix::fs::PermissionsExt;
 
     let dir = scratch_git_repo();
-    let hook = dir.path().join(".githooks/commit-msg");
-    fs::create_dir_all(hook.parent().expect("a parent")).expect("create .githooks/");
-    fs::write(&hook, b"the project's own hook").expect("write the hook");
+    let hook = dir
+        .path()
+        .join(".claude/skills/migrating-knowledge/SKILL.md");
+    fs::create_dir_all(hook.parent().expect("a parent")).expect("create the skill directory");
+    fs::write(&hook, b"the project's own hook").expect("write the skill");
     fs::set_permissions(&hook, fs::Permissions::from_mode(0o200)).expect("drop the read bit");
     let Err(os_error) = fs::read(&hook) else {
         return;
@@ -871,7 +900,7 @@ fn init_names_a_kit_owned_file_that_cannot_be_read_and_leaves_it_alone() {
     );
     assert_file_holds(
         dir.path(),
-        ".githooks/commit-msg",
+        ".claude/skills/migrating-knowledge/SKILL.md",
         b"the project's own hook",
     );
 }
@@ -915,6 +944,7 @@ fn init_and_update_name_a_default_branch_that_is_no_string_and_change_nothing() 
 fn init_leaves_a_pinned_pack_whose_copy_is_missing_to_update() {
     let dir = scratch_git_repo();
     init_lines(dir.path(), &[]);
+    add_pack(dir.path(), "quality");
     let copy = dir.path().join("knowledge/packs/quality.json");
     fs::remove_file(&copy).expect("remove the copy");
 
@@ -1046,9 +1076,13 @@ fn init_seeds_an_absent_areas_file_of_an_existing_install_with_the_areas_of_its_
             .any(|line| line.starts_with("wrote knowledge/packs/")),
         "{lines:?}"
     );
+    // The block of `AGENTS.md` follows the areas file: the section of the
+    // seed's `tools` area goes with the area.
+    let agents = fs::read_to_string(dir.path().join("AGENTS.md")).expect("read AGENTS.md");
+    assert!(!agents.contains("### tools"), "{agents}");
     let mut after = snapshot(dir.path());
     let mut untouched = before.clone();
-    for changed in ["knowledge/areas.json", ".houserules.json"] {
+    for changed in ["knowledge/areas.json", ".houserules.json", "AGENTS.md"] {
         after.remove(changed);
         untouched.remove(changed);
     }

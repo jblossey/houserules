@@ -10,6 +10,7 @@
   "expected_behavior": [
     "Sentences are short, active, one instruction each (ASD-STE100)",
     "Commands are stated literally and are runnable as written",
-    "The report passes houserules validate; self_audit shows no deterministic failure"
+    "Every commit it makes carries one `Work-Item: <id>` trailer for each id of the brief's `Backlog:` line, in the last paragraph of the message",
+    "The report passes houserules validate with `model` set to the dispatch's `Model:` line; self_audit shows no deterministic failure"
   ]
 }

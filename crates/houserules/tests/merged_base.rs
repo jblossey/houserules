@@ -764,6 +764,7 @@ fn archive_leaves_an_inactive_pack_entry_in_its_copy() {
                 );
             }
             write_pack(root.path(), "demo", &[("demo", "Demo")], &[one]);
+            install_shape::mark_json_tracker(root.path());
             fs::create_dir_all(root.path().join("backlog").join("items"))
                 .expect("create backlog/items/");
             write_json(

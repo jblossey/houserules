@@ -48,6 +48,12 @@
 //! commit-msg hook, CI's commitlint job -- its CLI shape is derived
 //! from).
 //!
+//! `trailers` reads the trailers of a commit message with git's own rule and
+//! resolves the work-item references that `audit` collects (the `Work-Item:`
+//! and `Deferred:` trailers of its range and the `issues[].backlog` ids of
+//! the deliverables it reads) through the installed tracker
+//! (`trailers.rs`'s own module doc has the account; spec 3.7).
+//!
 //! `git_paths` is the one place git's path lists become install-root
 //! paths: `audit`'s `changed_files` and `tree_files`, and `check_commit`'s
 //! per-commit file read, all go through `InstallPrefix::map`, so a
@@ -93,6 +99,7 @@ mod render;
 mod stats;
 #[cfg(test)]
 mod test_support;
+mod trailers;
 mod validate_deliverable;
 
 pub(crate) use audit::cmd_audit;

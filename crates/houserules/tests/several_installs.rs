@@ -189,7 +189,7 @@ fn assert_subdirectory_workflow(top: &Path, file: &str, path: &str) {
     assert_eq!(lines[at("    runs-on: ubuntu-latest") + 2], "      run:");
 }
 
-/// `init --dir sub` installs in `sub`: `.claude/`, `.githooks/`, the
+/// `init --dir sub` installs in `sub`: `.claude/`, `tools/`, the
 /// knowledge base, and the marker live in the install root, and the one file
 /// outside it is the CI workflow at the top level, in the subdirectory form
 /// and baselined under git's top-level pathspec form.
@@ -204,10 +204,10 @@ fn init_dir_installs_in_the_subdirectory_and_writes_its_workflow_at_the_top_leve
 
     for file in [
         ".houserules.json",
-        ".githooks/commit-msg",
-        ".claude/skills/orchestrating/SKILL.md",
+        ".claude/skills/houserules-step/SKILL.md",
+        "tools/houserules-step.sh",
         "knowledge/schema.json",
-        "knowledge/packs/process.json",
+        "knowledge/packs/knowledge-base.json",
         "AGENTS.md",
     ] {
         assert!(top.join("sub").join(file).is_file(), "sub/{file}");
@@ -259,6 +259,16 @@ fn an_install_at_the_top_level_keeps_the_template_workflow_and_baselines_it() {
 fn every_command_from_inside_the_subdirectory_finds_the_install() {
     let (_dir, top) = github_repo();
     init_ok(&top.join("sub"));
+    let tracker = houserules()
+        .args(["init", "--tracker", "json", "--dir"])
+        .arg(top.join("sub"))
+        .output()
+        .expect("run init --tracker json");
+    assert!(
+        tracker.status.success(),
+        "init --tracker json failed: {}",
+        String::from_utf8_lossy(&tracker.stderr)
+    );
     fs::create_dir_all(top.join("sub/deeper")).expect("create deeper/");
 
     for cwd in [top.join("sub"), top.join("sub/deeper")] {
@@ -290,13 +300,7 @@ fn every_command_from_inside_the_subdirectory_finds_the_install() {
             .collect();
         assert_eq!(
             names,
-            [
-                "knowledge-base",
-                "process",
-                "quality",
-                "security-hygiene",
-                "writing-style"
-            ],
+            ["knowledge-base"],
             "{}: {}",
             cwd.display(),
             String::from_utf8_lossy(&output.stderr)
@@ -442,6 +446,31 @@ fn init_in_the_own_root_of_an_install_is_no_second_install() {
         lines.contains(&"kept .github/workflows/knowledge-a.yml".to_string()),
         "{lines:?}"
     );
+}
+
+/// `init` on a target that holds its own marker refuses no placement that
+/// `update` accepts, and `update` runs no overlap check: the install is no
+/// new root. Each of the three overlaps that `init` refuses for a new root
+/// leaves `init` on the existing install at exit 0 and the tree as it was: a
+/// marker below the root (a vendored project or a fixture), a marker above
+/// it, and a marker whose folder makes the same workflow file name.
+#[test]
+fn init_on_an_existing_install_runs_no_overlap_check() {
+    for (install, other) in [("a", "a/vendor"), ("b/c", "b"), ("x/y", "x-y")] {
+        let (_dir, top) = github_repo();
+        init_ok(&top.join(install));
+        fs::create_dir_all(top.join(other)).expect("create the other root");
+        fs::write(top.join(other).join(".houserules.json"), "{}\n").expect("write the marker");
+        let before = snapshot(&top);
+
+        let lines = init_ok(&top.join(install));
+
+        assert_same_tree(&before, &snapshot(&top), install);
+        assert!(
+            !lines.iter().any(|line| line.starts_with("wrote ")),
+            "{install}: {lines:?}"
+        );
+    }
 }
 
 /// An install below a top-level install is refused, and the line names the
@@ -617,7 +646,7 @@ fn check_commit_from_counts_the_commits_outside_a_freshly_initialized_subdirecto
 
     assert_eq!(
         String::from_utf8_lossy(&output.stdout),
-        "check-commit: skipped 1 commit with no change under sub/\ncheck-commit: ok\n",
+        "check-commit: skipped 1 commit with no change under sub/\ncheck-commit: no commits check is installed; checked nothing\n",
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );

@@ -59,13 +59,9 @@ fn scratch_git_repo() -> tempfile::TempDir {
 /// `RETIRED` instead.
 const KIT_OWNED: &[&str] = &[
     "tools/claude-session-start.sh",
-    ".githooks/commit-msg",
-    ".claude/agents/implementer.md",
-    ".claude/agents/task-reviewer.md",
-    ".claude/agents/branch-reviewer.md",
-    ".claude/skills/orchestrating/SKILL.md",
-    ".claude/skills/finishing-a-feature/SKILL.md",
     ".claude/skills/migrating-knowledge/SKILL.md",
+    ".claude/skills/houserules-step/SKILL.md",
+    "tools/houserules-step.sh",
 ];
 
 /// Every `SEED_ONCE` path -- `install/mod.rs`'s own array, duplicated here
@@ -73,20 +69,22 @@ const KIT_OWNED: &[&str] = &[
 const SEED_ONCE: &[&str] = &[
     "knowledge/schema.json",
     "knowledge/areas.json",
-    "backlog/schema.json",
-    "backlog/amendments.json",
-    "backlog/batches.json",
-    "backlog/decisions.json",
-    "backlog/parked.json",
-    "backlog/items/general.json",
     ".claude/schemas/deliverables.json",
-    ".claude/evals/dependency-add.json",
-    ".claude/evals/docs-edit.json",
-    ".claude/evals/record.json",
-    ".claude/evals/seeded-violations.json",
     "docs/README.md",
     "AGENTS.md",
     "CLAUDE.md",
+];
+
+/// The files of the JSON tracker -- `install/classes.rs`'s `TRACKER_DATA` and
+/// `TRACKER_SCHEMA`: `init --tracker json` writes them, a plain `init` writes
+/// none.
+const TRACKER_FILES: &[&str] = &[
+    "backlog/batches.json",
+    "backlog/amendments.json",
+    "backlog/decisions.json",
+    "backlog/parked.json",
+    "backlog/items/general.json",
+    "backlog/schema.json",
 ];
 
 /// The CI workflow, the one D3 file that only a GitHub-hosted target gets.
@@ -95,12 +93,7 @@ const GITHUB_HOSTED_SEED_ONCE: &[&str] = &[".github/workflows/knowledge.yml"];
 /// The `KIT_OWNED` files that only the Claude renderer needs --
 /// `install/mod.rs`'s own `CLAUDE_FILES`. `init` leaves them out without
 /// `--target claude`.
-const CLAUDE_FILES: &[&str] = &[
-    "tools/claude-session-start.sh",
-    ".claude/agents/implementer.md",
-    ".claude/agents/task-reviewer.md",
-    ".claude/agents/branch-reviewer.md",
-];
+const CLAUDE_FILES: &[&str] = &["tools/claude-session-start.sh"];
 
 /// The five topic files of a 1.x install: `init` writes the kit's rules as
 /// packs, so it seeds none of them.
@@ -112,14 +105,30 @@ const TOPIC_FILES: &[&str] = &[
     "knowledge/knowledge-base.json",
 ];
 
-/// The five kit packs, in the order `init` installs them.
-const PACKS: &[&str] = &[
-    "knowledge-base",
-    "process",
-    "quality",
-    "security-hygiene",
-    "writing-style",
+/// The packs that a plain `init` installs (spec 4.6): the other four kit
+/// packs come with `pack add`.
+const PACKS: &[&str] = &["knowledge-base"];
+
+/// The files of the reference workflow (`workflowFiles`): `init --workflow
+/// reference` writes them, and a plain `init` writes none.
+const WORKFLOW_FILES: &[&str] = &[
+    ".claude/agents/implementer.md",
+    ".claude/agents/task-reviewer.md",
+    ".claude/agents/branch-reviewer.md",
+    ".claude/agents/spec-reviewer.md",
+    ".claude/skills/orchestrating/SKILL.md",
+    ".claude/skills/finishing-a-feature/SKILL.md",
+    ".claude/skills/designing/SKILL.md",
+    ".claude/skills/planning/SKILL.md",
+    ".claude/evals/dependency-add.json",
+    ".claude/evals/docs-edit.json",
+    ".claude/evals/seeded-violations.json",
+    ".githooks/commit-msg",
+    "tools/reference-session-start.sh",
 ];
+
+/// The project data file of the workflow (`workflowData`).
+const WORKFLOW_DATA: &[&str] = &[".claude/evals/record.json"];
 
 /// The `SEED_ONCE` files that `init` seeds: every one.
 fn seeded_once() -> impl Iterator<Item = &'static &'static str> {
@@ -146,35 +155,16 @@ fn files_output() -> (String, serde_json::Value) {
     (text, parsed)
 }
 
-/// The whole output of `files`, spelled out: four classes, each path in one
+/// The whole output of `files`, spelled out: seven classes, each path in one
 /// of them (spec section 15: the pack copies and the D3 files are classes of
-/// their own).
+/// their own; batch 34 spec 4.2: so are the tracker files, the workflow
+/// files, and the workflow data).
 #[test]
 fn files_prints_the_file_classes_of_the_kit_as_json() {
     let expected = serde_json::json!({
-        "kitOwned": [
-            "tools/claude-session-start.sh",
-            ".githooks/commit-msg",
-            ".claude/agents/implementer.md",
-            ".claude/agents/task-reviewer.md",
-            ".claude/agents/branch-reviewer.md",
-            ".claude/skills/orchestrating/SKILL.md",
-            ".claude/skills/finishing-a-feature/SKILL.md",
-            ".claude/skills/migrating-knowledge/SKILL.md",
-        ],
+        "kitOwned": KIT_OWNED,
         "seedOnce": [
             "knowledge/areas.json",
-            "backlog/schema.json",
-            "backlog/amendments.json",
-            "backlog/batches.json",
-            "backlog/decisions.json",
-            "backlog/parked.json",
-            "backlog/items/general.json",
-            ".claude/schemas/deliverables.json",
-            ".claude/evals/dependency-add.json",
-            ".claude/evals/docs-edit.json",
-            ".claude/evals/record.json",
-            ".claude/evals/seeded-violations.json",
             "docs/README.md",
             "AGENTS.md",
             "CLAUDE.md",
@@ -188,8 +178,19 @@ fn files_prints_the_file_classes_of_the_kit_as_json() {
         ],
         "d3Files": [
             "knowledge/schema.json",
+            ".claude/schemas/deliverables.json",
             ".github/workflows/knowledge.yml",
         ],
+        "trackerFiles": [
+            "backlog/batches.json",
+            "backlog/amendments.json",
+            "backlog/decisions.json",
+            "backlog/parked.json",
+            "backlog/items/general.json",
+            "backlog/schema.json",
+        ],
+        "workflowFiles": WORKFLOW_FILES,
+        "workflowData": WORKFLOW_DATA,
     });
 
     let (text, actual) = files_output();
@@ -206,7 +207,7 @@ fn files_prints_the_file_classes_of_the_kit_as_json() {
 }
 
 /// A path is a file of one class: it is kit-owned, or seeded once, or a copy
-/// of a kit pack, or a D3 file.
+/// of a kit pack, or a D3 file, or a file of the JSON tracker.
 #[test]
 fn each_path_that_files_prints_is_in_one_class_only() {
     let (_, actual) = files_output();
@@ -279,31 +280,30 @@ fn files_takes_no_dir_flag() {
     assert_eq!(output.status.code(), Some(2));
 }
 
-/// The lines `init` prints after the kit-owned and seed-once files, on a
-/// repository with no `origin`: the skipped workflow, then (when `claude`)
-/// the settings file, then the render lines: the blocks of the AGENTS.md
-/// renderer, and with `claude` the files of the Claude renderer.
+/// The lines `init` prints after the kit-owned and seed-once files and the
+/// packs, on a repository with no `origin`: the `.gitignore` of the step, the
+/// skipped workflow, then (when `claude`) the settings file, then the render
+/// lines: the block of the AGENTS.md renderer, and with `claude` the files of
+/// the Claude renderer. The `knowledge-base` pack alone gives no directory
+/// block.
 fn expected_tail_lines(claude: bool) -> Vec<String> {
     // `scratch_git_repo` configures no `origin` remote, so the
     // GitHub-hosted-only file is skipped, not written -- a fresh scratch
     // repository is never GitHub-hosted.
-    let mut lines: Vec<String> = GITHUB_HOSTED_SEED_ONCE
-        .iter()
-        .map(|file| {
-            format!(
-                "skipped {file} (origin is not GitHub-hosted; see the migrating-knowledge skill to add your own CI gate)"
-            )
-        })
-        .collect();
+    let mut lines = vec!["wrote .gitignore".to_string()];
+    lines.extend(GITHUB_HOSTED_SEED_ONCE.iter().map(|file| {
+        format!(
+            "skipped {file} (origin is not GitHub-hosted; see the migrating-knowledge skill to add your own CI gate)"
+        )
+    }));
     if claude {
         lines.push("wrote .claude/settings.json".to_string());
     }
-    lines.extend(["AGENTS.md: written", "tools/AGENTS.md: written"].map(str::to_string));
+    lines.push("AGENTS.md: written".to_string());
     if claude {
         lines.extend(
             [
                 ".claude/rules/docs.md: written",
-                ".claude/rules/tools.md: written",
                 ".claude/skills/project-knowledge/SKILL.md: written",
             ]
             .map(str::to_string),
@@ -313,7 +313,7 @@ fn expected_tail_lines(claude: bool) -> Vec<String> {
 }
 
 /// Without `--target claude`, a fresh `init` writes the kit-owned files that
-/// every install gets, the seed-once files, and the five kit packs, then
+/// every install gets, the seed-once files, and the `knowledge-base` pack, then
 /// renders and prints the line that enables Claude Code. Every printed line
 /// is pinned whole.
 #[test]
@@ -348,7 +348,7 @@ fn init_into_a_fresh_repo_writes_every_kit_owned_and_seed_once_file_then_renders
     for file in kit_owned().chain(seeded_once()) {
         assert!(dir.path().join(file).is_file(), "{file} was not written");
     }
-    for file in CLAUDE_FILES.iter().chain(TOPIC_FILES) {
+    for file in CLAUDE_FILES.iter().chain(TOPIC_FILES).chain(TRACKER_FILES) {
         assert!(!dir.path().join(file).exists(), "{file} was written");
     }
     for file in GITHUB_HOSTED_SEED_ONCE {
@@ -468,7 +468,7 @@ fn init_with_no_dir_flag_seeds_the_current_working_directory() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(dir.path().join(".githooks/commit-msg").is_file());
+    assert!(dir.path().join("tools/houserules-step.sh").is_file());
 }
 
 /// `tools/kb.sh` and `tools/backlog.sh` are not in `KIT_OWNED`, so a
@@ -550,7 +550,16 @@ fn init_marks_shell_scripts_and_the_git_hook_executable() {
 
     let dir = scratch_git_repo();
     let output = houserules()
-        .args(["init", "--target", "claude", "--dir"])
+        .args([
+            "init",
+            "--target",
+            "claude",
+            "--tracker",
+            "json",
+            "--workflow",
+            "reference",
+            "--dir",
+        ])
         .arg(dir.path())
         .output()
         .expect("run init");
@@ -560,7 +569,12 @@ fn init_marks_shell_scripts_and_the_git_hook_executable() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    for file in ["tools/claude-session-start.sh", ".githooks/commit-msg"] {
+    for file in [
+        "tools/claude-session-start.sh",
+        "tools/houserules-step.sh",
+        ".githooks/commit-msg",
+        "tools/reference-session-start.sh",
+    ] {
         let mode = fs::metadata(dir.path().join(file))
             .unwrap_or_else(|error| panic!("stat {file}: {error}"))
             .permissions()
@@ -602,16 +616,17 @@ fn init_stamps_the_marker_with_the_kit_version_and_the_default_id_prefix() {
 
 /// `init` stamps a baseline for every `KIT_OWNED` path it wrote (a fresh
 /// install's own content trivially matches the payload it was just written
-/// from) and for `knowledge/schema.json`, and for no knowledge entry: the
-/// kit's rules come as packs, whose pins replace the per-entry baselines. The
-/// seeded workflow is baselined too, but only when `init` writes it, which
-/// needs a GitHub-hosted origin.
+/// from) and for the two schemas that are D3 files, `knowledge/schema.json` and
+/// `.claude/schemas/deliverables.json`, and for no knowledge entry: the kit's
+/// rules come as packs, whose pins replace the per-entry baselines. The seeded
+/// workflow is baselined too, but only when `init` writes it, which needs a
+/// GitHub-hosted origin.
 fn assert_baselines_are_the_paths_init_wrote(marker: &serde_json::Value) {
     let baselines = marker["baselines"]
         .as_object()
         .unwrap_or_else(|| panic!("baselines is not an object in {marker:?}"));
     let mut expected: Vec<&str> = KIT_OWNED.to_vec();
-    expected.push("knowledge/schema.json");
+    expected.extend(["knowledge/schema.json", ".claude/schemas/deliverables.json"]);
     expected.sort_unstable();
     let mut actual: Vec<&str> = baselines.keys().map(String::as_str).collect();
     actual.sort_unstable();
@@ -622,7 +637,7 @@ fn assert_baselines_are_the_paths_init_wrote(marker: &serde_json::Value) {
 fn init_rewrites_the_id_prefix_in_prefixed_seed_files_but_not_the_marker_content_rules() {
     let dir = scratch_git_repo();
     let output = houserules()
-        .args(["init", "--dir"])
+        .args(["init", "--tracker", "json", "--dir"])
         .arg(dir.path())
         .arg("--id-prefix")
         .arg("FOO")
@@ -1117,8 +1132,8 @@ fn a_second_init_keeps_every_file_that_exists_a_changed_kit_owned_file_included(
         "stderr: {}",
         String::from_utf8_lossy(&first.stderr)
     );
-    let changed = ".githooks/commit-msg";
-    fs::write(dir.path().join(changed), b"the adopter's own hook").expect("change the hook");
+    let changed = "tools/houserules-step.sh";
+    fs::write(dir.path().join(changed), b"the adopter's own hook").expect("change the script");
 
     let output = houserules()
         .args(["init", "--target", "claude", "--dir"])
@@ -1162,8 +1177,9 @@ fn a_second_init_keeps_every_file_that_exists_a_changed_kit_owned_file_included(
         .collect();
     assert!(wrote.is_empty(), "got {wrote:?}");
     assert!(stdout.contains("kept .claude/settings.json (hooks already present)\n"));
+    assert!(stdout.contains("kept .gitignore (.houserules/step/ already present)\n"));
     assert!(
-        fs::read(dir.path().join(changed)).expect("read the hook") == b"the adopter's own hook",
+        fs::read(dir.path().join(changed)).expect("read the script") == b"the adopter's own hook",
         "{changed} changed"
     );
 }
@@ -1178,9 +1194,12 @@ fn a_second_init_keeps_every_file_that_exists_a_changed_kit_owned_file_included(
 fn init_over_a_pre_existing_topic_file_keeps_it_and_stamps_no_entry_baseline() {
     let dir = scratch_git_repo();
     fs::create_dir_all(dir.path().join("knowledge")).expect("mkdir knowledge");
-    let adopters_own_file = r#"{"$schema": "./schema.json", "topic": "process", "title": "Adopter's own", "entries": []}"#;
-    fs::write(dir.path().join("knowledge/process.json"), adopters_own_file)
-        .expect("write adopter's own process.json");
+    let adopters_own_file = r#"{"$schema": "./schema.json", "topic": "knowledge-base", "title": "Adopter's own", "entries": []}"#;
+    fs::write(
+        dir.path().join("knowledge/knowledge-base.json"),
+        adopters_own_file,
+    )
+    .expect("write adopter's own knowledge-base.json");
 
     let output = houserules()
         .args(["init", "--dir"])
@@ -1194,7 +1213,7 @@ fn init_over_a_pre_existing_topic_file_keeps_it_and_stamps_no_entry_baseline() {
     );
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
     assert!(
-        stdout.contains("wrote knowledge/packs/process.json\n"),
+        stdout.contains("wrote knowledge/packs/knowledge-base.json\n"),
         "got:\n{stdout}"
     );
 
@@ -1203,11 +1222,13 @@ fn init_over_a_pre_existing_topic_file_keeps_it_and_stamps_no_entry_baseline() {
             .unwrap();
     let baselines = marker["baselines"].as_object().expect("baselines object");
     assert!(
-        !baselines.keys().any(|key| key.starts_with("process.")),
+        !baselines
+            .keys()
+            .any(|key| key.starts_with("knowledge-base.")),
         "init stamped a baseline for an entry: {baselines:?}"
     );
     assert_eq!(
-        fs::read_to_string(dir.path().join("knowledge/process.json")).unwrap(),
+        fs::read_to_string(dir.path().join("knowledge/knowledge-base.json")).unwrap(),
         adopters_own_file,
         "init modified a pre-existing topic file it should only have kept"
     );
@@ -1224,11 +1245,11 @@ fn init_over_a_pre_existing_topic_file_keeps_it_and_stamps_no_entry_baseline() {
     );
     let update_stdout = String::from_utf8(update_output.stdout).expect("utf8 stdout");
     assert!(
-        !update_stdout.contains("knowledge/process.json"),
+        !update_stdout.contains("knowledge/knowledge-base.json"),
         "got:\n{update_stdout}"
     );
     assert_eq!(
-        fs::read_to_string(dir.path().join("knowledge/process.json")).unwrap(),
+        fs::read_to_string(dir.path().join("knowledge/knowledge-base.json")).unwrap(),
         adopters_own_file,
         "update modified a topic file of the project"
     );
@@ -1298,14 +1319,15 @@ fn write_settings(dir: &Path, value: &serde_json::Value) {
     .expect("write settings.json");
 }
 
-/// The two matchers the embedded `.claude/settings.json` template's own
-/// `SessionStart` array carries.
-const TEMPLATE_MATCHERS: [&str; 2] = ["compact", "startup|resume|clear|fork"];
+/// The matcher the embedded `.claude/settings.json` template's own
+/// `SessionStart` array carries: the compaction entry is the only core hook
+/// entry (C40).
+const TEMPLATE_MATCHERS: [&str; 1] = ["compact"];
 
 /// A JSON `null` at `hooks` seeds cleanly under the frozen JS. With
 /// `.claude/settings.json = {"hooks": null}`, `node bin/houserules.mjs
 /// init --dir <scratch>` exits 0, prints `merged .claude/settings.json
-/// (SessionStart hooks added)`, and writes both template matchers into
+/// (SessionStart hooks added)`, and writes the template matcher into
 /// `hooks.SessionStart` -- `settings.hooks ??= {}` replaces `null` the
 /// same as a missing key, so this is not a crash arm.
 #[test]
@@ -1342,7 +1364,7 @@ fn init_seeds_a_null_hooks_settings_file_exactly_as_the_js_does() {
 /// A JSON `null` at `hooks.SessionStart` (with `hooks` itself a genuine
 /// object) also seeds cleanly. With `.claude/settings.json = {"hooks":
 /// {"SessionStart": null}}`, `node bin/houserules.mjs init` exits 0,
-/// prints the same `merged` line, and writes both template matchers --
+/// prints the same `merged` line, and writes the template matcher --
 /// `settings.hooks.SessionStart ??= []` replaces `null` the same way.
 #[test]
 fn init_seeds_a_null_session_start_settings_file_exactly_as_the_js_does() {

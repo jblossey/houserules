@@ -38,6 +38,19 @@ const CITING_FILES: [&str; 2] = [
     ".claude/skills/orchestrating/SKILL.md",
 ];
 
+/// The line of the requirement check (batch 34, spec 4.3) for `DELETED_ID`
+/// when no installed pack provides it. The install holds the reference
+/// workflow, which requires the id, so every case that takes the id from the
+/// base also gets this line, before the lines of the lint.
+const REQUIREMENT_NOT_PROVIDED: &str = "workflow reference requires process.evals-rerun: no \
+     installed pack provides it; run houserules pack add process\n";
+
+/// The line of the requirement check for `DELETED_ID` when
+/// `knowledge/overrides.json` excludes it.
+const REQUIREMENT_EXCLUDED: &str = "workflow reference requires process.evals-rerun, which \
+     knowledge/overrides.json excludes; remove the exclusion, and override the entry to change \
+     it\n";
+
 /// A `Command` for the compiled `houserules` binary under test, with the
 /// self-update phase of `update` switched off (`update.rs`'s own copy has the
 /// account).
@@ -56,10 +69,12 @@ const KIT_PACKS: [&str; 5] = [
     "writing-style",
 ];
 
-/// A scratch git repository that `houserules init --target claude` installed,
-/// and whose kit packs then became local topic files: each topic file holds
-/// the entries of its pack, and the install holds no pack, so each case below
-/// builds its own pack state.
+/// A scratch repository that `houserules init --target claude --tracker json
+/// --workflow reference --add-required-packs` installed, with the `quality`
+/// pack added, and whose kit packs then became local topic files: each topic
+/// file holds the entries of its pack, and the install holds no pack, so each
+/// case below builds its own pack state. The files that cite `DELETED_ID` are
+/// the files of the reference workflow, which the install pins.
 fn seeded_repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let status = Command::new("git")
@@ -69,7 +84,17 @@ fn seeded_repo() -> tempfile::TempDir {
         .expect("run git init");
     assert!(status.success(), "git init failed");
     let init = houserules()
-        .args(["init", "--target", "claude", "--dir"])
+        .args([
+            "init",
+            "--target",
+            "claude",
+            "--tracker",
+            "json",
+            "--workflow",
+            "reference",
+            "--add-required-packs",
+            "--dir",
+        ])
         .arg(dir.path())
         .output()
         .expect("run init");
@@ -77,6 +102,16 @@ fn seeded_repo() -> tempfile::TempDir {
         init.status.success(),
         "init failed: {}",
         String::from_utf8_lossy(&init.stderr)
+    );
+    let quality = houserules()
+        .args(["pack", "add", "quality", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run pack add");
+    assert!(
+        quality.status.success(),
+        "pack add quality failed: {}",
+        String::from_utf8_lossy(&quality.stderr)
     );
     for pack in KIT_PACKS {
         let copy = read_json(&dir.path().join(format!("knowledge/packs/{pack}.json")));
@@ -218,13 +253,18 @@ fn check_knowledge_fails_a_kit_owned_citation_of_a_deleted_entry() {
     delete_the_entry(dir.path());
     let output = run(dir.path(), "check-knowledge");
     assert_eq!(String::from_utf8_lossy(&output.stdout), "");
-    assert_eq!(String::from_utf8_lossy(&output.stderr), both_findings());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        format!("{REQUIREMENT_NOT_PROVIDED}{}", both_findings())
+    );
     assert_eq!(output.status.code(), Some(1));
 }
 
-/// The adopter-visible behavior of an override: a kit-owned file the stamp
-/// lists is the adopter's own, so a citation in it is no finding. The same
-/// install fails before the override, so the pass is not vacuous.
+/// The adopter-visible behavior of an override: a workflow file the stamp
+/// lists is the adopter's own, so a citation in it is no finding of the lint.
+/// The same install fails with both findings before the override, so the
+/// skip is not vacuous. The requirement check has no waiver (design.md 5.112):
+/// the id is still gone, so its line stays and the install still fails.
 #[test]
 fn an_overridden_kit_owned_file_is_skipped() {
     let dir = seeded_repo();
@@ -233,7 +273,12 @@ fn an_overridden_kit_owned_file_is_skipped() {
     edit_stamp(dir.path(), |stamp| {
         stamp["ownedPaths"] = json!(CITING_FILES);
     });
-    assert_passes(dir.path());
+    let output = run(dir.path(), "check-knowledge");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        REQUIREMENT_NOT_PROVIDED
+    );
+    assert_eq!(output.status.code(), Some(1));
 }
 
 /// A stamp that `update` rejects is a finding too: the lint cannot read the
@@ -291,7 +336,7 @@ fn a_pin_file_that_cannot_give_its_pins_prints_its_defect_once() {
     assert_eq!(output.status.code(), Some(1));
 }
 
-/// The kit-owned skill the unseeded-id cases below put an older kit's text
+/// The workflow skill the unseeded-id cases below put an older kit's text
 /// into.
 const FINISHING_SKILL: &str = ".claude/skills/finishing-a-feature/SKILL.md";
 
@@ -303,15 +348,15 @@ const UNSEEDED_ID: &str = "process.cited-by-an-older-kit";
 fn older_kit_skill() -> String {
     let current = fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../template/.claude/skills/finishing-a-feature/SKILL.md"),
+            .join("../../template/workflows/reference/.claude/skills/finishing-a-feature/SKILL.md"),
     )
     .expect("read the template skill");
     format!("{current}\nAn older kit cited `{UNSEEDED_ID}` here.\n")
 }
 
-/// Puts `older_kit_skill()` into `root`, stamped with its own hash as `update`
-/// stamps a file it wrote, so the install looks like one that has not yet run
-/// `update` with the new binary. With `local_edit` the file also carries one
+/// Puts `older_kit_skill()` into `root`, pinned at its own hash as `update`
+/// pins a workflow file it wrote, so the install looks like one that has not
+/// yet run `update` with the new binary. With `local_edit` the file also carries one
 /// line the adopter added after that stamp.
 fn install_older_kit_skill(root: &Path, local_edit: bool) {
     let older = older_kit_skill();
@@ -326,7 +371,7 @@ fn install_older_kit_skill(root: &Path, local_edit: bool) {
         .map(|byte| format!("{byte:02x}"))
         .collect();
     edit_stamp(root, |stamp| {
-        stamp["baselines"][FINISHING_SKILL] = json!(hash);
+        stamp["workflow"]["files"][FINISHING_SKILL] = json!(hash);
     });
 }
 
@@ -335,7 +380,7 @@ fn unseeded_finding() -> String {
     format!(
         "{FINISHING_SKILL}: cites \"{UNSEEDED_ID}\", which is not in the knowledge base; the kit \
          does not seed it, so no entry can be restored: run houserules update, and if update \
-         prints \"kept {FINISHING_SKILL} (locally modified)\", remove the citation from \
+         prints a \"kept {FINISHING_SKILL}\" line, remove the citation from \
          {FINISHING_SKILL} or list \"{FINISHING_SKILL}\" in \"ownedPaths\" in .houserules.json\n"
     )
 }
@@ -383,7 +428,10 @@ fn the_printed_remedy_clears_an_unseeded_citation_in_a_kept_file_by_editing_it_o
     assert_fails_with_the_unseeded_finding(dir.path());
     let printed = update_output(dir.path());
     assert!(
-        printed.contains(&format!("kept {FINISHING_SKILL} (locally modified)")),
+        printed.contains(&format!(
+            "kept {FINISHING_SKILL} (locally modified; reference workflow {})",
+            env!("CARGO_PKG_VERSION")
+        )),
         "update did not keep the skill: {printed}"
     );
     assert_fails_with_the_unseeded_finding(dir.path());
@@ -408,7 +456,10 @@ fn the_printed_remedy_clears_an_unseeded_citation_in_a_kept_file_by_listing_it_i
     assert_fails_with_the_unseeded_finding(dir.path());
     let printed = update_output(dir.path());
     assert!(
-        printed.contains(&format!("kept {FINISHING_SKILL} (locally modified)")),
+        printed.contains(&format!(
+            "kept {FINISHING_SKILL} (locally modified; reference workflow {})",
+            env!("CARGO_PKG_VERSION")
+        )),
         "update did not keep the skill: {printed}"
     );
     assert_fails_with_the_unseeded_finding(dir.path());
@@ -698,7 +749,10 @@ fn assert_fails_with_both_excluded_findings(root: &Path) {
         .iter()
         .map(|file| excluded_finding_for(file))
         .collect();
-    assert_eq!(String::from_utf8_lossy(&output.stderr), both);
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        format!("{REQUIREMENT_EXCLUDED}{both}")
+    );
     assert_eq!(output.status.code(), Some(1));
 }
 
@@ -714,7 +768,10 @@ fn check_knowledge_fails_a_kit_owned_citation_of_an_excluded_entry() {
         .iter()
         .map(|file| excluded_finding_for(file))
         .collect();
-    assert_eq!(String::from_utf8_lossy(&output.stderr), both);
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        format!("{REQUIREMENT_EXCLUDED}{both}")
+    );
     assert_eq!(
         String::from_utf8_lossy(&output.stdout),
         "exclusion process.evals-rerun: not for this project\n"
@@ -881,7 +938,10 @@ fn an_upstream_pack_named_like_a_kit_pack_does_not_make_the_citations_live() {
         .iter()
         .map(|file| name_held_finding_for(file, UPSTREAM_SOURCE))
         .collect();
-    assert_eq!(String::from_utf8_lossy(&output.stderr), both);
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        format!("{REQUIREMENT_NOT_PROVIDED}{both}")
+    );
     assert_eq!(String::from_utf8_lossy(&output.stdout), "");
     assert_eq!(output.status.code(), Some(1));
 }
@@ -920,7 +980,10 @@ fn an_older_kit_copy_that_lacks_a_cited_id_is_a_finding_for_each_citing_file() {
         .iter()
         .map(|file| inactive_in_copy_finding_for(file, "0.9.0"))
         .collect();
-    assert_eq!(String::from_utf8_lossy(&output.stderr), both);
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        format!("{REQUIREMENT_NOT_PROVIDED}{both}")
+    );
     assert_eq!(String::from_utf8_lossy(&output.stdout), "");
     assert_eq!(output.status.code(), Some(1));
 }
@@ -939,7 +1002,10 @@ fn the_printed_remedy_of_an_older_kit_copy_clears_the_finding_through_update() {
         .iter()
         .map(|file| inactive_in_copy_finding_for(file, "0.9.0"))
         .collect();
-    assert_eq!(String::from_utf8_lossy(&output.stderr), both);
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        format!("{REQUIREMENT_NOT_PROVIDED}{both}")
+    );
     assert_eq!(output.status.code(), Some(1));
 
     let printed = update_output(dir.path());
@@ -951,7 +1017,15 @@ fn the_printed_remedy_of_an_older_kit_copy_clears_the_finding_through_update() {
         )),
         "update did not move the pack: {printed}"
     );
-    assert_passes(dir.path());
+    // The move offers the every-commit entry of the process pack (spec 3.7):
+    // the exclusion with the reason `opt-in` is listed on stdout.
+    let output = run(dir.path(), "check-knowledge");
+    assert_eq!(String::from_utf8_lossy(&output.stderr), "");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "exclusion process.every-commit-names-a-work-item: opt-in\nknowledge: ok\n"
+    );
+    assert_eq!(output.status.code(), Some(0));
 }
 
 /// The same line when the status of the kit copy itself retires the cited

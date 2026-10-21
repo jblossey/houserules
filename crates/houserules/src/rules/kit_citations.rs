@@ -9,8 +9,9 @@
 //! `update` treats each kit-owned file by what the project did to
 //! it (`install`'s module doc, "`update` and the ownership baseline"): it
 //! overwrites a file the project has not changed, keeps a locally modified
-//! file and reports it (`kept <path> (locally modified)`), and leaves a file
-//! that the project owns as found. So a citation dangles when the base lacks
+//! file and reports it (a `kept <path>` line), and leaves a file that the
+//! project owns as found. A file of an installed workflow gets the same
+//! treatment through the pins of the workflow (`workflow`'s own module doc). So a citation dangles when the base lacks
 //! the cited entry, and it also dangles in a kept file whose older text cites
 //! an id that no kit pack ships any more. This lint turns the dangling
 //! citation into a finding. The remedy it prints depends on the case
@@ -345,8 +346,8 @@ fn status_an_override_sets<'a>(base: &'a Base, id: &str) -> Option<&'a str> {
 /// - No kit pack ships the id: the file cites it because it holds an older
 ///   kit's text. If the project has not changed the file, `update` overwrites
 ///   it with the current text, which cites no such id. If the project has
-///   changed it, `update` keeps it and prints `kept <file> (locally
-///   modified)`; the file is then the project's own text, so the project
+///   changed it, `update` keeps it and prints a `kept <file>` line; the file
+///   is then the project's own text, so the project
 ///   removes the citation or lists the file in `ownedPaths`, which makes it no
 ///   subject of this lint. The shipped template never cites an id that no kit
 ///   pack ships (`shipped_kit_owned_files_cite_only_shipped_ids`), so a file
@@ -385,8 +386,8 @@ fn missing_finding(
     else {
         return format!(
             "{file}: cites \"{id}\", which is not in the knowledge base; the kit does not seed \
-             it, so no entry can be restored: run houserules update, and if update prints \"kept \
-             {file} (locally modified)\", remove the citation from {file} or list \"{file}\" in \
+             it, so no entry can be restored: run houserules update, and if update prints a \
+             \"kept {file}\" line, remove the citation from {file} or list \"{file}\" in \
              \"ownedPaths\" in .houserules.json"
         );
     };
@@ -509,8 +510,8 @@ mod tests {
     fn unshipped_line(file: &str, id: &str) -> String {
         format!(
             "{file}: cites \"{id}\", which is not in the knowledge base; the kit does not seed it, \
-             so no entry can be restored: run houserules update, and if update prints \"kept {file} \
-             (locally modified)\", remove the citation from {file} or list \"{file}\" in \
+             so no entry can be restored: run houserules update, and if update prints a \
+             \"kept {file}\" line, remove the citation from {file} or list \"{file}\" in \
              \"ownedPaths\" in .houserules.json"
         )
     }

@@ -15,6 +15,7 @@
     "Installs with the project's own package manager CLI (for example `pnpm add --save-exact <pkg>@<version>`, `cargo add <crate>@=<version>`) and verifies the resolved version in the manifest; never writes a version by hand; no ^ or ~ range",
     "Verifies the library's API against current docs before use and lists it in docs_verified",
     "Writes the failing test first; tdd holds the verbatim RED and GREEN output",
-    "The report passes houserules validate; self_audit holds the audit summary and deterministic rows; security-hygiene.exact-pins and security-hygiene.dependency-vetting pass"
+    "Every commit it makes carries one `Work-Item: <id>` trailer for each id of the brief's `Backlog:` line, in the last paragraph of the message",
+    "The report passes houserules validate with `model` set to the dispatch's `Model:` line; self_audit holds the audit summary and deterministic rows; security-hygiene.exact-pins and security-hygiene.dependency-vetting pass"
   ]
 }

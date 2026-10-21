@@ -23,6 +23,7 @@ use crate::rules::imports_agents_md;
 
 use super::super::AREAS_FILE;
 use super::super::hand_steps;
+use super::d3::{ReleasedEntry, released_entries};
 
 /// A local topic file or an archive file, parsed.
 pub(super) struct TopicFile {
@@ -61,6 +62,9 @@ pub(super) struct Tree {
     pub(super) owned_paths: Vec<String>,
     /// The `baselines` of the marker.
     pub(super) baselines: Map<String, Value>,
+    /// The `version` of the marker: the release of 1.x that last ran the
+    /// install, whose text of an entry is the base of what the project changed.
+    pub(super) version: Option<String>,
     /// The `sha256` that the marker pins for each pack, by pack name.
     pub(super) pinned: BTreeMap<String, String>,
     /// What each `.json` path under `knowledge/packs/` holds, by pack name.
@@ -165,14 +169,62 @@ fn canonical_entry_bytes(entry: &Value) -> Vec<u8> {
 /// `baseline::classify`. The entry differs from its recorded baseline and
 /// from `shipped`, the entry of the pack; with no baseline, from `shipped`
 /// alone. An entry that the project never changed is unchanged even when the
-/// text of the kit moved since its release.
-fn is_changed(entry: &Value, recorded: Option<&str>, shipped: &Value) -> bool {
+/// text of the kit moved since its release, and an entry that equals a text
+/// that a release shipped (`released`) is the kit's whatever the baselines say.
+fn is_changed(
+    entry: &Value,
+    recorded: Option<&str>,
+    shipped: &Value,
+    released: &[ReleasedEntry],
+) -> bool {
     baseline::classify(
         recorded,
         Some(&canonical_entry_bytes(entry)),
         &canonical_entry_bytes(shipped),
         false,
     ) == Status::Modified
+        && !released.iter().any(|text| text.entry == *entry)
+}
+
+/// The text of an entry that its 1.x release shipped, from `texts`, every text
+/// that a release shipped: the text whose canonical bytes hash to the baseline
+/// that the marker recorded for the id, else the text of the release that the
+/// marker names. `None` when no release shipped the id, or the marker names
+/// neither, so no base exists.
+fn released_base<'a>(
+    texts: &'a [ReleasedEntry],
+    recorded: Option<&str>,
+    version: Option<&str>,
+) -> Option<&'a Value> {
+    recorded
+        .and_then(|hash| {
+            texts
+                .iter()
+                .find(|text| baseline::hash(&canonical_entry_bytes(&text.entry)) == hash)
+        })
+        .or_else(|| {
+            version.and_then(|version| {
+                texts
+                    .iter()
+                    .find(|text| text.versions.iter().any(|found| found == version))
+            })
+        })
+        .map(|text| &text.entry)
+}
+
+/// The fields of the override for the entry `entry` of the project: the fields
+/// that differ from `shipped`, the entry of the pack, and that the project
+/// changed from `released`, the text that its release shipped. A field that the
+/// kit changed after that release, and that the project left alone, reaches the
+/// install through the pack. With no released text, every field that differs
+/// from the pack is the project's.
+fn changed_fields(entry: &Value, released: Option<&Value>, shipped: &Value) -> Map<String, Value> {
+    let mut fields = differing_fields(entry, shipped);
+    if let Some(released) = released {
+        let by_the_project = differing_fields(entry, released);
+        fields.retain(|key, _| by_the_project.contains_key(key));
+    }
+    fields
 }
 
 /// The ids of the `overrides` and `exclusions` that an overrides document
@@ -372,6 +424,7 @@ pub(super) fn plan(tree: &Tree, packs: &[PackCopy]) -> Result<Plan, String> {
     };
     let handled = ids_in_document(&document);
 
+    let released = released_entries();
     for (id, (pack_name, shipped_entry)) in &shipped {
         if covered.contains(topic_of(id))
             || !plan.install_packs.iter().any(|name| name == pack_name)
@@ -379,20 +432,23 @@ pub(super) fn plan(tree: &Tree, packs: &[PackCopy]) -> Result<Plan, String> {
             continue;
         }
         let recorded = tree.baselines.get(*id).and_then(Value::as_str);
+        let texts = released.get(*id).map_or(&[][..], Vec::as_slice);
+        let base = released_base(texts, recorded, tree.version.as_deref());
         let home = if let Some(entry) = archived.get(id) {
-            let fields = if listed.contains(id) || is_changed(entry, recorded, shipped_entry) {
-                differing_fields(entry, shipped_entry)
+            let fields = if listed.contains(id) || is_changed(entry, recorded, shipped_entry, texts)
+            {
+                changed_fields(entry, base, shipped_entry)
             } else {
                 Map::new()
             };
             Home::Retired(retired_fields(fields))
         } else if let Some((_, entry)) = local.get(id) {
             if listed.contains(id) {
-                override_or_pack(differing_fields(entry, shipped_entry))
+                override_or_pack(changed_fields(entry, base, shipped_entry))
             } else if handled.contains(*id) {
                 Home::Handled
-            } else if is_changed(entry, recorded, shipped_entry) {
-                override_or_pack(differing_fields(entry, shipped_entry))
+            } else if is_changed(entry, recorded, shipped_entry, texts) {
+                override_or_pack(changed_fields(entry, base, shipped_entry))
             } else {
                 Home::Pack
             }
@@ -524,6 +580,7 @@ mod tests {
             overrides: None,
             owned_paths: Vec::new(),
             baselines: Map::new(),
+            version: None,
             pinned: BTreeMap::new(),
             copies: BTreeMap::new(),
             areas_file_exists: true,
@@ -1119,5 +1176,91 @@ mod tests {
 
         assert_eq!(home(&plan, "beta.one"), Home::Pack);
         assert_eq!(plan.topic_removals, ["knowledge/misc.json"]);
+    }
+
+    /// The released 1.4.0 text of `process.tdd`, and a pack of the binary that
+    /// ships the id with another text, so that every field of the 1.4.0 text
+    /// differs from the pack's entry.
+    fn released_tdd() -> (Value, Vec<PackCopy>) {
+        let texts = released_entries().remove("process.tdd").expect("released");
+        let text = texts
+            .iter()
+            .find(|text| text.versions.iter().any(|version| version == "1.4.0"))
+            .expect("the 1.4.0 text");
+        (text.entry.clone(), vec![pack("process", &["process.tdd"])])
+    }
+
+    /// An entry that the project changed becomes an override of the fields
+    /// that it changed from the text of its release, not of every field that
+    /// differs from the pack. The text of the release is the one whose hash
+    /// the marker recorded.
+    #[test]
+    fn an_override_carries_only_the_fields_the_project_changed_from_its_release() {
+        let (released, packs) = released_tdd();
+        let mut mine = released.clone();
+        mine["summary"] = json!("Mine");
+        let mut tree = tree();
+        tree.topic_files = vec![file("knowledge/process.json", vec![mine])];
+        tree.baselines
+            .insert("process.tdd".to_string(), baseline_of(&released));
+
+        let plan = plan(&tree, &packs).expect("a plan");
+
+        assert_eq!(
+            home(&plan, "process.tdd"),
+            Home::Override(json!({"summary": "Mine"}).as_object().unwrap().clone())
+        );
+    }
+
+    /// With no baseline for the id, the text of the release that the marker
+    /// names is the base of what the project changed.
+    #[test]
+    fn the_release_that_the_marker_names_is_the_base_when_no_baseline_exists() {
+        let (released, packs) = released_tdd();
+        let mut mine = released;
+        mine["summary"] = json!("Mine");
+        let mut tree = tree();
+        tree.version = Some("1.4.0".to_string());
+        tree.topic_files = vec![file("knowledge/process.json", vec![mine])];
+
+        let plan = plan(&tree, &packs).expect("a plan");
+
+        assert_eq!(
+            home(&plan, "process.tdd"),
+            Home::Override(json!({"summary": "Mine"}).as_object().unwrap().clone())
+        );
+    }
+
+    /// An entry that equals a text that a release shipped is the kit's, whatever
+    /// the baselines say: it becomes the entry of the pack, not an override.
+    #[test]
+    fn an_entry_that_equals_a_released_text_is_the_kits_without_a_baseline() {
+        let (released, packs) = released_tdd();
+        let mut tree = tree();
+        tree.topic_files = vec![file("knowledge/process.json", vec![released])];
+
+        let plan = plan(&tree, &packs).expect("a plan");
+
+        assert_eq!(home(&plan, "process.tdd"), Home::Pack);
+    }
+
+    /// A listed id follows the same rule: the project owns the fields that it
+    /// changed, and the pack supplies the rest.
+    #[test]
+    fn a_listed_id_carries_only_the_fields_the_project_changed_from_its_release() {
+        let (released, packs) = released_tdd();
+        let mut mine = released.clone();
+        mine["tags"] = json!(["mine"]);
+        let mut tree = tree();
+        tree.overrides = Some(vec!["process.tdd".to_string()]);
+        tree.version = Some("1.4.0".to_string());
+        tree.topic_files = vec![file("knowledge/process.json", vec![mine])];
+
+        let plan = plan(&tree, &packs).expect("a plan");
+
+        assert_eq!(
+            home(&plan, "process.tdd"),
+            Home::Override(json!({"tags": ["mine"]}).as_object().unwrap().clone())
+        );
     }
 }

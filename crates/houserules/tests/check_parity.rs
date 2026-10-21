@@ -245,6 +245,7 @@ const ROOT_RESOLVING_COMMANDS: &[&[&str]] = &[
     &["list"],
     &["batch", "1"],
     &["set", "X-1", "status=done"],
+    &["defer", "--title", "t", "--reason", "r", "--origin", "o"],
     &["stats", "workspace"],
     &["validate", "x.json"],
     &["audit", "--base", "HEAD"],

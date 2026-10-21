@@ -296,9 +296,9 @@ fn exceptions() -> Vec<Exception> {
 /// gate.rs` reads this printed count to flag exactly that shape (a
 /// declared exception the current tree no longer needs).
 /// `residue-gate.rs` carries the identical helper -- each `src/bin/*.rs`
-/// file keeps its own copy rather than sharing one, since this package
-/// has no library target for a `src/bin/*.rs` file to share code through
-/// (`gen-goldens.rs`'s own module doc explains why).
+/// file keeps its own copy rather than sharing one: this package has no
+/// library target, and the one `#[path]` module the bins share is
+/// `dev_support/cargo_target.rs` (`gen-goldens.rs`'s `repo_root` doc).
 fn declared_exception_counts(
     exceptions: &[Exception],
     excepted: &[(Hit, &'static str, &'static str)],
@@ -575,9 +575,9 @@ mod tests {
     /// `true` when `text` holds a maximal run of 7-40 ASCII hex
     /// characters -- a git commit sha's own shape, the identical bound
     /// `rules::durable_sha::hex_candidates` uses (kept as its own copy
-    /// here: this package has no library target for a `src/bin/*.rs`
-    /// file to share code through). A longer run (a sha256 digest, say)
-    /// is excluded the same way: it merely looks hex.
+    /// here: this package has no library target, and the bins share only
+    /// the `#[path]` module `dev_support/cargo_target.rs`). A longer run
+    /// (a sha256 digest, say) is excluded the same way: it merely looks hex.
     fn contains_hex_sha(text: &str) -> bool {
         let mut run = 0usize;
         for ch in text.chars().chain(std::iter::once(' ')) {

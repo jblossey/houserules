@@ -114,12 +114,14 @@ fn identify(command: &str) -> &'static str {
         "mise run lint" => "lint",
         "mise run test" | "cargo test --locked" => "test",
         "cargo fmt --check" => "fmt",
+        _ if command.starts_with("cargo clippy") && command.contains(" --target ") => {
+            "cross-target"
+        }
         _ if command.starts_with("cargo clippy") => "clippy",
         _ if command.starts_with("mise run audit") => "audit",
         _ if command.starts_with("mise run houserules -- check-commit") => "check-commit",
         _ if command.starts_with("shellcheck ") => "shellcheck",
         "cargo deny check" => "deny",
-        _ if command.starts_with("cargo check --target") => "cross-target",
         _ if command.starts_with("mise run houserules -- check-knowledge") => "check-knowledge",
         _ if command.starts_with("mise run houserules -- check-backlog") => "check-backlog",
         _ if command.starts_with("mise run houserules -- render") => "render",
@@ -140,7 +142,10 @@ fn identify(command: &str) -> &'static str {
 /// body is trusted to describe that command with -- this module's own
 /// doc, "Matching", has the paraphrase account. `check-knowledge` and
 /// `check-backlog` share one alias, "knowledge gates": the body names
-/// them together ("both knowledge gates"), never individually.
+/// them together ("both knowledge gates"), never individually. The
+/// windows-gnu clippy member of the lint task has its own identifier,
+/// `cross-target`, so the body must keep that word even though the
+/// plain `clippy` alias already holds for ci.yml's own clippy step.
 const ALIASES: &[(&str, &[&str])] = &[
     ("lint", &["lint chain"]),
     ("test", &["full suite"]),
@@ -150,7 +155,7 @@ const ALIASES: &[(&str, &[&str])] = &[
     ("check-commit", &["check-commit"]),
     ("shellcheck", &["shellcheck"]),
     ("deny", &["cargo deny"]),
-    ("cross-target", &["cross-target check"]),
+    ("cross-target", &["cross-target"]),
     ("check-knowledge", &["knowledge gates"]),
     ("check-backlog", &["knowledge gates"]),
     ("render", &["render --check"]),
@@ -371,4 +376,43 @@ fn every_mise_lint_member_has_a_matching_mention_in_the_task_gates_mirror_ci_ent
     );
     let body = task_gates_mirror_ci_body_text();
     assert_every_command_has_a_matching_mention(&commands, &body, "mise.toml [tasks.lint]");
+}
+
+/// The windows target that `mise.toml` provisions under `rust`: the local
+/// stand-in for `windows-latest`.
+const WINDOWS_TARGET: &str = "x86_64-pc-windows-gnu";
+
+/// The cross-target lint member is the clippy command of ci.yml's `rust`
+/// job, run for `WINDOWS_TARGET`. A `cargo check` member would pass a
+/// warning that the `-D warnings` clippy run of `windows-latest` fails.
+/// The test builds the expected member from the ci.yml command, so a flag
+/// that ci.yml gains fails the test until the member has it too.
+#[test]
+fn the_cross_target_lint_member_is_the_ci_clippy_command_for_the_windows_target() {
+    let ci_path = repo_root().join(".github/workflows/ci.yml");
+    let yaml = fs::read_to_string(&ci_path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", ci_path.display()));
+    let ci_clippy: Vec<String> = extract_ci_run_lines(&yaml)
+        .into_iter()
+        .filter(|command| identify(command) == "clippy")
+        .collect();
+    assert_eq!(
+        ci_clippy.len(),
+        1,
+        "ci.yml declares one clippy step: {ci_clippy:?}"
+    );
+    let expected = ci_clippy[0].replacen(
+        "cargo clippy",
+        &format!("cargo clippy --target {WINDOWS_TARGET}"),
+        1,
+    );
+
+    let mise_path = repo_root().join("mise.toml");
+    let toml = fs::read_to_string(&mise_path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", mise_path.display()));
+    let members = extract_mise_lint_run_lines(&toml);
+    assert!(
+        members.contains(&expected),
+        "mise.toml [tasks.lint] lacks {expected:?}: {members:?}"
+    );
 }

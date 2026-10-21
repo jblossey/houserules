@@ -695,17 +695,20 @@ fn add_refuses_a_name_that_has_only_a_copy_or_only_a_pin() {
     );
 }
 
-/// C7: `pack add process` reads the presence of `backlog/` as the tracker.
+/// Spec 3.10: `pack add process` reads the `tracker` key of the marker. A
+/// `backlog/` directory is no tracker.
 #[test]
-fn add_process_refuses_without_a_backlog_directory_and_adds_it_with_one() {
+fn add_process_refuses_without_a_tracker_and_adds_it_with_one() {
     let project = Project::new();
-    refused_changing_nothing(
-        &project,
-        &["pack", "add", "process"],
-        "pack process needs a tracker, and this install has no backlog/ directory; install a tracker with --tracker first",
-    );
+    let refusal = "pack process needs a tracker; run houserules init --tracker json|github|beads";
+    refused_changing_nothing(&project, &["pack", "add", "process"], refusal);
 
     project.write("backlog/schema.json", "{}\n");
+    refused_changing_nothing(&project, &["pack", "add", "process"], refusal);
+
+    let mut marker = project.read_json(".houserules.json");
+    marker["tracker"] = json!({"adapter": "json"});
+    project.write_json(".houserules.json", &marker);
     let lines = succeeded(&project.run(&["pack", "add", "process"]));
 
     assert!(

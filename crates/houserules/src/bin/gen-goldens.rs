@@ -59,6 +59,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{Value, json};
 
+#[path = "../dev_support/cargo_target.rs"]
+mod cargo_target;
+
+use cargo_target::{metadata_command, target_directory_of};
+
 /// The frozen sha every golden here checks out a worktree at -- this
 /// binary's own copy of `tests/common/mod.rs`'s `FROZEN_SHA` (same value;
 /// that module's own doc has the full provenance account). A
@@ -123,7 +128,8 @@ impl Drop for ScratchDir {
 /// `tests/*.rs` file's own copy of this helper (`tests/common/mod.rs`'s own
 /// doc explains why each keeps its own rather than sharing one: this
 /// package has no library target, so a `src/bin/*.rs` file shares no code
-/// with `src/main.rs` or with `tests/` at all).
+/// with `src/main.rs` or with `tests/`, bar the one `#[path]` module
+/// `dev_support/cargo_target.rs`).
 fn repo_root() -> PathBuf {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     root.canonicalize()
@@ -161,7 +167,9 @@ fn build_houserules(root: &Path) -> PathBuf {
         .expect("run cargo build --bin houserules");
     assert!(status.success(), "cargo build --bin houserules failed");
     let suffix = std::env::consts::EXE_SUFFIX;
-    root.join(format!("target/debug/houserules{suffix}"))
+    target_directory_of(metadata_command(root))
+        .join("debug")
+        .join(format!("houserules{suffix}"))
 }
 
 /// A detached git worktree at `sha`, removed on drop -- `tests/common/
@@ -204,16 +212,18 @@ impl Worktree {
     }
 }
 
-/// Adds the install `schema` key to the `.houserules.json` of the worktree at
-/// `path`, so that D4 lets the commands under capture read it. The frozen sha
-/// holds a marker of release 1.x. The key is the only change:
-/// `tests/common/mod.rs`'s `FrozenWorktree` makes the same change.
+/// Adds the install `schema` key and the JSON `tracker` key to the
+/// `.houserules.json` of the worktree at `path`, so that D4 lets the commands
+/// under capture read it and the backlog commands reach the frozen backlog.
+/// The frozen sha holds a marker of release 1.x. These two keys are the only
+/// change: `tests/common/mod.rs`'s `FrozenWorktree` makes the same change.
 fn stamp_install_schema(path: &Path) {
     let marker = path.join(".houserules.json");
     let mut stamp: serde_json::Map<String, Value> =
         serde_json::from_str(&fs::read_to_string(&marker).unwrap_or_else(|_| "{}".to_string()))
             .expect("the frozen marker is a JSON object");
     stamp.insert("schema".to_string(), json!("houserules/install@2.0.0"));
+    stamp.insert("tracker".to_string(), json!({"adapter": "json"}));
     fs::write(
         &marker,
         format!(

@@ -18,7 +18,9 @@
 //!   `"entries": []` stays. An archive file that the step empties goes too.
 //!
 //! [`plan`] decides everything and writes nothing, so a caller can refuse
-//! before it writes any other file; [`Plan::apply`] writes. [`one_source`]
+//! before it writes any other file; [`Plan::apply`] writes. A caller that
+//! writes `knowledge/overrides.json` on its own account edits the plan with
+//! [`Plan::edit_overrides`], so that the plan writes the file once. [`one_source`]
 //! is both, for a caller that has installed its packs already.
 
 use std::collections::BTreeMap;
@@ -46,6 +48,32 @@ impl Plan {
     /// The lines to print, in the order the step decided them.
     pub(super) fn lines(&self) -> &[String] {
         &self.lines
+    }
+
+    /// Applies `edit` to the `knowledge/overrides.json` that [`Plan::apply`]
+    /// leaves: the document the step plans to write, or `current` (the parsed
+    /// file, `null` when the file does not exist) when the step plans none.
+    /// `edit` answers the changed document, or `None` to leave the file alone.
+    /// A changed document replaces the planned write, so `apply` writes the
+    /// file once. The step decided on the project's own overrides, so an edit
+    /// made here is never one of its replacements: an exclusion that a caller
+    /// adds survives a local entry that carries its id.
+    pub(super) fn edit_overrides(
+        &mut self,
+        root: &Path,
+        current: &Value,
+        edit: impl FnOnce(&Value) -> Option<Value>,
+    ) {
+        let path = root.join("knowledge").join("overrides.json");
+        let planned = self.writes.iter().position(|(target, _)| *target == path);
+        let document = planned.map_or(current, |index| &self.writes[index].1);
+        let Some(changed) = edit(document) else {
+            return;
+        };
+        match planned {
+            Some(index) => self.writes[index].1 = changed,
+            None => self.writes.push((path, changed)),
+        }
     }
 
     /// Writes each file in emit form, then removes each emptied file.
@@ -482,5 +510,108 @@ mod tests {
         );
         assert!(!knowledge.join("team.json").exists());
         assert!(!knowledge.join("overrides.json").exists());
+    }
+
+    /// A scratch install root with the pack `team`, which ships `team.alpha`
+    /// with the summary "A", and a topic file that holds a local `team.alpha`
+    /// with the summary "Local". The step moves the local entry into an
+    /// override. Returns the root and the base.
+    fn install_with_a_local_entry_that_the_step_moves() -> (tempfile::TempDir, Base) {
+        let root = tempfile::tempdir().expect("tempdir");
+        let knowledge = root.path().join("knowledge");
+        fs::create_dir_all(knowledge.join("packs")).expect("create packs/");
+        fs::write(knowledge.join("schema.json"), "{}").expect("write schema.json");
+        fs::write(knowledge.join("areas.json"), "{}").expect("write areas.json");
+        write_json(
+            &knowledge.join("packs").join("team.json"),
+            &json!({
+                "name": "team", "version": "1.0.0", "schema": "houserules/pack@1.0.0",
+                "topics": {"team": {"title": "Team"}},
+                "areas": {"global": {"paths": []}},
+                "entries": [entry("team.alpha", "A")],
+            }),
+        )
+        .expect("write the pack copy");
+        write_json(
+            &knowledge.join("team.json"),
+            &json!({"topic": "team", "title": "Team", "entries": [entry("team.alpha", "Local")]}),
+        )
+        .expect("write the topic file");
+        let base = load_base(root.path()).expect("load the base");
+        (root, base)
+    }
+
+    /// `edit_overrides` hands the edit the document that the step plans to
+    /// write, and the answer replaces that write: `apply` writes one document
+    /// that holds the override of the step and the edit.
+    #[test]
+    fn edit_overrides_edits_the_document_the_step_plans() {
+        let (root, base) = install_with_a_local_entry_that_the_step_moves();
+        let mut step = plan(
+            root.path(),
+            &base.topic_files,
+            &base.packs,
+            &base.overrides_raw,
+        )
+        .expect("plan the step");
+
+        step.edit_overrides(root.path(), &base.overrides_raw, |planned| {
+            assert_eq!(
+                planned["overrides"],
+                json!([{"id": "team.alpha", "fields": {"summary": "Local"}}])
+            );
+            let mut changed = planned.clone();
+            changed["exclusions"] = json!([{"id": "team.beta", "reason": "opt-in"}]);
+            Some(changed)
+        });
+        step.apply().expect("write the plan");
+
+        let written: Value = serde_json::from_str(
+            &fs::read_to_string(root.path().join("knowledge/overrides.json"))
+                .expect("read overrides.json"),
+        )
+        .expect("parse overrides.json");
+        assert_eq!(
+            written["overrides"],
+            json!([{"id": "team.alpha", "fields": {"summary": "Local"}}])
+        );
+        assert_eq!(
+            written["exclusions"],
+            json!([{"id": "team.beta", "reason": "opt-in"}])
+        );
+    }
+
+    /// A step that plans no write of `overrides.json` hands the edit the
+    /// document `current`; the answer becomes a write of the plan. An edit
+    /// that answers `None` plans nothing.
+    #[test]
+    fn edit_overrides_starts_from_the_current_document_when_the_step_plans_none() {
+        let (root, _base) = install_with_a_local_entry_that_the_step_moves();
+        let overrides = root.path().join("knowledge/overrides.json");
+        let current = json!({"schema": "houserules/overrides@1.0.0", "exclusions": []});
+        let mut untouched = Plan {
+            writes: Vec::new(),
+            removals: Vec::new(),
+            lines: Vec::new(),
+        };
+        untouched.edit_overrides(root.path(), &current, |_| None);
+        untouched.apply().expect("write the plan");
+        assert!(!overrides.exists());
+
+        let mut step = Plan {
+            writes: Vec::new(),
+            removals: Vec::new(),
+            lines: Vec::new(),
+        };
+        step.edit_overrides(root.path(), &current, |document| {
+            assert_eq!(document, &current);
+            Some(json!({"schema": "houserules/overrides@1.0.0", "exclusions": [{"id": "x.y"}]}))
+        });
+        step.apply().expect("write the plan");
+        assert_eq!(
+            serde_json::from_str::<Value>(&fs::read_to_string(&overrides).expect("read"))
+                .expect("parse"),
+            json!({"schema": "houserules/overrides@1.0.0", "exclusions": [{"id": "x.y"}]})
+        );
     }
 }

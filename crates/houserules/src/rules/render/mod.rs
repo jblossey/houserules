@@ -3,16 +3,18 @@
 //! the parity gate -- see `crates/houserules/tests/`.
 //!
 //! A renderer plans its [`Output`]s from the merged base: [`agents_md`] is
-//! always on and owns one marked block of each `AGENTS.md` it writes to;
+//! always on and owns one marked block of each `AGENTS.md` it writes to (the
+//! root block also names the session commands of the installed tracker and the
+//! pointer of the installed workflow);
 //! [`claude`] is on when `renderers` in `.houserules.json` lists `claude` (or
 //! the key is absent) and owns the area files `.claude/rules/<area>.md` and
 //! the `project-knowledge` skill whole. [`apply`] writes the plan, or with
 //! `check` only reports what it would change. [`budget`](super::budget) reads
 //! the plan's generated text, never the files on disk.
 //!
-//! `location` is the git resolution that `render`, `check-knowledge`, and
-//! `check-backlog` share before they load a base. `block` holds the marker
-//! scan.
+//! `location` is the git resolution that the commands which load a base share
+//! (`render`, `check-knowledge`, and the check of the installed tracker).
+//! `block` holds the marker scan.
 //!
 //! `render_and_report` is `cmd_render`'s own non-`--check` body,
 //! extracted so `install::cmd_init` can render a freshly-seeded target
@@ -35,7 +37,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use crate::install::marker::read_claude_enabled_for_gate;
+use crate::install::marker::{RenderInputs, read_render_inputs_for_gate};
 
 use super::budget;
 use super::model::{Base, Entry, load_base};
@@ -255,10 +257,10 @@ fn area_sections(base: &Base, area: &str, level: usize) -> Option<String> {
 
 /// The outputs of every enabled renderer, in the order `render` and
 /// `render --check` report them: the AGENTS.md renderer first, then the
-/// Claude renderer when `claude` is set.
-fn plan_for(base: &Base, claude: bool) -> Result<Vec<Output>, RenderError> {
-    let mut outputs = agents_md::plan(base)?;
-    if claude {
+/// Claude renderer when `inputs` enable it.
+fn plan_for(base: &Base, inputs: &RenderInputs) -> Result<Vec<Output>, RenderError> {
+    let mut outputs = agents_md::plan(base, inputs)?;
+    if inputs.claude {
         outputs.extend(claude::plan(base)?);
     }
     Ok(outputs)
@@ -266,8 +268,8 @@ fn plan_for(base: &Base, claude: bool) -> Result<Vec<Output>, RenderError> {
 
 /// The outputs of every renderer that `.houserules.json` enables.
 fn plan(base: &Base) -> Result<Vec<Output>, RenderError> {
-    let claude = read_claude_enabled_for_gate(&base.root).map_err(RenderError)?;
-    plan_for(base, claude)
+    let inputs = read_render_inputs_for_gate(&base.root).map_err(RenderError)?;
+    plan_for(base, &inputs)
 }
 
 /// Reads `path` below `root`; `None` when the file does not exist.
@@ -421,11 +423,11 @@ pub(crate) fn render(base: &Base, check: bool) -> Result<Vec<Change>, RenderErro
 /// owns, and each output over its budget. An install whose marker cannot say
 /// which renderers are enabled gives the one line that names the marker.
 pub(super) fn check_findings(base: &Base) -> Vec<String> {
-    let claude = match read_claude_enabled_for_gate(&base.root) {
-        Ok(claude) => claude,
+    let inputs = match read_render_inputs_for_gate(&base.root) {
+        Ok(inputs) => inputs,
         Err(line) => return vec![line],
     };
-    let outputs = match plan_for(base, claude) {
+    let outputs = match plan_for(base, &inputs) {
         Ok(outputs) => outputs,
         Err(error) => return vec![error.to_string()],
     };
@@ -434,7 +436,7 @@ pub(super) fn check_findings(base: &Base) -> Vec<String> {
         Ok(changes) => findings.extend(changes.iter().map(Change::finding)),
         Err(error) => findings.push(error.to_string()),
     }
-    if claude {
+    if inputs.claude {
         let written: HashSet<&str> = outputs
             .iter()
             .filter_map(|output| match output {

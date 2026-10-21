@@ -1,6 +1,6 @@
 {
   "name": "writing-style",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "schema": "houserules/pack@1.0.0",
   "topics": {
     "writing-style": {
@@ -60,7 +60,9 @@
         "A reference to a durable doc, spec, or design record that states the current contract is likewise a contract pointer, not history; it may stay in a comment.",
         "Fixture data inside a test body (an id, a date, a path) is data, not narration; leave it as written.",
         "A comment stating a constraint plus its history keeps the constraint only; drop the history.",
-        "A history-sweep's verification derives its marker classes from the survey's own hit list and re-widens after every fix round; a zero from a pattern that never tested a spelling the sweep removed elsewhere is vacuous."
+        "A history-sweep's verification derives its marker classes from the survey's own hit list and re-widens after every fix round; a zero from a pattern that never tested a spelling the sweep removed elsewhere is vacuous.",
+        "A comment on measured or third-party behavior names an openable source: a document, a file, or a command that a reader can run.",
+        "A doc comment written in a fix round is swept for the round's own vocabulary before the commit, and the brief of the fix round names the sweep."
       ],
       "tags": [
         "comments"
@@ -83,7 +85,8 @@
         "Self-documenting code first: full words, verbs for functions, `is`/`has` for booleans, no abbreviation a newcomer must decode, one meaning per name. A comment that explains a name means the name is wrong.",
         "Comments inside a body still follow writing-style.code-comments: only for a constraint the code cannot show.",
         "A doc comment stating a behavior ('returns tracked files', 'exits 0 on clean') is a claim under process.claims-match-artifacts - re-read it against the symbol at HEAD in the same pass that edits the symbol.",
-        "A rewrite re-resolves, in the same commit, every cross-reference to a section, file, or symbol it deletes or renames; the dangling-cross-reference class recurs whenever a rewrite skips this step."
+        "A rewrite re-resolves, in the same commit, every cross-reference to a section, file, or symbol it deletes or renames; the dangling-cross-reference class recurs whenever a rewrite skips this step.",
+        "A new caller re-opens the callee's doc comment and confirms that it still states the contract the caller relies on."
       ],
       "tags": [
         "docs",
@@ -115,7 +118,7 @@
         "A shipped instruction that names a repo-local resource states what every other population does instead: a closing act's false-positive arm that names a resource only one population (the source-carrying one) has, branches explicitly on source-present vs. installed-binary populations rather than assuming the resource exists everywhere.",
         "An instruction naming the populations it governs enumerates all of them: test the sentence against each population the code path actually handles, not just the two most common ones.",
         "A procedure's state space includes the states its own automation creates: walk every generated commit and bot-authored change through the gates the procedure depends on - an automated PR's own commit is as much a state to cover as a human one.",
-        "A ruling with a named set of outcomes states the count in every text that lists them ('one of three ways'), so a grep for the count finds a text that lists fewer (batch 32 task 2: a contested finding had three outcomes, and two texts named two)."
+        "A ruling with a named set of outcomes states the count in every text that lists them ('one of three ways'), so a grep for the count finds a text that lists fewer (a contested finding had three outcomes, and two texts named two)."
       ],
       "tags": [
         "instructions",

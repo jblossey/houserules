@@ -28,11 +28,12 @@ const DELIVERABLES_SCHEMA: &str = ".claude/schemas/deliverables.json";
 
 /// Maps a deliverable's `kind` field to its definition name in
 /// `DELIVERABLES_SCHEMA`.
-const DELIVERABLE_KINDS: [(&str, &str); 4] = [
+const DELIVERABLE_KINDS: [(&str, &str); 5] = [
     ("task-report", "taskReport"),
     ("task-review", "taskReview"),
     ("re-review", "reReview"),
     ("branch-review", "branchReview"),
+    ("spec-review", "specReview"),
 ];
 
 /// `task-report` statuses that claim the task is genuinely finished.
@@ -282,7 +283,7 @@ mod tests {
 
     fn report_sample() -> Value {
         json!({
-            "kind": "task-report",
+            "kind": "task-report", "model": "claude-opus-5-5",
             "task": 1,
             "backlog": ["WI-001"],
             "status": "DONE",
@@ -362,8 +363,8 @@ mod tests {
         );
     }
 
-    /// The marker gate runs for each of the four deliverable kinds, beside
-    /// the schema findings that a bare document brings.
+    /// The marker gate runs for each deliverable kind, beside the schema
+    /// findings that a bare document brings.
     #[test]
     fn rejects_a_compression_marker_in_every_deliverable_kind() {
         for (kind, _) in DELIVERABLE_KINDS {
@@ -596,6 +597,30 @@ mod tests {
             "rows": [{
                 "id": "process.sequential", "mode": "deterministic",
                 "result": "pass", "evidence": "empty range: 0 commits checked",
+            }],
+        });
+        let file = write_report(root.path(), &report);
+        assert_eq!(
+            validate_deliverable(root.path(), &file).unwrap().errors,
+            Vec::<String>::new()
+        );
+    }
+
+    /// Accepts a self_audit summary that copies the audit's `reference_fail`
+    /// count, as the implementer copies the printed summary whole.
+    #[test]
+    fn accepts_a_self_audit_summary_that_copies_reference_fail() {
+        let root = schema_root();
+        let mut report = report_sample();
+        report["self_audit"] = json!({
+            "summary": {
+                "base": "abc1234", "head": "abc1235", "deterministic": 1,
+                "pass": 1, "fail": 0, "warn": 0, "skipped": 0, "judged": 0,
+                "reference_fail": 2,
+            },
+            "rows": [{
+                "id": "process.sequential", "mode": "deterministic",
+                "result": "pass", "evidence": "1 commits checked",
             }],
         });
         let file = write_report(root.path(), &report);
@@ -843,7 +868,8 @@ mod tests {
         fs::write(
             &file,
             serde_json::to_string(&json!({
-                "kind": "task-review", "task": 1, "base": "abc1234", "head": "abc1235",
+                "kind": "task-review", "model": "claude-opus-5-5", "task": 1,
+                "base": "abc1234", "head": "abc1235",
                 "spec_compliance": {"verdict": "compliant", "items": []},
                 "rule_adherence": [{"id": "a.b", "mode": "judged", "result": "open", "evidence": "x"}],
                 "strengths": [], "issues": [],
@@ -866,7 +892,8 @@ mod tests {
 
     fn re_review_sample() -> Value {
         json!({
-            "kind": "re-review", "task": 1, "round": 1, "fix_base": "abc1234", "head": "abc1235",
+            "kind": "re-review", "model": "claude-opus-5-5", "task": 1, "round": 1,
+            "fix_base": "abc1234", "head": "abc1235",
             "finding_verdicts": [{"finding": "f", "verdict": "addressed", "evidence": "a.mjs:1"}],
             "rule_adherence": [{"id": "process.sequential", "mode": "judged", "result": "pass", "evidence": "x"}],
             "new_breakage": [], "out_of_scope": [],
@@ -920,7 +947,8 @@ mod tests {
     /// not prose.
     fn branch_review_sample() -> Value {
         json!({
-            "kind": "branch-review", "base": "abc1234", "head": "abc1235",
+            "kind": "branch-review", "model": "claude-opus-5-5",
+            "base": "abc1234", "head": "abc1235",
             "strengths": ["Clear commit history across the whole branch."],
             "issues": [], "rule_adherence": [],
             "recommendations": ["Ship the next batch at the same steady pace."],
@@ -950,6 +978,27 @@ mod tests {
             validate_deliverable(root.path(), &file).unwrap().errors,
             Vec::<String>::new()
         );
+    }
+
+    /// A spec review with the required fields of spec 4.5 validates, and
+    /// routes to the `specReview` definition by its `kind`.
+    #[test]
+    fn accepts_a_well_formed_spec_review_with_no_errors() {
+        let root = schema_root();
+        let file = root.path().join("spec-review.json");
+        let review = json!({
+            "kind": "spec-review", "model": "claude-opus-5-5", "target": "docs/specs/x.md",
+            "base": "abc1234", "head": "abc1235", "strengths": ["Every fact re-runs."],
+            "findings": [{
+                "id": "S1", "severity": "minor", "section": "1", "what": "w",
+                "evidence": "e", "fix": "f",
+            }],
+            "verdict": "approve",
+        });
+        fs::write(&file, serde_json::to_string(&review).unwrap()).unwrap();
+        let result = validate_deliverable(root.path(), &file).unwrap();
+        assert_eq!(result.kind, "spec-review");
+        assert_eq!(result.errors, Vec::<String>::new());
     }
 
     /// The schema's `prose` type (`minLength: 3`, used by `self_review`,

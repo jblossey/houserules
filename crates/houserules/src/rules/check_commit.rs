@@ -39,6 +39,14 @@
 //! not: it reads an as-yet-uncommitted message, with no commit and so no
 //! diffable file list, and no parent tree to check a mechanism against.
 //!
+//! A `commits` check may carry `require_trailer` (spec 3.7): the check then
+//! reads the trailers of each message (`trailers::parse`, git's own rule) and
+//! fails a commit that has none of that key, unless `exempt_authors` names
+//! its author or `exempt_subjects` matches its subject. The message-file arm
+//! has no author yet, so there only the subject exemption applies. When no
+//! check carries `require_trailer`, `check-commit` makes no
+//! `git interpret-trailers` call.
+//!
 //! ## Two call shapes
 //!
 //! A positional message-file argument runs the hook arm (`template/
@@ -135,6 +143,7 @@ use super::audit::{
 use super::check_shape::{CheckLevel, CheckType};
 use super::git_paths::InstallPrefix;
 use super::model::{Base, CheckField, load_base};
+use super::trailers;
 
 /// `git commit --verbose`'s own "cut here" line's fixed second half; the
 /// comment character itself (`comment_char`) is the repository-specific
@@ -313,7 +322,15 @@ pub(crate) struct Findings {
     /// has it only when it skipped. `None` for an install at the git top
     /// level.
     pub skipped: Option<String>,
+    /// `true` when the base holds no check that `check-commit` runs: no
+    /// `commits`-type entry and no `per_commit` `co-change` entry. Such a run
+    /// checked nothing, and says so (design.md 5.125).
+    pub checked_nothing: bool,
 }
+
+/// The line that a run prints in place of `check-commit: ok` when it checked
+/// nothing: a check that ran nothing does not read as a pass.
+const CHECKED_NOTHING_LINE: &str = "check-commit: no commits check is installed; checked nothing";
 
 /// The line that counts `count` commits skipped in the install below
 /// `prefix` (`InstallPrefix::as_str`): `check-commit: skipped 2 commits
@@ -384,18 +401,30 @@ fn changes_only_outside_the_install(
 /// ref, a failed `git stripspace`, or a malformed check pattern is a named
 /// `Err`, never a panic (`houserules.crash-paths-are-named`).
 fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<Findings, String> {
+    let reads_trailers = base.entries.values().any(|entry| {
+        matches!(
+            &entry.check,
+            CheckField::Valid(check)
+                if check.kind == CheckType::Commits && check.require_trailer.is_some()
+        )
+    });
     let commits = match (&opts.message_file, &opts.from) {
         (Some(path), None) => {
             let raw =
                 fs::read_to_string(path).map_err(|error| format!("{}: {error}", path.display()))?;
             let cleaned = strip_verbose_and_comments(&base.root, &raw)?;
             let (subject, body) = split_message(&cleaned);
-            vec![Commit::unattributed(subject, body)]
+            let trailers = if reads_trailers {
+                trailers::parse(&base.root, &cleaned)?
+            } else {
+                Vec::new()
+            };
+            vec![Commit::unattributed(subject, body, trailers)]
         }
         (None, Some(from)) => {
             let base_sha = rev(&base.root, from)?;
             let head_sha = rev(&base.root, opts.to.as_deref().unwrap_or("HEAD"))?;
-            commits_in(&base.root, &base_sha, &head_sha)?
+            commits_in(&base.root, &base_sha, &head_sha, reads_trailers)?
         }
         _ => unreachable!("cmd_check_commit enforces exactly one of message_file or from"),
     };
@@ -412,7 +441,7 @@ fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<Findings, String>
         match check.kind {
             CheckType::Commits => {
                 let compiled =
-                    CommitsCheck::compile(check).map_err(|error| format!("{id}: {error}"))?;
+                    CommitsCheck::compile(id, check).map_err(|error| format!("{id}: {error}"))?;
                 commit_checks.push((id, compiled));
             }
             CheckType::CoChange if check.per_commit == Some(true) => {
@@ -434,8 +463,8 @@ fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<Findings, String>
             continue;
         }
         for (id, compiled) in &commit_checks {
-            if let Some(evidence) = compiled.violation(commit) {
-                let line = format!("{id}: {evidence}");
+            if let Some(violation) = compiled.violation(commit) {
+                let line = violation.line(id);
                 match compiled.level() {
                     CheckLevel::Fail => fails.push(line),
                     CheckLevel::Warn => warns.push(line),
@@ -475,6 +504,7 @@ fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<Findings, String>
         warns,
         skipped: (prefix.is_subdirectory() && (counts_every_run || skipped > 0))
             .then(|| skipped_line(skipped, prefix.as_str())),
+        checked_nothing: commit_checks.is_empty() && cochange_checks.is_empty(),
     })
 }
 
@@ -489,7 +519,10 @@ fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<Findings, String>
 /// line that counts the commits a subdirectory install skipped follows
 /// them on stdout (`Findings::skipped` says when it prints); fail-level
 /// findings print on stderr and exit 1, only when at least one exists -- a
-/// warn-only run still prints `check-commit: ok` and exits 0.
+/// warn-only run still prints `check-commit: ok` and exits 0. A base with no
+/// check to run (`Findings::checked_nothing`) prints `CHECKED_NOTHING_LINE`
+/// in place of `check-commit: ok`, so a run that checked nothing does not
+/// read as a pass.
 pub(crate) fn cmd_check_commit(
     dir: Option<PathBuf>,
     message_file: Option<PathBuf>,
@@ -532,6 +565,7 @@ pub(crate) fn cmd_check_commit(
             fails,
             warns,
             skipped,
+            checked_nothing,
         }) => {
             for warn in &warns {
                 println!("warn: {warn}");
@@ -545,7 +579,11 @@ pub(crate) fn cmd_check_commit(
                 }
                 return ExitCode::from(1);
             }
-            println!("check-commit: ok");
+            if checked_nothing {
+                println!("{CHECKED_NOTHING_LINE}");
+            } else {
+                println!("check-commit: ok");
+            }
             ExitCode::SUCCESS
         }
         Err(error) => {
@@ -778,6 +816,41 @@ mod tests {
             skipped_line(2, "sub dir/sä/"),
             "check-commit: skipped 2 commits with no change under sub dir/sä/"
         );
+    }
+
+    // ---- check_commit: nothing to check ----
+
+    /// A base with no `commits` check and no `per_commit` `co-change` check
+    /// checked nothing, and says so; one `commits` check, whatever its level
+    /// or result, ends that.
+    #[test]
+    fn a_base_with_no_check_to_run_checked_nothing() {
+        let plain = make_repo(&[entry(json!({"id": "process.plain"}))]);
+        let path = write_message(plain.path(), "feat: x\n");
+        let base = load_base(plain.path()).expect("loads");
+        let findings = check_commit(&base, &message_opts(path)).expect("check_commit");
+        assert!(findings.checked_nothing);
+        assert!(findings.fails.is_empty() && findings.warns.is_empty());
+
+        let checked = make_repo(&[conventional_commits_entry()]);
+        let path = write_message(checked.path(), "feat: x\n");
+        let base = load_base(checked.path()).expect("loads");
+        let findings = check_commit(&base, &message_opts(path)).expect("check_commit");
+        assert!(!findings.checked_nothing);
+    }
+
+    /// An entry whose `co-change` check does not opt in to `per_commit`
+    /// is a check that `check-commit` never runs.
+    #[test]
+    fn a_co_change_check_without_per_commit_leaves_the_run_checking_nothing() {
+        let repo = make_repo(&[entry(json!({
+            "id": "process.range-only",
+            "check": {"type": "co-change", "level": "fail", "if": "src/**", "then": "CHANGELOG.md"},
+        }))]);
+        let path = write_message(repo.path(), "feat: x\n");
+        let base = load_base(repo.path()).expect("loads");
+        let findings = check_commit(&base, &message_opts(path)).expect("check_commit");
+        assert!(findings.checked_nothing);
     }
 
     // ---- check_commit: message-file arm ----

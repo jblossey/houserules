@@ -1,7 +1,7 @@
 //! The kit texts that batch 33 changes with the render port (task 8): the
 //! implementer template's standing line, the seeded `AGENTS.md` with its
 //! marked block, the notes that the agent templates install with
-//! `--target claude`, and the retire text for a pack entry. The texts are
+//! `--workflow reference`, and the retire text for a pack entry. The texts are
 //! contract: an adopter reads them as printed.
 
 use std::fs;
@@ -27,7 +27,7 @@ fn template_text(relative: &str) -> String {
 /// holds the standing rules.
 #[test]
 fn the_implementer_template_points_its_standing_rules_at_agents_md() {
-    let template = template_text(".claude/agents/implementer.md");
+    let template = template_text("workflows/reference/.claude/agents/implementer.md");
 
     assert!(
         template.lines().any(|line| line
@@ -90,20 +90,22 @@ fn template_files(dir: &Path, prefix: &str, found: &mut Vec<String>) {
     }
 }
 
-/// Every seeded text that names the agent templates says that
-/// `houserules init --target claude` installs them (C9). The set derives from
-/// the grep of spec section 11: every line of `template/` that matches
+/// No seeded text outside the reference workflow says that `houserules init
+/// --target claude` installs the agent templates: the workflow installs them
+/// (spec 4.4, F10), so every seeded text that names them points at
+/// `houserules init --workflow reference`. The set derives from the grep of
+/// spec section 11: every line of `template/` that matches
 /// `\.claude/agents|agent templates|subagent templates|Templates: `, outside
-/// `template/.claude/agents/` and the process pack, which govern a project
-/// that has the templates. The note sits on the line or on the next one, the
-/// width of a wrapped Markdown line.
+/// the reference workflow (`template/workflows/reference/`) and the process
+/// pack, which govern a project that has the templates. The command sits on
+/// the line or on the next one, the width of a wrapped Markdown line.
 #[test]
-fn every_seeded_text_that_names_the_agent_templates_says_how_they_install() {
+fn every_seeded_text_that_names_the_agent_templates_points_at_the_workflow() {
     let mut files = Vec::new();
     template_files(&repo_root().join("template"), "", &mut files);
     let mut hits = 0;
     for file in &files {
-        if file.starts_with(".claude/agents/") || file == "packs/process.json" {
+        if file.starts_with("workflows/reference/") || file == "packs/process.json" {
             continue;
         }
         let text = template_text(file);
@@ -119,31 +121,43 @@ fn every_seeded_text_that_names_the_agent_templates_says_how_they_install() {
             hits += 1;
             let window = format!("{line}\n{}", lines.get(number + 1).copied().unwrap_or(""));
             assert!(
-                window.contains("--target claude"),
-                "template/{file}:{} names the agent templates without `--target claude`: {line}",
+                window.contains("init --workflow reference"),
+                "template/{file}:{} names the agent templates without `init --workflow reference`: {line}",
+                number + 1
+            );
+            assert!(
+                !window.contains("--target claude"),
+                "template/{file}:{} says `--target claude` installs the agent templates: {line}",
                 number + 1
             );
         }
     }
     assert_eq!(
-        hits, 5,
-        "the grep of spec section 11 finds five lines outside the agent templates and the process pack"
+        hits, 3,
+        "the grep of spec section 11 finds three lines outside the reference workflow and the process pack"
     );
 }
 
 /// The retire text of a pack entry: the entry stays in its pack copy, `retire`,
 /// `demote`, and `narrow` are overrides, `retire` is an override with
-/// `status: retired`, and `mechanize` is a backlog item. The orchestrating
-/// skill and the process pack carry the same sentences.
+/// `status: retired`, and `mechanize` files an item in the tracker. The
+/// orchestrating skill and the process pack carry the same sentences, and the
+/// pack names the item a work item, because a pack entry names no JSON backlog
+/// (spec section 7).
 #[test]
 fn the_retire_text_names_the_override_for_a_pack_entry() {
     let retire = "`retire` sets `status: retired` and, for a local entry, runs `houserules archive`. A pack entry stays in its pack copy: a `retire`, `demote`, or `narrow` proposal for it is an override in `knowledge/overrides.json`, and `retire` is an override with `status: retired`.";
-    let mechanize = "`mechanize` files a backlog item for the check.";
     let overrides = "A pack entry that the project retires, demotes, rewrites, or tags `ruled-keep` is an override in `knowledge/overrides.json`, and `houserules update` keeps the override.";
 
-    for file in [
-        ".claude/skills/orchestrating/SKILL.md",
-        "packs/process.json",
+    for (file, mechanize) in [
+        (
+            "workflows/reference/.claude/skills/orchestrating/SKILL.md",
+            "`mechanize` files a backlog item for the check.",
+        ),
+        (
+            "packs/process.json",
+            "`mechanize` files a work item for the check.",
+        ),
     ] {
         let text = template_text(file);
         assert!(text.contains(retire), "{file} lacks the retire text");

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Agent deliverables",
-  "description": "Task reports, task reviews, re-reviews, and branch reviews written by the agent templates in .claude/agents/, which `houserules init --target claude` installs. The `kind` field selects the definition. Validate with houserules validate <file>.",
+  "description": "Task reports, task reviews, re-reviews, branch reviews, and spec reviews written by the agent templates in .claude/agents/, which `houserules init --workflow reference` installs. The `kind` field selects the definition. Every kind records the `model` that wrote it. Validate with houserules validate <file>.",
   "$defs": {
     "sha": {
       "type": "string",
@@ -13,7 +13,12 @@
     },
     "backlogId": {
       "type": "string",
-      "pattern": "^(WI-[0-9]+|PP-[0-9]+-[0-9]+)$"
+      "pattern": "^[A-Za-z0-9#._-]+$"
+    },
+    "model": {
+      "description": "The model that wrote the deliverable: the value that its task names (a model alias or a model id), `human`, or `unknown`.",
+      "type": "string",
+      "minLength": 1
     },
     "text": {
       "type": "string",
@@ -282,6 +287,10 @@
         "sanctioned_fail": {
           "type": "integer",
           "minimum": 1
+        },
+        "reference_fail": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -411,6 +420,13 @@
           "items": {
             "$ref": "#/$defs/run"
           }
+        },
+        "gates_run": {
+          "description": "The gates the round re-ran, one entry per gate: its command or its name.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/text"
+          }
         }
       }
     },
@@ -418,6 +434,7 @@
       "type": "object",
       "required": [
         "kind",
+        "model",
         "task",
         "backlog",
         "status",
@@ -441,6 +458,9 @@
           "enum": [
             "task-report"
           ]
+        },
+        "model": {
+          "$ref": "#/$defs/model"
         },
         "task": {
           "$ref": "#/$defs/taskNumber"
@@ -568,6 +588,7 @@
       "type": "object",
       "required": [
         "kind",
+        "model",
         "task",
         "base",
         "head",
@@ -583,6 +604,9 @@
           "enum": [
             "task-review"
           ]
+        },
+        "model": {
+          "$ref": "#/$defs/model"
         },
         "task": {
           "$ref": "#/$defs/taskNumber"
@@ -678,6 +702,7 @@
       "type": "object",
       "required": [
         "kind",
+        "model",
         "task",
         "round",
         "fix_base",
@@ -694,6 +719,9 @@
           "enum": [
             "re-review"
           ]
+        },
+        "model": {
+          "$ref": "#/$defs/model"
         },
         "task": {
           "$ref": "#/$defs/taskNumber"
@@ -777,6 +805,7 @@
       "type": "object",
       "required": [
         "kind",
+        "model",
         "base",
         "head",
         "strengths",
@@ -792,6 +821,9 @@
           "enum": [
             "branch-review"
           ]
+        },
+        "model": {
+          "$ref": "#/$defs/model"
         },
         "base": {
           "$ref": "#/$defs/sha"
@@ -977,6 +1009,220 @@
               "$ref": "#/$defs/text"
             }
           }
+        }
+      }
+    },
+    "specFinding": {
+      "type": "object",
+      "required": [
+        "id",
+        "severity",
+        "section",
+        "what",
+        "evidence",
+        "fix"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/text"
+        },
+        "severity": {
+          "enum": [
+            "critical",
+            "important",
+            "minor"
+          ]
+        },
+        "section": {
+          "$ref": "#/$defs/text"
+        },
+        "what": {
+          "$ref": "#/$defs/text"
+        },
+        "evidence": {
+          "$ref": "#/$defs/text"
+        },
+        "fix": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "specReview": {
+      "type": "object",
+      "required": [
+        "kind",
+        "model",
+        "target",
+        "base",
+        "head",
+        "strengths",
+        "findings",
+        "verdict"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "spec-review"
+          ]
+        },
+        "model": {
+          "$ref": "#/$defs/model"
+        },
+        "target": {
+          "$ref": "#/$defs/text"
+        },
+        "base": {
+          "$ref": "#/$defs/sha"
+        },
+        "head": {
+          "$ref": "#/$defs/sha"
+        },
+        "scope": {
+          "$ref": "#/$defs/text"
+        },
+        "strengths": {
+          "$ref": "#/$defs/proseList"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/specFinding"
+          }
+        },
+        "facts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "verdict",
+              "probe"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/text"
+              },
+              "verdict": {
+                "enum": [
+                  "confirmed",
+                  "wrong",
+                  "partial"
+                ]
+              },
+              "probe": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        },
+        "controller_calls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "verdict",
+              "why"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/text"
+              },
+              "verdict": {
+                "enum": [
+                  "sound",
+                  "unsound",
+                  "needs-owner"
+                ]
+              },
+              "why": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        },
+        "coverage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "subject",
+              "where",
+              "gap"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "subject": {
+                "$ref": "#/$defs/text"
+              },
+              "where": {
+                "$ref": "#/$defs/text"
+              },
+              "gap": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        },
+        "questions_for_owner": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "question",
+              "recommendation"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/text"
+              },
+              "question": {
+                "$ref": "#/$defs/text"
+              },
+              "recommendation": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        },
+        "prior": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "verdict",
+              "where"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/text"
+              },
+              "verdict": {
+                "enum": [
+                  "addressed",
+                  "partial",
+                  "not-addressed"
+                ]
+              },
+              "where": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        },
+        "verdict": {
+          "enum": [
+            "approve",
+            "needs-fixes"
+          ]
         }
       }
     }

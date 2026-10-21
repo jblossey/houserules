@@ -1,3 +1,6 @@
 {
-  "schema": "houserules/install@2.0.0"
+  "schema": "houserules/install@2.0.0",
+  "tracker": {
+    "adapter": "json"
+  }
 }

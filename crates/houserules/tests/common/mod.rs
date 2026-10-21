@@ -282,10 +282,12 @@ impl FrozenWorktree {
     }
 }
 
-/// Adds the install `schema` key to the `.houserules.json` of the worktree at
-/// `path`, so that D4 (spec section 5) lets the commands under test read it.
-/// The frozen sha holds a marker of release 1.x, which D4 refuses. The key is
-/// the only change: no command whose output a golden pins reads it.
+/// Adds the install `schema` key and the JSON `tracker` key to the
+/// `.houserules.json` of the worktree at `path`, so that D4 (spec section 5)
+/// lets the commands under test read it and the backlog commands reach the
+/// frozen backlog through the JSON adapter. The frozen sha holds a marker of
+/// release 1.x, which D4 refuses. These two keys are the only change: the
+/// JSON adapter prints what the 1.4.0 commands printed, which the goldens pin.
 fn stamp_install_schema(path: &Path) {
     let marker = path.join(".houserules.json");
     let mut stamp: serde_json::Map<String, serde_json::Value> =
@@ -294,6 +296,10 @@ fn stamp_install_schema(path: &Path) {
     stamp.insert(
         "schema".to_string(),
         serde_json::json!("houserules/install@2.0.0"),
+    );
+    stamp.insert(
+        "tracker".to_string(),
+        serde_json::json!({"adapter": "json"}),
     );
     fs::write(
         &marker,

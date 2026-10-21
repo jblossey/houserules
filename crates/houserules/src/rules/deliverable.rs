@@ -4,7 +4,9 @@
 //!
 //! Both callers aggregate across a workspace of agent-authored JSON
 //! files (`task-*-audit*.json`, `task-*-report.json`,
-//! `task-*-review*.json`) that need not be schema-valid at read time --
+//! `task-*-review*.json`, `spec-review.json`, `spec-review-r<n>.json`,
+//! `branch-review.json`; the constants below list them once) that need not be
+//! schema-valid at read time --
 //! a report missing `knowledge_used`, a review missing
 //! `rule_adherence`, or an audit file missing `ids`/`rules` entirely are
 //! all tolerated. A typed, `deny_unknown_fields` parse of, say, the full
@@ -52,50 +54,162 @@ pub(super) fn read_deliverable_value(path: &Path) -> Result<Value, String> {
 
 /// One workspace directory's deliverable filenames by kind, each
 /// sorted: `audits` (`task-*-audit*.json`), `reports`
-/// (`task-*-report.json`), and `reviews` (`task-*-review*.json`).
+/// (`task-*-report.json`), `reviews` (`task-*-review*.json`), and
+/// `spec_reviews` (`spec-review.json` and `spec-review-r<n>.json`).
 pub(super) struct WorkspaceFiles {
     pub audits: Vec<String>,
     pub reports: Vec<String>,
     pub reviews: Vec<String>,
+    pub spec_reviews: Vec<String>,
 }
 
-/// The task-id segment shared by every deliverable filename pattern below,
-/// declared once as `.claude/schemas/deliverables.json`'s `$defs.taskId`
+/// The task-id segment shared by every task deliverable filename pattern
+/// below, declared once as `.claude/schemas/deliverables.json`'s `$defs.taskId`
 /// pattern (both copies) -- `task_id_shape_is_declared_identically_in_both_
 /// schema_copies` pins the two to this literal. Digits, with an optional
 /// trailing lowercase letter for a split task (`1`, `3a`).
 const TASK_ID_SHAPE: &str = r"\d+[a-z]?";
 
-/// The `task-<id>-audit*.json` filename pattern, with `<id>` built from
-/// `TASK_ID_SHAPE`.
+/// One kind of deliverable file in a workspace: its name as a person writes
+/// it, and the pattern that matches it. `STATS_READS` lists every kind, and
+/// both the classification of a filename and every message that names the
+/// files read it, so the two cannot disagree.
+pub(super) struct DeliverableFile {
+    /// The name as a person writes it; `*` stands for any part that varies,
+    /// and `<n>` for a round number. A name with neither is the exact
+    /// filename.
+    pub glob: &'static str,
+    /// The anchored pattern that matches the name, built on demand because the
+    /// task kinds embed `TASK_ID_SHAPE`.
+    pattern: fn() -> String,
+}
+
+impl DeliverableFile {
+    /// `true` when `name` is a file of this kind.
+    fn names(&self, name: &str) -> bool {
+        matches(name, &(self.pattern)())
+    }
+}
+
+/// `task-<id>-audit*.json`, with `<id>` built from `TASK_ID_SHAPE`.
+pub(super) const AUDIT: DeliverableFile = DeliverableFile {
+    glob: "task-*-audit*.json",
+    pattern: audit_pattern,
+};
+
+/// `task-<id>-review*.json`, with `<id>` built from `TASK_ID_SHAPE`.
+pub(super) const REVIEW: DeliverableFile = DeliverableFile {
+    glob: "task-*-review*.json",
+    pattern: review_pattern,
+};
+
+/// `task-<id>-report.json`, with `<id>` built from `TASK_ID_SHAPE`. A report
+/// never carries a round suffix, unlike an audit or a review, so nothing
+/// follows the marker word.
+pub(super) const REPORT: DeliverableFile = DeliverableFile {
+    glob: "task-*-report.json",
+    pattern: report_pattern,
+};
+
+/// `spec-review.json`: the first design review of a spec, which has no task
+/// id. A probe capture named after a spec review (`spec-review-probe-*.json`)
+/// is evidence, not a deliverable.
+pub(super) const SPEC_REVIEW: DeliverableFile = DeliverableFile {
+    glob: "spec-review.json",
+    pattern: spec_review_pattern,
+};
+
+/// `spec-review-r<n>.json`: the design re-review of round `<n>`, with `<n>`
+/// digits only, so a probe capture such as `spec-review-r2-probe-list.json`
+/// is no deliverable.
+pub(super) const SPEC_REVIEW_ROUND: DeliverableFile = DeliverableFile {
+    glob: "spec-review-r<n>.json",
+    pattern: spec_review_round_pattern,
+};
+
+/// The exact name of the deliverable of a whole branch. `workspace_files`
+/// does not list it: it carries no task id, and its name is fixed.
+pub(super) const BRANCH_REVIEW_FILE: &str = "branch-review.json";
+
+/// The deliverable of a whole branch, named `BRANCH_REVIEW_FILE`.
+pub(super) const BRANCH_REVIEW: DeliverableFile = DeliverableFile {
+    glob: BRANCH_REVIEW_FILE,
+    pattern: branch_review_pattern,
+};
+
+/// Every deliverable file that `stats` reads from a workspace, in the order
+/// its messages name them.
+pub(super) const STATS_READS: [&DeliverableFile; 6] = [
+    &AUDIT,
+    &REVIEW,
+    &REPORT,
+    &SPEC_REVIEW,
+    &SPEC_REVIEW_ROUND,
+    &BRANCH_REVIEW,
+];
+
+/// The globs of `STATS_READS` as one phrase for a message: `a, b, and c`.
+pub(super) fn stats_reads_phrase() -> String {
+    let globs: Vec<&str> = STATS_READS.iter().map(|file| file.glob).collect();
+    match globs.split_last() {
+        Some((last, rest)) if !rest.is_empty() => format!("{}, and {last}", rest.join(", ")),
+        Some((only, _)) => (*only).to_string(),
+        None => String::new(),
+    }
+}
+
+/// The pattern of `AUDIT`.
 fn audit_pattern() -> String {
     format!(r"^task-{TASK_ID_SHAPE}-audit.*\.json$")
 }
 
-/// The `task-<id>-report.json` filename pattern, with `<id>` built from
-/// `TASK_ID_SHAPE`. A report never carries a round suffix, unlike an audit
-/// or a review, so nothing follows the marker word.
+/// The pattern of `REPORT`.
 fn report_pattern() -> String {
     format!(r"^task-{TASK_ID_SHAPE}-report\.json$")
 }
 
-/// The `task-<id>-review*.json` filename pattern, with `<id>` built from
-/// `TASK_ID_SHAPE`.
+/// The pattern of `REVIEW`.
 fn review_pattern() -> String {
     format!(r"^task-{TASK_ID_SHAPE}-review.*\.json$")
+}
+
+/// The pattern of `SPEC_REVIEW`.
+fn spec_review_pattern() -> String {
+    r"^spec-review\.json$".to_string()
+}
+
+/// The pattern of `SPEC_REVIEW_ROUND`.
+fn spec_review_round_pattern() -> String {
+    r"^spec-review-r[0-9]+\.json$".to_string()
+}
+
+/// The pattern of `BRANCH_REVIEW`.
+fn branch_review_pattern() -> String {
+    r"^branch-review\.json$".to_string()
 }
 
 /// `true` when `name` matches `pattern` anywhere -- every pattern this
 /// module compiles is anchored (`^...$`), so this is a whole-string
 /// match. Uses `regress` (already this crate's ECMAScript-regex engine,
 /// `check.rs`'s `validate`/`regex_validity_message`) rather than
-/// hand-rolling the three static patterns below, so a future pattern
+/// hand-rolling the static patterns above, so a future pattern
 /// change gets the same regex semantics everywhere in this crate.
 fn matches(name: &str, pattern: &str) -> bool {
     Regex::new(pattern)
         .unwrap_or_else(|error| panic!("{pattern:?} is a static, known-valid pattern: {error}"))
         .find(name)
         .is_some()
+}
+
+/// The sorted members of `names` that are files of any of `files`.
+fn names_of_kinds(names: &[String], files: &[&DeliverableFile]) -> Vec<String> {
+    let mut found: Vec<String> = names
+        .iter()
+        .filter(|name| files.iter().any(|file| file.names(name)))
+        .cloned()
+        .collect();
+    found.sort();
+    found
 }
 
 /// Lists `dir`'s deliverable filenames by kind (see `WorkspaceFiles`), or
@@ -109,28 +223,11 @@ pub(super) fn workspace_files(dir: &Path) -> Result<WorkspaceFiles, String> {
             names.push(name);
         }
     }
-    let mut audits: Vec<String> = names
-        .iter()
-        .filter(|name| matches(name, &audit_pattern()))
-        .cloned()
-        .collect();
-    let mut reports: Vec<String> = names
-        .iter()
-        .filter(|name| matches(name, &report_pattern()))
-        .cloned()
-        .collect();
-    let mut reviews: Vec<String> = names
-        .iter()
-        .filter(|name| matches(name, &review_pattern()))
-        .cloned()
-        .collect();
-    audits.sort();
-    reports.sort();
-    reviews.sort();
     Ok(WorkspaceFiles {
-        audits,
-        reports,
-        reviews,
+        audits: names_of_kinds(&names, &[&AUDIT]),
+        reports: names_of_kinds(&names, &[&REPORT]),
+        reviews: names_of_kinds(&names, &[&REVIEW]),
+        spec_reviews: names_of_kinds(&names, &[&SPEC_REVIEW, &SPEC_REVIEW_ROUND]),
     })
 }
 
@@ -228,12 +325,50 @@ mod tests {
         assert!(error.contains("missing.json"), "{error}");
     }
 
+    /// Every listed kind matches the names its own glob stands for: the task
+    /// kinds with a task id, and with and without a round suffix after the
+    /// marker word, and a round number for `<n>`. The glob and the pattern
+    /// come from the one entry, so a kind whose pattern drifts from its glob
+    /// fails here.
+    #[test]
+    fn every_listed_file_matches_the_names_its_glob_stands_for() {
+        for file in STATS_READS {
+            for tail in ["", "-r1"] {
+                let named = file
+                    .glob
+                    .replacen("task-*", "task-1", 1)
+                    .replace("<n>", "1");
+                let sample = match named.split_once('*') {
+                    Some((head, rest)) => format!("{head}{tail}{rest}"),
+                    None if tail.is_empty() => named,
+                    None => continue,
+                };
+                assert!(file.names(&sample), "{} should match {sample}", file.glob);
+            }
+        }
+    }
+
+    /// The phrase of the globs keeps the order of `STATS_READS` and joins the
+    /// last two with `, and`.
+    #[test]
+    fn stats_reads_phrase_names_every_listed_glob_in_order() {
+        assert_eq!(
+            stats_reads_phrase(),
+            "task-*-audit*.json, task-*-review*.json, task-*-report.json, \
+             spec-review.json, spec-review-r<n>.json, and branch-review.json"
+        );
+    }
+
     /// The workspace fixture mixes `task-1-audit.json`,
     /// `task-2-audit-r1.json`, `task-1-report.json`, a lettered
     /// `task-3a-report.json` (plus a decoy `task-1-report.md`),
-    /// `task-2-review.json`, an unrelated file, and a branch-level
+    /// `task-2-review.json`, the spec reviews `spec-review.json` and
+    /// `spec-review-r1.json` (plus the decoys `spec-review.txt`,
+    /// `review-spec.json`, `spec-review-r.json`, and the probe captures
+    /// `spec-review-probe-x.json` and `spec-review-r2-probe-y.json`), an
+    /// unrelated file, and a branch-level
     /// deliverable `branch-fix-1-report.json` that must land in none of
-    /// the three lists -- this pins `workspace_files`' own
+    /// the four lists -- this pins `workspace_files`' own
     /// classification directly, at both the letter-accepting and the
     /// branch-decoy-rejecting edges of its patterns. Three retained,
     /// ad-hoc evidence names that predate and fall outside the declared
@@ -251,6 +386,13 @@ mod tests {
             "task-3a-report.json",
             "task-1-report.md",
             "task-2-review.json",
+            "spec-review.json",
+            "spec-review-r1.json",
+            "spec-review.txt",
+            "review-spec.json",
+            "spec-review-r.json",
+            "spec-review-probe-x.json",
+            "spec-review-r2-probe-y.json",
             "unrelated.txt",
             "branch-fix-1-report.json",
             "task-1-final-full-task-audit.json",
@@ -269,6 +411,10 @@ mod tests {
             vec!["task-1-report.json", "task-3a-report.json"]
         );
         assert_eq!(files.reviews, vec!["task-2-review.json"]);
+        assert_eq!(
+            files.spec_reviews,
+            vec!["spec-review-r1.json", "spec-review.json"]
+        );
         assert!(
             !files
                 .audits

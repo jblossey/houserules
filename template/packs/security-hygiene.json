@@ -1,6 +1,6 @@
 {
   "name": "security-hygiene",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "schema": "houserules/pack@1.0.0",
   "topics": {
     "security-hygiene": {
@@ -82,7 +82,21 @@
           "**/Gemfile",
           "Gemfile.lock",
           "**/composer.json",
-          "composer.lock"
+          "composer.lock",
+          "**/mise.toml",
+          "**/.mise.toml",
+          "**/.mise.*.toml",
+          "**/mise.*.toml",
+          "**/.tool-versions",
+          "**/mise/config.toml",
+          "**/mise/config.*.toml",
+          "**/mise/conf.d/**/*.toml",
+          "**/.mise/config.toml",
+          "**/.mise/config.*.toml",
+          "**/.mise/conf.d/**/*.toml",
+          "**/.config/mise.toml",
+          "**/.config/mise/*.toml",
+          "**/.config/mise/conf.d/**/*.toml"
         ],
         "field": "dependency_vetting"
       }

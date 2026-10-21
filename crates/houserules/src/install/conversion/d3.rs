@@ -1,13 +1,23 @@
-//! Step 8 of the 1.x conversion: D3, first time (spec section 5).
+//! The contents that the kit shipped, and step 8 of the 1.x conversion: D3,
+//! first time (batch 33 spec section 5).
 //!
-//! The binary carries every content of `knowledge/schema.json` and of the
-//! seeded CI workflow that a 1.x release shipped (`crates/houserules/released/`).
-//! The step compares the copy on disk with those contents, after the id-prefix
-//! rewrite of the install, and decides one [`Action`] for each file. The
-//! knowledge schema is compared without `$defs.area`, because a 1.x project
-//! extended that enum with its own areas, and 2.0 reads the areas from
+//! The binary carries every content that a 1.x release shipped of the files
+//! that the kit writes and the project may have kept, and the content of each
+//! at the batch-33 main (`crates/houserules/released/`, `index.json`):
+//! [`known_contents`] reads them. A file whose bytes equal a known content,
+//! after the id-prefix rewrite of the install, is the kit's (batch 34 spec
+//! 4.7). It also carries every text of a pack entry that a 1.x release shipped
+//! ([`released_entries`]), the base from which the conversion decides which
+//! fields of an entry the project changed.
+//!
+//! Step 8 compares the copy of the knowledge schema and of the seeded CI
+//! workflow on disk with the known contents and decides one [`Action`] for each
+//! file. The knowledge schema is compared without `$defs.area`, because a 1.x
+//! project extended that enum with its own areas, and 2.0 reads the areas from
 //! `knowledge/areas.json`. Later runs of `update` deliver both files through
 //! the path-baseline sync (`install::sync`).
+
+use std::collections::BTreeMap;
 
 use rust_embed::RustEmbed;
 use serde_json::Value;
@@ -18,11 +28,46 @@ use super::super::hand_steps;
 use super::super::with_id_prefix;
 use super::plan::owned_path_is_absent;
 
-/// The released 1.x contents of the two D3 files, embedded from
+/// The released contents of the kit, embedded from
 /// `crates/houserules/released/`.
 #[derive(RustEmbed)]
 #[folder = "released/"]
 struct Released;
+
+/// One distinct text of a pack entry that a 1.x release shipped.
+#[derive(Debug, Clone)]
+pub(super) struct ReleasedEntry {
+    /// The 1.x releases whose topic files held this text, without the `v`.
+    pub(super) versions: Vec<String>,
+    /// The entry.
+    pub(super) entry: Value,
+}
+
+/// Every text of every pack entry that a 1.x release shipped, by entry id. The
+/// embedded file is a build input, so a defect of it is a build defect, and a
+/// test reads it.
+pub(super) fn released_entries() -> BTreeMap<String, Vec<ReleasedEntry>> {
+    let file = Released::get("entries.json").expect("the released entries are embedded");
+    let all: BTreeMap<String, Vec<Value>> =
+        serde_json::from_slice(&file.data).expect("the released entries are valid JSON");
+    all.into_iter()
+        .map(|(id, texts)| {
+            let texts = texts
+                .into_iter()
+                .map(|text| ReleasedEntry {
+                    versions: text["versions"]
+                        .as_array()
+                        .expect("the versions of a released entry")
+                        .iter()
+                        .map(|version| version.as_str().expect("a version").to_string())
+                        .collect(),
+                    entry: text["entry"].clone(),
+                })
+                .collect();
+            (id, texts)
+        })
+        .collect()
+}
 
 /// The path of the knowledge schema below the install root.
 pub(super) const SCHEMA_PATH: &str = "knowledge/schema.json";
@@ -77,26 +122,27 @@ impl Decision {
     }
 }
 
-/// Every content of `installed` (`SCHEMA_PATH` or `WORKFLOW_PATH`) that a 1.x
-/// release shipped, once each, with the id-prefix rewrite of `prefix`. The
-/// embedded index names the files; a defect of it is a build defect, and a
-/// test reads every content.
-fn released_contents(installed: &str, prefix: &str) -> Result<Vec<Vec<u8>>, String> {
+/// Every content of the install path `path` that a 1.x release shipped, and
+/// the content that the batch-33 main holds, once each, with the id-prefix
+/// rewrite of `prefix`. A path that the index does not name has none. The
+/// content of the running kit is no part of the list: the caller holds it. The
+/// embedded index names the files; a defect of it is a build defect, and a test
+/// reads every content.
+pub(crate) fn known_contents(path: &str, prefix: &str) -> Result<Vec<Vec<u8>>, String> {
     let index = Released::get("index.json").expect("the released index is embedded");
     let index: Value =
         serde_json::from_slice(&index.data).expect("the embedded released index is valid JSON");
-    let files = index[installed]
-        .as_array()
-        .unwrap_or_else(|| panic!("the released index lists {installed}"));
-    files
-        .iter()
+    let Some(rows) = index[path].as_array() else {
+        return Ok(Vec::new());
+    };
+    rows.iter()
         .map(|row| {
             let name = row["file"].as_str().expect("a released file name");
             let content = Released::get(name)
                 .unwrap_or_else(|| panic!("{name} is embedded"))
                 .data
                 .into_owned();
-            with_id_prefix(installed, content, prefix)
+            with_id_prefix(path, content, prefix)
         })
         .collect()
 }
@@ -179,7 +225,7 @@ pub(super) fn decide_schema(
         ));
     };
     let disk_without_enum = without_area_enum(parsed.clone());
-    for released in released_contents(SCHEMA_PATH, prefix)? {
+    for released in known_contents(SCHEMA_PATH, prefix)? {
         if let Ok(released) = serde_json::from_slice::<Value>(&released)
             && without_area_enum(released) == disk_without_enum
         {
@@ -218,7 +264,7 @@ pub(super) fn decide_workflow(
     if disk == kit {
         return Ok(Decision::of(Action::Baseline));
     }
-    if released_contents(WORKFLOW_PATH, prefix)?
+    if known_contents(WORKFLOW_PATH, prefix)?
         .iter()
         .any(|released| released == disk)
     {
@@ -446,5 +492,98 @@ mod tests {
             decide_workflow(None, false, &kit, WORKFLOW_PATH, "WI").unwrap(),
             Decision::of(Action::Absent)
         );
+    }
+
+    /// Every row of the index names an embedded file, so `known_contents` reads
+    /// one content for each row of each path.
+    #[test]
+    fn every_row_of_the_index_is_a_known_content() {
+        let index: Value = serde_json::from_slice(&released("index.json")).expect("parse");
+        for (path, rows) in index.as_object().expect("an object") {
+            let contents = known_contents(path, "WI").expect("known contents");
+            assert_eq!(
+                contents.len(),
+                rows.as_array().expect("rows").len(),
+                "{path}"
+            );
+        }
+    }
+
+    /// A path that the index does not name has no known content: the kit never
+    /// shipped it before the running release.
+    #[test]
+    fn a_path_the_index_does_not_name_has_no_known_content() {
+        assert_eq!(
+            known_contents("tools/houserules-step.sh", "WI"),
+            Ok(Vec::new())
+        );
+    }
+
+    /// The batch-33 content joins the releases, once each when two tags hold the
+    /// same bytes: the deliverables schema has the content of every 1.x release
+    /// and the content of the batch-33 main.
+    #[test]
+    fn the_batch_33_content_is_known_beside_the_released_ones() {
+        assert_eq!(
+            known_contents(".claude/schemas/deliverables.json", "WI")
+                .expect("known contents")
+                .len(),
+            2
+        );
+        assert_eq!(
+            known_contents("tools/claude-session-start.sh", "WI")
+                .expect("known contents")
+                .len(),
+            1
+        );
+    }
+
+    /// The id-prefix rewrite applies to the files that carry the prefix, as it
+    /// does to the kit's own content, and to no other file.
+    #[test]
+    fn known_contents_carry_the_id_prefix_of_the_install() {
+        let schema = ".claude/schemas/deliverables.json";
+        let default = known_contents(schema, "WI").expect("known contents");
+        let renamed = known_contents(schema, "HR").expect("known contents");
+        assert_eq!(default.len(), renamed.len());
+        for (default, renamed) in default.iter().zip(&renamed) {
+            let default = String::from_utf8_lossy(default);
+            assert!(default.contains("WI-"));
+            assert_eq!(
+                String::from_utf8_lossy(renamed),
+                default.replace("WI-", "HR-")
+            );
+        }
+        let hook = ".githooks/commit-msg";
+        assert_eq!(
+            known_contents(hook, "WI").expect("known contents"),
+            known_contents(hook, "HR").expect("known contents")
+        );
+    }
+
+    /// The released entries hold each distinct text of an entry once, with the
+    /// versions that shipped it, and each text is the entry of its id.
+    #[test]
+    fn released_entries_hold_each_text_with_the_versions_that_shipped_it() {
+        let entries = released_entries();
+        let texts = &entries["process.tdd"];
+        assert!(
+            texts
+                .iter()
+                .any(|text| text.versions.iter().any(|version| version == "1.4.0")),
+            "{texts:?}"
+        );
+        for (id, texts) in &entries {
+            for (at, text) in texts.iter().enumerate() {
+                assert_eq!(text.entry["id"], json!(id));
+                assert!(!text.versions.is_empty(), "{id}");
+                assert!(
+                    texts[at + 1..]
+                        .iter()
+                        .all(|other| other.entry != text.entry),
+                    "{id} holds one text twice"
+                );
+            }
+        }
     }
 }

@@ -70,15 +70,20 @@ struct Install {
 }
 
 impl Install {
-    /// `git init` and `houserules init`, with `--target claude` when
-    /// `claude`. The seeded `AGENTS.md` and the generated files are rendered.
+    /// `git init` and `houserules init --tracker json`, with `--target claude`
+    /// when `claude`, then `pack add` for the four kit packs that a plain
+    /// `init` leaves out (the process pack needs the tracker). The seeded
+    /// `AGENTS.md` and the generated files are rendered, and the install
+    /// holds all five kit packs.
     fn new(claude: bool) -> Self {
         let install = Self {
             dir: tempfile::tempdir().expect("tempdir"),
         };
         git(install.root(), &["init", "-q"]);
         let mut command = houserules();
-        command.args(["init", "--dir"]).arg(install.root());
+        command
+            .args(["init", "--tracker", "json", "--dir"])
+            .arg(install.root());
         if claude {
             command.args(["--target", "claude"]);
         }
@@ -88,6 +93,14 @@ impl Install {
             "init failed: {}",
             text(&output.stderr)
         );
+        for pack in ["process", "quality", "security-hygiene", "writing-style"] {
+            let added = install.run(&["pack", "add", pack]);
+            assert!(
+                added.status.success(),
+                "pack add {pack} failed: {}",
+                text(&added.stderr)
+            );
+        }
         install
     }
 
@@ -1025,7 +1038,8 @@ fn an_install_without_the_claude_renderer_owns_no_rules_directory() {
 
 /// The knowledge skill has no standing section, and its retrieval protocol
 /// tells the agent to save houserules output to a file and read the file
-/// with its file-read tool.
+/// with its file-read tool. The protocol holds the reads of every task, and no
+/// step of a dispatch (spec 4.4).
 #[test]
 fn the_knowledge_skill_has_no_standing_section_and_reads_output_from_a_file() {
     let install = Install::new(true);
@@ -1034,7 +1048,7 @@ fn the_knowledge_skill_has_no_standing_section_and_reads_output_from_a_file() {
 
     assert!(!skill.contains("## Standing rules"));
     assert!(skill.contains(
-        "## Retrieval protocol\n\nSave the output of every `houserules` command to a file, then read the file with your file-read tool.\n\n1. Resolve every id"
+        "## Retrieval protocol\n\nSave the output of every `houserules` command to a file, then read the file with your file-read tool.\n\n1. Before editing, run `houserules for <every file you will change>` and read the rules it prints.\n2. Run `houserules get <ids>`"
     ));
     assert!(skill.contains("## Topics\n\n"));
 }

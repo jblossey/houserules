@@ -20,11 +20,13 @@ use super::{Class, GENERATED, Output, RenderError, SKILL_PATH, area_sections, ca
 const RULES_DIR: &str = ".claude/rules";
 
 /// The retrieval protocol lines the knowledge skill lists under
-/// `## Retrieval protocol`, after its lead sentence.
-const PROTOCOL: [&str; 3] = [
-    "1. Resolve every id under `Knowledge:` in your task: `houserules get <ids>` (JSON).",
-    "2. Before editing, run `houserules for <every file you will change>` and `get` any rule you are unsure about.",
-    "3. Write `REPORT_FILE` as a `task-report` (schema `.claude/schemas/deliverables.json`, `self_audit: null`), then run `houserules audit --base <BASE> --head HEAD --ids <ids, comma-separated> --report <REPORT_FILE>`. The `--ids` value is the task's `Knowledge:` list, generated from it, never typed separately. Copy the audit `summary` and its `deterministic` rows into `self_audit` — never hand-written rows; the judged rows are the reviewer's. Fix every `fail`, re-run until clean, then run `houserules validate <REPORT_FILE>` and fix every error. Declare a spec-booked interim fail once with `--sanctioned <rule>=<ref>` instead of narrating it by hand. List the ids you relied on in `knowledge_used`.",
+/// `## Retrieval protocol`, after its lead sentence. They hold the two reads
+/// that every task needs, whoever hands it over: the rules of the files to
+/// change, and the entries a task names. The steps of a dispatch belong to the
+/// agent templates of a workflow.
+const PROTOCOL: [&str; 2] = [
+    "1. Before editing, run `houserules for <every file you will change>` and read the rules it prints.",
+    "2. Run `houserules get <ids>` for any rule you are unsure about, and for every id your task names.",
 ];
 
 /// The sentence that opens the retrieval protocol: the agent saves the
@@ -96,7 +98,7 @@ fn skill(base: &Base) -> Output {
     let mut lines: Vec<String> = vec![
         "---".to_string(),
         "name: project-knowledge".to_string(),
-        "description: Use when working on this repository as a dispatched subagent, before reading or changing any file".to_string(),
+        "description: Use before reading or changing any file in this repository".to_string(),
         "user-invocable: false".to_string(),
         "---".to_string(),
         GENERATED.to_string(),
@@ -225,11 +227,19 @@ mod tests {
 
         let skill = files[1].1;
         assert!(skill.starts_with(&format!(
-            "---\nname: project-knowledge\ndescription: Use when working on this repository as a dispatched subagent, before reading or changing any file\nuser-invocable: false\n---\n{GENERATED}\n\n# Project knowledge\n\n## Retrieval protocol\n\n{SAVE_OUTPUT_LINE}\n\n1. Resolve every id under `Knowledge:`"
+            "---\nname: project-knowledge\ndescription: Use before reading or changing any file in this repository\nuser-invocable: false\n---\n{GENERATED}\n\n# Project knowledge\n\n## Retrieval protocol\n\n{SAVE_OUTPUT_LINE}\n\n{}\n{}\n\n## Topics\n",
+            PROTOCOL[0], PROTOCOL[1]
         )));
         assert!(!skill.contains("## Standing rules"));
         assert!(!skill.contains("process.sequential"));
-        assert!(skill.contains(PROTOCOL[2]));
+        for dispatch_word in [
+            "dispatched subagent",
+            "Knowledge:",
+            "REPORT_FILE",
+            "audit --base",
+        ] {
+            assert!(!skill.contains(dispatch_word), "{dispatch_word}");
+        }
         assert!(skill.ends_with("## Topics\n\nprocess  2  process title\nrust  3  rust title\n"));
     }
 

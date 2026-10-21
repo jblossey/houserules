@@ -4,8 +4,10 @@
 //! [`Marker`] holds the file whole, so a write keeps every key it does not
 //! own, in its order. It validates the keys `init` and `update` read
 //! (`idPrefix`, `version`, `overrides`, `ownedPaths`, `renderers`,
-//! `baselines`, `schema`, `defaultBranch`) and hands out the `packs` key as
-//! [`Pin`]s. A command names the file by its path. [`read_pins_for_gate`]
+//! `baselines`, `schema`, `defaultBranch`, `tracker`, `optInOffered`,
+//! `workflow`) and hands out the `packs` key as [`Pin`]s, the `tracker` key as
+//! a `TrackerConfig`, and the `workflow` key as found (`workflow::pins` reads
+//! its shape). A command names the file by its path. [`read_pins_for_gate`]
 //! reads the same pins for `check-knowledge`, which names the file by its
 //! relative name; [`Marker::read_or_default_for_gate`] reads the whole marker
 //! for its kit-owned citation lint the same way.
@@ -26,6 +28,7 @@ use serde_json::{Map, Value, json};
 
 use crate::archive::{read_json, read_json_as, write_json};
 use crate::root::INSTALL_MARKER;
+use crate::tracker::{Adapter, TrackerConfig};
 
 /// The shared constraint text for both `idPrefix` rejection messages.
 pub(super) const ID_PREFIX_HINT: &str = "must be 1-8 characters, A-Z then A-Z0-9";
@@ -141,8 +144,10 @@ pub(crate) struct Marker {
     fresh: bool,
 }
 
-/// The install schema id that `init` stamps (spec section 3).
-const INSTALL_SCHEMA: &str = "houserules/install@2.0.0";
+/// The install schema id that `init` stamps and the 1.x conversion writes:
+/// 2.1.0 adds the `tracker`, `workflow`, and `optInOffered` keys to the
+/// marker (batch 34, spec 3.7).
+pub(super) const INSTALL_SCHEMA: &str = "houserules/install@2.1.0";
 
 /// The text that an install schema id starts with.
 const INSTALL_SCHEMA_PREFIX: &str = "houserules/install@";
@@ -317,7 +322,7 @@ impl Marker {
         if !self.has_default_branch_shape() {
             return Err(format!("{file}: defaultBranch must be a string"));
         }
-        for key in ["ownedPaths", "renderers"] {
+        for key in ["ownedPaths", "renderers", "optInOffered"] {
             if let Some(list) = self.map.get(key)
                 && !list
                     .as_array()
@@ -326,7 +331,58 @@ impl Marker {
                 return Err(format!("{file}: {key} must be an array of strings"));
             }
         }
+        self.tracker()?;
+        crate::workflow::pins::read(self)?;
         Ok(())
+    }
+
+    /// The tracker of the install: the `tracker` key, or `None` when the
+    /// marker has none. A key of another shape is one line that names the
+    /// marker and the fault, never `None`: a reader of a marker that
+    /// [`Marker::read`] returned unvalidated gets the line too.
+    pub(crate) fn tracker(&self) -> Result<Option<TrackerConfig>, String> {
+        self.map
+            .get("tracker")
+            .map(|value| {
+                TrackerConfig::from_value(value).map_err(|fault| format!("{}: {fault}", self.file))
+            })
+            .transpose()
+    }
+
+    /// Sets `tracker`. The key keeps its place when it exists and goes last
+    /// when it does not.
+    pub(crate) fn set_tracker(&mut self, config: &TrackerConfig) {
+        self.map.insert("tracker".to_string(), config.to_value());
+    }
+
+    /// The ids of the opt-in entries that a command offered to the project
+    /// (`optInOffered`), or none when the marker has no such key.
+    pub(crate) fn opt_in_offered(&self) -> Vec<String> {
+        self.strings("optInOffered")
+    }
+
+    /// Sets `optInOffered`. The key keeps its place when it exists and goes
+    /// last when it does not.
+    pub(crate) fn set_opt_in_offered(&mut self, ids: &[String]) {
+        self.map.insert("optInOffered".to_string(), json!(ids));
+    }
+
+    /// The `workflow` key as found, or `None` when the marker has none.
+    /// `workflow::pins::read` checks its shape.
+    pub(crate) fn workflow_value(&self) -> Option<&Value> {
+        self.map.get("workflow")
+    }
+
+    /// Sets `workflow`. The key keeps its place when it exists and goes last
+    /// when it does not.
+    pub(crate) fn set_workflow_value(&mut self, value: Value) {
+        self.map.insert("workflow".to_string(), value);
+    }
+
+    /// How a line names the marker: its path for a command, its relative name
+    /// for a gate.
+    pub(crate) fn file_name(&self) -> &str {
+        &self.file
     }
 
     /// The strings of the array under `key`. [`Marker::validate`] has
@@ -596,17 +652,6 @@ impl Marker {
     }
 }
 
-/// `root`'s own stamped `idPrefix`, for a reader that needs it outside
-/// `init` and `update` -- `get`'s id-shape routing
-/// (`crate::get::is_backlog_id`) is the one caller. `"WI"` stands in for
-/// the CLI's `--id-prefix` flag (`get` takes none): an absent marker, or
-/// one without an `idPrefix` key, resolves to `"WI"`, the default of `init`
-/// and `update`; a present, invalid `idPrefix` is the named error of
-/// [`Marker::read_or_default`] (`houserules.crash-paths-are-named`).
-pub(crate) fn stamped_id_prefix(root: &Path) -> Result<String, String> {
-    Ok(Marker::read_or_default(root, "WI")?.id_prefix_or("WI"))
-}
-
 /// The commands that D4 guards, by the marker states they run on
 /// (`refuse_install_schema` lists the states and what each guard does with
 /// them).
@@ -689,18 +734,36 @@ pub(crate) fn read_pins_for_gate(root: &Path) -> Result<BTreeMap<String, Pin>, S
     Marker::from_json(path, INSTALL_MARKER.to_string(), value)?.pins()
 }
 
-/// `true` when the install at `root` enables the Claude renderer, as `render`
-/// and `check-knowledge` read it: `renderers` lists `claude`, or the marker or
-/// its `renderers` key is absent ([`Marker::claude_enabled`]). A marker that
-/// cannot give the answer is one line that names the defect, with the file by
-/// its relative name.
-pub(crate) fn read_claude_enabled_for_gate(root: &Path) -> Result<bool, String> {
+/// What the renderers read from the marker.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct RenderInputs {
+    /// `true` when the Claude renderer is enabled: `renderers` lists
+    /// `claude`, or the marker or its `renderers` key is absent
+    /// ([`Marker::claude_enabled`]).
+    pub(crate) claude: bool,
+    /// The adapter of the installed tracker, or `None` when the install has
+    /// none. The AGENTS.md block names the session commands of the adapter.
+    pub(crate) adapter: Option<Adapter>,
+    /// `true` when the install holds a `workflow` key. The AGENTS.md block
+    /// carries the pointer of the workflow then.
+    pub(crate) workflow: bool,
+}
+
+/// The inputs of the renderers of the install at `root`, as `render` and
+/// `check-knowledge` read them. An absent marker enables the Claude renderer
+/// and holds no tracker and no workflow. A marker that cannot give them is
+/// one line that names the defect, with the file by its relative name.
+pub(crate) fn read_render_inputs_for_gate(root: &Path) -> Result<RenderInputs, String> {
     let path = root.join(INSTALL_MARKER);
     let present = path
         .try_exists()
         .map_err(|error| format!("{INSTALL_MARKER}: {error}"))?;
     if !present {
-        return Ok(true);
+        return Ok(RenderInputs {
+            claude: true,
+            adapter: None,
+            workflow: false,
+        });
     }
     let value = read_json_as(&path, INSTALL_MARKER)?;
     let marker = Marker::from_json(path, INSTALL_MARKER.to_string(), value)?;
@@ -713,7 +776,11 @@ pub(crate) fn read_claude_enabled_for_gate(root: &Path) -> Result<bool, String> 
             "{INSTALL_MARKER}: renderers must be an array of strings"
         ));
     }
-    Ok(marker.claude_enabled())
+    Ok(RenderInputs {
+        claude: marker.claude_enabled(),
+        adapter: marker.tracker()?.map(|config| config.adapter),
+        workflow: marker.workflow_value().is_some(),
+    })
 }
 
 /// Why a gate cannot take the `defaultBranch` from the marker. A gate words
@@ -778,6 +845,100 @@ mod tests {
             added_areas: vec!["docs".to_string()],
             commit: commit.map(str::to_string),
         }
+    }
+
+    /// The `tracker` key reads back as written, goes last when new, keeps its
+    /// place when it exists, and `tracker()` is `None` without the key.
+    #[test]
+    fn the_tracker_key_reads_back_goes_last_and_keeps_its_place() {
+        use crate::tracker::Adapter;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut marker = marker_in(dir.path(), &json!({"idPrefix": "WI", "baselines": {}}));
+        assert_eq!(marker.tracker(), Ok(None));
+
+        let github = TrackerConfig {
+            adapter: Adapter::Github,
+            repo: Some("acme/widgets".to_string()),
+        };
+        marker.set_tracker(&github);
+        marker.write().expect("write the marker");
+        let written = read_json(&dir.path().join(INSTALL_MARKER)).expect("read");
+        let keys: Vec<&String> = written.as_object().expect("an object").keys().collect();
+        assert_eq!(keys, ["idPrefix", "baselines", "tracker"]);
+        assert_eq!(
+            Marker::read(dir.path()).expect("read").tracker(),
+            Ok(Some(github))
+        );
+
+        let mut reread = Marker::read(dir.path()).expect("read");
+        reread.set_tracker(&TrackerConfig {
+            adapter: Adapter::Json,
+            repo: None,
+        });
+        reread.set_baselines(Map::new());
+        let keys: Vec<&String> = reread.map.keys().collect();
+        assert_eq!(keys, ["idPrefix", "baselines", "tracker"]);
+        assert_eq!(
+            reread
+                .tracker()
+                .expect("a tracker")
+                .map(|config| config.adapter),
+            Some(Adapter::Json)
+        );
+    }
+
+    /// A `tracker` key of the wrong shape is no absent tracker: `tracker()`
+    /// answers the fault with the marker's path in front of it, also for a
+    /// marker that [`Marker::read`] returned unvalidated.
+    #[test]
+    fn tracker_names_the_marker_and_the_fault_of_a_key_of_the_wrong_shape() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let marker = marker_in(dir.path(), &json!({"tracker": {"adapter": "svn"}}));
+        let file = dir.path().join(INSTALL_MARKER).display().to_string();
+        assert_eq!(
+            marker.tracker(),
+            Err(format!(
+                "{file}: tracker.adapter must be json, github, or beads"
+            ))
+        );
+    }
+
+    /// `validate` names a `tracker` key of the wrong shape and an
+    /// `optInOffered` key that is no array of strings, each as one line that
+    /// names the marker.
+    #[test]
+    fn validate_names_a_tracker_and_an_opt_in_key_of_the_wrong_shape() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join(INSTALL_MARKER).display().to_string();
+        for (value, fault) in [
+            (
+                json!({"tracker": {"adapter": "svn"}}),
+                "tracker.adapter must be json, github, or beads",
+            ),
+            (
+                json!({"optInOffered": [1]}),
+                "optInOffered must be an array of strings",
+            ),
+        ] {
+            std::fs::write(dir.path().join(INSTALL_MARKER), emit(&value)).expect("write");
+            let error = Marker::read_or_default(dir.path(), "WI").err();
+            assert_eq!(error, Some(format!("{file}: {fault}")));
+        }
+    }
+
+    /// `optInOffered` reads back as written and is empty when absent.
+    #[test]
+    fn the_opt_in_offered_ids_read_back_as_written() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut marker = marker_in(dir.path(), &json!({"idPrefix": "WI"}));
+        assert_eq!(marker.opt_in_offered(), Vec::<String>::new());
+        marker.set_opt_in_offered(&["process.a".to_string(), "process.b".to_string()]);
+        marker.write().expect("write the marker");
+        assert_eq!(
+            Marker::read(dir.path()).expect("read").opt_in_offered(),
+            ["process.a", "process.b"]
+        );
     }
 
     /// A pin reads back as written, with or without a commit.
@@ -967,12 +1128,17 @@ mod tests {
         assert!(!unreadable.contains(&root), "{unreadable}");
     }
 
+    /// The Claude flag of the render inputs of the install at `root`.
+    fn claude_enabled_for_gate(root: &Path) -> Result<bool, String> {
+        read_render_inputs_for_gate(root).map(|inputs| inputs.claude)
+    }
+
     /// The Claude renderer is on when `renderers` lists `claude`, and when the
     /// marker or its `renderers` key is absent.
     #[test]
     fn a_gate_reads_the_claude_renderer_from_the_renderers_key() {
         let dir = tempfile::tempdir().expect("tempdir");
-        assert_eq!(read_claude_enabled_for_gate(dir.path()), Ok(true));
+        assert_eq!(claude_enabled_for_gate(dir.path()), Ok(true));
 
         for (renderers, enabled) in [
             (json!([]), false),
@@ -982,14 +1148,79 @@ mod tests {
         ] {
             marker_in(dir.path(), &json!({"renderers": renderers}));
             assert_eq!(
-                read_claude_enabled_for_gate(dir.path()),
+                claude_enabled_for_gate(dir.path()),
                 Ok(enabled),
                 "{renderers}"
             );
         }
 
         marker_in(dir.path(), &json!({"idPrefix": "WI"}));
-        assert_eq!(read_claude_enabled_for_gate(dir.path()), Ok(true));
+        assert_eq!(claude_enabled_for_gate(dir.path()), Ok(true));
+    }
+
+    /// The render inputs name the adapter of the `tracker` key and whether
+    /// the marker has a `workflow` key; an absent marker has neither and
+    /// enables the Claude renderer.
+    #[test]
+    fn a_gate_reads_the_tracker_and_the_workflow_from_the_marker() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        assert_eq!(
+            read_render_inputs_for_gate(dir.path()),
+            Ok(RenderInputs {
+                claude: true,
+                adapter: None,
+                workflow: false
+            })
+        );
+        for (tracker, adapter) in [
+            (json!({"adapter": "json"}), Adapter::Json),
+            (
+                json!({"adapter": "github", "repo": "owner/name"}),
+                Adapter::Github,
+            ),
+            (json!({"adapter": "beads"}), Adapter::Beads),
+        ] {
+            marker_in(
+                dir.path(),
+                &json!({
+                    "renderers": [],
+                    "tracker": tracker,
+                    "workflow": {"name": "reference", "version": "2.0.0", "files": {}, "models": {}},
+                }),
+            );
+            assert_eq!(
+                read_render_inputs_for_gate(dir.path()),
+                Ok(RenderInputs {
+                    claude: false,
+                    adapter: Some(adapter),
+                    workflow: true
+                }),
+                "{tracker}"
+            );
+        }
+    }
+
+    /// A `workflow` key of another shape is one line that names the marker
+    /// and the field, for a command and for a gate.
+    #[test]
+    fn a_workflow_key_of_the_wrong_shape_is_one_named_line() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            dir.path().join(INSTALL_MARKER),
+            r#"{"workflow": {"name": 5, "version": "1", "files": {}, "models": {}}}"#,
+        )
+        .expect("write the marker");
+        let command = Marker::read_or_default(dir.path(), "WI")
+            .err()
+            .expect("a malformed key");
+        assert!(
+            command.ends_with(".houserules.json: workflow.name must be a string"),
+            "{command}"
+        );
+        assert_eq!(
+            Marker::read_or_default_for_gate(dir.path(), "WI").err(),
+            Some(".houserules.json: workflow.name must be a string".to_string())
+        );
     }
 
     /// A `renderers` value that is no array of strings, and a marker that
@@ -1001,14 +1232,14 @@ mod tests {
         for renderers in [json!("claude"), json!(5), json!(["claude", 5]), json!(null)] {
             marker_in(dir.path(), &json!({"renderers": renderers}));
             assert_eq!(
-                read_claude_enabled_for_gate(dir.path()),
+                claude_enabled_for_gate(dir.path()),
                 Err(".houserules.json: renderers must be an array of strings".to_string()),
                 "{renderers}"
             );
         }
 
         std::fs::write(dir.path().join(INSTALL_MARKER), "{").expect("write the marker");
-        let invalid = read_claude_enabled_for_gate(dir.path()).expect_err("invalid JSON");
+        let invalid = claude_enabled_for_gate(dir.path()).expect_err("invalid JSON");
         assert!(
             invalid.starts_with(".houserules.json: invalid JSON ("),
             "{invalid}"

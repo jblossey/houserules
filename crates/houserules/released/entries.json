@@ -1,0 +1,2772 @@
+{
+  "knowledge-base.controller-rules-are-tagged": [
+    {
+      "versions": [
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "knowledge-base.controller-rules-are-tagged",
+        "kind": "rule",
+        "area": "docs",
+        "standing": false,
+        "summary": "Tag an entry `controller` when only the controller's acts can break it; a task audit leaves it out, the branch audit judges it.",
+        "body": [
+          "A controller act is a step that the controller takes: a spec, a plan, a dispatch, a ruling, a merge, a release. A task diff cannot break a rule that governs only these acts.",
+          "A task audit is `houserules audit` with `--report`. It leaves an entry tagged `controller` out of its package. This holds for a standing entry, an entry in a touched area, a global entry, and an entry with a check. `--ids` brings the entry back.",
+          "The branch audit (`--workspace`) and a plain audit (neither flag) keep the entry. The branch reviewer judges its rows. In a batch without a branch review, the controller runs `houserules audit --base <merge base> --workspace <WORKSPACE>` before Finish and judges the `controller` rows in the ledger.",
+          "A rule that task reviews catch stays untagged. `process.rulings-to-file`, `process.tdd`, and `process.claims-match-artifacts` are examples.",
+          "The tag is the exact string `controller`. A tag is a free string: the knowledge schema does not change."
+        ],
+        "tags": [
+          "knowledge",
+          "authoring",
+          "audit"
+        ],
+        "source": {
+          "date": "2026-10-10",
+          "by": "controller",
+          "ref": "batch 32 spec 3.1"
+        },
+        "verify": [
+          ".claude/skills/orchestrating/SKILL.md"
+        ]
+      }
+    }
+  ],
+  "knowledge-base.ids-are-permanent": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "knowledge-base.ids-are-permanent",
+        "kind": "rule",
+        "area": "docs",
+        "summary": "Never rename a merged entry id. Add a new entry and link the old one with `see`.",
+        "body": [
+          "Dispatches, reports, audits, and `see` lists cite ids; a rename breaks every one of them silently.",
+          "Permanence includes reachability through every reader - get, see-citations, batch membership - across an archive sweep; a mover that strands any one reader breaks the rule even though the id still exists on disk."
+        ],
+        "tags": [
+          "knowledge",
+          "authoring",
+          "ids"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "knowledge-base.rules-need-a-loading-path": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0"
+      ],
+      "entry": {
+        "id": "knowledge-base.rules-need-a-loading-path",
+        "kind": "rule",
+        "area": "docs",
+        "standing": false,
+        "summary": "Give every rule, invariant, or checked entry a loading path: `standing: true`, or an area whose globs match the files it governs.",
+        "body": [
+          "A non-standing entry in an area with empty globs other than global (`process` in the seed) never loads with a file. A global entry loads with every file through `houserules for` and joins every audit package, but renders into no rules file.",
+          "After filing, run `houserules for <a file the rule governs>` and confirm the entry appears.",
+          "A `check` needs an audit loading path too: it joins the package when its entry is `standing`, sits in a touched or global area (any kind, not only rule and invariant), or is named in `--ids`."
+        ],
+        "tags": [
+          "knowledge",
+          "authoring",
+          "loading"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.3.0"
+      ],
+      "entry": {
+        "id": "knowledge-base.rules-need-a-loading-path",
+        "kind": "rule",
+        "area": "docs",
+        "standing": false,
+        "summary": "Give every rule, invariant, or checked entry a loading path: `standing: true`, or an area whose globs match the files it governs.",
+        "body": [
+          "A non-standing entry in an area with empty globs other than global (`process` in the seed) never loads with a file. A global entry loads with every file through `houserules for` and joins every audit package, but renders into no rules file.",
+          "After filing, run `houserules for <a file the rule governs>` and confirm the entry appears.",
+          "The kit's non-standing procedure rules in the glob-less `process` area load by citation instead: a kit-owned skill or agent template names the id, and its reader runs `houserules get <id>`. `check-knowledge` fails a cited id that the base does not hold. Such an entry never joins an audit package by area; name it in `--ids` to audit against it. `process.risk-tiers`, `process.severity-by-impact`, `process.bounded-review-loop`, `process.knowledge-earns-its-place`, and `process.parallel-on-disjoint-files` load this way.",
+          "A `check` needs an audit loading path too: it joins the package when its entry is `standing`, sits in a touched or global area (any kind, not only rule and invariant), or is named in `--ids`."
+        ],
+        "tags": [
+          "knowledge",
+          "authoring",
+          "loading"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "knowledge-base.rules-need-a-loading-path",
+        "kind": "rule",
+        "area": "docs",
+        "standing": false,
+        "summary": "Give every rule, invariant, or checked entry a loading path: `standing: true`, or an area whose globs match the files it governs.",
+        "body": [
+          "A non-standing entry in an area with empty globs other than global (`process` in the seed) never loads with a file. A global entry loads with every file through `houserules for` and joins every audit package (a task audit leaves out an entry tagged `controller` unless `--ids` names it), but renders into no rules file.",
+          "After filing, run `houserules for <a file the rule governs>` and confirm the entry appears.",
+          "The kit's non-standing procedure rules in the glob-less `process` area load by citation instead: a kit-owned skill or agent template names the id, and its reader runs `houserules get <id>`. `check-knowledge` fails a cited id that the base does not hold. Such an entry never joins an audit package by area; name it in `--ids` to audit against it. `process.risk-tiers`, `process.severity-by-impact`, `process.bounded-review-loop`, `process.knowledge-earns-its-place`, and `process.parallel-on-disjoint-files` load this way.",
+          "A non-standing `process` entry also loads through two paths. The controller reads its summary at the session ritual's `houserules index --area process`. An agent receives its id on the `Knowledge:` line of a dispatch.",
+          "Make a process rule standing only when every session must carry it. Give the `controller` tag to a rule that only the controller can break: a task audit leaves the entry out of its package unless `--ids` names it (`knowledge-base.controller-rules-are-tagged`).",
+          "A `check` needs an audit loading path too: it joins the package when its entry is `standing`, sits in a touched or global area (any kind, not only rule and invariant), or is named in `--ids`. A task audit leaves out the check of an entry tagged `controller` unless `--ids` names that entry."
+        ],
+        "tags": [
+          "knowledge",
+          "authoring",
+          "loading"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "knowledge-base.state-only-the-source": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "knowledge-base.state-only-the-source",
+        "kind": "rule",
+        "area": "docs",
+        "summary": "State only what the source states; verify polarity, counts, and mechanisms against the code before filing an entry or shipping teaching prose.",
+        "body": [
+          "Invented claims read plausibly; that is what makes them dangerous.",
+          "When two sources disagree, read the code and record which one the entry follows.",
+          "A shipped template or seed names no root-only id, path, or command; verify every reference resolves in a fresh install before syncing the root copy.",
+          "Run every command block you ship exactly as printed, top to bottom, in the environment the reader will have (a fresh directory for a quick start). A block that needs unstated context, or that resolves differently than printed (an unpinned git spec), fails this rule.",
+          "The walk includes a control: when a line looks optional, re-run the block without it and confirm the block then fails - that proves the line load-bearing instead of decorative.",
+          "A sweep keyed on one name for a subject misses a claim keyed on a different, surviving spelling of the same subject; sweep for the claim's SUBJECT, not just the name a prior sweep happened to use.",
+          "A corrected measurement sweeps its dependents: when a sentence is corrected, re-open every sentence that cites, paraphrases, or leans on it - not only the lines the round edited; antecedents drift when their referent is repaired.",
+          "An amendment re-derives the entry's summary from the amended body before filing - the summary is the half that renders into the loaded rules files, so a stale summary ships wider than the body it contradicts.",
+          "Before shipping a uniqueness or attribution sentence ('the only', 'caused by'), run the enumeration that would falsify it against the tree at HEAD.",
+          "A rewritten doc comment is teaching prose under this rule: re-derive caller counts, uniqueness claims, and cross-references from the tree at the revision under edit, never from the pre-rewrite text or another agent's summary.",
+          "Prose stating an invariant about commit history ('always', 'never', 'by the time it reaches main') enumerates every author class that writes such commits - bot-authored release and dependency commits included.",
+          "When a commit closes a tracked item, grep the tracked docs for that item's id in the same commit: the closing commit owns every sentence that scheduled the work."
+        ],
+        "tags": [
+          "knowledge",
+          "authoring",
+          "fidelity"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "knowledge-base.summary-is-the-rule": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0"
+      ],
+      "entry": {
+        "id": "knowledge-base.summary-is-the-rule",
+        "kind": "rule",
+        "area": "docs",
+        "summary": "The `summary` states the rule in one sentence; `body` carries why, how, exceptions; examples in docs and skills model this split. No time-sensitive phrasing.",
+        "body": [
+          "Dates live in `source.date` and in `kind: history` entries linked by `see`.",
+          "The summary is the only text that renders into rule files and indexes."
+        ],
+        "tags": [
+          "knowledge",
+          "authoring"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "verify": [
+          "knowledge/schema.json"
+        ]
+      }
+    },
+    {
+      "versions": [
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "knowledge-base.summary-is-the-rule",
+        "kind": "rule",
+        "area": "docs",
+        "summary": "The `summary` states the rule in one sentence; `body` carries why, how, exceptions; examples in docs and skills model this split. No time-sensitive phrasing.",
+        "body": [
+          "Dates live in `source.date` and in `kind: history` entries linked by `see`.",
+          "The summary is the only text that renders into rule files and indexes.",
+          "The `warn` check reads every changed file under `knowledge/` and `template/knowledge/` for time-sensitive wording and names the first hit with its line. The `pattern` field lists the wording: words for the present day, and a clause that waits on a release. Move the time to `source.date` or to a `kind: history` entry, and state the rule without it. The pattern spells each word with one bracketed letter, so the file that holds the pattern never matches it.",
+          "A kit update or archive commit that rewrites a topic file draws the warn for older text in that file, an adopter's own text included. Fix that text as the warn says."
+        ],
+        "tags": [
+          "knowledge",
+          "authoring"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "verify": [
+          "knowledge/schema.json"
+        ],
+        "check": {
+          "type": "grep-absent",
+          "level": "warn",
+          "files": [
+            "knowledge/**/*.json",
+            "template/knowledge/**/*.json"
+          ],
+          "pattern": "\\b(toda[y]|curren[t]ly|for no[w]|at the mo[m]ent)\\b|\\bunti[l]\\b[^.;:]{0,40}\\b(ships?|lands?)\\b",
+          "flags": "i",
+          "scope": "changed"
+        }
+      }
+    }
+  ],
+  "process.ask-when-missing": [
+    {
+      "versions": [
+        "1.0.0"
+      ],
+      "entry": {
+        "id": "process.ask-when-missing",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Ask the project's owner or decider when information is missing. Do not assume.",
+        "body": [
+          "Who answers depends on the project and its environment: a human owner in a supervised setup, an orchestrator or manager agent in a fully autonomous one. Name the project's actual decider once known, in CLAUDE.md or a knowledge entry."
+        ],
+        "tags": [
+          "users"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.ask-when-missing",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Ask the project's owner or decider when information is missing. Do not assume.",
+        "body": [
+          "Who answers depends on the project and its environment: a human owner in a supervised setup, an orchestrator or manager agent in a fully autonomous one. Name the project's actual decider once known, in AGENTS.md or a knowledge entry."
+        ],
+        "tags": [
+          "users"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "process.backlog-drives-work": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0"
+      ],
+      "entry": {
+        "id": "process.backlog-drives-work",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "The backlog drives all work. Select backlog items before you start; every requirement traces to an item.",
+        "body": [
+          "The backlog lives in `backlog/` (JSON). Read it with `houserules list --open`, `get <id>`, `batch <n>`; tick items with `set <id> status=done batch=<n>`."
+        ],
+        "tags": [
+          "backlog"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "verify": [
+          "backlog/schema.json"
+        ]
+      }
+    },
+    {
+      "versions": [
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.backlog-drives-work",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "The backlog drives all work. Select backlog items before you start; every requirement traces to an item.",
+        "body": [
+          "The backlog lives in `backlog/` (JSON). Read it with `houserules list --open`, `get <id>`, `batch <n>`; tick items with `set <id> status=done batch=<n>`."
+        ],
+        "tags": [
+          "backlog",
+          "controller"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "verify": [
+          "backlog/schema.json"
+        ]
+      }
+    }
+  ],
+  "process.bounded-review-loop": [
+    {
+      "versions": [
+        "1.3.0"
+      ],
+      "entry": {
+        "id": "process.bounded-review-loop",
+        "kind": "rule",
+        "area": "process",
+        "standing": false,
+        "summary": "Bound the review loop: a re-review reads the fix diff only, a Minor-only fix round skips it, and each tier caps its re-reviews.",
+        "body": [
+          "A fix round that holds only Minor fixes closes with a controller verification note (`process.fix-round-verification-record`), never with a re-review.",
+          "A re-review reads the fix diff and the original findings only. It files new findings at their impact (`process.severity-by-impact`). Only a new Critical or Important finding opens a further round. A new Minor finding joins a Minor-only round.",
+          "Re-reviews per task: light 0, standard 1, full 2. A branch-review fix wave has the same cap as the batch's tier.",
+          "At the cap, the open non-critical findings become one backlog item with the reason (a deferral under `process.no-tech-debt`). An open Critical finding goes to the project's owner or decider.",
+          "A light task with an Important or Critical finding moves up to the standard tier and gets its one re-review."
+        ],
+        "tags": [
+          "review",
+          "fix-round",
+          "loop"
+        ],
+        "source": {
+          "date": "2026-10-09",
+          "by": "user",
+          "ref": "owner ruling, batch 31"
+        },
+        "see": [
+          "process.severity-by-impact",
+          "process.fix-round-verification-record",
+          "process.no-tech-debt",
+          "process.risk-tiers"
+        ]
+      }
+    },
+    {
+      "versions": [
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.bounded-review-loop",
+        "kind": "rule",
+        "area": "process",
+        "standing": false,
+        "summary": "Bound the review loop: a re-review reads the fix diff only, a Minor-only fix round skips it, and each tier caps its re-reviews.",
+        "body": [
+          "A fix round that holds only Minor fixes closes with a controller verification note (`process.fix-round-verification-record`), never with a re-review. The controller runs the check that each Minor finding names and cites its result in the note.",
+          "A re-review reads the fix diff and the original findings only. It files new findings at their impact (`process.severity-by-impact`). Only a new Critical or Important finding opens a further round. A new Minor finding joins a Minor-only round.",
+          "Re-reviews per task: light 0, standard 1, full 2. A branch-review fix wave has the same cap as the batch's tier.",
+          "At the cap, the open non-critical findings become one backlog item with the reason (a deferral under `process.no-tech-debt`). An open Critical finding goes to the project's owner or decider.",
+          "A light task with an Important or Critical finding moves up to the standard tier and gets its one re-review."
+        ],
+        "tags": [
+          "review",
+          "fix-round",
+          "loop"
+        ],
+        "source": {
+          "date": "2026-10-09",
+          "by": "user",
+          "ref": "owner ruling, batch 31"
+        },
+        "see": [
+          "process.severity-by-impact",
+          "process.fix-round-verification-record",
+          "process.no-tech-debt",
+          "process.risk-tiers"
+        ]
+      }
+    }
+  ],
+  "process.brainstorm-first": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0"
+      ],
+      "entry": {
+        "id": "process.brainstorm-first",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Start each batch with a brainstorming session or a written spec; get approval from the project's owner or decider before implementing.",
+        "body": [
+          "Use the superpowers brainstorming and spec skills when the plugin is installed; otherwise write the spec by hand. Specs live in `docs/specs/`.",
+          "The order is strict: spec, then plan. A plan written before its approved spec is nil - deleted and the planning phase redone from the spec, never re-anchored."
+        ],
+        "tags": [
+          "batch",
+          "design"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.3.0"
+      ],
+      "entry": {
+        "id": "process.brainstorm-first",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Start each batch with a brainstorming session or a written spec; get approval from the project's owner or decider before implementing.",
+        "body": [
+          "Use the superpowers brainstorming and spec skills when the plugin is installed; otherwise write the spec by hand. Specs live in `docs/specs/`.",
+          "The order is strict: spec, then plan. A plan written before its approved spec is nil - deleted and the planning phase redone from the spec, never re-anchored.",
+          "A light-tier change (`process.risk-tiers`) has no plan. The body of its backlog item is the written spec, and the project's owner or decider approves it before implementation."
+        ],
+        "tags": [
+          "batch",
+          "design"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.brainstorm-first",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Start each batch with a brainstorming session or a written spec; get approval from the project's owner or decider before implementing.",
+        "body": [
+          "Use the superpowers brainstorming and spec skills when the plugin is installed; otherwise write the spec by hand. Specs live in `docs/specs/`.",
+          "The order is strict: spec, then plan. A plan written before its approved spec is nil - deleted and the planning phase redone from the spec, never re-anchored.",
+          "A light-tier change (`process.risk-tiers`) has no plan. The body of its backlog item is the written spec, and the project's owner or decider approves it before implementation."
+        ],
+        "tags": [
+          "batch",
+          "design",
+          "controller"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "process.brief-carries-the-spec": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.brief-carries-the-spec",
+        "kind": "rule",
+        "area": "process",
+        "standing": false,
+        "summary": "A task brief carries every test, gate, and file its spec task names; an implementer who cannot satisfy one flags it instead of dropping it.",
+        "body": [
+          "The controller writes briefs from the spec and plan; a silent omission surfaces only in review, one round late.",
+          "When a brief and the spec disagree, the spec wins and the disagreement is a ruling to record."
+        ],
+        "tags": [
+          "dispatch",
+          "briefs"
+        ],
+        "source": {
+          "date": "2026-09-01",
+          "by": "review",
+          "ref": "review retrospective, uncovered_findings"
+        }
+      }
+    }
+  ],
+  "process.claims-match-artifacts": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.claims-match-artifacts",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Before submitting a report, re-open every artifact a claim cites and confirm the artifact shows what the sentence says.",
+        "body": [
+          "The recurring failure is not fabrication but drift: the work is right while the sentence describing it cites a capture that is not there, quotes a line the capture lost, or keeps a rationale a later verification overturned.",
+          "The check is mechanical: for each named file, open it; for each quoted line, grep it; for each number, recompute it from the artifact. A reviewer does exactly this, so a report that skips it converts Minor findings into review rounds.",
+          "A reversed trend is worth recording too: name the pattern in the review when it appears, and name its reversal when a later round demonstrates it.",
+          "A SHIPPED doc or comment sentence stating a measurement is a claim like a report sentence: it cites a retained capture at a durable path, and a fix round's sweep re-opens every doc sentence the round touched. The report-claims checker cannot see shipped files — the manual sweep is the only net there.",
+          "A command field is the literal command copied from the terminal — never retyped, never annotated inline; labels and notes go beside the field. A reviewer paste-runs command fields; a field that cannot paste-run is a finding by itself.",
+          "Close every report by running the report-claims checker (`houserules check-report-claims <REPORT_FILE>`) over the report file after the last edit, and paste its clean run as the final tests entry. The checker is a floor, not a substitute for the manual sweep: its Limits section (crates/houserules/src/report_claims.rs, reachable only where this kit's own source lives) names what only the sweep catches; an adopter repo carries no such source, so there a false positive is disclosed per report and reported upstream instead. It ships as a `houserules` subcommand, so the closing act runs in every adopter repo, not only the one that built it. The checker gates gitignored workspace reports, never a tracked artifact a CI job could see, so it carries no CI job of its own -- the implementer template's closing-act mandate is the whole mechanism.",
+          "A commit message body is a claim like a report sentence: recompute its counts from the artifact before committing; a wrong count found post-commit is recorded in the report for aggregation to carry, never amended and never left silent.",
+          "After any world-changing event - a fix round, an interruption, a rebase - re-derive every count and summary-scope field (implemented, self_review, doc comments citing measurements) from the tree at HEAD before re-submitting; a carried-forward sentence is a new claim, never trusted.",
+          "A claim about a failure names whether it was OBSERVED or INFERRED - a commit body keeps the same observed-vs-reconstructed split its report keeps.",
+          "Drift recurs in a handful of shapes, each caught only by re-derivation: a rewritten command string that was never run as written; a count not re-measured after the change; a citation carrying a stream index where a file line belongs; a false universal ('every', 'all') no enumeration was run for; and a transcription of another agent's wording whose particulars were never checked against the tree.",
+          "Re-derive every sentence from the tree at the final HEAD immediately before the report ships; a sentence carried from a draft, a review, or a dispatch is re-derived before it lands."
+        ],
+        "tags": [
+          "reports",
+          "evidence",
+          "review"
+        ],
+        "source": {
+          "date": "2026-09-04",
+          "by": "review",
+          "ref": "review trend note; owner ruling"
+        }
+      }
+    }
+  ],
+  "process.closure-claims-carry-enumeration": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.closure-claims-carry-enumeration",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "A claim that a set is closed ('every', 'all', 'no remaining') names the bounded, rerunnable enumeration that produced it; without the artifact, no claim.",
+        "body": [
+          "An unenumerated closure sentence is false in at least one direction more often than not; the fix is always a script whose output the sentence can then cite.",
+          "The enumeration lives at a path that outlives the session and reruns cleanly; its own summary line states the counts the claim cites, so a reader checks the artifact, not the prose.",
+          "A migration or flip closure names its zero-hit sweep of the RETIRED form (the grep pattern and its variants), rerunnable at HEAD; the enumeration is of the old form's residue, not the new form's presence — a presence enumeration only confirms known work, a residue sweep is what falsifies closure.",
+          "The enumeration artifact is executable: a script whose own run prints the counts the claim cites, not a static dump or a hand-asserted mapping — an asserted mapping can hide a live coverage drop, a grep dump that matches no command at HEAD proves nothing until an executable sweep replaces it, and a scratch-directory list fails durability until the comparison reruns from git history.",
+          "The enumeration's pattern derives from the claim's SUBJECT, widened to every spelling the corpus itself uses - run a spelling-discovery probe first and retain it - never from one artifact's name: a name-keyed sweep can miss subject-spelling lines, a scratch-directory-only regex can miss scratchpad citations, and a hand-asserted home list can omit a live home.",
+          "The enumeration names its corpus AND its pattern classes, and the pattern set derives from the corpus's own spellings: run a spelling-discovery probe first and retain it beside the verification script. Three failure sub-shapes recur: a spelling the pattern never tested for, an assigned file absent from the file list, and a marker class the script's own header claimed but did not encode."
+        ],
+        "tags": [
+          "reports",
+          "evidence",
+          "review"
+        ],
+        "source": {
+          "date": "2026-09-05",
+          "by": "user",
+          "ref": "owner ruling; branch review retrospective"
+        }
+      }
+    }
+  ],
+  "process.code-health-scan": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0"
+      ],
+      "entry": {
+        "id": "process.code-health-scan",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Every plan carries a code-health scan of the files the batch touches: name the smells and antipatterns found, and fold targeted fixes into the tasks.",
+        "body": [
+          "The goal is active maintenance. The Boy Scout Rule: leave the code cleaner than you found it. Visible neglect invites more neglect, so entropy is fought at every touch, not in rescue projects.",
+          "During brainstorming and plan writing, read the files the batch will change and list: code smells (duplication, long functions or files, divergent change, shotgun surgery, feature envy, primitive obsession, data clumps, speculative generality), antipatterns, and deviations from current best practice (verified against current docs, not memory).",
+          "Fold the fixes in as opportunistic refactoring: a step inside the task that touches the file, or a dedicated task when the cleanup is load-bearing. Where a cleanup makes the feature change easy, do it first.",
+          "Scope bound: only code the batch touches or directly depends on. An improvement outside that scope becomes a backlog item, never plan scope creep.",
+          "The scan's output is part of the plan: a Code health section naming the findings, what the plan fixes, and what goes to the backlog and why. A clean scan states what was checked.",
+          "This rule never justifies over-engineering: no abstraction for one caller, no configurability without a second use, no rewrite of working code the batch does not touch. Speculative generality is itself a smell."
+        ],
+        "tags": [
+          "planning",
+          "refactoring",
+          "code-health"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "see": [
+          "quality.principles",
+          "process.no-tech-debt",
+          "process.brainstorm-first"
+        ]
+      }
+    },
+    {
+      "versions": [
+        "1.3.0"
+      ],
+      "entry": {
+        "id": "process.code-health-scan",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Every plan carries a code-health scan of the files the batch touches: name the smells and antipatterns found, and fold targeted fixes into the tasks.",
+        "body": [
+          "The goal is active maintenance. The Boy Scout Rule: leave the code cleaner than you found it. Visible neglect invites more neglect, so entropy is fought at every touch, not in rescue projects.",
+          "During brainstorming and plan writing, read the files the batch will change and list: code smells (duplication, long functions or files, divergent change, shotgun surgery, feature envy, primitive obsession, data clumps, speculative generality), antipatterns, and deviations from current best practice (verified against current docs, not memory).",
+          "Fold the fixes in as opportunistic refactoring: a step inside the task that touches the file, or a dedicated task when the cleanup is load-bearing. Where a cleanup makes the feature change easy, do it first.",
+          "Scope bound: only code the batch touches or directly depends on. An improvement outside that scope becomes a backlog item, never plan scope creep.",
+          "The scan's output is part of the plan: a Code health section naming the findings, what the plan fixes, and what goes to the backlog and why. A clean scan states what was checked.",
+          "This rule never justifies over-engineering: no abstraction for one caller, no configurability without a second use, no rewrite of working code the batch does not touch. Speculative generality is itself a smell.",
+          "In the light tier (`process.risk-tiers`), the scan is one line in the dispatch brief: it names the smells found in the touched files, or states what was checked."
+        ],
+        "tags": [
+          "planning",
+          "refactoring",
+          "code-health"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "see": [
+          "quality.principles",
+          "process.no-tech-debt",
+          "process.brainstorm-first"
+        ]
+      }
+    },
+    {
+      "versions": [
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.code-health-scan",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Every plan carries a code-health scan of the files the batch touches: name the smells and antipatterns found, and fold targeted fixes into the tasks.",
+        "body": [
+          "The goal is active maintenance. The Boy Scout Rule: leave the code cleaner than you found it. Visible neglect invites more neglect, so entropy is fought at every touch, not in rescue projects.",
+          "During brainstorming and plan writing, read the files the batch will change and list: code smells (duplication, long functions or files, divergent change, shotgun surgery, feature envy, primitive obsession, data clumps, speculative generality), antipatterns, and deviations from current best practice (verified against current docs, not memory).",
+          "Fold the fixes in as opportunistic refactoring: a step inside the task that touches the file, or a dedicated task when the cleanup is load-bearing. Where a cleanup makes the feature change easy, do it first.",
+          "Scope bound: only code the batch touches or directly depends on. An improvement outside that scope becomes a backlog item, never plan scope creep.",
+          "The scan's output is part of the plan: a Code health section naming the findings, what the plan fixes, and what goes to the backlog and why. A clean scan states what was checked.",
+          "This rule never justifies over-engineering: no abstraction for one caller, no configurability without a second use, no rewrite of working code the batch does not touch. Speculative generality is itself a smell.",
+          "In the light tier (`process.risk-tiers`), the scan is one line in the dispatch brief: it names the smells found in the touched files, or states what was checked."
+        ],
+        "tags": [
+          "planning",
+          "refactoring",
+          "code-health",
+          "controller"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "see": [
+          "quality.principles",
+          "process.no-tech-debt",
+          "process.brainstorm-first"
+        ]
+      }
+    }
+  ],
+  "process.contract-refresh-sweep": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.contract-refresh-sweep",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "A contract change migrates every earlier report in-batch: a report-only refresh round per task, a scoped re-review, and scripted checks for mechanical fixes.",
+        "body": [
+          "Plan the sweep at pre-flight: refresh rounds run right after the contract task closes and before the next task dispatch, so every later review reads a valid workspace.",
+          "Semantic decisions in a refresh (which tdd mode, which narrative) belong to the task's reviewer, not the refresh dispatch: a controller who over-steers a mode needs the re-reviewer to correct it.",
+          "Controller verification replaces a further review round only for reviewer-prescribed mechanical edits whose expected outcome the reviewer pre-verified; it is scripted (byte-equal audit rows, field presence), gated with && chains, and logged in the ledger. Judged findings always get a real review round.",
+          "The branch review reads the full workspace regardless, so the sweep is auditable end to end."
+        ],
+        "tags": [
+          "process",
+          "reviews",
+          "contract"
+        ],
+        "source": {
+          "date": "2026-09-02",
+          "by": "review",
+          "ref": "review retrospective"
+        }
+      }
+    }
+  ],
+  "process.conventional-commits": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.conventional-commits",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Commits use Conventional Commits (feat, fix, chore, test, ci, docs, refactor). Header at most 100 characters, body lines at most 100.",
+        "body": [
+          "Start the subject in lowercase; a subject that starts with an uppercase token fails common commitlint configurations.",
+          "A commit whose author name ends in `[bot]` (Dependabot, any GitHub App) is exempt from the body-line limit alone: its body is generated and carries compare links no human wraps. Its subject and the trailer rules still apply."
+        ],
+        "tags": [
+          "git"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "check": {
+          "type": "commits",
+          "level": "fail",
+          "subject": "^(?=.{1,100}$)(feat|fix|chore|test|ci|docs|refactor|perf|build|style|revert)(\\([^)]+\\))?!?: .+",
+          "body_line_max": 100
+        }
+      }
+    }
+  ],
+  "process.deliverables-json": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "entry": {
+        "id": "process.deliverables-json",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Task reports, reviews, and branch reviews are JSON files that pass `houserules validate` against `.claude/schemas/deliverables.json`.",
+        "body": [
+          "Every deliverable an agent writes is structured data in the batch workspace: `task-<N>-report.json`, `task-<N>-review.json`, `task-<N>-review-r<R>.json`, `branch-review.json`. The `kind` field names the definition.",
+          "Write the file, run `houserules validate <file>`, fix every error, then audit. A deliverable that does not validate is incomplete; the controller re-dispatches.",
+          "The implementer's `self_audit` starts as `null` and holds the audit's `summary` and deterministic rows after the audit; the check below fails until it does. `self_audit` always covers the whole task (`BASE..HEAD` at report time); a fix round's audit over the fix diff goes into that `fix_rounds` entry's `tests`.",
+          "`houserules stats` and the branch retrospective read these files; prose is invisible to them."
+        ],
+        "tags": [
+          "reports",
+          "deliverables"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "see": [
+          "process.knowledge-first"
+        ],
+        "verify": [
+          ".claude/schemas/deliverables.json"
+        ],
+        "check": {
+          "type": "report-field",
+          "level": "fail",
+          "if": "**",
+          "field": "self_audit"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.deliverables-json",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Task reports, reviews, and branch reviews are JSON files that pass `houserules validate` against `.claude/schemas/deliverables.json`.",
+        "body": [
+          "Every deliverable an agent writes is structured data in the batch workspace: `task-<N>-report.json`, `task-<N>-review.json`, `task-<N>-review-r<R>.json`, `branch-review.json`. The `kind` field names the definition.",
+          "Write the file, run `houserules validate <file>`, fix every error, then audit. A deliverable that does not validate is incomplete; the controller re-dispatches.",
+          "The implementer's `self_audit` starts as `null` and holds the audit's `summary` and deterministic rows after the audit. A single-report audit (`--report`) passes the check below while the field is `null`, the draft state; a `--workspace` audit fails it, and `houserules validate` rejects a `null` `self_audit` at status `DONE` or `DONE_WITH_CONCERNS`. `self_audit` always covers the whole task (`BASE..HEAD` at report time); a fix round's audit over the fix diff goes into that `fix_rounds` entry's `tests`.",
+          "`houserules stats` and the branch retrospective read these files; prose is invisible to them."
+        ],
+        "tags": [
+          "reports",
+          "deliverables"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "see": [
+          "process.knowledge-first"
+        ],
+        "verify": [
+          ".claude/schemas/deliverables.json"
+        ],
+        "check": {
+          "type": "report-field",
+          "level": "fail",
+          "if": "**",
+          "field": "self_audit"
+        }
+      }
+    }
+  ],
+  "process.eval-fixture-procedure": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.eval-fixture-procedure",
+        "kind": "procedure",
+        "area": "docs",
+        "summary": "Seeded-violations fixtures follow fixed steps: seed violations in the eval worktree, doctor the report to hide only those fail rows, keep the true audit aside.",
+        "body": [
+          "Seed at least two rule violations of different check types (for example a version-range dependency for exact-pins plus a null dependency_vetting) in one small commit inside the detached eval worktree.",
+          "Doctor the report minimally: remove only the seeded fail rows from self_audit, adjust the summary counts to match, and let the prose claim compliance — the reviewer must prove the edit by row arithmetic against a fresh run.",
+          "Keep the undoctored audit output outside the workspace the reviewer reads (the session scratchpad, for example), so the judge can score expected_behavior against ground truth.",
+          "The reviewer dispatch carries the identical Knowledge:/Backlog:/--ids block as a real task review; artifacts carry the eval- prefix in the batch workspace and the record append names both template blob ids."
+        ],
+        "tags": [
+          "evals",
+          "fixtures"
+        ],
+        "source": {
+          "date": "2026-09-02",
+          "by": "review",
+          "ref": "review retrospective"
+        }
+      }
+    }
+  ],
+  "process.evals-rerun": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0"
+      ],
+      "entry": {
+        "id": "process.evals-rerun",
+        "kind": "rule",
+        "area": "docs",
+        "summary": "Re-run every `.claude/evals/` scenario when the implementer or task-reviewer template or a scenario changes; append the run to `.claude/evals/record.json`.",
+        "body": [
+          "The scenarios are the regression suite for the agent templates. The check is a `co-change`: a change to `.claude/agents/implementer.md`, `.claude/agents/task-reviewer.md`, or `.claude/evals/*.json` without a change to `.claude/evals/record.json` fails the audit. The entry routes through the `docs` area (`.claude/**`), so every audit that touches the templates carries it without `--ids`; the `process` area has no paths.",
+          "Run every scenario in a detached scratch worktree at the branch head before the branch review; the orchestrating skill holds the procedure. Keep nothing from a worktree; workspace artifacts carry the `eval-` prefix.",
+          "A run set in the record names `date`, `templates` (the git blob id of each template under test from `git rev-parse HEAD:<path>`; blob ids survive commit aggregation, commit SHAs do not), and one row per scenario: `scenario`, `agent`, `model`, `pass`, `of`, `notes`. The branch reviewer compares the latest blob ids with `HEAD`.",
+          "No scenario covers `branch-reviewer` or the orchestrating skill; a change there needs no run. The `houserules render` command's own retrieval-protocol text shapes the generated skill the implementer loads; run the scenarios after a change there too — the check cannot see it.",
+          "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns; the branch does not merge before the record commit lands, and the branch-range audit is the row that must pass.",
+          "A template-touching batch may book ONE shared rerun at the final template state instead of a rerun per task (the ledgered economy); each interim task audit's deterministic fail is then recorded plan-mandated, citing the spec section that books the rerun, and the branch-range audit after the record commit is the row that must pass."
+        ],
+        "tags": [
+          "evals",
+          "templates",
+          "agents"
+        ],
+        "source": {
+          "date": "2026-08-31",
+          "by": "user",
+          "ref": "owner ruling"
+        },
+        "see": [
+          "process.deliverables-json",
+          "process.keep-knowledge-current"
+        ],
+        "verify": [
+          ".claude/evals/record.json",
+          ".claude/skills/orchestrating/SKILL.md"
+        ],
+        "check": {
+          "type": "co-change",
+          "level": "fail",
+          "if": [
+            ".claude/agents/implementer.md",
+            ".claude/agents/task-reviewer.md",
+            ".claude/evals/*.json"
+          ],
+          "then": ".claude/evals/record.json"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.evals-rerun",
+        "kind": "rule",
+        "area": "docs",
+        "summary": "Re-run every `.claude/evals/` scenario when the implementer or task-reviewer template or a scenario changes; append the run to `.claude/evals/record.json`.",
+        "body": [
+          "The scenarios are the regression suite for the agent templates. The check is a `co-change`: a change to `.claude/agents/implementer.md`, `.claude/agents/task-reviewer.md`, or `.claude/evals/*.json` without a change to `.claude/evals/record.json` fails the audit. The entry routes through the `docs` area (`.claude/**`), so every audit that touches the templates carries it without `--ids`; the `process` area has no paths.",
+          "Run every scenario in a detached scratch worktree at the branch head before the branch review, or before Finish in a batch without one; the orchestrating skill holds the procedure. Keep nothing from a worktree; workspace artifacts carry the `eval-` prefix.",
+          "A run set in the record names `date`, `templates` (the git blob id of each template under test from `git rev-parse HEAD:<path>`; blob ids survive commit aggregation, commit SHAs do not), and one row per scenario: `scenario`, `agent`, `model`, `pass`, `of`, `notes`. The branch reviewer compares the latest blob ids with `HEAD`; in a batch without a branch review, the controller compares them before Finish.",
+          "No scenario covers `branch-reviewer` or the orchestrating skill; a change there needs no run. The `houserules render` command's own retrieval-protocol text shapes the generated skill the implementer loads; run the scenarios after a change there too — the check cannot see it.",
+          "A batch that edits templates in several tasks may pay with one end-of-batch run scheduled in the spec; each interim audit then carries the expected fail row, disclosed in the report's concerns; the branch does not merge before the record commit lands, and the branch-range audit is the row that must pass.",
+          "A template-touching batch may book ONE shared rerun at the final template state instead of a rerun per task (the ledgered economy); each interim task audit's deterministic fail is then recorded plan-mandated, citing the spec section that books the rerun, and the branch-range audit after the record commit is the row that must pass."
+        ],
+        "tags": [
+          "evals",
+          "templates",
+          "agents"
+        ],
+        "source": {
+          "date": "2026-08-31",
+          "by": "user",
+          "ref": "owner ruling"
+        },
+        "see": [
+          "process.deliverables-json",
+          "process.keep-knowledge-current"
+        ],
+        "verify": [
+          ".claude/evals/record.json",
+          ".claude/skills/orchestrating/SKILL.md"
+        ],
+        "check": {
+          "type": "co-change",
+          "level": "fail",
+          "if": [
+            ".claude/agents/implementer.md",
+            ".claude/agents/task-reviewer.md",
+            ".claude/evals/*.json"
+          ],
+          "then": ".claude/evals/record.json"
+        }
+      }
+    }
+  ],
+  "process.evidence-outlives-the-session": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.evidence-outlives-the-session",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Cite evidence only at paths that outlive the session: the batch workspace or the tracked tree, never a session scratchpad.",
+        "body": [
+          "A report or workspace doc that cites a capture must name a file under the batch workspace (or the repository) that a later reader can open. A session scratchpad path is dead the moment the session ends; a citation into it is a claim nobody can collect on.",
+          "Copy small captures into the workspace beside the doc that cites them. An artifact too large to retain is disclosed as not retained, with its decisive excerpt quoted inline - never cited at a path that no longer exists.",
+          "Truncation markers count as citations: a marker naming a full log must point at a durable file whose content is a byte-prefix match of the retained excerpt.",
+          "A long-lived SOURCE comment states the rerunnable command and its measured counts inline, self-contained; a batch-workspace path may ride along as provenance but never as the only evidence, because a clone carries no workspace."
+        ],
+        "tags": [
+          "evidence",
+          "reports",
+          "workspace"
+        ],
+        "source": {
+          "date": "2026-09-04",
+          "by": "review",
+          "ref": "review finding; owner ruling"
+        }
+      }
+    }
+  ],
+  "process.fix-proofs-extend-the-reviewers-run": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.fix-proofs-extend-the-reviewers-run",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "A fix round's proof re-runs the review's own reproduction, extended to cover the fix -- never a fresh, narrower proof.",
+        "body": [
+          "If the reviewer ran the full pipeline, the fix is proven on the full pipeline, not a narrower stand-in.",
+          "Escalation tends to happen one level at a time: a proof that falls back to a source read where the task read live config, to a full-pipeline run where the fix ported the consumer out, or to the real merge base where the report used the fix-diff base, are all the same pattern - the reviewer running one level deeper than the fix's own proof.",
+          "Convergence begins when the implementer adopts and extends the reviewer's own simulation instead of replacing it with a fresh, smaller one."
+        ],
+        "tags": [
+          "review",
+          "fix-round",
+          "verification"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "process.fix-round-verification-record": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0"
+      ],
+      "entry": {
+        "id": "process.fix-round-verification-record",
+        "kind": "rule",
+        "area": "process",
+        "standing": false,
+        "summary": "A fix round closes only with a written verification record: a re-review deliverable, or a controller note naming each finding and the artifact proving its fix.",
+        "body": [
+          "A re-review deliverable in the workspace is the default for rounds with executable changes or any critical finding. A controller verification note suffices for report-only or prose rounds when it names finding-by-finding evidence.",
+          "A fix round can close on a ledger note alone even when the verifications are real and reproducible, if nothing pins where such a record must live or what it must name - that gap is exactly what this rule closes."
+        ],
+        "tags": [
+          "review",
+          "fix-round",
+          "verification"
+        ],
+        "source": {
+          "date": "2026-09-12",
+          "by": "review",
+          "ref": "branch review retrospective"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.3.0"
+      ],
+      "entry": {
+        "id": "process.fix-round-verification-record",
+        "kind": "rule",
+        "area": "process",
+        "standing": false,
+        "summary": "A fix round closes only with a written verification record: a re-review deliverable, or a controller note naming each finding and the artifact proving its fix.",
+        "body": [
+          "A re-review deliverable in the workspace is the default for rounds with executable changes or any critical finding. A controller verification note suffices for report-only or prose rounds when it names finding-by-finding evidence.",
+          "A round that holds only Minor fixes always closes with a controller verification note, whatever the kind of change (`process.bounded-review-loop`).",
+          "A fix round can close on a ledger note alone even when the verifications are real and reproducible, if nothing pins where such a record must live or what it must name - that gap is exactly what this rule closes."
+        ],
+        "tags": [
+          "review",
+          "fix-round",
+          "verification"
+        ],
+        "source": {
+          "date": "2026-09-12",
+          "by": "review",
+          "ref": "branch review retrospective"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.fix-round-verification-record",
+        "kind": "rule",
+        "area": "process",
+        "standing": false,
+        "summary": "A fix round closes only with a written verification record: a re-review deliverable, or a controller note naming each finding and the artifact proving its fix.",
+        "body": [
+          "A re-review deliverable in the workspace is the default for rounds with executable changes or any critical finding. A controller verification note suffices for report-only or prose rounds when it names finding-by-finding evidence.",
+          "A round that holds only Minor fixes always closes with a controller verification note, whatever the kind of change (`process.bounded-review-loop`). The note runs the check that each Minor finding names (a command and its expected result) and cites the result. When a finding names no check, the controller names one.",
+          "A fix round can close on a ledger note alone even when the verifications are real and reproducible, if nothing pins where such a record must live or what it must name - that gap is exactly what this rule closes."
+        ],
+        "tags": [
+          "review",
+          "fix-round",
+          "verification"
+        ],
+        "source": {
+          "date": "2026-09-12",
+          "by": "review",
+          "ref": "branch review retrospective"
+        }
+      }
+    }
+  ],
+  "process.gate-shell-chains": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.gate-shell-chains",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Chain every evidence-producing shell sequence with && or explicit exit checks; an unchained tail after a heredoc reports success for a command that never ran.",
+        "body": [
+          "This class is easy to hit twice in the same session: a heredoc-tail slip forces an amend, and a follow-up verification prints a success message while the evidence append is silently skipped; both are caught only when the output is re-read.",
+          "Write verification scripts so the success message is unreachable when any prior command fails: && chains, or a trailing explicit exit-code check per command. set -e does not protect tool-run shells.",
+          "Re-run, do not hand-repair, any evidence produced by a sequence that later proves unchained.",
+          "Output redirection placed after an && chain binds only the last command; wrap the chain in a subshell, or redirect per command, when the whole sequence is the evidence.",
+          "A zero-count probe (grep -c) exits nonzero on zero matches and breaks the chain even when zero is the expected answer; gate count probes on their output, not their exit.",
+          "A before/after evidence bracket (snapshot, action, snapshot, diff) is one && chain in one call; snapshots captured across separate calls prove nothing about order. Re-run the whole bracket, never splice it, and check the artifact mtimes increase in chain order."
+        ],
+        "tags": [
+          "shell",
+          "evidence"
+        ],
+        "source": {
+          "date": "2026-09-02",
+          "by": "review",
+          "ref": "review retrospective"
+        }
+      }
+    }
+  ],
+  "process.keep-knowledge-current": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.keep-knowledge-current",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Add knowledge future sessions need to `knowledge/`; session memory is not portable, repo files are.",
+        "body": [
+          "Write the entry in the same turn you learn the fact. Then run `houserules render` and commit the generated files with it."
+        ],
+        "tags": [
+          "knowledge"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "verify": [
+          "knowledge/schema.json"
+        ],
+        "see": [
+          "process.rulings-to-file"
+        ]
+      }
+    }
+  ],
+  "process.knowledge-earns-its-place": [
+    {
+      "versions": [
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.knowledge-earns-its-place",
+        "kind": "rule",
+        "area": "process",
+        "standing": false,
+        "summary": "At every batch close, run `houserules stats` over recent workspaces and act on `proposals`: apply the ungated rows, report the owner-gated rows.",
+        "body": [
+          "A rule earns its place by catching defects. At every batch close the controller runs `houserules stats <WORKSPACE>...` over the five most recent batch workspaces, or over every workspace when fewer than five exist, and saves the output in the batch workspace as `stats.json`. Once a backlog item cites a stats file, never overwrite that file: a later run in the same batch gets a name that states its window, `stats-batches-<a>-<b>.json`.",
+          "The branch reviewer (a standard or full batch with a branch review) or the controller (every other batch) reads `proposals` beside the retrospective.",
+          "A proposal with `owner_gate: false` is applied in the batch's `docs(knowledge)` commit. The controller makes that commit after the branch review closes, or before Finish in a batch without one, so a row that only the batch-close run draws is applied too. `retire` sets `status: retired` and runs `houserules archive`. `demote` drops `standing` and gives the entry an area whose globs match the files it governs. `narrow` rewrites the entry's scope. `mechanize` files a backlog item for the check.",
+          "A proposal with `owner_gate: true` goes to the project's owner or decider in the batch report. A `budget` proposal always has `owner_gate: true`.",
+          "When the project's owner or decider rules to keep an entry that a proposal names, add the tag `ruled-keep` to the entry. A `ruled-keep` entry gets no `demote`, `retire`, `narrow`, or `mechanize` proposal, so the loop stops proposing it. It still counts toward the budget, and a `budget` row leaves it out of `candidates`.",
+          "A kit-shipped entry that the project retires, demotes, rewrites, or tags `ruled-keep` goes into `.houserules.json` `overrides`, so `houserules update` stays silent about it.",
+          "A new retrospective entry defaults to a non-standing area entry. A new standing entry names the standing entry it replaces, or the budget headroom from the latest `stats` run. The budget is 25 standing entries. The headroom is 25 minus the `rules` rows with `standing: true`.",
+          "Limit: a rule that prevents violations by its presence also shows zero fails. That is why every standing demotion is owner-gated."
+        ],
+        "tags": [
+          "knowledge",
+          "stats",
+          "batch-close"
+        ],
+        "source": {
+          "date": "2026-10-09",
+          "by": "user",
+          "ref": "owner ruling, batch 31"
+        },
+        "see": [
+          "knowledge-base.rules-need-a-loading-path",
+          "process.keep-knowledge-current"
+        ]
+      }
+    }
+  ],
+  "process.knowledge-first": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.knowledge-first",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Before you change a file, read its knowledge: the ids in your task and `houserules for <path>`. Cite the ids you relied on in your report.",
+        "body": [],
+        "tags": [
+          "knowledge"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "check": {
+          "type": "report-field",
+          "level": "warn",
+          "if": "**",
+          "field": "knowledge_used"
+        }
+      }
+    }
+  ],
+  "process.live-run-before-ci": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0"
+      ],
+      "entry": {
+        "id": "process.live-run-before-ci",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Verify a change live (run the app, service, or tool for real; capture evidence) before any PR, merge, or deploy spend.",
+        "body": [
+          "CI and deploy runs cost money and time; a live run catches what unit tests cannot. Record the project's live-run recipe as a `procedure` entry."
+        ],
+        "tags": [
+          "live-run",
+          "ci"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.live-run-before-ci",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Verify a change live (run the app, service, or tool for real; capture evidence) before any PR, merge, or deploy spend.",
+        "body": [
+          "CI and deploy runs cost money and time; a live run catches what unit tests cannot. Record the project's live-run recipe as a `procedure` entry."
+        ],
+        "tags": [
+          "live-run",
+          "ci",
+          "controller"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "process.main-wins-backlog-collisions": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.main-wins-backlog-collisions",
+        "kind": "procedure",
+        "area": "process",
+        "summary": "On a backlog collision with main, main wins: rebuild the branch on it by cherry-pick, drop the never-merged branch filings, and park superseded analysis.",
+        "body": [
+          "An owner-side agent can merge conflicting backlog ids to main while a branch carries candidate filings under the same ids. Never-merged branch-local filings can be dropped without breaching knowledge-base.ids-are-permanent.",
+          "Verify overlap yourself with git diff --name-only on both sides; another agent's no-overlap claim is a claim, not evidence.",
+          "Record the old-to-new sha map in a workspace file and the batch report: closed tasks' deliverables keep pre-rebuild shas, and gc can prune those objects."
+        ],
+        "tags": [
+          "backlog",
+          "collision",
+          "rebuild"
+        ],
+        "source": {
+          "date": "2026-09-03",
+          "by": "review",
+          "ref": "branch review retrospective"
+        }
+      }
+    }
+  ],
+  "process.model-policy": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0"
+      ],
+      "entry": {
+        "id": "process.model-policy",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Recommended: run reviews on a mightier model than the implementer they review, and implementers on the cheapest model that fits the task.",
+        "body": [
+          "A project may adopt a stricter or looser policy; record the project's own choice as its own entry once ruled. Absent a ruling, mightier-than-the-implementer is the default: an Opus implementer gets a Fable review, so choosing an Opus implementer is a deliberate, costed decision.",
+          "Scoped re-reviews follow the same bar as first reviews: the fix diff's size never lowers the reviewer's tier.",
+          "Name the model on every dispatch; an omitted model inherits the session's most expensive one.",
+          "The agent templates set their own effort level in frontmatter by default (implementers at xhigh, reviews at high); a dispatch that deviates names the deviation."
+        ],
+        "tags": [
+          "dispatch",
+          "models"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.model-policy",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Recommended: run reviews on a mightier model than the implementer they review, and implementers on the cheapest model that fits the task.",
+        "body": [
+          "A project may adopt a stricter or looser policy; record the project's own choice as its own entry once ruled. Absent a ruling, mightier-than-the-implementer is the default: an Opus implementer gets a Fable review, so choosing an Opus implementer is a deliberate, costed decision.",
+          "Scoped re-reviews follow the same bar as first reviews: the fix diff's size never lowers the reviewer's tier.",
+          "Name the model on every dispatch; an omitted model inherits the session's most expensive one.",
+          "The agent templates set their own effort level in frontmatter by default (implementers at xhigh, reviews at high); a dispatch that deviates names the deviation."
+        ],
+        "tags": [
+          "dispatch",
+          "models",
+          "controller"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "process.no-tech-debt": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0"
+      ],
+      "entry": {
+        "id": "process.no-tech-debt",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Fix every review finding, Minor included. Defer a fix only for a stated reason, as a backlog item; never as a TODO in code.",
+        "body": [
+          "Technical debt is a no-go. A finding a reviewer filed is fixed in the same fix round, whatever its severity.",
+          "The only way to defer: a backlog item that states the reason and the follow-up; the finding names the item. A ledger line or a chat note is not a deferral.",
+          "No `TODO`, `FIXME`, or `HACK` marker in source files; the deterministic check fails the audit on a new one. Todos live in `backlog/`."
+        ],
+        "tags": [
+          "review",
+          "debt"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "see": [
+          "quality.principles"
+        ],
+        "check": {
+          "type": "grep-absent",
+          "level": "fail",
+          "scope": "changed",
+          "files": [
+            "**/*.ts",
+            "**/*.tsx",
+            "**/*.mts",
+            "**/*.mjs",
+            "**/*.js",
+            "**/*.jsx",
+            "**/*.rs",
+            "**/*.py",
+            "**/*.go",
+            "**/*.rb",
+            "**/*.java",
+            "**/*.kt",
+            "**/*.swift",
+            "**/*.sh",
+            "**/*.toml",
+            "**/*.yml",
+            "**/*.yaml"
+          ],
+          "pattern": "\\b(TODO|FIXME|HACK)\\b"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.3.0"
+      ],
+      "entry": {
+        "id": "process.no-tech-debt",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Fix every review finding, Minor included. Defer a fix only for a stated reason, as a backlog item; never as a TODO in code.",
+        "body": [
+          "Technical debt is a no-go. A finding a reviewer filed is fixed in the same fix round, whatever its severity.",
+          "The only way to defer: a backlog item that states the reason and the follow-up; the finding names the item. A ledger line or a chat note is not a deferral.",
+          "Severity follows impact (`process.severity-by-impact`). A fix round that holds only Minor fixes closes without a re-review. At the re-review cap of `process.bounded-review-loop`, the open non-critical findings become one backlog item with the reason.",
+          "No `TODO`, `FIXME`, or `HACK` marker in source files; the deterministic check fails the audit on a new one. Todos live in `backlog/`."
+        ],
+        "tags": [
+          "review",
+          "debt"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "see": [
+          "quality.principles"
+        ],
+        "check": {
+          "type": "grep-absent",
+          "level": "fail",
+          "scope": "changed",
+          "files": [
+            "**/*.ts",
+            "**/*.tsx",
+            "**/*.mts",
+            "**/*.mjs",
+            "**/*.js",
+            "**/*.jsx",
+            "**/*.rs",
+            "**/*.py",
+            "**/*.go",
+            "**/*.rb",
+            "**/*.java",
+            "**/*.kt",
+            "**/*.swift",
+            "**/*.sh",
+            "**/*.toml",
+            "**/*.yml",
+            "**/*.yaml"
+          ],
+          "pattern": "\\b(TODO|FIXME|HACK)\\b"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.no-tech-debt",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Fix every review finding, Minor included. Defer a fix only for a stated reason, as a backlog item; never as a TODO in code.",
+        "body": [
+          "Technical debt is a no-go. A finding a reviewer filed is fixed in the same fix round, whatever its severity.",
+          "The only way to defer: a backlog item that states the reason and the follow-up; the finding names the item. A ledger line or a chat note is not a deferral.",
+          "A finding whose `fix` adds a capability that no caller needs may be contested: the implementer names the finding and the missing caller in `concerns`. The controller rules in one of three ways. The contest holds: drop the finding and record the reason in the ledger. Defer: file a backlog item that the finding names. The contest fails: the finding stands, and the implementer fixes it in the next round.",
+          "Severity follows impact (`process.severity-by-impact`). A fix round that holds only Minor fixes closes without a re-review. At the re-review cap of `process.bounded-review-loop`, the open non-critical findings become one backlog item with the reason.",
+          "No `TODO`, `FIXME`, or `HACK` marker in source files; the deterministic check fails the audit on a new one. Todos live in `backlog/`."
+        ],
+        "tags": [
+          "review",
+          "debt"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "see": [
+          "quality.principles"
+        ],
+        "check": {
+          "type": "grep-absent",
+          "level": "fail",
+          "scope": "changed",
+          "files": [
+            "**/*.ts",
+            "**/*.tsx",
+            "**/*.mts",
+            "**/*.mjs",
+            "**/*.js",
+            "**/*.jsx",
+            "**/*.rs",
+            "**/*.py",
+            "**/*.go",
+            "**/*.rb",
+            "**/*.java",
+            "**/*.kt",
+            "**/*.swift",
+            "**/*.sh",
+            "**/*.toml",
+            "**/*.yml",
+            "**/*.yaml"
+          ],
+          "pattern": "\\b(TODO|FIXME|HACK)\\b"
+        }
+      }
+    }
+  ],
+  "process.owner-content-mid-batch": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.owner-content-mid-batch",
+        "kind": "procedure",
+        "area": "process",
+        "summary": "Owner content found uncommitted on the shared tree mid-batch: commit it verbatim as its own commit, surface concerns instead of editing, record its position.",
+        "body": [
+          "Owner content can surface uncommitted on the shared tree while a task is running: secure it as its own commit immediately, surface any notes to the owner instead of silently editing it, and change nothing else.",
+          "Verify the interleave position with git log before writing the ledger line: state which task commits sit below and above it. A wrong containment claim forces a ledger correction and changes which range the task review must read.",
+          "At aggregation the commit stays its own commit; no task diff absorbs it, and the task-review dispatch names it as owner content to be judged as such."
+        ],
+        "tags": [
+          "owner-content",
+          "ledger",
+          "aggregation"
+        ],
+        "source": {
+          "date": "2026-09-04",
+          "by": "review",
+          "ref": "branch review retrospective"
+        }
+      }
+    }
+  ],
+  "process.owner-rulings-need-owner-supersession": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0"
+      ],
+      "entry": {
+        "id": "process.owner-rulings-need-owner-supersession",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Only the owner supersedes an owner ruling: a controller with latitude proposes the reversal at the next checkpoint and builds nothing on it until ruled.",
+        "body": [
+          "Work that depends on the reversal waits, or takes the reversal-free path, until the owner rules.",
+          "A controller may correctly flag that an owner ruling should reverse mid-task under fix-round latitude, but building further work on the proposed reversal before it is ruled risks a design that a later rejection discards and reopens.",
+          "Check for a path reachable without the reversal at all before betting the task on an unruled proposal."
+        ],
+        "tags": [
+          "rulings",
+          "owner"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.owner-rulings-need-owner-supersession",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Only the owner supersedes an owner ruling: a controller with latitude proposes the reversal at the next checkpoint and builds nothing on it until ruled.",
+        "body": [
+          "Work that depends on the reversal waits, or takes the reversal-free path, until the owner rules.",
+          "A controller may correctly flag that an owner ruling should reverse mid-task under fix-round latitude, but building further work on the proposed reversal before it is ruled risks a design that a later rejection discards and reopens.",
+          "Check for a path reachable without the reversal at all before betting the task on an unruled proposal."
+        ],
+        "tags": [
+          "rulings",
+          "owner",
+          "controller"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "process.parallel-on-disjoint-files": [
+    {
+      "versions": [
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.parallel-on-disjoint-files",
+        "kind": "rule",
+        "area": "process",
+        "standing": false,
+        "summary": "Run agents in parallel only on tasks whose planned file sets are disjoint, each in its own worktree; run every other handoff sequentially.",
+        "body": [
+          "The plan marks tasks parallel when their declared file sets are disjoint and no task needs another's output. Outside the cases in this entry, run handoffs sequentially: never start a second agent before the last one closes.",
+          "Files that many tasks regenerate belong to the controller: the generated rule files and skill that `houserules render` writes, `backlog/`, lockfiles, and any other file that a build or sync step regenerates. A parallel task does not touch them. The controller regenerates them at integration.",
+          "Each parallel implementer works in its own git worktree, on its own branch from the same `BASE`.",
+          "Every agent of one session gets the same scratchpad path, and two agents that write one file name there overwrite each other without an error. The dispatch of a parallel agent names its scratch root, `<scratchpad>/task-<N>/`, and the agent writes scratch files nowhere else.",
+          "The controller integrates a finished task onto the batch branch one at a time (cherry-pick), runs the gates after each, and writes the old-to-new commit map to the ledger. A conflict or a red gate at integration is a fix round for the later task.",
+          "A parallel task's fix round commits in the task's own worktree on its `FIX_BASE`, because a worktree-isolated agent cannot run git against the shared checkout. The controller cherry-picks that commit, runs the gates, and extends the commit map in the ledger.",
+          "Reviews of different tasks may run at the same time: reviewers do not write to the tree. The review of a task starts after its implementer closes.",
+          "At most three agents run at once unless the plan sets a lower limit. The ledger records each dispatch's start and close."
+        ],
+        "tags": [
+          "dispatch",
+          "parallel",
+          "worktree"
+        ],
+        "source": {
+          "date": "2026-10-09",
+          "by": "user",
+          "ref": "owner ruling, batch 31"
+        }
+      }
+    }
+  ],
+  "process.pointer-sweep-unfiltered": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.pointer-sweep-unfiltered",
+        "kind": "gotcha",
+        "area": "docs",
+        "standing": false,
+        "summary": "When a file moves or is deleted, sweep for its old path with an unfiltered grep over the whole tree; an extension-limited grep is not a pointer audit.",
+        "body": [
+          "An include-pattern or file-extension filter on the sweep misses a stale pointer sitting in an unusual place: a .gitignore entry, a comment in an uncommon file extension, an assertion message string.",
+          "Exclude only the directories that never carry source content (a dependency directory, a version-control directory, a build output directory, a scratch workspace) - never a file extension."
+        ],
+        "tags": [
+          "sweeps",
+          "grep",
+          "migration"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "process.report-evidence-verbatim": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.report-evidence-verbatim",
+        "kind": "rule",
+        "area": "global",
+        "standing": false,
+        "summary": "A deliverable pastes only real command output; a re-review reproduces at least one RED or audit before accepting a fix round.",
+        "body": [
+          "A fabricated capture and an overclaimed TDD RED are both caught only by a reviewer actually re-running the thing, never by a gate - the failure is invisible until someone reproduces it.",
+          "An implementer that cannot reproduce a piece of evidence says so and labels what it reconstructs instead; asserting an unrecorded chronology as observed is a violation even when the underlying work was done correctly."
+        ],
+        "tags": [
+          "reports",
+          "evidence",
+          "reproduction"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "process.review-findings-are-claims-too": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.review-findings-are-claims-too",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "A review finding stating a measurement, a reproduction, or a proposed fix's behavior is verified by running it before filing; restated claims are re-derived.",
+        "body": [
+          "A reviewer can be wrong (a prescribed device that provably does not work; a divergence tally measured with the wrong command names), and so can a controller's dispatch premise - each caught only because someone re-ran the thing. The discipline that binds the implementer's report binds the review's findings and the dispatch's diagnosis alike."
+        ],
+        "tags": [
+          "review",
+          "evidence"
+        ],
+        "source": {
+          "date": "2026-09-05",
+          "by": "user",
+          "ref": "owner ruling; branch review retrospective"
+        }
+      }
+    }
+  ],
+  "process.risk-tiers": [
+    {
+      "versions": [
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.risk-tiers",
+        "kind": "rule",
+        "area": "process",
+        "standing": false,
+        "summary": "Pick the tier (light, standard, or full) from the change's risk at plan time; the plan records the tier and the criterion that selected it.",
+        "body": [
+          "The tier sets the pipeline's depth. Light: one task; docs, comments, config values, or a dependency bump only; no executable behavior change; no entry tagged `full-tier` applies. The backlog item's body is the spec, and the project's owner or decider still approves it. The pipeline is an implementer, one task review, and the controller's live run. It has no plan document and no branch review.",
+          "Standard: every change that is neither light nor full. The pipeline is a short spec with the decision gate, a plan, an implementer, one task review, at most one re-review, and the controller's live run. A branch review runs only for a batch of two or more tasks.",
+          "Full: `houserules for --full <planned files>` returns an entry tagged `full-tier`, or the change alters a public contract, a schema, authentication or security code, or a data migration. The pipeline is the whole lifecycle of the orchestrating skill, with at most two re-reviews per task.",
+          "A lighter tier drops only what its pipeline names: the light tier drops the plan document and the branch review, and the standard tier drops the branch review for a one-task batch. Every tier runs Select items, the live run, Finish, and Rollout and acceptance.",
+          "A change that meets a full criterion runs the full tier, whatever else it meets. One tier covers the batch: the highest tier that any of its changes needs.",
+          "Mark a high-risk area with an area entry tagged `full-tier`. A tag is a free string of the knowledge schema: no schema change, no new command.",
+          "The plan records the tier and the criterion that selected it. For a light change, the dispatch brief records them. The task reviewer checks the tier, and a wrong tier is a finding.",
+          "A tier moves up during a batch, never down. `process.bounded-review-loop` states the one automatic move."
+        ],
+        "tags": [
+          "tiers",
+          "planning",
+          "review"
+        ],
+        "source": {
+          "date": "2026-10-09",
+          "by": "user",
+          "ref": "owner ruling, batch 31"
+        },
+        "see": [
+          "process.bounded-review-loop",
+          "process.severity-by-impact"
+        ]
+      }
+    }
+  ],
+  "process.rulings-to-file": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.rulings-to-file",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Every ruling goes to its home file in the same turn — a deferral’s backlog item included. A ledger and the chat are not home files; neither survives compaction.",
+        "body": [
+          "Home files: scope or product rulings go to a backlog entry; process rulings to a knowledge entry (`standing: true` when non-negotiable); design rulings to the batch spec.",
+          "A ledger note may accompany a ruling; it never substitutes for the tracked write.",
+          "A dispatch deviation from the spec's process line (model, order, gate) is a ruling: amend that spec line in the same turn. The batch report at the tick repeats it; it does not replace it.",
+          "An accepted implementer deviation is a ruling. Home it (a spec amendment or a backlog item) in the turn it is accepted, before the next dispatch.",
+          "A code comment is not a home file: a sanctioned deviation homes in the spec's deviations section or the design record the turn it is accepted; the comment may cite that home, never substitute for it."
+        ],
+        "tags": [
+          "rulings",
+          "compaction"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "process.severity-by-impact": [
+    {
+      "versions": [
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.severity-by-impact",
+        "kind": "rule",
+        "area": "process",
+        "standing": false,
+        "summary": "Set a finding's severity from its impact (critical, important, or minor), never from the class of the rule it cites.",
+        "body": [
+          "A finding's severity follows its impact. The rule's class (standing, area, or warn) does not set it. The finding keeps its `rule` id.",
+          "Critical: wrong behavior on a shipped contract (CLI, schema, user-facing text, a gate); a security exposure; data loss; a gate that passes when it must fail; fabricated evidence (a run that did not happen, output that is not real).",
+          "Important: a missed requirement; incorrect or fragile behavior; maintainability damage you would block a merge over; a misstated claim the merge decision relies on (a test result, a gate outcome, a behavior).",
+          "Minor: everything else: narrative report prose, comment and doc wording, report fields that no decision relies on, polish.",
+          "The core of `process.no-tech-debt` stays: every finding is fixed, or deferred as a backlog item with a reason."
+        ],
+        "tags": [
+          "review",
+          "severity"
+        ],
+        "source": {
+          "date": "2026-10-09",
+          "by": "user",
+          "ref": "owner ruling, batch 31"
+        },
+        "see": [
+          "process.no-tech-debt",
+          "process.bounded-review-loop"
+        ]
+      }
+    }
+  ],
+  "process.skills-for-procedures": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.skills-for-procedures",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Create a project skill (`.claude/skills/`) for a repeatable procedure. Author it with the writing-skills skill when available.",
+        "body": [],
+        "tags": [
+          "skills"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "process.suggestions-are-unverified": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.suggestions-are-unverified",
+        "kind": "rule",
+        "area": "global",
+        "standing": true,
+        "summary": "Another agent's suggested wording, pin, or count is a draft, not evidence: re-derive every number, quote, and reference from the tree before transcribing it.",
+        "body": [
+          "A reviewer's finding text and a controller's course correction are claims by their authors; the agent who lands them owns their truth at the landing revision.",
+          "A review's suggested wording can carry a wrong pin in the suggestion itself; transcribing it unchecked repairs nothing and can drop a pin for a stable name that needed none.",
+          "This is the transcriber's half of process.review-findings-are-claims-too, which binds only the finding's author.",
+          "Your own earlier prose is another agent's suggestion once the tree has moved: re-derive it too, not only text someone else wrote."
+        ],
+        "tags": [
+          "reports",
+          "reviews"
+        ],
+        "source": {
+          "date": "2026-09-12",
+          "by": "user",
+          "ref": "owner ruling, standing proposal"
+        }
+      }
+    }
+  ],
+  "process.tdd": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.tdd",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Test-driven development for every executable change: the failing test first, or a disclosed-mutation proof for already-correct behavior; verbatim RED and GREEN.",
+        "body": [
+          "Data-only and docs-only changes carry no RED/GREEN. The report's `tests` names the gates that ran instead (`kb check`, `backlog check`, `validate`, render drift, lint); the reviewer judges their sufficiency.",
+          "A data change with a testable consumer — a check pattern with a regression test, a rendered artifact a test pins — is a code change for this rule: the consumer test comes first.",
+          "A new test for behavior that is already correct proves it can fail through a deliberate, disclosed mutation, not a natural RED.",
+          "Never fabricate a cycle: an empty `tdd` with named gates is honest evidence; a manufactured RED is not.",
+          "A fix round that narrows or widens matching behavior carries its own RED or counter-example test. A cycle captured after the commit says so in the report's tdd entry and presents the runs in the order they really happened.",
+          "When no assertion can change (an output-noise or report-only fix), disclosed before/after captures of the observable difference are the honest evidence, presented in the order they ran.",
+          "The `mode` label follows when the shown run happened, not the failure's flavor: `natural` only when the shown RED ran pre-commit; a post-hoc recapture is `reconstructed` and the tdd entry says so; a disclosed-mutation proof is `mutation`.",
+          "Two label failures are common: a mutation proof's RED must show the test FAILING under the mutation — a capture showing the tests passing proves nothing; and a post-commit recapture is `reconstructed` regardless of what also ran earlier — the label follows the shown run, and one report uses one label for one procedure."
+        ],
+        "tags": [
+          "testing"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "process.verify-in-persisted-state": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.verify-in-persisted-state",
+        "kind": "gotcha",
+        "area": "process",
+        "standing": false,
+        "summary": "Verify behavior against the persisted state the code reads in production; a one-off override is a different state and can falsify the measurement.",
+        "body": [
+          "A process-scoped flag or environment variable can make two tools look like they share a blind spot when only one of them reads that kind of override at all; with the value persisted the way a user actually would (a config file, not a flag), the tools can diverge - and the reversed measurement is the real finding, the one that produces the right fix.",
+          "Before citing a tool's behavior under configuration, persist the configuration the way a user would, then run both sides from that persisted state. State the persistence mechanism in the capture."
+        ],
+        "tags": [
+          "testing",
+          "configuration"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "process.wiring-checks-run-the-resolution": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "process.wiring-checks-run-the-resolution",
+        "kind": "rule",
+        "area": "global",
+        "standing": false,
+        "summary": "A trigger, pin, or wiring check runs the resolution end to end - feed the produced value to its consumer; a string, glob, or schema match proves nothing.",
+        "body": [
+          "A tag or version glob can match exactly the tag a release will produce while the actual downstream resolution still fails on that same tag - the pattern check passes while the pipeline is broken on every tag the flow would ever produce.",
+          "The proof is the consumer's own run, captured: the actual planning or build command for a tag wiring, the updater's replacement count for a pin wiring, an as-CI shell for a workflow step. The match check stays as the cheap first gate, never the verdict.",
+          "A third-party breakage claim states WHEN it fires, derived from the pinned source's call path - never hedged as 'may fail', because the hedge is what mis-schedules the fix.",
+          "Run the resolution at the version the pinned consumer actually BUNDLES (read its own build metadata), never at the newest schema or docs version, and pin the two together with a cross-check test.",
+          "A comment or rule that names a gate also names the job or task that invokes it, so the claim is greppable against the project's own CI and task configuration."
+        ],
+        "tags": [
+          "wiring",
+          "ci",
+          "gates"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "quality.gates-derive-their-scope": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "quality.gates-derive-their-scope",
+        "kind": "rule",
+        "area": "tools",
+        "standing": false,
+        "summary": "A permanent gate derives its scope (tracked files minus declared, reasoned exclusions) and fails loudly on unreadable input; a hand-typed list is ungated.",
+        "body": [
+          "A hand-typed inclusion list cannot cover a file that does not exist yet, and it can already miss ones that do: a seeded violation passes a gate whose file was never added to its list. A gate declared permanent has to default to gated, not to remembering.",
+          "Derive the walk set (the tracked-file list minus a named, reasoned exclusions constant) so a newly tracked file is gated the moment it lands; pin the boundary with a test that classifies every real tracked path.",
+          "An input the gate cannot read is a named, fatal error, never a silent continue: a silent-skip version under-counts and can pass a seeded violation hiding behind a rename. A readable-but-binary input may be a counted, printed skip.",
+          "A gate's file list comes from the authoritative set (the tracked files, never the working directory); every finding names which derivation decided it; every skip is counted and printed on every branch, including the one where the primary derivation returns nothing; and an enumeration feeding a closure claim fails loudly on input it cannot read.",
+          "A gate that needs a toolchain component derives that need from declared configuration (a tool-version file, a lockfile), never from what the authoring machine happens to have installed; prove a new gate on a runner shaped like CI's fresh, declared install."
+        ],
+        "tags": [
+          "gates",
+          "scope",
+          "tooling"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "quality.no-compat-softening": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "quality.no-compat-softening",
+        "kind": "rule",
+        "area": "global",
+        "standing": true,
+        "summary": "Never soften a design for backward compatibility. Make the correct change and migrate everything it breaks; the codebase is not built on compromises.",
+        "body": [
+          "When a better contract, field, or shape exists, adopt it and update every consumer, fixture, report, and document in the same change.",
+          "Do not keep a deprecated field, alias, fallback, or optional-for-compat setting alive for old callers; the migration is part of the change, not a later batch.",
+          "A genuinely optional concept stays optional on its merits; optionality is never a compatibility device."
+        ],
+        "tags": [
+          "quality",
+          "compatibility"
+        ],
+        "source": {
+          "date": "2026-09-02",
+          "by": "user",
+          "ref": "owner instruction"
+        },
+        "see": [
+          "process.no-tech-debt"
+        ]
+      }
+    }
+  ],
+  "quality.pin-copies-byte-exact": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "quality.pin-copies-byte-exact",
+        "kind": "rule",
+        "area": "global",
+        "standing": false,
+        "summary": "Pin a hand-synced copy byte-exact modulo its one designed difference, expressed as the production transform; never normalize by deleting the differing field.",
+        "body": [
+          "Deleting the differing property from both sides pins the copies modulo the property, not modulo its value: a dropped field, whitespace drift, or key reordering all still pass.",
+          "Assert copyA equals transform(copyB) with the transform the production code actually applies, so the test and the shipped rewrite cannot drift apart.",
+          "When the copies are already in sync, prove the test can fail with a disclosed mutation and label the cycle mode mutation."
+        ],
+        "tags": [
+          "testing",
+          "pins"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "quality.principles": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "quality.principles",
+        "kind": "rule",
+        "area": "global",
+        "standing": true,
+        "summary": "YAGNI, KISS, DRY; prefer a well-maintained library to custom code; one responsibility per unit; tests assert behavior; a11y and i18n are part of done.",
+        "body": [
+          "YAGNI: build only what the current backlog item needs.",
+          "KISS: choose the simplest design that meets the requirement. No abstraction for one caller, no option without a second use, no layer that only forwards.",
+          "DRY once logic has two real call sites: never leave a copy that can drift (shared constants, option factories, one write path). One call site is not yet duplication.",
+          "Prefer a well-maintained library (vetted, exact-pinned) to a custom implementation of a solved problem: parsing, validation, globbing, dates, retries. A standing project decision may rule an exception; record it as an entry.",
+          "One responsibility per file and per function. Each unit boundary is one a reader can understand without its internals.",
+          "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test.",
+          "A dedicated compliance pass over the existing codebase is its own backlog item; new code complies immediately.",
+          "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test; an auto-restore setting covers only spies, so a mock created in a module-mock factory gets its own explicit afterEach reset.",
+          "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided."
+        ],
+        "tags": [
+          "quality"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "see": [
+          "process.no-tech-debt",
+          "security-hygiene.dependency-vetting"
+        ]
+      }
+    }
+  ],
+  "quality.tests-clean-temp-dirs": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "quality.tests-clean-temp-dirs",
+        "kind": "rule",
+        "area": "global",
+        "standing": false,
+        "summary": "A test that creates a temp directory removes it in its own teardown; never leak fixture directories into the OS temp directory.",
+        "body": [
+          "Track the directory at the same site that creates it, and remove it in the test framework's own teardown hook (an afterEach, a Drop guard, a finally block) rather than relying on a separate cleanup pass.",
+          "A suite that leaks its own scratch directories can silently fill a shared temp filesystem, breaking unrelated work on the same host until someone notices and clears it by hand."
+        ],
+        "tags": [
+          "testing",
+          "scratch-dirs"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "quality.well-maintained-libraries": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0"
+      ],
+      "entry": {
+        "id": "quality.well-maintained-libraries",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Use well-maintained libraries over custom code. The orchestrator researches candidates at spec time; the owner rules the choice; refactors fold into specs.",
+        "body": [
+          "The orchestrator researches candidate libraries or packages AT SPEC TIME with maintenance evidence, and presents them for the owner's ruling - never delegated to implementers, never deferred to plan time. The choice is ultimately the owner's.",
+          "Wherever the codebase is touched, existing custom code that a well-maintained library should replace is refactored in that batch: the refactor folds into the spec and plan. Deferring the rewrite is not an option.",
+          "A whole-codebase sweep can conclude 'named but not adopted this batch': record the candidate and the reason adoption waits (a competing spec priority, a not-yet-ruled owner decision), rather than silently dropping the finding. The next batch that touches the same code re-reads the record before repeating the search.",
+          "quality.principles carries the underlying preference; security-hygiene.dependency-vetting and exact-pins govern each adoption."
+        ],
+        "tags": [
+          "libraries",
+          "dependencies",
+          "process"
+        ],
+        "source": {
+          "date": "2026-09-05",
+          "by": "user",
+          "ref": "owner ruling"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "quality.well-maintained-libraries",
+        "kind": "rule",
+        "area": "process",
+        "standing": true,
+        "summary": "Use well-maintained libraries over custom code. The orchestrator researches candidates at spec time; the owner rules the choice; refactors fold into specs.",
+        "body": [
+          "The orchestrator researches candidate libraries or packages AT SPEC TIME with maintenance evidence, and presents them for the owner's ruling - never delegated to implementers, never deferred to plan time. The choice is ultimately the owner's.",
+          "Wherever the codebase is touched, existing custom code that a well-maintained library should replace is refactored in that batch: the refactor folds into the spec and plan. Deferring the rewrite is not an option.",
+          "A whole-codebase sweep can conclude 'named but not adopted this batch': record the candidate and the reason adoption waits (a competing spec priority, a not-yet-ruled owner decision), rather than silently dropping the finding. The next batch that touches the same code re-reads the record before repeating the search.",
+          "quality.principles carries the underlying preference; security-hygiene.dependency-vetting and exact-pins govern each adoption."
+        ],
+        "tags": [
+          "libraries",
+          "dependencies",
+          "process",
+          "controller"
+        ],
+        "source": {
+          "date": "2026-09-05",
+          "by": "user",
+          "ref": "owner ruling"
+        }
+      }
+    }
+  ],
+  "security-hygiene.dependency-vetting": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "security-hygiene.dependency-vetting",
+        "kind": "rule",
+        "area": "global",
+        "standing": true,
+        "summary": "Verify every new dependency is well-maintained before adding it. Record the check in the task report's `dependency_vetting` field.",
+        "body": [
+          "Check recent releases, commit activity, and issue responsiveness.",
+          "Outdated, stale, or abandoned dependencies are a no-go."
+        ],
+        "tags": [
+          "dependencies",
+          "supply-chain"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "check": {
+          "type": "report-field",
+          "level": "fail",
+          "if": [
+            "**/package.json",
+            "package-lock.json",
+            "pnpm-lock.yaml",
+            "pnpm-workspace.yaml",
+            "yarn.lock",
+            "**/Cargo.toml",
+            "Cargo.lock",
+            "**/pyproject.toml",
+            "**/requirements*.txt",
+            "uv.lock",
+            "go.mod",
+            "go.sum",
+            "**/Gemfile",
+            "Gemfile.lock",
+            "**/composer.json",
+            "composer.lock"
+          ],
+          "field": "dependency_vetting"
+        }
+      }
+    }
+  ],
+  "security-hygiene.exact-pins": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "security-hygiene.exact-pins",
+        "kind": "rule",
+        "area": "global",
+        "standing": true,
+        "summary": "Pin exact versions. Install only with a CLI (`pnpm add --save-exact`, `cargo add <crate>@=<version>`). Never write a version number by hand.",
+        "body": [
+          "Ranges (`^`, `~`) widen the attack surface. Resolve to the latest stable version at install time.",
+          "The deterministic check covers `package.json` and `Cargo.toml`; ranges inside the `engines` object are floors, not dependency pins, and are exempt. Other ecosystems are judged by the reviewer under the same rule.",
+          "A bare Cargo range (\"2.14\", an implicit caret) is invisible to the pattern without false-positiving the [package] version line; it stays judged material."
+        ],
+        "tags": [
+          "dependencies",
+          "supply-chain"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "check": {
+          "type": "grep-absent",
+          "level": "fail",
+          "files": [
+            "**/package.json",
+            "**/Cargo.toml"
+          ],
+          "pattern": "(?<!\"engines\":\\s*\\{[^}]*)(\"([\\^~]|>=?|<=?)\\s*\\d|\"\\*\"|\"latest\"|\"\\d+(\\.\\d+)*\\.x\")",
+          "scope": "changed"
+        }
+      }
+    }
+  ],
+  "security-hygiene.no-focused-tests": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "security-hygiene.no-focused-tests",
+        "kind": "rule",
+        "area": "global",
+        "standing": true,
+        "summary": "Never commit a focused test (`.only(`).",
+        "body": [],
+        "tags": [
+          "testing"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "check": {
+          "type": "grep-absent",
+          "level": "fail",
+          "files": [
+            "**/*.test.ts",
+            "**/*.test.tsx",
+            "**/*.test.js",
+            "**/*.test.jsx",
+            "**/*.test.mjs",
+            "**/*.spec.ts",
+            "**/*.spec.tsx",
+            "**/*.spec.js",
+            "**/*.spec.mjs"
+          ],
+          "pattern": "\\.only\\(",
+          "scope": "changed"
+        }
+      }
+    }
+  ],
+  "security-hygiene.verify-current-docs": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "security-hygiene.verify-current-docs",
+        "kind": "rule",
+        "area": "global",
+        "standing": true,
+        "summary": "Verify every library, tool, and framework API against current docs before use. Internal knowledge is stale.",
+        "body": [
+          "Use a docs source that is current (a docs MCP such as context7 when available, or the official documentation site). Record what you verified in the report's `docs_verified`."
+        ],
+        "tags": [
+          "docs",
+          "dependencies"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "check": {
+          "type": "report-field",
+          "level": "warn",
+          "if": [
+            "**/*.mjs",
+            "**/*.mts",
+            "**/*.ts",
+            "**/*.tsx",
+            "**/*.js",
+            "**/*.jsx",
+            "**/*.rs",
+            "**/*.py",
+            "**/*.go",
+            "**/*.rb",
+            "**/package.json",
+            "**/Cargo.toml",
+            "**/pyproject.toml",
+            "go.mod"
+          ],
+          "field": "docs_verified"
+        }
+      }
+    }
+  ],
+  "writing-style.code-comments": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "writing-style.code-comments",
+        "kind": "rule",
+        "area": "global",
+        "standing": true,
+        "summary": "Write a code comment only for a current constraint the code cannot show. Never narrate history in code; git, the specs, and the knowledge base hold it.",
+        "body": [
+          "A comment asserting measured or cross-engine behavior is a claim: run the measurement before committing the sentence, and state where it was verified. A false comment can ship silently, license a real defect, or survive its own fix - each is a reason to verify before writing it.",
+          "History narration belongs in git, the specs, and the knowledge base, not in the code itself.",
+          "A knowledge id naming a rule the code enforces is a current contract, not history; it may stay in a comment.",
+          "A reference to a durable doc, spec, or design record that states the current contract is likewise a contract pointer, not history; it may stay in a comment.",
+          "Fixture data inside a test body (an id, a date, a path) is data, not narration; leave it as written.",
+          "A comment stating a constraint plus its history keeps the constraint only; drop the history.",
+          "A history-sweep's verification derives its marker classes from the survey's own hit list and re-widens after every fix round; a zero from a pattern that never tested a spelling the sweep removed elsewhere is vacuous."
+        ],
+        "tags": [
+          "comments"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "writing-style.doc-comments": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "writing-style.doc-comments",
+        "kind": "rule",
+        "area": "global",
+        "standing": true,
+        "summary": "Document every exported symbol with the language's doc-comment convention: the current contract. Name things so the code reads without comments.",
+        "body": [
+          "A doc comment states what the item is for, its invariants, and what it returns or raises when the signature does not say so. It never restates the signature.",
+          "Conventions: TSDoc in TypeScript, JSDoc in JavaScript, rustdoc in Rust, docstrings in Python — the language's standard form.",
+          "Self-documenting code first: full words, verbs for functions, `is`/`has` for booleans, no abbreviation a newcomer must decode, one meaning per name. A comment that explains a name means the name is wrong.",
+          "Comments inside a body still follow writing-style.code-comments: only for a constraint the code cannot show.",
+          "A doc comment stating a behavior ('returns tracked files', 'exits 0 on clean') is a claim under process.claims-match-artifacts - re-read it against the symbol at HEAD in the same pass that edits the symbol.",
+          "A rewrite re-resolves, in the same commit, every cross-reference to a section, file, or symbol it deletes or renames; the dangling-cross-reference class recurs whenever a rewrite skips this step."
+        ],
+        "tags": [
+          "docs",
+          "comments",
+          "naming"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        },
+        "see": [
+          "writing-style.code-comments",
+          "writing-style.principles"
+        ]
+      }
+    }
+  ],
+  "writing-style.instructions-cover-the-state-space": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0"
+      ],
+      "entry": {
+        "id": "writing-style.instructions-cover-the-state-space",
+        "kind": "rule",
+        "area": "docs",
+        "standing": false,
+        "summary": "An instruction keyed to one value of an enumerated field names the value it displaces; test the sentence against every other value before shipping.",
+        "body": [
+          "A sentence such as 'set status to DONE_WITH_CONCERNS whenever concerns is non-empty' can silently also capture other enum values that legitimately carry concerns (a BLOCKED or NEEDS_CONTEXT report, say); the fix is naming the value it displaces - 'instead of DONE'.",
+          "Before shipping a conditional instruction into a template or skill, enumerate the conditioned field's full value set and read the sentence once per value it must not change.",
+          "After enumerating the conditioned field's values, enumerate each population's hidden environmental state too, and treat a command's output as itself a conditioned field: read the sentence once per output the command can print in each population.",
+          "An installed copy older than a just-merged declaration can make a drift-comparison line read equal, misleading in exactly the fired-trigger case; a comparison instruction names which side is the stamped one and which is the running one.",
+          "A gate is an instruction too: when a check is added to a tool, the surrounding protocol's own intermediate artifact states are part of the conditioned state space - a hardened validator that rejects the protocol's own in-progress draft (a terminal status alongside a still-null field the protocol fills in later) is fixed by migrating the flow, not by special-casing the draft.",
+          "A shipped instruction that names a repo-local resource states what every other population does instead: a closing act's false-positive arm that names a resource only one population (the source-carrying one) has, branches explicitly on source-present vs. installed-binary populations rather than assuming the resource exists everywhere.",
+          "An instruction naming the populations it governs enumerates all of them: test the sentence against each population the code path actually handles, not just the two most common ones.",
+          "A procedure's state space includes the states its own automation creates: walk every generated commit and bot-authored change through the gates the procedure depends on - an automated PR's own commit is as much a state to cover as a human one."
+        ],
+        "tags": [
+          "instructions",
+          "templates",
+          "enums"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    },
+    {
+      "versions": [
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "writing-style.instructions-cover-the-state-space",
+        "kind": "rule",
+        "area": "docs",
+        "standing": false,
+        "summary": "An instruction keyed to one value of an enumerated field names the value it displaces; test the sentence against every other value before shipping.",
+        "body": [
+          "A sentence such as 'set status to DONE_WITH_CONCERNS whenever concerns is non-empty' can silently also capture other enum values that legitimately carry concerns (a BLOCKED or NEEDS_CONTEXT report, say); the fix is naming the value it displaces - 'instead of DONE'.",
+          "Before shipping a conditional instruction into a template or skill, enumerate the conditioned field's full value set and read the sentence once per value it must not change.",
+          "After enumerating the conditioned field's values, enumerate each population's hidden environmental state too, and treat a command's output as itself a conditioned field: read the sentence once per output the command can print in each population.",
+          "An installed copy older than a just-merged declaration can make a drift-comparison line read equal, misleading in exactly the fired-trigger case; a comparison instruction names which side is the stamped one and which is the running one.",
+          "A gate is an instruction too: when a check is added to a tool, the surrounding protocol's own intermediate artifact states are part of the conditioned state space - a hardened validator that rejects the protocol's own in-progress draft (a terminal status alongside a still-null field the protocol fills in later) is fixed by migrating the flow, not by special-casing the draft.",
+          "A shipped instruction that names a repo-local resource states what every other population does instead: a closing act's false-positive arm that names a resource only one population (the source-carrying one) has, branches explicitly on source-present vs. installed-binary populations rather than assuming the resource exists everywhere.",
+          "An instruction naming the populations it governs enumerates all of them: test the sentence against each population the code path actually handles, not just the two most common ones.",
+          "A procedure's state space includes the states its own automation creates: walk every generated commit and bot-authored change through the gates the procedure depends on - an automated PR's own commit is as much a state to cover as a human one.",
+          "A ruling with a named set of outcomes states the count in every text that lists them ('one of three ways'), so a grep for the count finds a text that lists fewer (batch 32 task 2: a contested finding had three outcomes, and two texts named two)."
+        ],
+        "tags": [
+          "instructions",
+          "templates",
+          "enums"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "writing-style.principles": [
+    {
+      "versions": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "writing-style.principles",
+        "kind": "rule",
+        "area": "global",
+        "standing": true,
+        "summary": "Write docs, comments, commit messages, and reports in ASD-STE100 style: short sentences, active voice, one instruction per sentence, concise.",
+        "body": [
+          "Sources: Williams, *Style*; Gopen & Swan, \"The Science of Scientific Writing\". They apply on top of ASD-STE100.",
+          "Make the main character the subject and its action the verb.",
+          "Unpack nominalizations into verbs: \"perform validation of\" becomes \"validate\".",
+          "Delete expletives (\"there is\", \"it is\"), filler (\"in order to\", \"the fact that\", \"note that\"), and hedges that carry no information.",
+          "Put old information in the topic position, new information in the stress position.",
+          "Keep subject and verb adjacent.",
+          "End on the emphasis."
+        ],
+        "tags": [
+          "docs",
+          "style"
+        ],
+        "source": {
+          "date": "2026-08-30",
+          "by": "docs",
+          "ref": "houserules seed"
+        }
+      }
+    }
+  ],
+  "writing-style.readme-is-an-adopter-funnel": [
+    {
+      "versions": [
+        "1.1.0",
+        "1.2.0",
+        "1.3.0",
+        "1.4.0"
+      ],
+      "entry": {
+        "id": "writing-style.readme-is-an-adopter-funnel",
+        "kind": "rule",
+        "area": "docs",
+        "standing": false,
+        "summary": "A README is an adopter funnel: value, install, runnable usage, then depth; keep out process history, provenance narration, and claims that rot with releases.",
+        "body": [
+          "Order the file as a funnel (an evaluator can stop early, a user finds install and usage fast, a contributor reads to the end): title; a few meaningful badges; a one-liner under 120 characters matching the repository description; a short what/who/why description; a table of contents once the file passes 100 lines; install, with updating as a subsection; usage whose commands run exactly as written, with real output shown; deeper concepts; a reference section or a link to one; contributing (where to ask questions, whether pull requests are accepted); license last.",
+          "Keep out: maintainer evidence and verification narration, internal ids and ruling citations, changelog prose, marketing claims, and version-bound statements that go stale at the next release. State current facts plainly and keep provenance in the project's own records; link out for depth instead of inlining it.",
+          "Derived from standard-readme's specification, The Art of README's cognitive funneling, and makeareadme.com; re-check current guidance before a large rewrite."
+        ],
+        "tags": [
+          "docs",
+          "readme"
+        ],
+        "source": {
+          "date": "2026-09-15",
+          "by": "user",
+          "ref": "owner direction at the batch-26 README rework"
+        }
+      }
+    }
+  ]
+}

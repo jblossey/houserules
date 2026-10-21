@@ -26,8 +26,10 @@ pub(crate) const PACK_SCHEMA_MAJOR: u64 = 1;
 
 /// The newest pack schema minor of that major that the embedded schema
 /// names. A copy that declares a newer minor has its unnamed keys set
-/// aside before validation.
-const PACK_SCHEMA_MINOR: u64 = 0;
+/// aside before validation. Minor 1 names the `optIn` list and the
+/// `require_trailer`, `exempt_authors`, and `exempt_subjects` fields of a
+/// `commits` check.
+const PACK_SCHEMA_MINOR: u64 = 1;
 
 /// The text that a pack's `schema` id starts with.
 const PACK_SCHEMA_PREFIX: &str = "houserules/pack@";
@@ -61,6 +63,22 @@ pub(crate) struct PackCopy {
     pub(crate) raw: Value,
 }
 
+impl PackCopy {
+    /// The ids that the pack lists under `optIn`, in the order it lists
+    /// them; none when it lists none. `parse_pack` has checked that each is
+    /// an entry of the pack.
+    pub(crate) fn opt_in(&self) -> Vec<String> {
+        self.raw
+            .get("optIn")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(str::to_string)
+            .collect()
+    }
+}
+
 /// The kit's packs, sorted by name.
 ///
 /// The packs are part of the binary, so a pack that fails `parse_pack`
@@ -88,8 +106,8 @@ pub(crate) fn kit_packs() -> Vec<PackCopy> {
 /// when its `schema` id is malformed or names a major other than
 /// `PACK_SCHEMA_MAJOR`, when its `name` is not a legal pack name, when
 /// it breaks the embedded schema, when a topic name is not a slug, when
-/// an entry's id starts with a topic the pack does not declare, or when
-/// an id appears twice.
+/// an entry's id starts with a topic the pack does not declare, when
+/// an id appears twice, or when an `optIn` id is no entry of the pack.
 ///
 /// A copy that declares a newer minor of the major is checked against the
 /// embedded schema with every key the schema does not name set aside: a
@@ -157,6 +175,7 @@ pub(crate) fn parse_pack(raw: Value, origin: &str) -> Result<PackCopy, String> {
         raw,
     };
     check_topics_and_ids(&copy, origin)?;
+    check_opt_in(&copy, origin)?;
     Ok(copy)
 }
 
@@ -263,6 +282,26 @@ fn check_topics_and_ids(copy: &PackCopy, origin: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Refuses an `optIn` id that no entry of the pack carries: an exclusion of
+/// such an id would name nothing.
+fn check_opt_in(copy: &PackCopy, origin: &str) -> Result<(), String> {
+    let shipped: Vec<&str> = copy
+        .entries
+        .iter()
+        .map(|entry| entry["id"].as_str().expect("validated entry id"))
+        .collect();
+    match copy
+        .opt_in()
+        .into_iter()
+        .find(|id| !shipped.contains(&id.as_str()))
+    {
+        Some(id) => Err(format!(
+            "{origin}: optIn id {id:?} is not an entry of this pack"
+        )),
+        None => Ok(()),
+    }
+}
+
 /// Removes from `value` every key that `schema` forbids: a key that an
 /// object schema with `additionalProperties: false` does not list under
 /// `properties`, at every depth. A key that the schema permits stays.
@@ -338,11 +377,12 @@ mod tests {
     }
 
     /// The id of every entry that the kit's packs carry, sorted: the 58
-    /// seeded entries of release 1.4.0 and the two entries that release
-    /// 2.0.0 adds to `knowledge-base`. A change to this list is a change
-    /// to a pack's content and needs a version change in
+    /// seeded entries of release 1.4.0, the two entries that release
+    /// 2.0.0 adds to `knowledge-base`, and the opt-in entry and the four
+    /// design-phase entries that it adds to `process`. A change to this list
+    /// is a change to a pack's content and needs a version change in
     /// `KIT_PACK_VERSIONS`.
-    const KIT_IDS: [&str; 60] = [
+    const KIT_IDS: [&str; 65] = [
         "knowledge-base.cite-durable-refs",
         "knowledge-base.context-proxy-output-is-lossy",
         "knowledge-base.controller-rules-are-tagged",
@@ -361,8 +401,11 @@ mod tests {
         "process.contract-refresh-sweep",
         "process.conventional-commits",
         "process.deliverables-json",
+        "process.design-claims-are-labelled",
+        "process.design-decisions-carry-probes",
         "process.eval-fixture-procedure",
         "process.evals-rerun",
+        "process.every-commit-names-a-work-item",
         "process.evidence-outlives-the-session",
         "process.fix-proofs-extend-the-reviewers-run",
         "process.fix-round-verification-record",
@@ -379,11 +422,13 @@ mod tests {
         "process.parallel-on-disjoint-files",
         "process.pointer-sweep-unfiltered",
         "process.report-evidence-verbatim",
+        "process.reversals-are-recorded",
         "process.review-findings-are-claims-too",
         "process.risk-tiers",
         "process.rulings-to-file",
         "process.severity-by-impact",
         "process.skills-for-procedures",
+        "process.specs-list-borrowed-concepts",
         "process.suggestions-are-unverified",
         "process.tdd",
         "process.verify-in-persisted-state",
@@ -408,33 +453,37 @@ mod tests {
     /// Each kit pack with its version and the SHA-256 of its canonical
     /// serialization (`pack_sha256`). A change to a pack's content changes
     /// the checksum and so fails the test until this row changes with the
-    /// pack's version: major for a removed entry or a stricter check,
-    /// minor for an added entry, patch for a wording change.
+    /// pack's version. The version names the class of the change: major for a
+    /// removed entry or a stricter check (a wider `if` glob is a stricter
+    /// check), minor for an added entry, patch for a wording change. The
+    /// version moves once for each change, from the version before the
+    /// change: fix rounds that widen the same globs for one work item move it
+    /// once, never once for each round.
     const KIT_PACK_VERSIONS: [(&str, &str, &str); 5] = [
         (
             "knowledge-base",
-            "1.0.0",
-            "c12230319b6e588e39ed13c54835ee7104c1c832f1e3287fa404f8e3b7e7da0f",
+            "2.0.1",
+            "7105d8be3f70c9dcb94905d0e4f6d17ce0dd0d233757e0607f83ac5dd03523b8",
         ),
         (
             "process",
-            "1.0.2",
-            "2be8834438ac89ae3c27febee5fa99003a278185fdf591b82ffd0dadafe6e916",
+            "1.2.2",
+            "9c16794badec10cc6b6b43b158d9ea124fe664eb42cc6e5c5188a63bb8291903",
         ),
         (
             "quality",
-            "1.0.1",
-            "33b16f693bc0ecf178bcb681d5f67078e41d006f0a8b0d3a330a874787e7a99e",
+            "1.0.2",
+            "acc2b51463fb65122f5c7d4bae520db0e79255fae282e48e83f23f05b17f1ec6",
         ),
         (
             "security-hygiene",
-            "1.0.0",
-            "28683a1a05caafcd62d30a0a8b134d01d6fbe71843384d4bc692646ce9c3269e",
+            "3.0.0",
+            "37cd88eeed6a85bbb4ae11933fbbe5e0128c3bf7350aeb8c5651323887f93e24",
         ),
         (
             "writing-style",
-            "1.0.0",
-            "8b6ecd936a0fc3fbac4380ce82531c8653165c1b01138d4120e45dec3d971bae",
+            "1.0.1",
+            "37288facc38829050413653f66881b64f43167110ed8e9eeb878d4a054d5841a",
         ),
     ];
 
@@ -489,7 +538,7 @@ mod tests {
         json!({
             "name": "demo",
             "version": "1.2.3",
-            "schema": "houserules/pack@1.0.0",
+            "schema": "houserules/pack@1.1.0",
             "topics": {"demo": {"title": "Demo topic"}},
             "areas": {"docs": {"paths": ["docs/**", "AGENTS.md"]}, "global": {"paths": []}},
             "entries": [
@@ -515,6 +564,9 @@ mod tests {
                         "subject": "subject",
                         "body_absent": "absent",
                         "body_line_max": 100,
+                        "require_trailer": "Work-Item",
+                        "exempt_authors": ["dependabot[bot]"],
+                        "exempt_subjects": ["^chore\\(.+\\): release "],
                         "if": "src/**",
                         "then": "docs/**",
                         "per_commit": true,
@@ -530,7 +582,8 @@ mod tests {
                     "tags": [],
                     "source": {"date": "2026-10-19", "by": "review"}
                 }
-            ]
+            ],
+            "optIn": ["demo.two"]
         })
     }
 
@@ -644,7 +697,7 @@ mod tests {
     }
 
     #[test]
-    fn kit_pack_ids_are_the_1_4_0_ids_plus_the_two_new_ids_each_once() {
+    fn kit_pack_ids_are_the_1_4_0_ids_plus_the_seven_new_ids_each_once() {
         let mut ids: Vec<String> = kit_packs()
             .iter()
             .flat_map(|pack| pack.entries.iter())
@@ -957,6 +1010,75 @@ mod tests {
                 ("global".to_string(), Vec::new())
             ]
         );
+    }
+
+    #[test]
+    fn parse_pack_reads_the_opt_in_ids_in_the_order_the_pack_lists_them() {
+        let mut raw = full_pack();
+        raw["optIn"] = json!(["demo.two", "demo.one"]);
+        let copy = parse_pack(raw, ORIGIN).expect("a pack with opt-in ids parses");
+        assert_eq!(copy.opt_in(), ["demo.two", "demo.one"]);
+        let minimal = parse_pack(minimal_pack(), ORIGIN).expect("minimal pack parses");
+        assert_eq!(minimal.opt_in(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn parse_pack_refuses_an_opt_in_id_that_the_pack_does_not_ship() {
+        let mut raw = full_pack();
+        raw["optIn"] = json!(["demo.two", "demo.three"]);
+        assert_eq!(
+            refusal(raw),
+            format!("{ORIGIN}: optIn id \"demo.three\" is not an entry of this pack")
+        );
+    }
+
+    #[test]
+    fn parse_pack_refuses_a_malformed_opt_in_list() {
+        for (optin, message) in [
+            (json!("demo.one"), ".optIn: must be array"),
+            (
+                json!(["demo.one", "demo.one"]),
+                ".optIn: items must be unique",
+            ),
+            (
+                json!(["Demo.One"]),
+                ".optIn[0]: must match ^[a-z0-9-]+\\.[a-z0-9-]+$",
+            ),
+            (json!([1]), ".optIn[0]: must be string"),
+        ] {
+            let mut raw = full_pack();
+            raw["optIn"] = optin;
+            assert_eq!(refusal(raw), format!("{ORIGIN}{message}"));
+        }
+    }
+
+    #[test]
+    fn the_embedded_pack_schema_names_minor_1_and_holds_the_check_of_the_knowledge_schema() {
+        assert_eq!(PACK_SCHEMA_MINOR, 1);
+        let pack: Value = serde_json::from_str(PACK_SCHEMA).expect("the embedded schema is JSON");
+        let knowledge: Value =
+            serde_json::from_str(include_str!("../../../template/knowledge/schema.json"))
+                .expect("the knowledge schema is JSON");
+        assert_eq!(
+            pack["$defs"]["check"], knowledge["$defs"]["check"],
+            "the two check definitions are one definition"
+        );
+    }
+
+    #[test]
+    fn the_process_pack_lists_the_every_commit_entry_under_opt_in_at_pack_schema_1_1_0() {
+        let process = five_kit_packs()
+            .into_iter()
+            .find(|pack| pack.name == "process")
+            .expect("the kit carries the process pack");
+        assert_eq!(process.schema, "houserules/pack@1.1.0");
+        assert_eq!(process.opt_in(), ["process.every-commit-names-a-work-item"]);
+        for other in five_kit_packs()
+            .iter()
+            .filter(|pack| pack.name != "process")
+        {
+            assert_eq!(other.opt_in(), Vec::<String>::new(), "{}", other.name);
+        }
     }
 
     #[test]

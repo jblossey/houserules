@@ -32,26 +32,44 @@
 //! command uses: `init` seeds the directory it is given (or the
 //! process's own working directory), never an ancestor.
 //!
-//! `init` writes a 2.0 install (`seed`'s own doc has the steps): the
-//! `KIT_OWNED` files, the `SEED_ONCE` files, the five kit packs as copies in
-//! `knowledge/packs/` with their pins in `.houserules.json` (a new install
-//! only), the CI workflow, and the marker with `schema`
-//! `houserules/install@2.0.0`. It writes none of the five 1.x topic files.
+//! `init` writes a 2.0 install (`seed`'s own doc has the steps): the minimal
+//! default of spec 4.6. It holds the `KIT_OWNED` files, the `SEED_ONCE` files,
+//! the `DEFAULT_PACKS` as copies in `knowledge/packs/` with their pins in
+//! `.houserules.json` (a new install only), the `.houserules/step/` line of
+//! `.gitignore`, the CI workflow, and the marker with `schema`
+//! `houserules/install@2.1.0`. It installs no tracker and no workflow, and so
+//! writes none of the five 1.x topic files, no `backlog/` file, and no file of
+//! a workflow. `init --tracker json` installs the JSON tracker (`classes`' own
+//! module doc names the file classes; `tracker`'s names the trackers).
+//! `init --tracker <adapter>` writes the `tracker` key of the marker last,
+//! after the files of the adapter, so a stop in between leaves a tree that the
+//! next run finishes; an install that has the same tracker keeps it, and one
+//! that has another refuses. `init --workflow reference` needs a tracker,
+//! installs the reference workflow after it (`workflow`'s own module doc has
+//! the files and the pins), and, with `--add-required-packs`, adds the packs
+//! that hold the rules the workflow requires through `pack add`. It writes the
+//! `workflow` key of the marker last, so that a stop in between leaves a tree
+//! that the next run finishes.
 //! Without `--target claude` it also leaves out the Claude files
-//! (`CLAUDE_FILES`) and the hook entry of `.claude/settings.json`, and prints
-//! the line that enables them; with the flag, on a new install or an existing
-//! one, it records `claude` in `renderers`, seeds the Claude files that are
-//! missing, and keeps the ones that exist.
+//! (`CLAUDE_FILES`) and the hook entries of `.claude/settings.json`, and
+//! prints the line that enables them; with the flag, on a new install or an
+//! existing one, it records `claude` in `renderers`, seeds the Claude files
+//! that are missing, and keeps the ones that exist. Where `renderers` holds
+//! `claude` and the install pins a workflow, `init --workflow` and `init
+//! --target claude` add the `SessionStart` entry of the session-start script
+//! of the workflow (spec 4.3) to `.claude/settings.json` too.
 //!
 //! `init` seeds what is missing and keeps what exists: it writes no file that
 //! exists, a kit-owned file the project changed included, and lists each one
 //! as `kept`. A kit-owned file is baselined only when `init` writes it or
-//! finds it at the kit's bytes, so `update` still sees a change. Four writes
-//! to a file that exists remain, each by design: the hook entry that
-//! `--target claude` adds to a `.claude/settings.json` that `ownedPaths` does
-//! not list; the areas that a kit pack adds to `knowledge/areas.json` when a
-//! new install gets the pack; the stamp of `.houserules.json`; and the files
-//! `render` generates.
+//! finds it at the kit's bytes, so `update` still sees a change. Five writes
+//! to a file that exists remain, each by design: the hook entries that
+//! `--target claude` and `--workflow` add to a `.claude/settings.json` that
+//! `ownedPaths` does not list; the `.houserules/step/` line that `init` adds
+//! to a `.gitignore`
+//! that lacks it; the areas that a kit pack adds to `knowledge/areas.json`
+//! when a new install gets the pack; the stamp of `.houserules.json`; and the
+//! files `render` generates.
 //!
 //! `init` on an existing 2.0 install installs no pack and adds no area (spec
 //! C18): the pins name the installed packs, and only the `pack` commands and
@@ -88,11 +106,13 @@
 //! level keeps `.claude/`, `.githooks/`, and its knowledge base in its own
 //! root, and writes one file outside it: its CI workflow at the top level
 //! (`workflow`'s own module doc has the form and the file name), baselined
-//! under the key `:/<path>`. `init` refuses a root that nests with another
+//! under the key `:/<path>`. `init` refuses a new root that nests with another
 //! install of the repository and one whose workflow file name another
-//! install uses, before it writes anything. `update` accepts a directory
-//! below the top level only when it holds a `.houserules.json`, and rewrites
-//! only the workflow file of its own install.
+//! install uses, before it writes anything; a root that already holds its
+//! `.houserules.json` is no new root, and `init` runs no such check there.
+//! `update` accepts a directory below the top level only when it holds a
+//! `.houserules.json`, and rewrites only the workflow file of its own
+//! install.
 //!
 //! # `update` and the ownership baseline
 //!
@@ -111,14 +131,25 @@
 //!   keep a pack as it is) and the one-id-one-source step
 //!   (`pack::one_source`): the pin of each kit pack moves to the version of the
 //!   binary, and a local entry with a pack id becomes an override.
+//! - The conversion steps of batch 34 (`conversion::steps` has them): the
+//!   adoption of the reference workflow, the split of the session-start
+//!   script, and the delivery of the two schemas, on every run.
 //! - The file sync (`sync`'s own module doc has the outcomes): every
-//!   `KIT_OWNED` file not in `ownedPaths` is written when it is missing or at
-//!   its baseline, kept and reported once when the adopter changed it
+//!   `KIT_OWNED` file not in `ownedPaths` is written when it is missing, at
+//!   its baseline, or equal to a content that the kit shipped before (spec
+//!   4.7, C35); it is kept and reported once when the adopter changed it
 //!   (`kept <path> (locally modified)`), and neither written nor listed when
 //!   its bytes would not change. A path in `ownedPaths` is left exactly as
-//!   found, present or absent, with no report line at all. The two D3 files,
-//!   `knowledge/schema.json` and the CI workflow, join the sync once the marker
-//!   baselines them.
+//!   found, present or absent, with no report line at all. The D3 files, the
+//!   knowledge schema, the deliverables schema, and the CI workflow of the
+//!   tracker, join the sync once the marker baselines them. `update` reads the
+//!   `backlogId` pattern of the installed tracker for the deliverables schema,
+//!   and the Beads adapter asks `bd` for its issue prefix there: a `bd` that
+//!   cannot be reached leaves the pattern as it is, prints the unreachable line
+//!   on stderr, and does not change the exit status (spec 3.3, C38).
+//! - The workflow sync (`workflow`'s own module doc has the outcomes): an
+//!   install with a `workflow` key moves the pins of its workflow with the
+//!   binary. An install without the key gets no workflow file.
 //! - Any `RETIRED` path still present is deleted and reported
 //!   (`delete_retired`, below).
 //! - Every `SEED_ONCE` path that is entirely absent is written (a later kit
@@ -126,7 +157,11 @@
 //!   `ownedPaths` lists it; a file that exists is adopter data and stays. The
 //!   CI workflow is backfilled the same way, but only once
 //!   `origin_is_github_hosted` is true for the target; a non-GitHub origin
-//!   leaves it silently absent.
+//!   leaves it silently absent. An install with the JSON tracker and a
+//!   `backlog/` directory gets each absent `TRACKER_DATA` file the same way,
+//!   and keeps `backlog/schema.json` current as a D3 file; with the
+//!   directory missing, `update` writes nothing under `backlog/`, so that the
+//!   tracker stays unreachable until the project restores its data.
 //! - Each hand step that the earlier steps left is printed as `hand step:
 //!   <text>` (`hand_steps` holds every text).
 //!
@@ -186,10 +221,11 @@
 //!
 //! `init` prints one named stderr line and exits 2 for: a target that is
 //! not in a git repository (`location::locate`: a target outside one, one
-//! that does not exist yet, and a file name `git init`), a target
-//! that nests with another install of the repository or that would write
-//! another install's workflow file (`location::refuse_overlap`), a target
-//! whose path a workflow cannot hold (`Workflow::for_install`), a malformed
+//! that does not exist yet, and a file name `git init`), a new target (one
+//! with no `.houserules.json` yet) that nests with another install of the
+//! repository or that would write another install's workflow file
+//! (`location::refuse_overlap`), a target whose path a workflow cannot hold
+//! (`Workflow::for_install`), a malformed
 //! `--id-prefix`, and a pre-existing `.houserules.json` that is not valid JSON, is valid
 //! JSON but not an object, carries an invalid `idPrefix`, carries an
 //! empty/non-string `version`, or carries a `defaultBranch` that is no string
@@ -249,13 +285,14 @@
 //! platform instead of hardcoding one (its own doc comment and
 //! `seeded_repo`'s carry the fuller account).
 
+mod ci_workflow;
+mod classes;
 mod conversion;
-mod hand_steps;
+pub(crate) mod hand_steps;
 mod location;
 pub(crate) mod marker;
 mod pack_moves;
 mod sync;
-mod workflow;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -272,119 +309,25 @@ use crate::emit::emit;
 use crate::node_path::resolve_like_node;
 use crate::pack::areas::{add_pack_areas, seeded_areas_of};
 use crate::packs::{kit_packs, pack_sha256, parse_pack};
+use crate::tracker::{self, Adapter, TrackerConfig, TrackerInstall};
+use crate::workflow;
 
+use ci_workflow::Workflow;
+use classes::{
+    AREAS_FILE, CLAUDE_FILES, CLAUDE_SESSION_START, D3_FILES, DEFAULT_PACKS, DELIVERABLES_FILE,
+    KIT_OWNED, PREFIXED, RETIRED, SCHEMA_FILE, SEED_ONCE, TRACKER_DATA, TRACKER_SCHEMA,
+};
 use location::Placement;
 use marker::{ID_PREFIX_HINT, InstallStamp, Marker, Pin, is_id_prefix, unconverted_line};
-use workflow::Workflow;
 
-pub(crate) use marker::{Guard, refuse_install_schema, stamped_id_prefix};
+pub(crate) use conversion::known_contents;
+pub(crate) use marker::{Guard, refuse_install_schema};
 
 /// The kit payload, embedded from this repository's `template/` at compile
 /// time (this module's own doc has the full configuration account).
 #[derive(RustEmbed)]
 #[folder = "../../template/"]
 struct Payload;
-
-/// Machinery files houserules owns: `init` writes them, and `update`
-/// overwrites each one the adopter has not changed (this module's own doc,
-/// "`update` and the ownership baseline", has the keep and override cases).
-/// `tests/install.rs`'s own copy pins this list, so the two cannot silently
-/// drift apart.
-const KIT_OWNED: &[&str] = &[
-    "tools/claude-session-start.sh",
-    ".githooks/commit-msg",
-    ".claude/agents/implementer.md",
-    ".claude/agents/task-reviewer.md",
-    ".claude/agents/branch-reviewer.md",
-    ".claude/skills/orchestrating/SKILL.md",
-    ".claude/skills/finishing-a-feature/SKILL.md",
-    ".claude/skills/migrating-knowledge/SKILL.md",
-];
-
-/// The `KIT_OWNED` files that only the Claude Code renderer needs: the agent
-/// templates preload the `project-knowledge` skill, which only that renderer
-/// writes, and the session-start script runs from the hook entry of
-/// `.claude/settings.json`. An install whose `renderers` lacks `claude` has
-/// none of them, and the sync restores none.
-const CLAUDE_FILES: &[&str] = &[
-    "tools/claude-session-start.sh",
-    ".claude/agents/implementer.md",
-    ".claude/agents/task-reviewer.md",
-    ".claude/agents/branch-reviewer.md",
-];
-
-/// Project-data files `init` seeds once, and `update` never overwrites once
-/// they exist: an adopter's own edits to backlog items, evals, or
-/// `AGENTS.md`/`CLAUDE.md` are never kit-owned content. `update` still
-/// BACKFILLS a `SEED_ONCE` path
-/// that is entirely absent (this module's own "update" doc section has the
-/// full account) -- a later kit release can add a new path to this list, and
-/// an install seeded by an older release never had a chance to receive it.
-/// A subset of these paths -- `knowledge_topic_files`, below -- is the 1.x
-/// layout's topic files: `init` seeds none of them (the kit's rules come as
-/// packs), and `update` reconciles them entry by entry on a 1.x tree only.
-const SEED_ONCE: &[&str] = &[
-    "knowledge/schema.json",
-    "knowledge/areas.json",
-    "backlog/schema.json",
-    "backlog/amendments.json",
-    "backlog/batches.json",
-    "backlog/decisions.json",
-    "backlog/parked.json",
-    "backlog/items/general.json",
-    ".claude/schemas/deliverables.json",
-    ".claude/evals/dependency-add.json",
-    ".claude/evals/docs-edit.json",
-    ".claude/evals/record.json",
-    ".claude/evals/seeded-violations.json",
-    "docs/README.md",
-    "AGENTS.md",
-    "CLAUDE.md",
-];
-
-/// The knowledge schema, a D3 file: the sync covers it once
-/// `.houserules.json` baselines it.
-const SCHEMA_FILE: &str = "knowledge/schema.json";
-
-/// The one list of areas, which the project owns.
-const AREAS_FILE: &str = "knowledge/areas.json";
-
-/// The D3 files: `init` seeds each once, and `update` then keeps it at the
-/// content of the kit through a baseline, unless the project changed it or
-/// owns it (`sync`'s own module doc has the account).
-///
-/// The CI workflow is the one D3 file that only a GitHub-hosted target gets:
-/// the gate itself assumes a GitHub Actions runner and a GitHub PR event, so
-/// writing it into a project hosted elsewhere would ship a workflow file
-/// nothing ever runs. `seed` (`init`) writes it when the origin is GitHub
-/// hosted (`origin_is_github_hosted`), keeps a file that exists and reports
-/// it, and skips the write with a line that says why for any other origin.
-/// `update` backfills a still-absent workflow the same way, but only once the
-/// origin has become GitHub-hosted; skipping it for another origin stays
-/// silent there, matching `update`'s own convention of reporting only what it
-/// changes. A project not on GitHub gets its own CI gate from the
-/// `migrating-knowledge` skill's own instruction instead.
-const D3_FILES: &[&str] = &[SCHEMA_FILE, workflow::TEMPLATE_PATH];
-
-/// Seed files that carry the backlog id prefix; `--id-prefix` rewrites
-/// them.
-const PREFIXED: &[&str] = &[
-    "backlog/schema.json",
-    "backlog/items/general.json",
-    ".claude/schemas/deliverables.json",
-];
-
-/// Paths the kit does not ship, that `update` deletes from an install if
-/// present (this module's own doc, "Deletion", has the full account of
-/// the mechanism).
-const RETIRED: &[&str] = &[
-    "tools/kb.sh",
-    "tools/backlog.sh",
-    "tools/kb.mjs",
-    "tools/backlog.mjs",
-    "tools/lib/cli.mjs",
-    "tools/lib/json-store.mjs",
-];
 
 /// Path, relative to a target repository, `.claude/settings.json` seeds or merges at.
 const SETTINGS_PATH: &str = ".claude/settings.json";
@@ -427,7 +370,7 @@ fn with_id_prefix(file: &str, bytes: Vec<u8>, prefix: &str) -> Result<Vec<u8>, S
 /// Windows is the one platform where this shows: reading a topic file back
 /// from disk must build the same path the code that seeded it did, or a
 /// named error naming that path prints the wrong separator.
-fn join_components(target: &Path, relative: &str) -> PathBuf {
+pub(crate) fn join_components(target: &Path, relative: &str) -> PathBuf {
     relative
         .split('/')
         .fold(target.to_path_buf(), |path, part| path.join(part))
@@ -441,7 +384,7 @@ fn is_executable_file(file: &str) -> bool {
 
 /// Writes `content` to `file` under `target`, keeping shell scripts and
 /// git hooks executable.
-fn write_into(target: &Path, file: &str, content: &[u8]) -> Result<(), String> {
+pub(crate) fn write_into(target: &Path, file: &str, content: &[u8]) -> Result<(), String> {
     let path = target.join(file);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
@@ -456,7 +399,7 @@ fn write_into(target: &Path, file: &str, content: &[u8]) -> Result<(), String> {
 /// The bytes of the file at `path`, or `None` when the file does not exist.
 /// Any other read error is one line that names the path with the operating
 /// system's own text.
-fn read_if_present(path: &Path) -> Result<Option<Vec<u8>>, String> {
+pub(crate) fn read_if_present(path: &Path) -> Result<Option<Vec<u8>>, String> {
     match fs::read(path) {
         Ok(bytes) => Ok(Some(bytes)),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
@@ -512,14 +455,23 @@ fn read_json_object(path: &Path) -> Result<Map<String, Value>, String> {
 }
 
 /// What `check-knowledge`'s kit-owned citation lint needs from this module
-/// (`rules::KitScope`'s own doc has the contract): the `KIT_OWNED` paths
-/// minus the ones the stamp lists in `ownedPaths` (`Marker::owned_paths`),
-/// which are the project's own, and the topics that the kit's packs serve.
+/// (`rules::KitScope`'s own doc has the contract): the `KIT_OWNED` paths and
+/// the workflow files that the install pins, minus the ones the stamp lists in
+/// `ownedPaths` (`Marker::owned_paths`), which are the project's own, and the
+/// topics that the kit's packs serve. A workflow path with no pin, or with a
+/// `null` pin, holds a file of the project, and the lint reads none of it.
 /// An absent stamp owns no path; a present stamp that
 /// `Marker::read_or_default_for_gate` rejects is that function's own named
 /// error, which names the stamp by its relative name.
 pub(crate) fn kit_citation_scope(root: &Path) -> Result<crate::rules::KitScope, String> {
-    let owned = Marker::read_or_default_for_gate(root, "WI")?.owned_paths();
+    let marker = Marker::read_or_default_for_gate(root, "WI")?;
+    let owned = marker.owned_paths();
+    let workflow_files: Vec<String> = workflow::pins::read(&marker)?
+        .into_iter()
+        .flat_map(|pin| pin.files)
+        .filter_map(|(file, hash)| hash.map(|_| file))
+        .filter(|file| !is_overridden(&owned, file))
+        .collect();
     let mut seeded_topics: Vec<String> = kit_packs()
         .into_iter()
         .flat_map(|pack| pack.topics.into_iter().map(|(topic, _)| topic))
@@ -531,6 +483,7 @@ pub(crate) fn kit_citation_scope(root: &Path) -> Result<crate::rules::KitScope, 
             .iter()
             .filter(|file| !is_overridden(&owned, file))
             .map(|file| file.to_string())
+            .chain(workflow_files)
             .collect(),
         seeded_topics,
     })
@@ -559,20 +512,37 @@ fn is_overridden(overrides: &[String], key: &str) -> bool {
 /// (GitLab, Bitbucket, a self-hosted forge) -- `seed`/`update` read this as
 /// one boolean gate, never distinguishing why it came back `false`.
 fn origin_is_github_hosted(target: &Path) -> bool {
+    origin_url(target).is_some_and(|url| url.to_lowercase().contains("github.com"))
+}
+
+/// The URL of the `origin` remote of the repository of `target`
+/// (`git config --get remote.origin.url`, read locally with no network
+/// call), or `None` when there is none or `git` fails.
+fn origin_url(target: &Path) -> Option<String> {
     let output = Command::new("git")
         .args(["config", "--get", "remote.origin.url"])
         .current_dir(target)
-        .output();
-    let Ok(output) = output else {
-        return false;
-    };
-    if !output.status.success() {
-        return false;
+        .output()
+        .ok()
+        .filter(|output| output.status.success())?;
+    Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+/// The `<owner>/<name>` that a GitHub remote `url` names, in every real
+/// remote form (`https://github.com/<owner>/<name>.git`,
+/// `git@github.com:<owner>/<name>.git`, `ssh://git@github.com/<owner>/<name>`),
+/// or `None` for a URL of another host or of another shape.
+fn repository_of_url(url: &str) -> Option<String> {
+    let (before, after) = url.trim().split_once("github.com")?;
+    if !(before.ends_with('/') || before.ends_with('@')) {
+        return None;
     }
-    String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .to_lowercase()
-        .contains("github.com")
+    let path = after
+        .strip_prefix(':')
+        .or_else(|| after.strip_prefix('/'))?
+        .trim_end_matches('/');
+    let path = path.strip_suffix(".git").unwrap_or(path);
+    tracker::is_repo_name(path).then(|| path.to_string())
 }
 
 /// Deletes each `retired` path found under `target`, returning the ones
@@ -596,6 +566,30 @@ fn delete_retired(target: &Path, retired: &[&str]) -> Result<Vec<String>, String
 /// Merges the payload's `SessionStart` hooks into an existing
 /// `settings.json`, appending only entries whose `matcher` is not already
 /// present. Returns whether the merge changed the file.
+fn merge_settings(path: &Path, prefix: &str) -> Result<bool, String> {
+    let template: Value = serde_json::from_slice(&payload_content(SETTINGS_PATH, prefix)?)
+        .expect("the embedded settings.json is valid JSON");
+    let entries = template["hooks"]["SessionStart"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    merge_session_start(path, entries, |existing, entry| {
+        let matcher = |entry: &Value| {
+            entry
+                .get("matcher")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        };
+        existing
+            .iter()
+            .any(|present| matcher(present) == matcher(entry))
+    })
+}
+
+/// Appends each of `entries` to `hooks.SessionStart` of the `settings.json`
+/// at `path` for which `present` says the file lacks it: `present` gets the
+/// entries of the file as it was read and one of `entries`. Returns whether
+/// the merge changed the file.
 ///
 /// Two cases worth naming explicitly: a `null` at `hooks` or
 /// `hooks.SessionStart` is treated the same as a missing key -- replaced
@@ -607,9 +601,11 @@ fn delete_retired(target: &Path, retired: &[&str]) -> Result<Vec<String>, String
 /// error: this arm leaves the array's own elements untouched on disk, the
 /// attempted merge has no effect, and `changed` is still `true` (the
 /// write always runs), exit 0.
-fn merge_settings(path: &Path, prefix: &str) -> Result<bool, String> {
-    let template: Value = serde_json::from_slice(&payload_content(SETTINGS_PATH, prefix)?)
-        .expect("the embedded settings.json is valid JSON");
+fn merge_session_start(
+    path: &Path,
+    entries: Vec<Value>,
+    present: impl Fn(&[Value], &Value) -> bool,
+) -> Result<bool, String> {
     let mut settings = read_json_object(path)?;
     let hooks = settings
         .entry("hooks".to_string())
@@ -635,27 +631,10 @@ fn merge_settings(path: &Path, prefix: &str) -> Result<bool, String> {
         .as_array_mut()
         .ok_or_else(|| format!("{}: hooks.SessionStart is not an array", path.display()))?;
 
-    let existing_matchers: std::collections::HashSet<Option<String>> = session_start_arr
-        .iter()
-        .map(|entry| {
-            entry
-                .get("matcher")
-                .and_then(Value::as_str)
-                .map(str::to_string)
-        })
-        .collect();
-    let template_entries = template["hooks"]["SessionStart"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default();
-
+    let read_len = session_start_arr.len();
     let mut changed = false;
-    for entry in template_entries {
-        let matcher = entry
-            .get("matcher")
-            .and_then(Value::as_str)
-            .map(str::to_string);
-        if existing_matchers.contains(&matcher) {
+    for entry in entries {
+        if present(&session_start_arr[..read_len], &entry) {
             continue;
         }
         session_start_arr.push(entry);
@@ -671,8 +650,8 @@ fn merge_settings(path: &Path, prefix: &str) -> Result<bool, String> {
 /// A render target that `init --target` enables.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
 pub(crate) enum InitTarget {
-    /// The Claude Code files: the agent templates, the session-start script,
-    /// and its hook entry in `.claude/settings.json`.
+    /// The Claude Code files: the session-start script and its hook entries
+    /// in `.claude/settings.json`.
     Claude,
 }
 
@@ -686,10 +665,12 @@ const ENABLE_CLAUDE_LINE: &str =
     "for Claude Code: run houserules init --target claude in the install root";
 
 /// Seeds every `KIT_OWNED` file that `claude` allows. A file that is missing
-/// is written, listed as `wrote`, and baselined. A file that exists is kept
-/// and listed as `kept`: its bytes never change, and it is baselined only
-/// when they already match the kit's. A path in `owned` is kept when it
-/// exists and left absent when it does not, and its baseline never changes.
+/// is written, listed as `wrote`, and baselined. A file that exists and equals
+/// a content that the kit shipped before is the kit's (spec 4.7, C35): it is
+/// replaced, listed as `wrote`, and baselined. Any other file that exists is
+/// kept and listed as `kept`: its bytes never change, and it is baselined only
+/// when they already match the kit's. A path in `owned` is kept when it exists
+/// and left absent when it does not, and its baseline never changes.
 fn seed_kit_owned(
     target: &Path,
     prefix: &str,
@@ -710,6 +691,14 @@ fn seed_kit_owned(
                 write_into(target, file, &content)?;
                 println!("wrote {file}");
             }
+            Some(current)
+                if !is_owned
+                    && current != content
+                    && known_contents(file, prefix)?.contains(&current) =>
+            {
+                write_into(target, file, &content)?;
+                println!("wrote {file}");
+            }
             Some(current) => {
                 println!("kept {file}");
                 if is_owned || current != content {
@@ -725,18 +714,37 @@ fn seed_kit_owned(
     Ok(())
 }
 
+/// The content of the seed-once `file` that `init` and `update` write when the
+/// file is absent: the payload content with the id prefix `prefix`, and for the
+/// deliverables schema the `backlogId` pattern that `pattern` decides
+/// (`sync::deliverables_content`).
+fn seed_content(
+    target: &Path,
+    prefix: &str,
+    file: &str,
+    pattern: &sync::BacklogIdPattern,
+) -> Result<Vec<u8>, String> {
+    if file == DELIVERABLES_FILE {
+        sync::deliverables_content(target, prefix, pattern)
+    } else {
+        payload_content(file, prefix)
+    }
+}
+
 /// Writes every `SEED_ONCE` file that is absent and reports the ones that
 /// exist as `kept`. An absent path in `owned` stays absent. The kit's rules
-/// are no seed-once files: they come as packs. `knowledge/schema.json` is
-/// baselined when it is written. On an existing install (`existing_install`)
-/// an absent `knowledge/areas.json` is left to `seed_areas_of_installed_packs`
-/// (spec C18). Returns `true` when it wrote `knowledge/areas.json` from the
-/// kit.
+/// are no seed-once files: they come as packs. A D3 file (`D3_FILES`) is
+/// baselined when it is written. The deliverables schema holds the
+/// `backlogId` pattern that `pattern` decides. On an existing install
+/// (`existing_install`) an absent `knowledge/areas.json` is left to
+/// `seed_areas_of_installed_packs` (spec C18). Returns `true` when it wrote
+/// `knowledge/areas.json` from the kit.
 fn seed_once_files(
     target: &Path,
     prefix: &str,
     owned: &[String],
     existing_install: bool,
+    pattern: &sync::BacklogIdPattern,
     baselines: &mut Map<String, Value>,
 ) -> Result<bool, String> {
     let mut wrote_areas = false;
@@ -748,10 +756,10 @@ fn seed_once_files(
         if is_overridden(owned, file) || (existing_install && file == AREAS_FILE) {
             continue;
         }
-        let content = payload_content(file, prefix)?;
+        let content = seed_content(target, prefix, file, pattern)?;
         write_into(target, file, &content)?;
         println!("wrote {file}");
-        if file == SCHEMA_FILE {
+        if D3_FILES.contains(&file) {
             baselines.insert(file.to_string(), json!(baseline::hash(&content)));
         }
         wrote_areas |= file == AREAS_FILE;
@@ -789,10 +797,11 @@ fn seed_areas_of_installed_packs(
     Ok(())
 }
 
-/// Installs each kit pack into a new install: writes the copy in emit form,
-/// adds the areas it declares and `knowledge/areas.json` lacks, and pins it
-/// with `source: kit`. A copy that exists is kept. An existing install never
-/// reaches this function (spec C18).
+/// Installs each pack of `DEFAULT_PACKS` into a new install: writes the copy
+/// in emit form, adds the areas it declares and `knowledge/areas.json` lacks,
+/// and pins it with `source: kit`. A copy that exists is kept. An existing
+/// install never reaches this function (spec C18). The other kit packs come
+/// with `pack add`.
 ///
 /// When `areas_seeded` is `true`, `init` wrote `knowledge/areas.json` from the
 /// kit in this run, so each area that holds the globs of the pack that
@@ -805,7 +814,10 @@ fn seed_packs(
     pins: &mut BTreeMap<String, Pin>,
     areas_seeded: bool,
 ) -> Result<(), String> {
-    for pack in kit_packs() {
+    for pack in kit_packs()
+        .into_iter()
+        .filter(|pack| DEFAULT_PACKS.contains(&pack.name.as_str()))
+    {
         let relative = pack_copy_path(&pack.name);
         let copy = join_components(target, &relative);
         if copy.exists() {
@@ -838,6 +850,40 @@ fn seed_packs(
             println!("{line}");
         }
     }
+    Ok(())
+}
+
+/// The line of `.gitignore` that keeps the scratch output of the step out of
+/// the repository (spec 4.4a).
+const STEP_IGNORE_LINE: &str = ".houserules/step/";
+
+/// Adds `STEP_IGNORE_LINE` to the `.gitignore` of the install root: it writes
+/// a new file, or appends the line to a file that lacks it and keeps every
+/// line of the project. A `.gitignore` in `owned` is the project's own and
+/// stays as it is. It prints one line for the file.
+fn seed_gitignore(target: &Path, owned: &[String]) -> Result<(), String> {
+    const FILE: &str = ".gitignore";
+    if is_overridden(owned, FILE) {
+        return Ok(());
+    }
+    let Some(mut bytes) = read_if_present(&target.join(FILE))? else {
+        write_into(target, FILE, format!("{STEP_IGNORE_LINE}\n").as_bytes())?;
+        println!("wrote {FILE}");
+        return Ok(());
+    };
+    if String::from_utf8_lossy(&bytes)
+        .lines()
+        .any(|line| line.trim() == STEP_IGNORE_LINE)
+    {
+        println!("kept {FILE} ({STEP_IGNORE_LINE} already present)");
+        return Ok(());
+    }
+    if !bytes.is_empty() && !bytes.ends_with(b"\n") {
+        bytes.push(b'\n');
+    }
+    bytes.extend_from_slice(format!("{STEP_IGNORE_LINE}\n").as_bytes());
+    write_into(target, FILE, &bytes)?;
+    println!("merged {FILE} ({STEP_IGNORE_LINE} added)");
     Ok(())
 }
 
@@ -903,13 +949,54 @@ fn seed_settings(target: &Path, prefix: &str, owned: &[String]) -> Result<(), St
     Ok(())
 }
 
+/// Adds the `SessionStart` entry that runs the session-start script of the
+/// workflow (spec 4.3) to `.claude/settings.json`, where the install pins a
+/// workflow and `owned` lists neither the settings file nor the script. The
+/// caller has checked that the Claude renderer is on. A file that has a hook
+/// command which names the script has the entry already. It prints one line
+/// when it changes the file.
+fn seed_workflow_hook(target: &Path, marker: &Marker) -> Result<(), String> {
+    let Some(pin) = workflow::pins::read(marker)? else {
+        return Ok(());
+    };
+    let owned = marker.owned_paths();
+    if is_overridden(&owned, SETTINGS_PATH) || is_overridden(&owned, workflow::SESSION_START_SCRIPT)
+    {
+        return Ok(());
+    }
+    let names_the_script = |entry: &Value| {
+        entry["hooks"].as_array().is_some_and(|hooks| {
+            hooks.iter().any(|hook| {
+                hook["command"]
+                    .as_str()
+                    .is_some_and(|command| command.contains(workflow::SESSION_START_SCRIPT))
+            })
+        })
+    };
+    let added = merge_session_start(
+        &target.join(SETTINGS_PATH),
+        vec![workflow::session_start_entry()],
+        |existing, _| existing.iter().any(names_the_script),
+    )?;
+    if added {
+        println!(
+            "merged {SETTINGS_PATH} ({} workflow SessionStart hook added)",
+            pin.name
+        );
+    }
+    Ok(())
+}
+
 /// Seeds `target` as a 2.0 install from the embedded payload: the
 /// `KIT_OWNED` files (`seed_kit_owned`), the absent `SEED_ONCE` files, the
-/// five kit packs with their pins (a new install only: an existing 2.0 install
-/// gets no pack and no area, spec C18), the CI workflow for a GitHub-hosted
-/// origin, and `.claude/settings.json` with the hook entry; then it stamps
+/// `DEFAULT_PACKS` with their pins (a new install only: an existing 2.0 install
+/// gets no pack and no area, spec C18), the `.houserules/step/` line of
+/// `.gitignore`, the deliverables schema and the CI workflow for a GitHub-hosted
+/// origin (each in the form of the tracker that the same command installs, so
+/// that the tracker's own write of it finds it current), and
+/// `.claude/settings.json` with the hook entry; then it stamps
 /// `.houserules.json` and renders the generated markdown. It writes no file
-/// that exists but four (this module's own doc names them), and it never
+/// that exists but five (this module's own doc names them), and it never
 /// seeds a path in the marker's owned paths. Without
 /// `target_claude`, and on an install whose `renderers` lacks `claude`, it
 /// leaves out the Claude Code files and the hook entry (spec 7, C9) and
@@ -919,12 +1006,31 @@ fn seed_settings(target: &Path, prefix: &str, owned: &[String]) -> Result<(), St
 /// `--id-prefix` flag and then `WI` -- never the flag alone, so a re-`init`
 /// over an install that already committed to a prefix cannot backfill a
 /// `PREFIXED` file under a different one. An install of houserules 1.x is
-/// refused: `update` converts it. So is an install root that nests with
-/// another install of the repository or that would write another install's
-/// workflow file (`location::refuse_overlap`), and a root whose path a
-/// workflow cannot hold (`Workflow::for_install`); each refusal comes before
-/// any write.
-fn seed(target: &Path, id_prefix: Option<String>, target_claude: bool) -> Result<(), String> {
+/// refused: `update` converts it. So is a new install root (one with no
+/// marker yet) that nests with another install of the repository or that
+/// would write another install's workflow file (`location::refuse_overlap`),
+/// and a root whose path a workflow cannot hold (`Workflow::for_install`);
+/// each refusal comes before any write. A target that holds its own marker is
+/// no new root: `init` runs no overlap check there, as `update` runs none, so
+/// that the remedy of line A (`init --tracker json`) works on an install
+/// whose repository tracks another `.houserules.json` below the root.
+///
+/// With a `workflow_request`, `init` refuses before any write when the install
+/// has no tracker and `request` names none (spec 4.3), and installs the
+/// workflow after the tracker (`install_workflow`).
+///
+/// With a tracker `request`, `init` then installs the tracker (spec 3.3): the
+/// refusals of `tracker_to_install` come before any write too, the per-adapter
+/// work follows the stamp (`tracker::prepare_init`), and the `tracker` key of
+/// the marker is the last write before the render, so that a stop in between
+/// leaves a tree that the next `init --tracker` finishes.
+fn seed(
+    target: &Path,
+    id_prefix: Option<String>,
+    target_claude: bool,
+    request: Option<&TrackerRequest>,
+    workflow_request: Option<&WorkflowRequest>,
+) -> Result<(), String> {
     let placement = location::locate(target)?;
     let prefix = id_prefix.unwrap_or_else(|| "WI".to_string());
     if !is_id_prefix(&prefix) {
@@ -934,12 +1040,36 @@ fn seed(target: &Path, id_prefix: Option<String>, target_claude: bool) -> Result
     if marker.is_1_x() {
         return Err(unconverted_line(marker.path()));
     }
-    location::refuse_overlap(&placement, &location::other_installs(&placement)?)?;
+    if marker.is_fresh() {
+        location::refuse_overlap(&placement, &location::other_installs(&placement)?)?;
+    }
+    let tracker_install = request
+        .map(|request| tracker_to_install(target, &marker, request))
+        .transpose()?
+        .flatten();
+    let manifest = workflow_request.map(|request| request.workflow.manifest());
+    if let Some(manifest) = &manifest
+        && request.is_none()
+        && marker.tracker()?.is_none()
+    {
+        return Err(workflow::needs_tracker_at_init(manifest));
+    }
     let effective_prefix = marker.id_prefix_or(&prefix);
+    let adapter = match &tracker_install {
+        Some(install) => Some(install.config.adapter),
+        None => marker.tracker()?.map(|config| config.adapter),
+    };
     let workflow = Workflow::for_install(
         &placement,
-        &payload_content(workflow::TEMPLATE_PATH, &effective_prefix)?,
+        &ci_workflow::template_for(adapter, &effective_prefix)?,
     )?;
+    let backlog_id_pattern = match &tracker_install {
+        Some(install) => sync::BacklogIdPattern::Named(
+            tracker::install_backlog_id_pattern(target, &effective_prefix, install)
+                .map_err(|error| error.to_string())?,
+        ),
+        None => sync::BacklogIdPattern::Kit,
+    };
     let claude = target_claude || (!marker.is_fresh() && marker.claude_enabled());
     let existing_install = marker.is_2_0();
     let owned = marker.owned_paths();
@@ -960,6 +1090,7 @@ fn seed(target: &Path, id_prefix: Option<String>, target_claude: bool) -> Result
         &effective_prefix,
         &owned,
         existing_install,
+        &backlog_id_pattern,
         &mut baselines,
     )?;
     if !existing_install {
@@ -967,9 +1098,11 @@ fn seed(target: &Path, id_prefix: Option<String>, target_claude: bool) -> Result
     } else if areas_absent {
         seed_areas_of_installed_packs(target, &mut pins)?;
     }
+    seed_gitignore(target, &owned)?;
     seed_workflow(&placement, &workflow, &owned, &mut baselines)?;
     if claude {
         seed_settings(target, &effective_prefix, &owned)?;
+        seed_workflow_hook(target, &marker)?;
     }
 
     let renderers = marker.renderers_for_init(target_claude);
@@ -981,6 +1114,12 @@ fn seed(target: &Path, id_prefix: Option<String>, target_claude: bool) -> Result
         baselines,
     });
     marker.write()?;
+    if let Some(install) = &tracker_install {
+        install_tracker(target, &mut marker, install)?;
+    }
+    if let (Some(request), Some(manifest)) = (workflow_request, &manifest) {
+        install_workflow(target, &mut marker, request, manifest)?;
+    }
     crate::rules::render_and_report(target)?;
     println!("houserules: initialized {}", target.display());
     if !claude {
@@ -990,15 +1129,233 @@ fn seed(target: &Path, id_prefix: Option<String>, target_claude: bool) -> Result
     Ok(())
 }
 
+/// A workflow that `init --workflow` installs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub(crate) enum InitWorkflow {
+    /// The reference workflow: agent templates, skills, evals, and a commit-msg
+    /// hook that fill the report format of the kit.
+    Reference,
+}
+
+impl InitWorkflow {
+    /// The manifest of the workflow, as the binary carries it.
+    fn manifest(self) -> workflow::Manifest {
+        match self {
+            InitWorkflow::Reference => workflow::reference(),
+        }
+    }
+}
+
+/// What `init --workflow` asks for: the workflow, and whether `init` adds the
+/// packs that hold the rules the workflow requires.
+pub(crate) struct WorkflowRequest {
+    /// The workflow to install.
+    pub(crate) workflow: InitWorkflow,
+    /// The `--add-required-packs` flag.
+    pub(crate) add_required_packs: bool,
+}
+
+/// Installs the workflow `manifest` into the install that `marker` holds,
+/// which `init` has stamped and written, with its tracker. The packs that
+/// provide the required rules and that the install lacks are added through
+/// `pack add` with `--add-required-packs` (the marker is read again, since
+/// the command writes it), and named in one line without it. Then it writes
+/// the files and the pins (`workflow::install`), and the marker, the last
+/// write.
+fn install_workflow(
+    target: &Path,
+    marker: &mut Marker,
+    request: &WorkflowRequest,
+    manifest: &workflow::Manifest,
+) -> Result<(), String> {
+    let missing = workflow::requirements::packs_to_add(manifest, &marker.pins()?);
+    if request.add_required_packs {
+        for name in &missing {
+            for line in crate::pack::add(target, name)? {
+                println!("{line}");
+            }
+        }
+        *marker = Marker::read(target)?;
+    } else if !missing.is_empty() {
+        println!(
+            "{}",
+            workflow::requirements::add_packs_line(manifest, &missing)
+        );
+    }
+    for line in workflow::install(target, marker, manifest)? {
+        println!("{line}");
+    }
+    if marker.claude_enabled() {
+        seed_workflow_hook(target, marker)?;
+    }
+    marker.write()
+}
+
+/// What `init --tracker` asks for: the adapter, and for GitHub the
+/// repository that `--repo` names.
+pub(crate) struct TrackerRequest {
+    /// The adapter to install.
+    pub(crate) adapter: Adapter,
+    /// The `--repo` value, when the command line has one.
+    pub(crate) repo: Option<String>,
+}
+
+/// The tracker that `init` installs for `request` on the install that
+/// `marker` holds, or `None` when the install already has that adapter, so
+/// that `init --tracker json` on a JSON install does nothing for the tracker.
+/// The refusals of spec 3.3, each one line and each before any write: a
+/// `--repo` that is no `<owner>/<name>` or that goes with another adapter, an
+/// install with another tracker, `github` or `beads` over a `backlog/`
+/// directory, `github` with neither `--repo` nor an `origin` remote that names
+/// a repository, and `beads` with no `bd`, no store, or a store whose issue
+/// prefix `bd` cannot name. The one read of that prefix is here, so that a
+/// refused `init --tracker` writes nothing on every adapter (C37).
+fn tracker_to_install(
+    target: &Path,
+    marker: &Marker,
+    request: &TrackerRequest,
+) -> Result<Option<TrackerInstall>, String> {
+    if let Some(repo) = &request.repo {
+        if request.adapter != Adapter::Github {
+            return Err(tracker::lines::REPO_NEEDS_GITHUB.to_string());
+        }
+        if !tracker::is_repo_name(repo) {
+            return Err(tracker::lines::repo_is_malformed(repo));
+        }
+    }
+    if let Some(installed) = marker.tracker()? {
+        return if installed.adapter == request.adapter {
+            Ok(None)
+        } else {
+            Err(tracker::lines::already_has_tracker(
+                installed.adapter.as_str(),
+            ))
+        };
+    }
+    if request.adapter != Adapter::Json && target.join("backlog").is_dir() {
+        return Err(tracker::lines::BACKLOG_HOLDS_JSON_DATA.to_string());
+    }
+    let repo = match request.adapter {
+        Adapter::Github => Some(
+            request
+                .repo
+                .clone()
+                .or_else(|| origin_url(target).and_then(|url| repository_of_url(&url)))
+                .ok_or_else(|| tracker::lines::GITHUB_NEEDS_REPOSITORY.to_string())?,
+        ),
+        Adapter::Json | Adapter::Beads => None,
+    };
+    let issue_prefix = match request.adapter {
+        Adapter::Beads => {
+            Some(tracker::beads::prefix_for_init(target).map_err(|error| error.to_string())?)
+        }
+        Adapter::Json | Adapter::Github => None,
+    };
+    Ok(Some(TrackerInstall {
+        config: TrackerConfig {
+            adapter: request.adapter,
+            repo,
+        },
+        issue_prefix,
+    }))
+}
+
+/// Installs the tracker `install` into the install that `marker` holds, which
+/// `init` has stamped and written: the per-adapter work and its lines
+/// (`tracker::prepare_init`), then the `tracker` key, the last write. The
+/// `backlogId` pattern that `prepare_init` writes is a setting of the install
+/// and no change by the project, so a deliverables schema that was at its
+/// baseline stays at it.
+fn install_tracker(
+    target: &Path,
+    marker: &mut Marker,
+    install: &TrackerInstall,
+) -> Result<(), String> {
+    let config = &install.config;
+    let schema = join_components(target, DELIVERABLES_FILE);
+    let before = read_if_present(&schema)?;
+    for line in tracker::prepare_init(target, marker, install).map_err(|error| error.to_string())? {
+        println!("{line}");
+    }
+    if let (Some(before), Some(after)) = (before, read_if_present(&schema)?)
+        && before != after
+    {
+        let mut baselines = marker.baselines();
+        if baseline_hash(&baselines, DELIVERABLES_FILE) == Some(baseline::hash(&before).as_str()) {
+            baselines.insert(DELIVERABLES_FILE.to_string(), json!(baseline::hash(&after)));
+            marker.set_baselines(baselines);
+        }
+    }
+    marker.set_tracker(config);
+    marker.write()?;
+    match &config.repo {
+        Some(repo) => println!("tracker: {} ({repo})", config.adapter.as_str()),
+        None => println!("tracker: {}", config.adapter.as_str()),
+    }
+    Ok(())
+}
+
+/// Seeds the files of the JSON tracker into `target`: each `TRACKER_DATA`
+/// file and `TRACKER_SCHEMA` that is missing is written, listed as `wrote`;
+/// one that exists is kept and listed as `kept`, whatever it holds; a path in
+/// `ownedPaths` is kept when it exists and left absent when it does not. The
+/// schema is a D3 file: it is baselined in `marker` when written here or
+/// found at the kit's bytes. Returns the lines `init` prints.
+pub(crate) fn seed_tracker_files(
+    target: &Path,
+    marker: &mut Marker,
+) -> Result<Vec<String>, String> {
+    let prefix = marker.id_prefix_or("WI");
+    let owned = marker.owned_paths();
+    let mut baselines = marker.baselines();
+    let mut lines = Vec::new();
+    for &file in TRACKER_DATA.iter().chain([&TRACKER_SCHEMA]) {
+        let is_owned = is_overridden(&owned, file);
+        let content = payload_content(file, &prefix)?;
+        match read_if_present(&join_components(target, file))? {
+            None if is_owned => continue,
+            None => {
+                write_into(target, file, &content)?;
+                lines.push(format!("wrote {file}"));
+            }
+            Some(current) => {
+                lines.push(format!("kept {file}"));
+                if is_owned || current != content {
+                    continue;
+                }
+            }
+        }
+        if file == TRACKER_SCHEMA {
+            baselines.insert(file.to_string(), json!(baseline::hash(&content)));
+        }
+    }
+    marker.set_baselines(baselines);
+    Ok(lines)
+}
+
+/// Writes the seeded CI workflow of the install for the tracker `adapter`
+/// (`ci_workflow::write_for`); the lines name each file written.
+pub(crate) fn write_ci_workflow(
+    root: &Path,
+    marker: &mut Marker,
+    adapter: Option<Adapter>,
+) -> Result<Vec<String>, String> {
+    ci_workflow::write_for(root, marker, adapter)
+}
+
 /// Runs the `init` subcommand: resolves `dir` via
 /// `node_path::resolve_like_node` (this module's own doc explains why
 /// this, not `crate::root::resolve_root`'s git-root walk, is the correct
-/// resolution here), then seeds it from the embedded payload. Every error
-/// is one named stderr line and exit 2 (`houserules.crash-paths-are-named`).
+/// resolution here), then seeds it from the embedded payload, and installs
+/// the tracker that `request` names and the workflow that `workflow_request`
+/// names. Every error is one named stderr line and exit 2
+/// (`houserules.crash-paths-are-named`).
 pub(crate) fn cmd_init(
     dir: Option<PathBuf>,
     id_prefix: Option<String>,
     target: Option<InitTarget>,
+    request: Option<TrackerRequest>,
+    workflow_request: Option<WorkflowRequest>,
 ) -> ExitCode {
     let root = match resolve_like_node(dir.as_deref().unwrap_or_else(|| Path::new("."))) {
         Ok(root) => root,
@@ -1007,7 +1364,13 @@ pub(crate) fn cmd_init(
             return ExitCode::from(2);
         }
     };
-    match seed(&root, id_prefix, target == Some(InitTarget::Claude)) {
+    match seed(
+        &root,
+        id_prefix,
+        target == Some(InitTarget::Claude),
+        request.as_ref(),
+        workflow_request.as_ref(),
+    ) {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             eprintln!("{message}");
@@ -1050,21 +1413,32 @@ fn convert_or_move_packs(
 /// Writes every `SEED_ONCE` path that is absent and that `owned` does not
 /// list (a later kit release can add one after the install's `init` ran), and
 /// the CI workflow of the install when it is absent, not owned, and the
-/// origin is GitHub hosted; the workflow gets its baseline.
+/// origin is GitHub hosted; a D3 file gets its baseline. With the JSON
+/// tracker (`plan.json_tracker`) it also writes each absent `TRACKER_DATA` file
+/// and the schema of the tracker. The deliverables schema holds the `backlogId`
+/// pattern of the plan (`sync::deliverables_content`).
 fn backfill_missing_files(
-    target: &Path,
-    prefix: &str,
-    owned: &[String],
+    plan: &sync::Plan,
     placement: &Placement,
-    workflow: &Workflow,
     baselines: &mut Map<String, Value>,
 ) -> Result<(), String> {
-    for file in SEED_ONCE {
+    let (target, prefix, owned, workflow) = (plan.target, plan.prefix, plan.owned, plan.workflow);
+    let tracker_data: &[&str] = if plan.json_tracker { TRACKER_DATA } else { &[] };
+    let tracker_schema: &[&str] = if plan.json_tracker {
+        &[TRACKER_SCHEMA]
+    } else {
+        &[]
+    };
+    for file in SEED_ONCE.iter().chain(tracker_data).chain(tracker_schema) {
         if target.join(file).exists() || is_overridden(owned, file) {
             continue;
         }
-        write_into(target, file, &payload_content(file, prefix)?)?;
+        let content = seed_content(target, prefix, file, plan.backlog_id_pattern)?;
+        write_into(target, file, &content)?;
         println!("wrote {file}");
+        if D3_FILES.contains(file) || *file == TRACKER_SCHEMA {
+            baselines.insert(file.to_string(), json!(baseline::hash(&content)));
+        }
     }
     let top_level_workflow = placement.top_level.join(&workflow.path);
     if !top_level_workflow.exists()
@@ -1079,6 +1453,28 @@ fn backfill_missing_files(
         );
     }
     Ok(())
+}
+
+/// What decides the `backlogId` pattern of the install at `root` (spec 3.9):
+/// the pattern that its tracker names, the pattern of the kit (any token) for
+/// an install with no tracker, or the pattern that the schema holds for a
+/// tracker that cannot name its pattern (Beads with an unreachable `bd`):
+/// `update` prints the unreachable line of spec 3.4 on stderr and goes on
+/// (C38). A `tracker` key that cannot be read is an error.
+fn tracker_backlog_id_pattern(
+    root: &Path,
+    marker: &Marker,
+) -> Result<sync::BacklogIdPattern, String> {
+    let Some(tracker) = tracker::installed(root, marker).map_err(|error| error.to_string())? else {
+        return Ok(sync::BacklogIdPattern::Kit);
+    };
+    Ok(match tracker.backlog_id_pattern() {
+        Ok(pattern) => sync::BacklogIdPattern::Named(pattern),
+        Err(error) => {
+            eprintln!("{error}");
+            sync::BacklogIdPattern::Held
+        }
+    })
 }
 
 /// Syncs `target` from the embedded payload against its recorded ownership
@@ -1122,57 +1518,62 @@ fn update(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
     let effective_prefix = marker.id_prefix_or(&prefix);
     let workflow = Workflow::for_install(
         &placement,
-        &payload_content(workflow::TEMPLATE_PATH, &effective_prefix)?,
+        &payload_content(ci_workflow::TEMPLATE_PATH, &effective_prefix)?,
     )?;
 
     let mut hand_steps = Vec::new();
     if previously_seeded {
-        hand_steps = convert_or_move_packs(
-            &conversion::Context {
-                root: target,
-                top_level: &placement.top_level,
-                prefix: &effective_prefix,
-                workflow: &workflow,
-            },
-            &mut marker,
-        )?;
+        let ctx = conversion::Context {
+            root: target,
+            top_level: &placement.top_level,
+            prefix: &effective_prefix,
+            workflow: &workflow,
+        };
+        hand_steps = convert_or_move_packs(&ctx, &mut marker)?;
         marker = Marker::read_or_default(target, &prefix)?;
+        hand_steps.extend(conversion::steps::run(&ctx, &mut marker)?);
     }
     let owned = marker.owned_paths();
     let mut baselines = marker.baselines();
+    let adapter = marker.tracker()?.map(|config| config.adapter);
+    let json_tracker = adapter == Some(Adapter::Json) && target.join("backlog").is_dir();
+    let kit_workflow = Workflow::for_install(
+        &placement,
+        &ci_workflow::template_for(adapter, &effective_prefix)?,
+    )?;
+    let backlog_id_pattern = tracker_backlog_id_pattern(target, &marker)?;
+    let plan = sync::Plan {
+        target,
+        prefix: &effective_prefix,
+        owned: &owned,
+        claude_enabled: marker.claude_enabled(),
+        json_tracker,
+        adapter,
+        backlog_id_pattern: &backlog_id_pattern,
+        top_level: &placement.top_level,
+        workflow: &kit_workflow,
+    };
 
     let mut sync_lines = Vec::new();
-    let synced = sync::sync_owned_files(
-        &sync::Plan {
-            target,
-            prefix: &effective_prefix,
-            owned: &owned,
-            claude_enabled: marker.claude_enabled(),
-            top_level: &placement.top_level,
-            workflow: &workflow,
-        },
-        &mut baselines,
-        &mut sync_lines,
-    );
+    let synced = sync::sync_owned_files(&plan, &mut baselines, &mut sync_lines, &mut hand_steps);
     for line in &sync_lines {
         println!("{line}");
     }
     synced?;
+    for line in workflow::sync(target, &mut marker, &workflow::reference())? {
+        println!("{line}");
+    }
     for file in delete_retired(target, RETIRED)? {
         println!("removed {file}");
     }
 
     if previously_seeded {
-        backfill_missing_files(
-            target,
-            &effective_prefix,
-            &owned,
-            &placement,
-            &workflow,
-            &mut baselines,
-        )?;
+        backfill_missing_files(&plan, &placement, &mut baselines)?;
     }
 
+    if let Some(line) = workflow::forget_pinned_baselines(&marker, &mut baselines)? {
+        println!("{line}");
+    }
     for step in &hand_steps {
         println!("{}{step}", hand_steps::PREFIX);
     }
@@ -1218,9 +1619,11 @@ pub(crate) fn cmd_update(dir: Option<PathBuf>, id_prefix: Option<String>) -> Exi
 }
 
 /// Runs the `files` subcommand: prints the file classes of the kit as JSON:
-/// the kit-owned files, the seed-once files, the copies of the kit packs, and
-/// the D3 files. Each path is in exactly one class: the D3 files, the CI
-/// workflow among them, are not seed-once files.
+/// the kit-owned files, the seed-once files, the copies of the kit packs, the
+/// D3 files, the tracker files (the five data files and the schema of the
+/// JSON tracker), the files of the reference workflow, and its data file.
+/// Each path is in exactly one class: the D3 files, the CI workflow among
+/// them, are not seed-once files.
 pub(crate) fn cmd_files() -> ExitCode {
     let seed_once: Vec<&str> = SEED_ONCE
         .iter()
@@ -1231,6 +1634,11 @@ pub(crate) fn cmd_files() -> ExitCode {
         .iter()
         .map(|pack| pack_copy_path(&pack.name))
         .collect();
+    let tracker_files: Vec<&str> = TRACKER_DATA
+        .iter()
+        .copied()
+        .chain([TRACKER_SCHEMA])
+        .collect();
     print!(
         "{}",
         emit(&json!({
@@ -1238,6 +1646,9 @@ pub(crate) fn cmd_files() -> ExitCode {
             "seedOnce": seed_once,
             "packCopies": pack_copies,
             "d3Files": D3_FILES,
+            "trackerFiles": tracker_files,
+            "workflowFiles": workflow::reference().files,
+            "workflowData": workflow::DATA_FILES,
         }))
     );
     ExitCode::SUCCESS
@@ -1257,7 +1668,8 @@ mod tests {
             .iter()
             .chain(SEED_ONCE)
             .chain(D3_FILES)
-            .chain([&SETTINGS_PATH])
+            .chain(TRACKER_DATA)
+            .chain([&TRACKER_SCHEMA, &SETTINGS_PATH])
         {
             assert!(
                 Payload::get(file).is_some(),
@@ -1499,11 +1911,14 @@ mod tests {
     }
 
     /// The knowledge base, the scope, and the citation scan of the shipped
-    /// state: the base holds the kit packs of `template/packs/` as installed
-    /// copies, and its root is `template/`, where the kit-owned files lie.
-    /// Fails when a kit-owned file is absent from `template/`, because the
-    /// lint would skip it without a line.
+    /// state, over a scratch install: the base holds the kit packs of
+    /// `template/packs/` as installed copies, and its root holds the kit-owned
+    /// files of `template/` and the files of the reference workflow at their
+    /// install paths, as an install with the workflow pins them. The guard
+    /// keeps the scratch install alive. Fails when a file is absent from
+    /// `template/`, because the lint would skip it without a line.
     fn template_citations() -> (
+        tempfile::TempDir,
         crate::rules::Base,
         crate::rules::KitScope,
         crate::rules::Scan,
@@ -1525,29 +1940,36 @@ mod tests {
             )
             .expect("copy a kit pack");
         }
-        let mut base = crate::rules::load_base(scratch.path()).expect("the kit packs load");
-        base.root = template.clone();
-        let scope = kit_citation_scope(&template).expect("template/ carries no stamp");
-        for file in &scope.owned_files {
-            assert!(
-                template.join(file).is_file(),
-                "{file} is kit-owned but absent from template/, so the lint would skip it"
-            );
+        let manifest = workflow::reference();
+        for file in KIT_OWNED {
+            let bytes = fs::read(template.join(file)).unwrap_or_else(|error| {
+                panic!("{file} is kit-owned but absent from template/, so the lint would skip it: {error}")
+            });
+            write_into(scratch.path(), file, &bytes).expect("write a kit-owned file");
         }
+        for file in &manifest.files {
+            write_into(scratch.path(), file, &manifest.content(file))
+                .expect("write a workflow file");
+        }
+        let base = crate::rules::load_base(scratch.path()).expect("the kit packs load");
+        let mut scope =
+            kit_citation_scope(scratch.path()).expect("the scratch install carries no stamp");
+        scope.owned_files.extend(manifest.files.iter().cloned());
         let scan = crate::rules::scan_kit_citations(&base, &scope);
-        (base, scope, scan)
+        (scratch, base, scope, scan)
     }
 
-    /// The kit-side proof: every id a kit-owned file under `template/`
-    /// cites resolves in the kit packs of `template/packs/`. Both sides come from the
-    /// code: the kit-owned list from `kit_citation_scope`, the ids from the
-    /// lint's own extractor. Two controls keep the pass from being vacuous:
+    /// The kit-side proof: every id a kit-owned file or a file of the
+    /// reference workflow cites resolves in the kit packs of
+    /// `template/packs/`. Both sides come from the code: the file lists from
+    /// `kit_citation_scope` and the manifest, the ids from the lint's own
+    /// extractor. Two controls keep the pass from being vacuous:
     /// the extractor sees a citation the kit is known to make, and the lint
     /// reports that citation once its entry leaves the base. The test prints
     /// the count of distinct ids it checked (visible with `--nocapture`).
     #[test]
     fn shipped_kit_owned_files_cite_only_shipped_ids() {
-        let (base, scope, scan) = template_citations();
+        let (_scratch, base, scope, scan) = template_citations();
         let distinct: std::collections::BTreeSet<&str> = scan
             .cited
             .iter()
@@ -1610,7 +2032,7 @@ mod tests {
             !directories.is_empty(),
             "the skill's grep names no directory"
         );
-        let (_, _, scan) = template_citations();
+        let (_scratch, _, _, scan) = template_citations();
         for citation in &scan.cited {
             assert!(
                 directories

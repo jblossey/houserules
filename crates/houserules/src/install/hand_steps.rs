@@ -9,7 +9,60 @@
 use crate::pack::source::PackSource;
 
 /// The prefix of a printed hand step.
-pub(super) const PREFIX: &str = "hand step: ";
+pub(crate) const PREFIX: &str = "hand step: ";
+
+/// Step 2 of the conversion steps of batch 34 (spec 4.7): the file at a path of
+/// the workflow `workflow` is not the kit's, so the workflow leaves it to the
+/// project. `update` and `init --workflow` print it once for the path.
+pub(crate) fn not_the_kits(workflow: &str, path: &str) -> String {
+    format!("{path} is not the kit's; the {workflow} workflow leaves it to the project")
+}
+
+/// Step 2 (spec 4.7) and `check-knowledge` (spec 4.3): the project excludes the
+/// rule `id`, which the workflow `workflow` requires.
+pub(crate) fn workflow_excludes_a_required_id(workflow: &str, id: &str) -> String {
+    format!(
+        "workflow {workflow} requires {id}, which knowledge/overrides.json excludes; remove the exclusion, and override the entry to change it"
+    )
+}
+
+/// Step 2 (spec 4.7): the install adopted the reference workflow and has no
+/// tracker.
+pub(super) fn workflow_needs_a_tracker() -> String {
+    "the reference workflow and the process pack need a tracker; run houserules init --tracker json|github|beads".to_string()
+}
+
+/// Step 3 (spec 4.7): the session-start script of the claude renderer is the
+/// project's and still holds the ritual line that the reference workflow moved
+/// to its own script.
+pub(super) fn ritual_line_stays_in_the_session_script() -> String {
+    "tools/claude-session-start.sh holds the reference workflow's ritual line; move it to tools/reference-session-start.sh".to_string()
+}
+
+/// Step 4 (spec 4.7): the schema at `path` equals no content that houserules
+/// shipped, so `update` kept it.
+pub(super) fn schema_kept(path: &str) -> String {
+    format!(
+        "{path} differs from every content of it that houserules shipped, so houserules update kept it; compare it with the file that houserules init writes, and merge the rest by hand"
+    )
+}
+
+/// The seeded CI workflow (spec 4.8): the file at `path` is the project's, and
+/// it lacks the lines that the GitHub tracker needs.
+pub(super) fn ci_lacks_the_github_lines(path: &str) -> String {
+    format!(
+        "{path} lacks the lines that the github tracker needs; add permissions: {{contents: read, issues: read}} to the gates job, and env: {{GH_TOKEN: ${{{{ github.token }}}}}} to each step that runs houserules check-backlog or houserules audit"
+    )
+}
+
+/// The seeded CI workflow (spec 4.8): the file at `path` is the project's, and
+/// it lacks the steps that the Beads tracker needs. `bd_version` is the release
+/// of `bd` that the kit pins.
+pub(super) fn ci_lacks_the_beads_steps(path: &str, bd_version: &str) -> String {
+    format!(
+        "{path} lacks the steps that the beads tracker needs; add a step that installs bd {bd_version} from its GitHub release, and a step that runs bd bootstrap --yes, before the step that runs houserules check-backlog"
+    )
+}
 
 /// Step 0: a 1.x topic file `knowledge/overrides.json` holds the reserved
 /// name of the file that 2.0 reads as the overrides of the project. The
@@ -99,11 +152,14 @@ mod tests {
     const GUIDE: &str = "../../docs/upgrading-to-2.md";
 
     /// The names of the functions of this module, read from its own source:
-    /// each line that starts with `pub(super) fn `.
+    /// each line that starts with `pub(super) fn ` or `pub(crate) fn `.
     fn function_names() -> BTreeSet<String> {
         include_str!("hand_steps.rs")
             .lines()
-            .filter_map(|line| line.strip_prefix("pub(super) fn "))
+            .filter_map(|line| {
+                line.strip_prefix("pub(super) fn ")
+                    .or_else(|| line.strip_prefix("pub(crate) fn "))
+            })
             .map(|rest| rest.split('(').next().expect("a name").to_string())
             .collect()
     }
@@ -133,6 +189,25 @@ mod tests {
             ("schema_differs", schema_differs()),
             ("schema_unreadable", schema_unreadable()),
             ("workflow_differs", workflow_differs("<path>")),
+            ("not_the_kits", not_the_kits("reference", "<file>")),
+            (
+                "workflow_excludes_a_required_id",
+                workflow_excludes_a_required_id("reference", "<id>"),
+            ),
+            ("workflow_needs_a_tracker", workflow_needs_a_tracker()),
+            (
+                "ritual_line_stays_in_the_session_script",
+                ritual_line_stays_in_the_session_script(),
+            ),
+            ("schema_kept", schema_kept("<path>")),
+            (
+                "ci_lacks_the_github_lines",
+                ci_lacks_the_github_lines("<path>"),
+            ),
+            (
+                "ci_lacks_the_beads_steps",
+                ci_lacks_the_beads_steps("<path>", "<bd-version>"),
+            ),
             ("kit_pack_shares_an_id", shared(Some(&git))),
             ("kit_pack_shares_an_id", shared(Some(&file))),
             ("kit_pack_shares_an_id", shared(Some(&PackSource::Kit))),

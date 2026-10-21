@@ -28,13 +28,13 @@ To keep a file for good, list its path in `ownedPaths`:
 
 ```json
 {
-  "ownedPaths": ["tools/claude-session-start.sh", ".github/workflows/knowledge.yml"]
+  "ownedPaths": ["tools/houserules-step.sh", ".github/workflows/knowledge.yml"]
 }
 ```
 
 A listed path governs the whole file, whichever kind it is: a kit-owned
 file, the knowledge schema, the CI workflow, or any other file houserules
-seeds (a backlog file, an eval scenario, `AGENTS.md`, this file). `update`
+seeds (a data file of the tracker, a file of the reference workflow, `AGENTS.md`, this file). `update`
 never writes, replaces, or recreates a listed file again, whatever the kit
 ships for it next, and it prints no line for it. `init` never seeds it.
 The files and blocks that `render` generates follow the knowledge base, not
@@ -101,14 +101,14 @@ version of the running kit and rewrites its copy. It keeps
 the file names, `check-knowledge` names the id: delete that override or
 exclusion.
 
-## Pruning the knowledge base at batch close
+## Pruning the knowledge base
 
-At every batch close, `houserules stats <WORKSPACE>...` over the five most
-recent batch workspaces prints a `proposals` key. Each row proposes to
-`demote`, `retire`, `mechanize`, or `narrow` an entry, or names the budget
-of the standing set. The `orchestrating` skill applies the rows with
-`owner_gate: false` and sends the other rows to the project's owner or
-decider. When the owner or decider rules to keep an entry that a row
+When a body of work closes, `houserules stats <WORKSPACE>...` over the five
+most recent folders of deliverables prints a `proposals` key. Each row
+proposes to `demote`, `retire`, `mechanize`, or `narrow` an entry, or names
+the budget of the standing set. The person who runs the work applies the
+rows with `owner_gate: false` and sends the other rows to the project's
+owner or decider. When the owner or decider rules to keep an entry that a row
 names, tag the entry `ruled-keep`: it then gets no `demote`, `retire`,
 `narrow`, or `mechanize` row, and it still counts toward the budget. Record
 a change to a pack entry that the project retires (`status`), demotes

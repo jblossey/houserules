@@ -54,14 +54,25 @@ fn run_ok(dir: &Path, args: &[&str]) {
     );
 }
 
-/// Installs the kit into `dir` with `init` (a 2.0 install), then makes the
-/// topic `process` a local topic file `knowledge/process.json` that holds the
-/// entries of the pack, and removes the pack. Every test here starts from such
-/// a repository, then edits specific files to build its own scenario, rather
-/// than a hand-built fixture that could drift from what the kit ships. The
-/// sweep moves local entries only, so each scenario needs a local topic file.
+/// Installs the kit into `dir` with `init --tracker json --workflow reference
+/// --add-required-packs` (a 2.0 install with the JSON backlog, the reference
+/// workflow, and the packs it requires: the files that the entries of the
+/// process pack verify exist), then makes the topic `process` a local topic
+/// file
+/// `knowledge/process.json` that holds the entries of the pack, and removes
+/// the pack. Every test here starts from such a repository, then edits
+/// specific files to build its own scenario, rather than a hand-built fixture
+/// that could drift from what the kit ships. The sweep moves local entries
+/// only, so each scenario needs a local topic file.
 fn seed_install(dir: &Path, init_args: &[&str]) {
-    let mut init = vec!["init"];
+    let mut init = vec![
+        "init",
+        "--tracker",
+        "json",
+        "--workflow",
+        "reference",
+        "--add-required-packs",
+    ];
     init.extend(init_args);
     run_ok(dir, &init);
     let copy = read_json(dir, "knowledge/packs/process.json");

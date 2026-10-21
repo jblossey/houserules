@@ -1,6 +1,6 @@
 //! The pack-layer checks of `check-knowledge`, end to end through the
-//! compiled binary, on a scratch install that `houserules init` made, whose
-//! kit packs are pinned copies; the `quality` pack is the one under test: a
+//! compiled binary, on a scratch install that `houserules init` made, with
+//! the `quality` pack added; the `quality` pack is the one under test: a
 //! clean tree passes, and each failing state prints its whole line and exits
 //! with the code the spec names. The checks' own cases are unit tests in
 //! `src/rules/check_packs.rs`.
@@ -72,9 +72,10 @@ fn pin_the_copy(root: &Path) {
     write_json(&path, &stamp);
 }
 
-/// A scratch repository that `houserules init` installed: the kit's five
-/// packs are pinned copies, and the generated files are fresh.
-/// `tempfile`'s `TempDir` removes itself on drop.
+/// A scratch repository that `houserules init` installed, with the pack under
+/// test added: the `knowledge-base` pack and that pack are pinned copies, and
+/// the generated files are fresh. `tempfile`'s `TempDir` removes itself on
+/// drop.
 fn pack_repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let status = Command::new("git")
@@ -88,6 +89,16 @@ fn pack_repo() -> tempfile::TempDir {
         init.status.success(),
         "init failed: {}",
         String::from_utf8_lossy(&init.stderr)
+    );
+    let add = houserules()
+        .args(["pack", "add", PACK, "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run pack add");
+    assert!(
+        add.status.success(),
+        "pack add failed: {}",
+        String::from_utf8_lossy(&add.stderr)
     );
     dir
 }

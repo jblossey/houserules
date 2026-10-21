@@ -1,6 +1,6 @@
 {
   "name": "knowledge-base",
-  "version": "1.0.0",
+  "version": "2.0.1",
   "schema": "houserules/pack@1.0.0",
   "topics": {
     "knowledge-base": {
@@ -27,7 +27,7 @@
       "body": [
         "Dates live in `source.date` and in `kind: history` entries linked by `see`.",
         "The summary is the only text that renders into rule files and indexes.",
-        "The `warn` check reads every changed file under `knowledge/` and `template/knowledge/` for time-sensitive wording and names the first hit with its line. The `pattern` field lists the wording: words for the present day, and a clause that waits on a release. Move the time to `source.date` or to a `kind: history` entry, and state the rule without it. The pattern spells each word with one bracketed letter, so the file that holds the pattern never matches it.",
+        "The `warn` check reads every changed file under `knowledge/` and `template/knowledge/` for time-sensitive wording and names the first hit with its line. The `pattern` field lists the wording: words for the present day, and a clause that waits on a release. Move the time to `source.date` or to a `kind: history` entry, and state the rule without it. Each branch of the pattern carries a bracketed letter, so the file that holds the pattern never matches it. The release clause reads up to 40 characters after `until`; a period that a digit follows, as in 1.3.0, does not end it.",
         "A kit update or archive commit that rewrites a topic file draws the warn for older text in that file, an adopter's own text included. Fix that text as the warn says."
       ],
       "tags": [
@@ -49,7 +49,7 @@
           "knowledge/**/*.json",
           "template/knowledge/**/*.json"
         ],
-        "pattern": "\\b(toda[y]|curren[t]ly|for no[w]|at the mo[m]ent)\\b|\\bunti[l]\\b[^.;:]{0,40}\\b(ships?|lands?)\\b",
+        "pattern": "\\b(toda[y]|curren[t]ly|for no[w]|at the mo[m]ent)\\b|\\bunti[l]\\b(?:[^.;:]|\\.\\d){0,40}\\b(ships?|lands?)\\b",
         "flags": "i",
         "scope": "changed"
       }
@@ -71,7 +71,9 @@
         "Before shipping a uniqueness or attribution sentence ('the only', 'caused by'), run the enumeration that would falsify it against the tree at HEAD.",
         "A rewritten doc comment is teaching prose under this rule: re-derive caller counts, uniqueness claims, and cross-references from the tree at the revision under edit, never from the pre-rewrite text or another agent's summary.",
         "Prose stating an invariant about commit history ('always', 'never', 'by the time it reaches main') enumerates every author class that writes such commits - bot-authored release and dependency commits included.",
-        "When a commit closes a tracked item, grep the tracked docs for that item's id in the same commit: the closing commit owns every sentence that scheduled the work."
+        "When a commit closes a tracked item, grep the tracked docs for that item's id in the same commit: the closing commit owns every sentence that scheduled the work.",
+        "A premise about a third-party platform is a claim: quote the page's own sentence before a brief, a spec, or an entry restates it.",
+        "The sweep for a corrected fact is a grep for the fact's key nouns over the tracked tree and the project's work documents, in the commit that corrects the fact."
       ],
       "tags": [
         "knowledge",
@@ -90,8 +92,8 @@
       "area": "docs",
       "summary": "Never rename a merged entry id. Add a new entry and link the old one with `see`.",
       "body": [
-        "Dispatches, reports, audits, and `see` lists cite ids; a rename breaks every one of them silently.",
-        "Permanence includes reachability through every reader - get, see-citations, batch membership - across an archive sweep; a mover that strands any one reader breaks the rule even though the id still exists on disk."
+        "Task briefs, reports, audits, and `see` lists cite ids; a rename breaks every one of them silently.",
+        "Permanence includes reachability through every reader - get, see-citations, and every grouping that lists the id - across an archive sweep; a mover that strands any one reader breaks the rule even though the id still exists on disk."
       ],
       "tags": [
         "knowledge",
@@ -114,8 +116,8 @@
         "A non-standing entry in an area with empty globs other than global (`process` in the seed) never loads with a file. A global entry loads with every file through `houserules for` and joins every audit package (a task audit leaves out an entry tagged `controller` unless `--ids` names it), but renders into no rules file.",
         "After filing, run `houserules for <a file the rule governs>` and confirm the entry appears.",
         "The kit's non-standing procedure rules in the glob-less `process` area load by citation instead: a kit-owned skill or agent template names the id, and its reader runs `houserules get <id>`. `check-knowledge` fails a cited id that the base does not hold. Such an entry never joins an audit package by area; name it in `--ids` to audit against it. `process.risk-tiers`, `process.severity-by-impact`, `process.bounded-review-loop`, `process.knowledge-earns-its-place`, and `process.parallel-on-disjoint-files` load this way.",
-        "A non-standing `process` entry also loads through two paths. The controller reads its summary at the session ritual's `houserules index --area process`. An agent receives its id on the `Knowledge:` line of a dispatch.",
-        "Make a process rule standing only when every session must carry it. Give the `controller` tag to a rule that only the controller can break: a task audit leaves the entry out of its package unless `--ids` names it (`knowledge-base.controller-rules-are-tagged`).",
+        "A non-standing `process` entry also loads through two paths. The person who runs the work reads its summary at `houserules index --area process`. An agent receives its id in the task brief that hands it the work.",
+        "Make a process rule standing only when every session must carry it. Give the `controller` tag to a rule that only the person who runs the work can break: a task audit leaves the entry out of its package unless `--ids` names it (`knowledge-base.controller-rules-are-tagged`).",
         "A `check` needs an audit loading path too: it joins the package when its entry is `standing`, sits in a touched or global area (any kind, not only rule and invariant), or is named in `--ids`. A task audit leaves out the check of an entry tagged `controller` unless `--ids` names that entry."
       ],
       "tags": [
@@ -134,11 +136,11 @@
       "kind": "rule",
       "area": "docs",
       "standing": false,
-      "summary": "Tag an entry `controller` when only the controller's acts can break it; a task audit leaves it out, the branch audit judges it.",
+      "summary": "Tag an entry `controller` when only the acts of the person who runs the work can break it; a task audit leaves it out, the branch audit judges it.",
       "body": [
-        "A controller act is a step that the controller takes: a spec, a plan, a dispatch, a ruling, a merge, a release. A task diff cannot break a rule that governs only these acts.",
+        "A coordinating act is a step that the person who runs the work takes: a spec, a plan, a handoff, a ruling, a merge, a release. A task diff cannot break a rule that governs only these acts.",
         "A task audit is `houserules audit` with `--report`. It leaves an entry tagged `controller` out of its package. This holds for a standing entry, an entry in a touched area, a global entry, and an entry with a check. `--ids` brings the entry back.",
-        "The branch audit (`--workspace`) and a plain audit (neither flag) keep the entry. The branch reviewer judges its rows. In a batch without a branch review, the controller runs `houserules audit --base <merge base> --workspace <WORKSPACE>` before Finish and judges the `controller` rows in the ledger.",
+        "The branch audit (`--workspace`) and a plain audit (neither flag) keep the entry. The reviewer of the branch judges its rows. When the work has no branch review, the person who runs the work runs `houserules audit --base <merge base> --workspace <WORKSPACE>` before the finish and judges the `controller` rows in the record of the work.",
         "A rule that task reviews catch stays untagged. `process.rulings-to-file`, `process.tdd`, and `process.claims-match-artifacts` are examples.",
         "The tag is the exact string `controller`. A tag is a free string: the knowledge schema does not change."
       ],
@@ -153,18 +155,18 @@
         "ref": "batch 32 spec 3.1"
       },
       "verify": [
-        ".claude/skills/orchestrating/SKILL.md"
+        ".claude/skills/migrating-knowledge/SKILL.md"
       ]
     },
     {
       "id": "knowledge-base.cite-durable-refs",
       "kind": "rule",
       "area": "docs",
-      "summary": "Cite a commit in a permanent file only if the default branch reaches it or will; name in-branch events by batch/task/round; restate interim SHAs at aggregation.",
+      "summary": "Cite a commit in a permanent file only if the default branch reaches it or will; name in-branch events by work/task/round; restate interim SHAs at aggregation.",
       "body": [
-        "A rebase replays commits under new SHAs. Knowledge or backlog prose written before the rebase then keeps SHAs that no branch reaches. `git branch --contains <sha>` is the reachability check a reviewer runs before accepting a SHA citation.",
-        "Aggregation collapses a branch into new commits, so even a SHA from after a rebase dies at the finish. Only the aggregated commits land on the default branch. A durable locator is the event's batch, task, and round plus its subject, or the final aggregated SHA added at aggregation time.",
-        "Workspace deliverables are exempt in practice: they are untracked, local to one machine, and live only as long as the reflog. Tracked knowledge, backlog bodies, specs, and design records are permanent, and every clone sees them.",
+        "A rebase replays commits under new SHAs. Knowledge or tracker prose written before the rebase then keeps SHAs that no branch reaches. `git branch --contains <sha>` is the reachability check a reviewer runs before accepting a SHA citation.",
+        "Aggregation collapses a branch into new commits, so even a SHA from after a rebase dies at the finish. Only the aggregated commits land on the default branch. A durable locator is the event's body of work, task, and round plus its subject, or the final aggregated SHA added at aggregation time.",
+        "Workspace deliverables are exempt in practice: they are untracked, local to one machine, and live only as long as the reflog. Tracked knowledge, tracker records kept in the tree, specs, and design records are permanent, and every clone sees them.",
         "The `durable-sha` check of this entry enforces the rule. `houserules audit` flags a hex string of 7 to 40 characters that a diff hunk adds to a file that this check's `files` globs match, when the string resolves in the repository's object database to a commit that the default branch does not reach. The audit reads the `defaultBranch` key of `.houserules.json` first: its value names `origin/<name>`, then the local branch `<name>`, and a value that names neither is one named error, with no fallback to another branch. Without the key, the audit tries `origin/HEAD`, `origin/main`, `origin/master`, then a local `main` or `master` branch, in that order. When none of these exists, the check reports one named error that tells you to set `defaultBranch` in `.houserules.json`. The audit never uses its `--base` for this, because a per-task caller points `--base` at an in-branch commit. A content hash, a digest, or an example SHA passes by construction: the string must be 7 to 40 hex characters and must resolve to a real commit."
       ],
       "tags": [
@@ -197,7 +199,7 @@
       "body": [
         "A context proxy sits between an agent and its tools and compresses tool results before the model reads them. In one measurement, 50 of 110 single-entry `get` outputs lost at least one string. One `get` of all 110 ids kept a sample of 70 entries, and 32 ids appeared nowhere in the output, 15 of them standing rules. `files` lost 7 of its 21 kit-owned paths. `standing`, `index`, `list`, `topics`, and `for` came through intact in that run.",
         "The loss has three shapes: a string replaced by a retrieval marker, items dropped from a list, and words dropped from prose. The transcript shows no sign of any of them.",
-        "Copying compressed output into a knowledge file, a backlog file, or a deliverable files the loss as fact. A rule can lose its scope, a quotation can stop being verbatim, and a marker can enter a file. Treat the source files and the gates as the truth. Open the file to read a rule's full text. Run a gate to learn its verdict. Do not rely on the transcript for either."
+        "Copying compressed output into a knowledge file, a tracker file, or a deliverable files the loss as fact. A rule can lose its scope, a quotation can stop being verbatim, and a marker can enter a file. Treat the source files and the gates as the truth. Open the file to read a rule's full text. Run a gate to learn its verdict. Do not rely on the transcript for either."
       ],
       "tags": [
         "knowledge",

@@ -305,15 +305,17 @@ fn set_with_a_bad_key_value_pair_prints_the_frozen_message_and_exits_2() {
     );
 }
 
-/// A missing `backlog/schema.json` is a load failure, one named line
-/// naming the file, exit 2 -- `tools/backlog.mjs`'s `readJson` raising a
+/// A `backlog/` directory without `schema.json` is a load failure, one named
+/// line naming the file, exit 2 -- `tools/backlog.mjs`'s `readJson` raising a
 /// plain (uncaught) `Error`, per the CLI-failure-path deviation this whole
 /// port follows: a crash-class JS failure becomes a named stderr line
 /// here, never a stack trace.
 #[test]
-fn a_missing_backlog_directory_prints_a_named_error_and_exits_2() {
+fn a_backlog_directory_without_its_schema_prints_a_named_error_and_exits_2() {
     let dir = tempfile::tempdir().expect("tempdir");
     install_shape::mark_2_0(dir.path());
+    install_shape::mark_json_tracker(dir.path());
+    fs::create_dir_all(dir.path().join("backlog")).expect("create backlog/");
     let output = houserules()
         .args(["check-backlog", "--dir"])
         .arg(dir.path())
@@ -324,6 +326,26 @@ fn a_missing_backlog_directory_prints_a_named_error_and_exits_2() {
     let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
     assert_eq!(stderr.lines().count(), 1, "exactly one named error line");
     assert!(stderr.contains("schema.json"), "got: {stderr:?}");
+}
+
+/// A missing `backlog/` directory is an unreachable JSON tracker (batch 34,
+/// spec 3.4), not a load failure: the line of the spec, exit 1 from the gate.
+#[test]
+fn a_missing_backlog_directory_is_an_unreachable_json_tracker() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    install_shape::mark_2_0(dir.path());
+    install_shape::mark_json_tracker(dir.path());
+    let output = houserules()
+        .args(["check-backlog", "--dir"])
+        .arg(dir.path())
+        .output()
+        .expect("run check-backlog");
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.stdout, b"");
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("utf8 stderr"),
+        "tracker json cannot be reached: backlog/ is missing; restore backlog/ from version control\n"
+    );
 }
 
 /// Invalid JSON in an items file: `check-backlog`'s (or any command's)

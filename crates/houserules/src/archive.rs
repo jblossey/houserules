@@ -16,12 +16,16 @@
 //! no more trace in its active file, so a second run finds nothing to move
 //! for it.
 //!
-//! This module owns no reader of its own for the active set -- `get`
-//! (`crate::get`) is the one caller of [`find_archived_backlog_item`] and
-//! [`find_archived_knowledge_entry`], the fallback lookups that let an
-//! archived id keep resolving (`knowledge-base.ids-are-permanent`) once
-//! `houserules archive` has moved it out of the base `rules::load_base`/
-//! `backlog::load_backlog` read.
+//! The backlog half runs through the tracker of the install
+//! (`crate::tracker`): the JSON adapter calls [`archive_backlog_half`], and an
+//! install with no tracker skips it (`cmd_archive` has the table of spec 3.4).
+//!
+//! This module owns no reader of its own for the active set -- the JSON
+//! adapter and `get` (`crate::get`) are the callers of
+//! [`find_archived_backlog_item`] and [`find_archived_knowledge_entry`], the
+//! fallback lookups that let an archived id keep resolving
+//! (`knowledge-base.ids-are-permanent`) once `houserules archive` has moved
+//! it out of the base `rules::load_base`/`backlog::load_backlog` read.
 
 use std::fs;
 use std::io;
@@ -31,6 +35,7 @@ use std::process::ExitCode;
 use serde_json::Value;
 
 use crate::emit::emit;
+use crate::tracker::{self, Lookup, NoTracker};
 
 /// Reads `path` and parses it as JSON, naming `display_name` in either
 /// failure. This is the one place the module reads a JSON file from disk.
@@ -341,10 +346,41 @@ fn archive_knowledge_entries(root: &Path, lines: &mut Vec<String>) -> Result<usi
     Ok(moved_count)
 }
 
-/// Runs `houserules archive`: sweeps backlog items, batch entries, and
-/// knowledge entries in that order (see the module doc for what qualifies
-/// in each), printing one `archived ...` line per move followed by an
-/// `archive: <n> moved` summary, then exits 0.
+/// Runs the backlog half of `houserules archive` on the JSON backlog:
+/// moves done and dropped items, then done batches, to `backlog/archive/`.
+/// Returns the number moved and appends one `archived ...` line per move to
+/// `lines`; the lines stay in `lines` when a step fails, so the caller
+/// prints what happened before the failure.
+pub(crate) fn archive_backlog_half(root: &Path, lines: &mut Vec<String>) -> Result<usize, String> {
+    let items = archive_backlog_items(root, lines)?;
+    let batches = archive_batches(root, lines)?;
+    Ok(items + batches)
+}
+
+/// Marks a record resolved from `backlog/archive/` or `knowledge/archive/`
+/// (`find_archived_backlog_item`/`find_archived_knowledge_entry`) with
+/// `"archived": true` -- the designed token an archived id's `get` output
+/// carries (`quality.absence-is-designed`'s own principle, applied to a
+/// record's active or archived state rather than an absent field: a reader
+/// must see this at a glance, never infer it from the record's own `status`
+/// field, which a plain backlog item does not even carry).
+pub(crate) fn label_archived(mut record: Value) -> Value {
+    if let Value::Object(map) = &mut record {
+        map.insert("archived".to_string(), Value::Bool(true));
+    }
+    record
+}
+
+/// Runs `houserules archive`: sweeps the backlog half through the tracker of
+/// the install (backlog items and batch entries; a tracker that keeps its
+/// records in place says so in one line), then the knowledge entries (see the
+/// module doc for what qualifies in each), printing one `archived ...` line
+/// per move followed by an `archive: <n> moved` summary, then exits 0.
+///
+/// With no tracker and no `backlog/` directory, the backlog half is skipped
+/// with the archive line of spec 3.4 and the knowledge half runs. With no
+/// tracker and a `backlog/` directory, it moves nothing, prints line B, and
+/// exits 1. A tracker that cannot be reached moves nothing and exits 2.
 ///
 /// A batch's acceptance ruling being homed is the operator's own
 /// confirmation, made before running this command; `archive_batches`'s own
@@ -363,18 +399,31 @@ pub(crate) fn cmd_archive(dir: Option<PathBuf>) -> ExitCode {
         Err(code) => return code,
     };
     let mut lines = Vec::new();
-    let result = (|| -> Result<usize, String> {
-        let items = archive_backlog_items(&root, &mut lines)?;
-        let batches = archive_batches(&root, &mut lines)?;
-        let entries = archive_knowledge_entries(&root, &mut lines)?;
-        Ok(items + batches + entries)
-    })();
+    let backlog_half = match tracker::lookup(&root) {
+        Ok(Lookup::Installed(mut tracker)) => tracker
+            .archive_backlog_half(&mut lines)
+            .map_err(|error| error.to_string()),
+        Ok(Lookup::Absent(state @ NoTracker::BacklogDir)) => {
+            eprintln!("{}", state.line());
+            return ExitCode::from(1);
+        }
+        Ok(Lookup::Absent(NoTracker::Bare)) => {
+            lines.push(tracker::lines::archive_skipped());
+            Ok(())
+        }
+        Err(error) => Err(error.to_string()),
+    };
+    let result = backlog_half.and_then(|()| archive_knowledge_entries(&root, &mut lines));
     for line in &lines {
         println!("{line}");
     }
     match result {
-        Ok(total) => {
-            println!("archive: {total} moved");
+        Ok(_) => {
+            let moved = lines
+                .iter()
+                .filter(|line| line.starts_with("archived "))
+                .count();
+            println!("archive: {moved} moved");
             ExitCode::SUCCESS
         }
         Err(message) => {
@@ -392,7 +441,7 @@ pub(crate) fn cmd_archive(dir: Option<PathBuf>) -> ExitCode {
 /// `Ok(None)` when `backlog/archive` does not exist yet, or exists and was
 /// searched in full with no match. `Err` the moment any archive file
 /// cannot be read or parsed -- named by file, not silently treated as "no
-/// match" (`houserules.crash-paths-are-named`): `get`'s one caller reports
+/// match" (`houserules.crash-paths-are-named`): the JSON adapter reports
 /// this as the reason `id` did not resolve, rather than the misleading
 /// "unknown id" a swallowed error would print.
 pub(crate) fn find_archived_backlog_item(root: &Path, id: &str) -> Result<Option<Value>, String> {
@@ -464,22 +513,4 @@ pub(crate) fn find_archived_knowledge_entry(
         }
     }
     Ok(None)
-}
-
-/// Tries both archive lookups for `id`, backlog first, and returns the
-/// first match. `get`'s one fallback once `id` is unknown in the active
-/// set. Trying both, regardless of which domain the active id-shape
-/// matcher would route `id` to, is what lets an archived record resolve
-/// even when the matcher itself misroutes the id -- a stamped
-/// `--id-prefix` other than `HR-`/`A-`/`PP-` always routes to the
-/// knowledge branch; fixing the matcher itself is a separate, filed
-/// backlog item, not this function's job.
-///
-/// `Err` on the first read or parse failure either lookup hits.
-/// `Ok(None)` only once both have genuinely found nothing.
-pub(crate) fn find_archived_any(root: &Path, id: &str) -> Result<Option<Value>, String> {
-    if let Some(item) = find_archived_backlog_item(root, id)? {
-        return Ok(Some(item));
-    }
-    find_archived_knowledge_entry(root, id)
 }

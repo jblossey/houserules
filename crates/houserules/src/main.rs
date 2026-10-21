@@ -2,9 +2,11 @@
 //!
 //! Parses the command line and dispatches to the crate's modules.
 //! `backlog` and `rules` hold the backlog and knowledge command surfaces;
-//! `get` (`crate::get::cmd_get`) unifies `get` to resolve by id shape
-//! between a backlog item and a knowledge entry, rather than either
-//! module handling it directly (see that module's doc for why).
+//! `tracker` (`tracker::Tracker`) is the contract that every backlog command
+//! calls, with the JSON adapter behind it (`tracker`'s own module doc has the
+//! full account); `get` (`crate::get::cmd_get`) routes each id between a
+//! knowledge entry and the tracker, rather than either module handling it
+//! directly (see that module's doc for why).
 //! `schema_pin` (test-only) is the mechanism `backlog`'s and `rules`' own
 //! model layers use to pin their schema-typed structs against the
 //! vendored schema files. `emit` is the one shared JSON output serializer
@@ -43,6 +45,9 @@
 //! update-available header on stderr when a cached, receipt-free check
 //! says a newer release exists, or stays silent on every gate and every
 //! failure (`update_check.rs`'s own module doc has the full account).
+//! `workflow` holds the workflow packages that the binary embeds and the
+//! pins that an install keeps for the files of its workflow
+//! (`workflow/mod.rs`'s own module doc has the full account).
 //! `pack` (`pack::cmd_pack_list`, `cmd_pack_add`, `cmd_pack_remove`,
 //! `cmd_pack_upgrade`) lists, adds, removes, and upgrades the knowledge
 //! packs of an install (`pack/mod.rs`'s own module doc has the full
@@ -57,6 +62,8 @@
 //! included, refuses a tree whose install schema is newer than major 2 with a
 //! line that names the release it needs, and a tree whose install schema is no
 //! install schema id with a line that names the value (spec C23).
+
+#![warn(missing_docs)]
 
 mod archive;
 mod backlog;
@@ -73,7 +80,9 @@ mod rules;
 #[cfg(test)]
 mod schema_pin;
 mod selfupdate;
+mod tracker;
 mod update_check;
+mod workflow;
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -158,16 +167,24 @@ enum Command {
         #[arg(long)]
         dir: Option<PathBuf>,
     },
-    /// Prints one or more items by id, each resolved by its own shape: a
-    /// backlog item (`<idPrefix>-\d{3}`, the project's own stamped
-    /// prefix), an amendment or parked item (`A-\d{2}`, `PP-\d+-\d{2}`,
-    /// both kit-fixed regardless of idPrefix), or otherwise a knowledge
-    /// entry. A pack entry with an override prints as its effective entry,
-    /// with an `overridden` field that lists the replaced fields. An entry
-    /// that `knowledge/overrides.json` excludes prints too, with an
-    /// `excluded` field that holds the reason, or `true` when there is
-    /// none. A pack entry with status `retired` or `superseded` prints,
-    /// which the other commands leave out.
+    /// Prints one or more items by id, each routed by its own shape: an id
+    /// `<topic>.<rest>` of a topic of the knowledge base reads the knowledge
+    /// base and never needs the tracker; every other id goes to the installed
+    /// tracker, which resolves its own id shapes (for the JSON tracker an item
+    /// `<idPrefix>-\d{3}`, the project's own stamped prefix, an amendment or
+    /// parked item `A-\d{2}`, `PP-\d+-\d{2}`, both kit-fixed regardless of
+    /// idPrefix; for the GitHub tracker an issue `#<n>` or the bare `<n>`; for
+    /// the Beads tracker an issue `<prefix>-<hash>`, the store's own issue
+    /// prefix and a lowercase base-36 hash, such as `hr-a3f`, with `.<n>` for
+    /// each child level). An id that both resolve fails. With no tracker, an id for the
+    /// tracker prints one line that says how to add one, and exit 2; an id of a
+    /// kit pack that the install lacks prints the line that names `pack add`.
+    /// A pack entry with an override prints as its effective entry, with an
+    /// `overridden` field that lists the replaced fields. An entry that
+    /// `knowledge/overrides.json` excludes prints too, with an `excluded`
+    /// field that holds the reason, or `true` when there is none. A pack entry
+    /// with status `retired` or `superseded` prints, which the other commands
+    /// leave out.
     Get {
         /// Backlog and/or knowledge ids to print, in any mix.
         ids: Vec<String>,
@@ -177,11 +194,17 @@ enum Command {
         #[arg(long)]
         dir: Option<PathBuf>,
     },
-    /// Lists backlog items, optionally filtered.
+    /// Lists the work items of the installed tracker, optionally filtered.
+    /// With no tracker it prints one line that says how to add one, and
+    /// exits 2.
     List {
         /// Only items whose status is `open` or `partial`.
         #[arg(long)]
         open: bool,
+        /// Only items that carry a deferral; each row then ends with its
+        /// `deferral` object (`reason`, `origin`, `files`).
+        #[arg(long)]
+        deferred: bool,
         /// Only items with this exact status.
         #[arg(long)]
         status: Option<String>,
@@ -203,7 +226,8 @@ enum Command {
         #[arg(long)]
         dir: Option<PathBuf>,
     },
-    /// Prints one development batch's summary and item rows.
+    /// Prints one development batch's summary and item rows, from the
+    /// installed tracker.
     Batch {
         /// The batch number (exactly one).
         numbers: Vec<String>,
@@ -213,7 +237,9 @@ enum Command {
         #[arg(long)]
         dir: Option<PathBuf>,
     },
-    /// Applies `field=value` assignments to a backlog item and rewrites its file.
+    /// Applies `field=value` assignments to a work item of the installed
+    /// tracker and rewrites its record. The fields are `status`, `batch`, and
+    /// `milestone`; a write creates the label or milestone it needs.
     Set {
         /// The item id, followed by one or more `field=value` assignments.
         args: Vec<String>,
@@ -223,8 +249,51 @@ enum Command {
         #[arg(long)]
         dir: Option<PathBuf>,
     },
-    /// Validates the backlog: schema, cross-file invariants, and compression
-    /// markers that a context proxy left in a backlog file.
+    /// Files a deferral in the installed tracker and prints its id on one
+    /// line: `--title` files a new item (a chore, open, with the reason as its
+    /// body), and `--item` marks an existing item as a deferral. Either form
+    /// names the reason and the origin of the deferral, and the files it
+    /// concerns. A title of more than 120 characters is refused.
+    #[command(group(
+        clap::ArgGroup::new("deferral_target")
+            .required(true)
+            .args(["title", "item"])
+    ))]
+    Defer {
+        /// The title of a new item; at most 120 characters.
+        #[arg(long)]
+        title: Option<String>,
+        /// The id of an existing item to mark as a deferral.
+        #[arg(long)]
+        item: Option<String>,
+        /// Why the work waits.
+        #[arg(long)]
+        reason: String,
+        /// The reference that says where the deferral came from: a batch, a
+        /// task, a review, or a spec.
+        #[arg(long)]
+        origin: String,
+        /// A file the deferral concerns, `/`-separated; repeat it for more.
+        #[arg(long = "file")]
+        files: Vec<String>,
+        /// The section a new item goes to, which is the name of its items
+        /// file; defaults to `general`. Goes with `--title`.
+        #[arg(long, conflicts_with = "item")]
+        section: Option<String>,
+        /// Install root to write into; defaults to the nearest directory at
+        /// or above the current one that holds `.houserules.json`, no higher
+        /// than the git top level, else the git top level.
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
+    /// Validates the work items of the installed tracker: on every tracker
+    /// the contract's checks of ids, references, batches, and deferral
+    /// reasons; for the JSON
+    /// tracker also its schema, cross-file invariants, and compression markers
+    /// that a context proxy left in a backlog file; for the GitHub tracker the
+    /// `houserules:` labels; for the Beads tracker the custom types and the
+    /// `partial` status. With no tracker it prints one line and exits 0, or
+    /// exits 1 when a `backlog/` directory exists.
     CheckBacklog {
         /// Install root to check; defaults to the nearest directory at or
         /// above the current one that holds `.houserules.json`, no higher
@@ -234,7 +303,20 @@ enum Command {
     },
     /// Builds the rule package for a git range and runs every member's
     /// deterministic check. Every path it matches is relative to the install
-    /// root; a changed path outside the install root is out of scope.
+    /// root; a changed path outside the install root is out of scope. It also
+    /// resolves each `Work-Item:` and `Deferred:` trailer of the range's
+    /// commits, and each `issues[].backlog` id of the deliverables it reads
+    /// (`--report` and `--workspace`), through the installed tracker. It
+    /// prints one line on stderr for each reference that fails, and exits 1
+    /// when one does, when a member's check fails, or when the tracker cannot
+    /// be reached. With no tracker it resolves nothing: it prints one line
+    /// that counts the references it skipped, or, when a `backlog/`
+    /// directory exists, the line that asks for a tracker, and exits 1. The
+    /// JSON result holds the same verdict: `references.failures` lists each
+    /// failure line, `references.resolved` and `references.skipped` count the
+    /// references, and `summary.reference_fail` counts the failures. The line
+    /// that asks for a tracker, and the line of a tracker that cannot be
+    /// reached, are failures too.
     Audit {
         /// The range's base ref.
         #[arg(long)]
@@ -246,15 +328,18 @@ enum Command {
         #[arg(long)]
         ids: Option<String>,
         /// A single JSON deliverable a `report-field` check reads directly.
+        /// The audit also resolves the `issues[].backlog` ids of the file.
         /// With `--report` (a task audit), an entry tagged `controller`
         /// joins the package only when `--ids` names it.
         #[arg(long)]
         report: Option<PathBuf>,
-        /// A directory of `task-*-report.json` files a `report-field`
-        /// check judges by each report's `files_changed`.
+        /// A directory of `task-*-report.json` and `task-*-review*.json`
+        /// files. A `report-field` check judges each report by its
+        /// `files_changed`, and the audit resolves the `issues[].backlog` ids
+        /// of every file.
         #[arg(long)]
         workspace: Option<PathBuf>,
-        /// Also writes the JSON result to this file.
+        /// Also writes the JSON result that stdout prints to this file.
         #[arg(long)]
         json: Option<PathBuf>,
         /// Declares a spec-booked interim fail, `<rule>=<ref>`; repeatable.
@@ -368,7 +453,13 @@ enum Command {
     /// included. With a message file it reads the staged files and prints
     /// that line only when it skips: an amendment that stages only paths
     /// outside the install root is skipped, though the amended commit
-    /// touched the install.
+    /// touched the install. A `commits` check with `require_trailer` also
+    /// reads the trailers of each message and fails a message that has none
+    /// of that key. For a message file only `exempt_subjects` applies, since
+    /// no author exists yet. It exits 1 when a `fail`-level check finds a
+    /// violation. When the install holds no `commits` check and no
+    /// `per_commit` `co-change` check, it checks nothing: it says so in place
+    /// of `check-commit: ok` and exits 0.
     CheckCommit {
         /// A not-yet-committed message file (the commit-msg hook's own call
         /// shape: git passes the proposed message's path as `$1`). Exactly
@@ -390,9 +481,11 @@ enum Command {
     },
     /// Installs the kit into a target git repository from the embedded
     /// payload: the kit-owned files, the seed-once files, and, on a new
-    /// install, the five kit packs with their pins in `.houserules.json`.
+    /// install, the `knowledge-base` pack with its pin in `.houserules.json`.
+    /// It installs no tracker and no workflow unless `--tracker` or
+    /// `--workflow` asks for one.
     /// Without `--target claude` it leaves out the Claude Code files and the
-    /// hook entry, and prints the line that enables them. Running it again
+    /// hook entries, and prints the line that enables them. Running it again
     /// seeds what is missing and keeps what exists. On an existing install it
     /// installs no pack and adds no area: only the `pack` commands and
     /// `update` change the pins. It never seeds a path that `ownedPaths` in
@@ -408,8 +501,10 @@ enum Command {
         /// exist and lie in a git repository: the top level, or a directory
         /// below it for a subdirectory install, which writes its CI workflow
         /// at the top level as `.github/workflows/knowledge-<folder>.yml`.
-        /// It is refused when it nests with another install of the
-        /// repository or would write another install's workflow file.
+        /// A new install root (one with no `.houserules.json` yet) is
+        /// refused when it nests with another install of the repository or
+        /// would write another install's workflow file; a directory that
+        /// holds its own `.houserules.json` is no new root.
         #[arg(long)]
         dir: Option<PathBuf>,
         /// The backlog id prefix seeded schemas carry; defaults to `WI`.
@@ -418,18 +513,56 @@ enum Command {
         /// A render target to enable, in the install root. On an existing
         /// install it adds the target to `renderers`, seeds the files of the
         /// target that are missing, keeps every file that exists, and
-        /// renders. For `claude`, it adds the hook entry to an existing
-        /// `.claude/settings.json` and keeps the other keys. A
-        /// `.claude/settings.json` that `ownedPaths` in `.houserules.json`
-        /// lists gets no hook entry.
+        /// renders. For `claude`, it adds the hook entries to an existing
+        /// `.claude/settings.json` and keeps the other keys. Where the install
+        /// runs a workflow, it also adds the hook entry of the session-start
+        /// script of that workflow. A `.claude/settings.json` that
+        /// `ownedPaths` in `.houserules.json` lists gets no hook entry.
         #[arg(long, value_enum)]
         target: Option<install::InitTarget>,
+        /// The tracker to install: `json` writes the JSON backlog files in
+        /// `backlog/`, `github` keeps the work items in the issues of a GitHub
+        /// repository (`--repo`, else the `origin` remote), and `beads` keeps
+        /// them in a Beads store that exists already: run `bd init` (or
+        /// `bd bootstrap` in a clone) first, or `init` refuses. Every tracker
+        /// also writes the `backlogId` pattern of the deliverables schema for
+        /// the adapter, and brings the seeded CI workflow of the install, where
+        /// it has one, to the form of the adapter: `json` keeps the plain form,
+        /// `github` adds the token and the read of the issues to the steps that
+        /// run the gates, and `beads` adds the steps that install `bd` and
+        /// bootstrap the store. An install keeps its tracker: `init` with another
+        /// tracker refuses, and with the same one changes nothing for the
+        /// tracker. `github` and `beads` refuse an install that has a
+        /// `backlog/` directory.
+        #[arg(long, value_enum)]
+        tracker: Option<tracker::Adapter>,
+        /// The GitHub repository of `--tracker github`, as `<owner>/<name>`;
+        /// defaults to the repository that the `origin` remote names.
+        #[arg(long, requires = "tracker")]
+        repo: Option<String>,
+        /// The workflow to install: `reference` writes the agent templates,
+        /// the orchestrating and finishing-a-feature skills, the evals, the
+        /// commit-msg hook, and the session-start script of the reference
+        /// workflow at their install paths, and pins each file in
+        /// `.houserules.json`. A workflow needs a tracker: the install has
+        /// one, or `--tracker` installs one in the same run. A file that
+        /// exists at a workflow path stays as it is, and a file that is not
+        /// the kit's stays the project's.
+        #[arg(long, value_enum)]
+        workflow: Option<install::InitWorkflow>,
+        /// With `--workflow`, also adds the kit packs that hold the rules the
+        /// workflow requires and the install lacks. Without the flag, `init`
+        /// names those packs.
+        #[arg(long, requires = "workflow")]
+        add_required_packs: bool,
     },
     /// Prints the file classes of the kit as JSON: the kit-owned files, the
-    /// seed-once files, the copies of the kit packs, and the D3 files, which
-    /// `init` seeds and `update` keeps current through a baseline. Each path
-    /// is in one class. The CI workflow is a D3 file that only a GitHub-hosted
-    /// target gets.
+    /// seed-once files, the copies of the kit packs, the D3 files, which
+    /// `init` seeds and `update` keeps current through a baseline, the
+    /// tracker files, which `init --tracker json` writes, the files of the
+    /// reference workflow, which `init --workflow reference` writes, and the
+    /// data file of the workflow. Each path is in one class. The CI workflow
+    /// is a D3 file that only a GitHub-hosted target gets.
     Files,
     /// Self-updates the installed binary first, where the install channel
     /// supports it (`HOUSERULES_SKIP_SELF_UPDATE` opts out), then updates the
@@ -437,29 +570,60 @@ enum Command {
     /// install whose schema is newer than the binary writes, with a line that
     /// names the release it needs, and an install whose schema is no install
     /// schema id, with a line that names the value. An install of houserules
-    /// 1.x is converted to the 2.0 layout:
-    /// the seeded entries become the five kit packs in `knowledge/packs/`,
-    /// the `overrides` of `.houserules.json` become `ownedPaths` and
-    /// `knowledge/overrides.json`, and the `schema` key is written last. A
-    /// topic file `knowledge/overrides.json` of 1.x stops the conversion
-    /// before any write, and so does a `knowledge/` directory that does not
-    /// exist or is empty: restore the directory from version control and run
-    /// `update` again, or remove `.houserules.json` and run `init --id-prefix
-    /// <prefix>` for a fresh install, with the `idPrefix` of the marker. A
+    /// 1.x is converted to the 2.0 layout: the seeded entries become the five
+    /// kit packs in `knowledge/packs/`, the `overrides` of `.houserules.json`
+    /// become `ownedPaths` and `knowledge/overrides.json`, and the `schema` key
+    /// is written last. A 1.x install with a `backlog/` directory gets the JSON
+    /// tracker in the same run, and one without gets none. An opt-in entry of
+    /// a kit pack that the conversion or a pin move brings onto the install
+    /// arrives excluded: it writes the exclusion to `knowledge/overrides.json`
+    /// once, records the id in `optInOffered`, and prints that the entry is
+    /// opt-in. A topic file
+    /// `knowledge/overrides.json` of 1.x stops the conversion before any
+    /// write, and so does a `knowledge/` directory that does not exist or is
+    /// empty: restore the directory from version control and run `update`
+    /// again, or remove `.houserules.json` and run `init --id-prefix <prefix>`
+    /// for a fresh install, with the `idPrefix` of the marker. A
     /// `knowledge/areas.json` that `ownedPaths` lists and that does not exist
-    /// stops it too. On a 2.0 install it moves the pins of the kit packs
-    /// to the versions of the binary and turns a local entry with a pack id
-    /// into an override. Then it syncs the kit-owned files of an
-    /// already-`init`ed target from the embedded payload: it writes a missing
-    /// file, or one that the project has not changed, and lists it only when
-    /// its bytes change; it keeps and lists a file the project changed
-    /// (`kept <file> (locally modified)`); it never syncs a path that
-    /// `ownedPaths` in `.houserules.json` lists. While `renderers` lacks
-    /// `claude`, it skips the Claude Code files. It deletes any retired kit
-    /// file still present, prints each hand step that the project has left
-    /// (`hand step: ...`), and reports the stamped-to-running version drift.
-    /// Every other command that reads the install refuses an install of 1.x
-    /// with one line that names this command.
+    /// stops it too. On a 2.0 install it moves the pins of the kit packs to
+    /// the versions of the binary and turns a local entry with a pack id into
+    /// an override. Then it syncs the kit-owned files of an already-`init`ed
+    /// target from the embedded payload: it writes a missing file, or one that
+    /// the project has not changed, and lists it only when its bytes change;
+    /// it keeps and lists a file the project changed (`kept <file> (locally
+    /// modified)`); it never syncs a path that `ownedPaths` in
+    /// `.houserules.json` lists. Where the install runs a workflow, it syncs
+    /// the files of the workflow the same way: it writes a file that is
+    /// missing or that the project has not changed, and it keeps and lists a
+    /// changed file on every run (`kept <file> (locally modified; reference
+    /// workflow <version>)`) until the project merges the change by hand. An
+    /// install with files of the reference workflow at their paths and no
+    /// workflow yet adopts the workflow: it pins each file that is the kit's,
+    /// writes each file that is absent, and leaves a file that is not the kit's
+    /// to the project, with a hand step. Where the session-start script of the
+    /// Claude Code files still holds the ritual line of 1.x and the install
+    /// runs the workflow, it adds the hook entry of the session-start script
+    /// of the workflow to `.claude/settings.json`; the script that the kit
+    /// wrote becomes the core script, and a script that the project changed
+    /// stays, with a hand step. It removes the startup hook entry that the kit
+    /// seeded before, where `.claude/settings.json` holds it unchanged. It
+    /// delivers the deliverables
+    /// schema and, with the JSON tracker, the backlog schema, and writes the
+    /// `backlogId` pattern of the tracker of the install into the deliverables
+    /// schema (a pattern that accepts any token, for an install with no
+    /// tracker); a schema that differs from every content of it that the kit
+    /// shipped stays, with a hand step. With the Beads tracker it reads the
+    /// issue prefix again: where `bd` cannot be reached, it keeps the pattern,
+    /// prints one line on stderr, and finishes. It prints a hand step for a
+    /// seeded CI workflow that the project changed and that lacks what the
+    /// tracker needs. It writes each seed-once file that is missing and, on an
+    /// install with the JSON tracker, each tracker data file that is missing.
+    /// While `renderers` lacks `claude`, it skips the Claude Code files. It
+    /// deletes any retired kit file still present, prints each hand step that
+    /// the project has left (`hand step: ...`), and reports the
+    /// stamped-to-running version drift. Every other command that reads the
+    /// install refuses an install of 1.x with one line that names this
+    /// command.
     Update {
         /// The install root; defaults to the current directory. Resolved the
         /// same way `init`'s own `--dir` is. A directory below the git top
@@ -481,23 +645,41 @@ enum Command {
     /// bounded no-execution paste-run lint over every captured command
     /// field, ephemeral paths in the narrative, line numbers of cited
     /// files, counts beside a cited capture, and a cited sweep against the
-    /// files the report changed.
+    /// files the report changed. With `--doc` or `--item` in place of a
+    /// report, it reads a spec or a backlog item and names every cited
+    /// workspace path that does not exist; a workspace path is a cited path
+    /// that git ignores.
+    #[command(group(
+        clap::ArgGroup::new("claims_source")
+            .required(true)
+            .args(["report_path", "doc", "item"])
+    ))]
     CheckReportClaims {
         /// The report file to check.
-        report_path: PathBuf,
-        /// Install root the report's cited artifacts and commit shas resolve
-        /// against; defaults to the nearest directory at or above the current
-        /// one that holds `.houserules.json`, no higher than the git top
-        /// level, else the git top level. Independent of `report_path`,
-        /// which always resolves against the real current directory.
+        report_path: Option<PathBuf>,
+        /// A spec to check in place of a report: the file at this path, which
+        /// resolves against the real current directory.
+        #[arg(long, value_name = "PATH")]
+        doc: Option<PathBuf>,
+        /// A backlog item to check in place of a report: the item with this
+        /// id, which the installed tracker reads.
+        #[arg(long, value_name = "ID")]
+        item: Option<String>,
+        /// Install root the cited artifacts and commit shas resolve against;
+        /// defaults to the nearest directory at or above the current one that
+        /// holds `.houserules.json`, no higher than the git top level, else
+        /// the git top level. Independent of `report_path` and `--doc`, which
+        /// always resolve against the real current directory.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
-    /// Moves done/dropped backlog items, done batch entries, and
-    /// superseded/retired knowledge entries into their `archive/` mirrors.
-    /// It moves local knowledge entries only: a pack entry with status
-    /// `retired` or `superseded` stays in its pack copy, whether the pack
-    /// ships the status or an override sets it.
+    /// Moves done/dropped backlog items and done batch entries (through the
+    /// installed tracker) and superseded/retired knowledge entries into their
+    /// `archive/` mirrors. It moves local knowledge entries only: a pack entry
+    /// with status `retired` or `superseded` stays in its pack copy, whether
+    /// the pack ships the status or an override sets it. With no tracker and no
+    /// `backlog/` directory it skips the backlog half and says so; with a
+    /// `backlog/` directory and no tracker it moves nothing and exits 1.
     Archive {
         /// Install root to sweep; defaults to the nearest directory at or
         /// above the current one that holds `.houserules.json`, no higher
@@ -590,6 +772,7 @@ fn d4_guard(command: &Command) -> Option<(install::Guard, &Option<PathBuf>)> {
         | Command::List { dir, .. }
         | Command::Batch { dir, .. }
         | Command::Set { dir, .. }
+        | Command::Defer { dir, .. }
         | Command::CheckBacklog { dir }
         | Command::Audit { dir, .. }
         | Command::Validate { dir, .. }
@@ -653,6 +836,7 @@ fn main() -> ExitCode {
         Some(Command::Get { ids, dir }) => get::cmd_get(dir, ids),
         Some(Command::List {
             open,
+            deferred,
             status,
             milestone,
             section,
@@ -661,17 +845,37 @@ fn main() -> ExitCode {
             dir,
         }) => backlog::cmd_list(
             dir,
-            backlog::ListOpts {
+            tracker::ListOpts {
                 open,
                 status,
                 milestone,
                 section,
                 item_type,
                 batch,
+                deferred,
             },
         ),
         Some(Command::Batch { numbers, dir }) => backlog::cmd_batch(dir, numbers),
         Some(Command::Set { args, dir }) => backlog::cmd_set(dir, args),
+        Some(Command::Defer {
+            title,
+            item,
+            reason,
+            origin,
+            files,
+            section,
+            dir,
+        }) => backlog::cmd_defer(
+            dir,
+            tracker::DeferRequest {
+                item,
+                title,
+                reason,
+                origin,
+                files,
+                section,
+            },
+        ),
         Some(Command::CheckBacklog { dir }) => backlog::cmd_check_backlog(dir),
         Some(Command::Audit {
             base,
@@ -715,12 +919,45 @@ fn main() -> ExitCode {
             dir,
             id_prefix,
             target,
-        }) => install::cmd_init(dir, id_prefix, target),
+            tracker,
+            repo,
+            workflow,
+            add_required_packs,
+        }) => install::cmd_init(
+            dir,
+            id_prefix,
+            target,
+            tracker.map(|adapter| install::TrackerRequest { adapter, repo }),
+            workflow.map(|workflow| install::WorkflowRequest {
+                workflow,
+                add_required_packs,
+            }),
+        ),
         Some(Command::Files) => install::cmd_files(),
         Some(Command::Update { dir, id_prefix }) => install::cmd_update(dir, id_prefix),
-        Some(Command::CheckReportClaims { report_path, dir }) => {
-            report_claims::cmd_check_report_claims(dir, report_path)
-        }
+        Some(Command::CheckReportClaims {
+            report_path,
+            doc,
+            item,
+            dir,
+        }) => match (report_path, doc, item) {
+            (Some(path), None, None) => report_claims::cmd_check_report_claims(
+                dir,
+                report_claims::ClaimsSource::Report(path),
+            ),
+            (None, Some(path), None) => {
+                report_claims::cmd_check_report_claims(dir, report_claims::ClaimsSource::Doc(path))
+            }
+            (None, None, Some(id)) => {
+                report_claims::cmd_check_report_claims(dir, report_claims::ClaimsSource::Item(id))
+            }
+            _ => {
+                eprintln!(
+                    "check-report-claims needs exactly one of a report path, --doc, or --item"
+                );
+                ExitCode::from(2)
+            }
+        },
         Some(Command::Archive { dir }) => archive::cmd_archive(dir),
         Some(Command::Pack { action }) => match action {
             PackCommand::List { dir } => pack::cmd_pack_list(dir),
@@ -760,7 +997,7 @@ mod tests {
     /// none carries a `long_about` distinct from its own short `about`
     /// either. Enumerated from `Cli::command().get_subcommands()` -- the
     /// same set clap itself renders, not a hand-typed list -- exactly the
-    /// 21 `Command` variants (clap's own built-in `help` subcommand is
+    /// 22 `Command` variants (clap's own built-in `help` subcommand is
     /// rendered separately and is not itself one of `get_subcommands()`'s
     /// entries).
     #[test]
@@ -769,8 +1006,8 @@ mod tests {
         let subcommands: Vec<_> = command.get_subcommands().collect();
         assert_eq!(
             subcommands.len(),
-            21,
-            "expected the full subcommand surface (21 Command variants), got: {:?}",
+            22,
+            "expected the full subcommand surface (22 Command variants), got: {:?}",
             subcommands.iter().map(|s| s.get_name()).collect::<Vec<_>>()
         );
         for subcommand in subcommands {
@@ -906,8 +1143,10 @@ mod tests {
     /// `include_str!`, see `check_calls_in` for what counts as a call), so
     /// a check added there without a pair in `HELP_CHECKS` fails here, and
     /// so does a phrase added to the about with no call behind it. The
-    /// about is read as a comma-separated list after its first `: `, in
-    /// call order: item `i` must carry the phrase of pair `i`.
+    /// about is read as a comma-separated list after its first `: `, up to
+    /// the end of that sentence (the sentence about `--doc` and `--item`
+    /// follows it), in call order: item `i` must carry the phrase of pair
+    /// `i`.
     #[test]
     fn the_check_report_claims_about_names_every_check() {
         let calls = check_calls_in(include_str!("report_claims.rs"))
@@ -929,7 +1168,8 @@ mod tests {
             .expect("check-report-claims has an about");
         let list = about
             .split_once(": ")
-            .map(|(_, list)| list.trim_end_matches('.'))
+            .map(|(_, rest)| rest.split_once(". ").map_or(rest, |(checks, _)| checks))
+            .map(|checks| checks.trim_end_matches('.'))
             .expect("the about lists its checks after a colon");
         let normalized = list.replace(", and ", ", ");
         let items: Vec<&str> = normalized.split(", ").collect();
@@ -1018,12 +1258,12 @@ mod tests {
         );
     }
 
-    /// The CLI surface: exactly these 21 subcommand names, in `--help`'s own
+    /// The CLI surface: exactly these 22 subcommand names, in `--help`'s own
     /// declaration order. The count assertion above cannot see a same-length
     /// rename, because a renamed variant keeps `get_subcommands().len()`;
     /// comparing the names themselves does.
     #[test]
-    fn the_cli_surface_names_exactly_these_21_subcommands() {
+    fn the_cli_surface_names_exactly_these_22_subcommands() {
         let command = Cli::command();
         let names: Vec<&str> = command.get_subcommands().map(|s| s.get_name()).collect();
         assert_eq!(
@@ -1035,6 +1275,7 @@ mod tests {
                 "list",
                 "batch",
                 "set",
+                "defer",
                 "check-backlog",
                 "audit",
                 "validate",
@@ -1051,7 +1292,7 @@ mod tests {
                 "archive",
                 "pack",
             ],
-            "the CLI surface (the 1.0 surface of design.md 5.82, then `pack`) changed"
+            "the CLI surface (the 1.0 surface of design.md 5.82, then `pack` and `defer`) changed"
         );
     }
 
@@ -1155,14 +1396,20 @@ mod tests {
     }
 
     /// `init --help` says what `init` installs and what it leaves alone: a new
-    /// install gets the five kit packs, a second run seeds the missing files
-    /// and keeps those that exist, an existing install gets no pack and no
-    /// area, a path of `ownedPaths` is never seeded, and an install schema that
-    /// is newer or malformed is refused. The update about says the same of its
-    /// sync, because both commands end with `render`. `--target` says that
-    /// a settings file of `ownedPaths` gets no hook entry. The test pins every
-    /// sentence of both texts whole, in order, so a deleted, added, or
-    /// reworded sentence fails it.
+    /// install gets the `knowledge-base` pack and no tracker or workflow
+    /// unless a flag asks for one, a second run seeds the missing files and
+    /// keeps those that exist, an existing install gets no pack and no area, a
+    /// path of `ownedPaths` is never seeded, and an install schema that is
+    /// newer or malformed is refused. The update about says the same of its
+    /// sync, because both commands end with `render`, and names the acts of the
+    /// conversion steps: the JSON tracker, the adoption of the workflow, the
+    /// hook entry, the delivery of the schemas, the `bd` that cannot be
+    /// reached, and the hand step of the CI workflow. `--target` says that a
+    /// settings file of `ownedPaths` gets no hook entry. `--tracker` says that
+    /// the CI workflow takes the form of the adapter. The test pins every
+    /// sentence of the init about, of `--target`, and of `--tracker`, whole and
+    /// in order, and each new sentence of the update about, so a deleted,
+    /// added, or reworded sentence fails it.
     #[test]
     fn the_init_help_states_what_an_existing_install_and_an_owned_path_get() {
         let command = Cli::command();
@@ -1174,8 +1421,9 @@ mod tests {
         assert_eq!(
             sentences(&about),
             [
-                "Installs the kit into a target git repository from the embedded payload: the kit-owned files, the seed-once files, and, on a new install, the five kit packs with their pins in `.houserules.json`",
-                "Without `--target claude` it leaves out the Claude Code files and the hook entry, and prints the line that enables them",
+                "Installs the kit into a target git repository from the embedded payload: the kit-owned files, the seed-once files, and, on a new install, the `knowledge-base` pack with its pin in `.houserules.json`",
+                "It installs no tracker and no workflow unless `--tracker` or `--workflow` asks for one",
+                "Without `--target claude` it leaves out the Claude Code files and the hook entries, and prints the line that enables them",
                 "Running it again seeds what is missing and keeps what exists",
                 "On an existing install it installs no pack and adds no area: only the `pack` commands and `update` change the pins",
                 "It never seeds a path that `ownedPaths` in `.houserules.json` lists; the files that `render` generates follow the knowledge base, not `ownedPaths`",
@@ -1193,6 +1441,24 @@ mod tests {
                 && !update.contains("never writes"),
             "the update about limits ownedPaths to the synced files: {update}"
         );
+        let update_sentences = sentences(&update);
+        for sentence in [
+            "A 1.x install with a `backlog/` directory gets the JSON tracker in the same run, and one without gets none",
+            "An opt-in entry of a kit pack that the conversion or a pin move brings onto the install arrives excluded: it writes the exclusion to `knowledge/overrides.json` once, records the id in `optInOffered`, and prints that the entry is opt-in",
+            "Where the install runs a workflow, it syncs the files of the workflow the same way: it writes a file that is missing or that the project has not changed, and it keeps and lists a changed file on every run (`kept <file> (locally modified; reference workflow <version>)`) until the project merges the change by hand",
+            "An install with files of the reference workflow at their paths and no workflow yet adopts the workflow: it pins each file that is the kit's, writes each file that is absent, and leaves a file that is not the kit's to the project, with a hand step",
+            "Where the session-start script of the Claude Code files still holds the ritual line of 1.x and the install runs the workflow, it adds the hook entry of the session-start script of the workflow to `.claude/settings.json`; the script that the kit wrote becomes the core script, and a script that the project changed stays, with a hand step",
+            "It removes the startup hook entry that the kit seeded before, where `.claude/settings.json` holds it unchanged",
+            "It delivers the deliverables schema and, with the JSON tracker, the backlog schema, and writes the `backlogId` pattern of the tracker of the install into the deliverables schema (a pattern that accepts any token, for an install with no tracker); a schema that differs from every content of it that the kit shipped stays, with a hand step",
+            "With the Beads tracker it reads the issue prefix again: where `bd` cannot be reached, it keeps the pattern, prints one line on stderr, and finishes",
+            "It prints a hand step for a seeded CI workflow that the project changed and that lacks what the tracker needs",
+            "It writes each seed-once file that is missing and, on an install with the JSON tracker, each tracker data file that is missing",
+        ] {
+            assert!(
+                update_sentences.contains(&sentence),
+                "the update about lacks the sentence {sentence:?}: {update}"
+            );
+        }
         let target = init
             .get_arguments()
             .find(|argument| argument.get_id() == "target")
@@ -1204,10 +1470,43 @@ mod tests {
             [
                 "A render target to enable, in the install root",
                 "On an existing install it adds the target to `renderers`, seeds the files of the target that are missing, keeps every file that exists, and renders",
-                "For `claude`, it adds the hook entry to an existing `.claude/settings.json` and keeps the other keys",
+                "For `claude`, it adds the hook entries to an existing `.claude/settings.json` and keeps the other keys",
+                "Where the install runs a workflow, it also adds the hook entry of the session-start script of that workflow",
                 "A `.claude/settings.json` that `ownedPaths` in `.houserules.json` lists gets no hook entry",
             ],
             "the sentences of the init --target help"
+        );
+        let tracker = init
+            .get_arguments()
+            .find(|argument| argument.get_id() == "tracker")
+            .and_then(|argument| argument.get_help())
+            .map(ToString::to_string)
+            .expect("init --tracker has a help");
+        assert_eq!(
+            sentences(&tracker),
+            [
+                "The tracker to install: `json` writes the JSON backlog files in `backlog/`, `github` keeps the work items in the issues of a GitHub repository (`--repo`, else the `origin` remote), and `beads` keeps them in a Beads store that exists already: run `bd init` (or `bd bootstrap` in a clone) first, or `init` refuses",
+                "Every tracker also writes the `backlogId` pattern of the deliverables schema for the adapter, and brings the seeded CI workflow of the install, where it has one, to the form of the adapter: `json` keeps the plain form, `github` adds the token and the read of the issues to the steps that run the gates, and `beads` adds the steps that install `bd` and bootstrap the store",
+                "An install keeps its tracker: `init` with another tracker refuses, and with the same one changes nothing for the tracker",
+                "`github` and `beads` refuse an install that has a `backlog/` directory",
+            ],
+            "the sentences of the init --tracker help"
+        );
+        let claude = init
+            .get_arguments()
+            .find(|argument| argument.get_id() == "target")
+            .and_then(|argument| {
+                argument
+                    .get_possible_values()
+                    .into_iter()
+                    .find(|value| value.get_name() == "claude")
+            })
+            .and_then(|value| value.get_help().map(ToString::to_string))
+            .expect("the claude target has a help");
+        assert_eq!(
+            claude,
+            "The Claude Code files: the session-start script and its hook entries in `.claude/settings.json`",
+            "`--target claude` installs no agent template (spec 4.4)"
         );
     }
 

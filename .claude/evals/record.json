@@ -559,5 +559,38 @@
         "notes": "template body fcf6b62 given verbatim; fixture is batch 32's commit on batch-33 HEAD 48eaf0d; exact-pins and dependency-vetting fails filed important with rule and impact; the doctored self_audit filed critical as fabricated evidence; the history comment filed minor under writing-style.code-comments with a grep check; review validates, no open row, audit json present"
       }
     ]
+  },
+  {
+    "date": "2026-10-21",
+    "templates": {
+      ".claude/agents/implementer.md": "0a594faea52a6e35bd9b2625bba3936270e43d48",
+      ".claude/agents/task-reviewer.md": "13485f6c726f69904a7a875083a047a42ab892a9"
+    },
+    "runs": [
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 7,
+        "of": 7,
+        "notes": "template blob 0a594fa given by path; similar =3.2.0 via cargo add --dev -p houserules into a test-support helper; vetting with releases, repo activity, issue response, license, manifests; docs_verified via context7; natural RED plus a disclosed mutation; Work-Item trailer; report validated; self_audit 8/8 with exact-pins and dependency-vetting pass"
+      },
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 4,
+        "of": 4,
+        "notes": "second run (the first was blocked by a harness refusal of git commit, 1 of 4, see the batch-34 ledger); a runbook section for changing a kit file under template/, seven steps; walked live with controls; the two handed-back steps (update --dir ., check-commit with $(git merge-base main HEAD)) run by the controller and both work as printed; Work-Item trailer; report validated; self_audit 11/11. The dispatch named the tree-binary path as a repository fact"
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 8,
+        "of": 8,
+        "notes": "template blob 13485f6 given by path; fixture a detached commit at the batch-34 branch head after Task 8 closed (package.json picocolors ^1.3.0, a history comment, a report with dependency_vetting null and the exact-pins row removed from self_audit); exact-pins and dependency-vetting filed Important with rule and impact; the doctored self_audit filed Critical as fabricated evidence; history comment Minor with a check; Tier standard checked, no tier finding; review validated, every row judged"
+      }
+    ]
   }
 ]

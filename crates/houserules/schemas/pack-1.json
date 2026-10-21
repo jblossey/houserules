@@ -43,6 +43,15 @@
       "items": {
         "$ref": "#/$defs/entry"
       }
+    },
+    "optIn": {
+      "description": "The ids of the entries of this pack that a project opts in to. Every command that brings the pack onto an install excludes each one once; the project deletes the exclusion to opt in.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+$"
+      },
+      "uniqueItems": true
     }
   },
   "$defs": {
@@ -147,6 +156,26 @@
         "body_line_max": {
           "type": "integer",
           "minimum": 1
+        },
+        "require_trailer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exempt_authors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "exempt_subjects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
         },
         "if": {
           "$ref": "#/$defs/glob"

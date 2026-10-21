@@ -83,6 +83,21 @@ pub(crate) struct CheckDef {
     pub body_absent: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body_line_max: Option<u64>,
+    /// A `commits` check's required trailer key (`Work-Item`): a commit
+    /// whose message has no trailer of that key breaks the check. Git's
+    /// trailer rules read the key without regard to its case.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub require_trailer: Option<String>,
+    /// The author names (`%an`, whole names) whose commits `require_trailer`
+    /// leaves alone. The check-commit hook reads a message before git knows
+    /// its author, so this list never applies there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exempt_authors: Option<Vec<String>>,
+    /// The patterns, under the check's `flags`, of the subjects whose commits
+    /// `require_trailer` leaves alone. A pattern may match anywhere in the
+    /// subject; anchor it with `^` to match the start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exempt_subjects: Option<Vec<String>>,
     #[serde(rename = "if", default, skip_serializing_if = "Option::is_none")]
     pub if_changed: Option<Glob>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -122,7 +137,8 @@ mod tests {
     /// exercises `field` alongside `if`, keeping the sample to one shape
     /// while still touching every property `$defs/check` declares (`files`,
     /// `pattern`, `flags`, `scope`, `subject`, `body_absent`,
-    /// `body_line_max`, `if`, `then`, `per_commit`, `field`, plus
+    /// `body_line_max`, `require_trailer`, `exempt_authors`,
+    /// `exempt_subjects`, `if`, `then`, `per_commit`, `field`, plus
     /// `type`/`level`).
     fn full_sample() -> Value {
         json!({
@@ -135,6 +151,9 @@ mod tests {
             "subject": "^fix",
             "body_absent": "wip",
             "body_line_max": 100,
+            "require_trailer": "Work-Item",
+            "exempt_authors": ["dependabot[bot]"],
+            "exempt_subjects": ["^chore\\(.+\\): release "],
             "if": ["**/*.rs"],
             "then": ["**/*.rs"],
             "per_commit": true,

@@ -20,8 +20,8 @@ fn houserules() -> Command {
     command
 }
 
-/// A scratch repository that `houserules init` installed, with one local
-/// topic file `knowledge/team.json` that holds one entry.
+/// A scratch repository that `houserules init --tracker json` installed,
+/// with one local topic file `knowledge/team.json` that holds one entry.
 /// `tempfile`'s `TempDir` removes itself on drop.
 fn seeded_repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -31,7 +31,7 @@ fn seeded_repo() -> tempfile::TempDir {
         .status()
         .expect("run git init");
     assert!(status.success(), "git init failed");
-    let init = run(dir.path(), &["init"]);
+    let init = run(dir.path(), &["init", "--tracker", "json"]);
     assert_eq!(init.status.code(), Some(0), "{init:?}");
     let topic = json!({
         "topic": "team",

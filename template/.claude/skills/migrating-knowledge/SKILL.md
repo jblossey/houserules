@@ -5,12 +5,12 @@ description: Use to migrate existing knowledge — AGENTS.md or CLAUDE.md prose,
 
 # Migrating existing knowledge
 
-`init` seeds a generic rule set (process, quality, security-hygiene,
-writing-style, knowledge-base) and an empty set of project topics. Most of
-the seed is `standing` and loads every session; some of it is
-case-dependent instead, scoped to an area and loading only when a matching
-file is read — both kinds are already there, not just the standing ones.
-Every project-specific rule you already live by is still scattered across
+`init` seeds the `knowledge-base` pack, which holds the rules for writing
+entries, and an empty set of project topics. `houserules pack add <name>`
+adds the other kit packs: `process`, `quality`, `security-hygiene`, and
+`writing-style`. A pack's entries are `standing` and load every session, or
+case-dependent: scoped to an area, loading only when a matching file is
+read. Every project-specific rule you already live by is still scattered across
 AGENTS.md, docs, code, past conversations, and whatever only lives in an
 agent's own memory. This skill moves it in. Knowledge that exists only
 in memory is the most fragile source: write it down explicitly, the same
@@ -93,11 +93,12 @@ its own `history` entry when it is long enough to want one.
 
 - Before you write an entry, check `houserules index --topic <t>` or
   `houserules standing` for a seeded rule that already says it. Drop the
-  duplicate instead of filing it — the seed already carries 33 standing
-  rules (conventional commits, TDD, exact pins, and more).
+  duplicate instead of filing it — the kit packs carry rules for
+  conventional commits, TDD, exact pins, and more (`houserules pack list`
+  lists the packs, and `houserules pack add <name>` installs one).
 - Before you delete a seeded entry, search the kit-owned files for its id
   (`grep -rn '<id>' .claude/agents .claude/skills`; `.claude/agents` exists after
-  `houserules init --target claude`):
+  `houserules init --workflow reference`):
   `houserules check-knowledge` fails when a kit-owned file cites an id the
   knowledge base no longer holds.
 - `summary` states the rule in one sentence, ≤ 160 characters, with no
@@ -137,12 +138,11 @@ it only for kind `rule` or `invariant` in area `global` or `process` —
 leave everything else area-scoped so it loads with its files.
 
 Keep a migrated process rule non-standing unless every session needs it.
-A non-standing `process` entry still loads: the controller reads it at
-`houserules index --area process`, and an agent receives its id on the
-`Knowledge:` line of a dispatch
-(`knowledge-base.rules-need-a-loading-path`). Tag a rule that only the
-controller's acts can break `controller`: a task audit leaves it out of
-its package, and the branch audit judges it
+A non-standing `process` entry still loads: the person who runs the work
+reads it at `houserules index --area process`, and an agent receives its id
+in the task brief (`knowledge-base.rules-need-a-loading-path`). Tag a rule
+that only the acts of the person who runs the work can break `controller`:
+a task audit leaves it out of its package, and the branch audit judges it
 (`knowledge-base.controller-rules-are-tagged`).
 
 ## Migrate topic by topic
@@ -151,14 +151,11 @@ Work one `knowledge/<topic>.json` at a time:
 
 1. Pick a source: one AGENTS.md section, one doc, one comment cluster.
 2. For each paragraph, write an entry, or park it when it is not worth one
-   yet. Parks are hand-edited into a group in `backlog/parked.json` — no
-   CLI creates one:
-   ```json
-   { "batch": <n>, "intro": "...", "items": [
-     { "id": "PP-<batch>-<nn>", "text": "<the rule>. Trigger: <what makes it worth an entry>" }
-   ] }
-   ```
-   The text ends with the trigger, so the park is re-openable later.
+   yet. With a tracker, file the park as a work item in it; without one,
+   keep it as a note in `docs/`. The text ends with the trigger
+   (`<the rule>. Trigger: <what makes it worth an entry>`), so the park is
+   re-openable later. The JSON tracker also keeps hand-edited parks, which
+   the section on trackers below describes.
 3. Delete the migrated prose — an AGENTS.md paragraph, a doc section that
    only restated the rule. Keep anything that enforces or executes: a
    lint or CI config, a code comment that still explains its code. The
@@ -179,10 +176,11 @@ After every topic:
 ```sh
 houserules render
 houserules check-knowledge
-houserules check-backlog
 ```
 
-Fix every failure before the next topic. The next branch audit checks the
+A project with a tracker also runs the check of its tracker: the
+houserules block of `AGENTS.md` lists the command. Fix every failure before
+the next topic. The next branch audit checks the
 migrated entries the same way it checks any other change.
 
 ## Elicit your own operating discipline
@@ -197,26 +195,27 @@ names the project's own ruling:
 
 - **Merge discipline** - how does a finished branch reach main: fast-forward
   only from the CLI, a merge commit, a squash merge, or your host's own
-  merge queue? Record it as a `process.*` rule (`standing: true`);
-  `finishing-a-feature`'s merge step follows the shipped fast-forward-only
+  merge queue? Record it as a `process.*` rule (`standing: true`); the
+  merge step of the reference workflow follows the shipped fast-forward-only
   default until this entry says otherwise.
 - **Commit attribution** - may a commit or PR description carry a
   co-author, session, or tool-attribution trailer? Record it as a
-  `security-hygiene.*` rule; the seeded commit-msg hook enforces only
-  Conventional Commits until a `commits`-type check on this entry adds an
-  attribution gate of your own.
-- **Agent parallelism** - may more than one agent dispatch run at once, or
-  does every dispatch wait for the last one to close? Record it as a
-  `process.*` rule; the `orchestrating` skill defaults to parallel
-  dispatch on tasks the plan marks as disjoint file sets, each in its own
-  worktree, and to sequential dispatch otherwise, until this entry rules
-  otherwise.
+  `security-hygiene.*` rule; `houserules check-commit` enforces only the
+  `commits` checks of the installed packs (the Conventional Commits check
+  of the `process` pack, for one) until a `commits`-type check on this
+  entry adds an attribution gate of your own.
+- **Agent parallelism** - may more than one agent run at once, or does
+  every handoff wait for the last one to close? Record it as a `process.*`
+  rule; the reference workflow defaults to parallel handoffs on tasks the
+  plan marks as disjoint file sets, each in its own worktree, and to
+  sequential handoffs otherwise, until this entry rules otherwise.
 
-Answer all three before the first real batch. A project that never rules
-them is choosing the shipped defaults (ff-only CLI merges, no attribution
-trailers, parallel dispatch on disjoint file sets and sequential dispatch
-otherwise) by omission, not by decision - ruling them explicitly, even to
-keep the default, is what lets a later reader tell the two apart.
+Answer all three before the first change you plan. A project that never
+rules them is choosing the shipped defaults (ff-only CLI merges, no
+attribution trailers, parallel handoffs on disjoint file sets and
+sequential handoffs otherwise) by omission, not by decision - ruling them
+explicitly, even to keep the default, is what lets a later reader tell
+the two apart.
 
 ## Generate your own CI gate
 
@@ -237,6 +236,150 @@ do not satisfy until you run `houserules update` and commit the result.
 Name the job and its trigger once written, so the wiring is a claim
 someone can grep against. Prove it with a real run before trusting it, not
 a syntax check alone.
+
+## Read houserules output through files
+
+Tool output can reach you shortened or with parts dropped, and the
+transcript shows no sign of it (`knowledge-base.context-proxy-output-is-lossy`).
+Write houserules output to a file and read the file with your file-read tool:
+`houserules get <ids> > <folder>/knowledge-<task>.json`, then open the file.
+The session commands of the houserules block print long output, so the same
+holds for them. Never act on output that you cannot read whole:
+treat a `<<` marker or a "more items" note as a lost read, and read the source file instead.
+
+## Set up a tracker and move `backlog/` data
+
+`init` installs no tracker. A project chooses one with
+`houserules init --tracker json|github|beads`. The tracker holds the
+project's work items, and the houserules block of `AGENTS.md` then names the
+commands that open and close a session on it. A tracker that the gates cannot
+reach is never a pass: the gate prints one line that names the tracker and
+the setup step, and fails.
+
+This section is a guide, not a command. No houserules command moves data
+between trackers, because the tracker contract has no create operation
+besides `houserules defer`. An install keeps its tracker once it has one, so
+choose it before you move data. `init --tracker github` and
+`init --tracker beads` refuse an install that has a `backlog/` directory:
+move the data first, remove `backlog/` (commit the removal), then run `init`.
+
+### The JSON tracker
+
+Setup: `houserules init --tracker json` writes the data files of `backlog/`,
+`backlog/schema.json`, and the `tracker` key of `.houserules.json`. An
+install of release 1.x that already has a `backlog/` directory gets this
+tracker from `houserules update`; there is nothing to move.
+
+The tracker has no command that files a park. Hand-edit a group into
+`backlog/parked.json`:
+
+```json
+{ "batch": <n>, "intro": "...", "items": [
+  { "id": "PP-<batch>-<nn>", "text": "<the rule>. Trigger: <what makes it worth an entry>" }
+] }
+```
+
+### GitHub Issues
+
+Setup:
+
+1. Install `gh` and run `gh auth login`. houserules never reads or stores a
+   token; `gh` keeps its own login.
+2. Create the labels that the adapter check names, one command each:
+   `gh label create houserules:section --repo <owner>/<name>`, and the same
+   for `houserules:batch`, `houserules:amendment`, `houserules:decision`,
+   `houserules:parked`, and `houserules:deferred`.
+   `houserules check-backlog` names each label that is missing.
+3. Run `houserules init --tracker github`. It takes the repository from
+   `--repo <owner>/<name>`, else from the `origin` remote.
+
+Move the data from `backlog/`:
+
+- An item becomes an issue. The title is the item title, and the body is
+  the item paragraphs, separated by blank lines.
+- Labels: `type:<type>`, `batch:<n>`, `section:<s>` (the name of the items
+  file), and `tag:<t>` for each tag.
+- Status: `open` stays open; `partial` stays open with the label
+  `status:partial`; `done` closes as completed; `dropped` closes as not
+  planned.
+- A milestone is a GitHub milestone. `gh` has no milestone command: create
+  one with `gh api repos/<owner>/<name>/milestones -f title=<m>`.
+- Fields that no issue field holds (`see`, `rulings`, `label`,
+  `extra_lines`, and a deferral's `deferral`) go in a fenced block at the
+  end of the body. The fence is `houserules`, and each field is one
+  `key: value` line, a list as JSON. A deferral also gets the label
+  `houserules:deferred`.
+- A batch, an amendment, a decision, and a parked group or item are issues
+  with the label `houserules:batch`, `houserules:amendment`,
+  `houserules:decision`, or `houserules:parked`. A batch is titled
+  `Batch <n>: <summary>` and keeps `kickoff` and `status` in its block. An
+  amendment keeps `type`, `label`, and `date` in its block, and its text is
+  the body. A parked group also carries `batch:<n>` and `group: true` in its
+  block; a parked item carries the `batch:<n>` of its group, its text is the
+  body, and its `resolved` flag sits in its block.
+
+Ids change: an issue number replaces each item id. Rewrite the `see` lists,
+the `backlog` ids in your reports and reviews, and the ids you cite in
+`Work-Item:` trailers. `houserules get <n>` reads an issue back. Run
+`houserules check-backlog` when the move is done.
+
+### Beads
+
+Setup:
+
+1. Install `bd`, and pin one release for every machine and for CI.
+2. Start a store with `bd init`, in a project where `houserules init` has run.
+   Where no `CLAUDE.md` exists, `bd init` writes one of its own, and
+   `houserules init` keeps it: `houserules check-knowledge` then fails until
+   that file holds `@AGENTS.md`. In a clone of a repository whose store
+   exists, run `bd bootstrap` instead: the data lives in `refs/dolt/data`,
+   apart from the source branches.
+3. Add the custom status and the custom types that the adapter check
+   names: `bd config set status.custom partial:active` and
+   `bd config set types.custom houserules-section,houserules-batch,houserules-amendment,houserules-decision,houserules-parked`.
+   `bd config set` replaces the whole list, so keep what the store already
+   lists; `houserules check-backlog` prints the exact step.
+4. Run `houserules init --tracker beads`. It reads the issue prefix from
+   `bd`, and it refuses when `bd` or the store is missing.
+
+houserules sets `BD_DISABLE_METRICS=1` and `DO_NOT_TRACK=1` on every `bd` it
+starts, so an adopter never sends bd usage events through houserules. A user's
+own `bd` calls keep bd's own setting.
+
+A CI job needs the data too. The seeded CI workflow of a Beads install installs
+`bd` at the pinned release and runs `bd bootstrap` in its fresh clone before
+the gates run. A CI job of your own needs the same two steps. End a session
+with `bd dolt push`, so the data travels.
+
+Move the data from `backlog/`: create one issue per item, with the fields of
+the GitHub list above.
+
+- The native type follows the item type: `feat` is `feature`; `bug` and `fix`
+  are `bug`; `chore` is `chore`; `decision` is `decision`; any other type is
+  `task`. The label `type:<type>` carries the item type itself.
+- Labels: `type:<type>`, `batch:<n>`, `section:<s>`, `milestone:<m>`, and
+  `tag:<t>` for each tag.
+- Status: `open` is open; `partial` is the custom status `partial`; `done` is
+  closed; `dropped` is closed with the close reason `dropped`.
+- A `see` entry is a `related` dependency. The block at the end of the
+  description holds `rulings`, `label`, `extra_lines`, and `deferral`.
+- A batch, an amendment, a decision, and a parked group or item are issues of
+  the custom type `houserules-batch`, `houserules-amendment`,
+  `houserules-decision`, or `houserules-parked`, with the same block as on
+  GitHub. A section record is the custom type `houserules-section`. The
+  native type `decision` stays for items of type `decision`.
+
+Ids change here too: rewrite the `see` lists, the ids in reports, and the
+`Work-Item:` trailers to the Beads ids. Run `houserules check-backlog` when
+the move is done.
+
+## What the reference workflow leaves to you
+
+The reference workflow covers the phases of a change: design, plan, build,
+review, live run, and finish. It covers nothing for
+debugging, writing new skills, or analysing a past session, because none of the
+three is a phase of that lifecycle. A project that wants help with them adds
+its own skill or plugin. Nothing in the kit asks for it or breaks it.
 
 ## A worked example
 
@@ -271,8 +414,8 @@ carries both reasons the source gave plus the fallback, and `verify`
 points at the code the rule protects. The entry is `standing: true`: a
 review-before-merge rule is a non-negotiable that every session needs,
 and area `process` carries no file globs, so a non-standing entry would
-reach only the controller's process index and a dispatch that names its
-id. The entry also carries the tag `controller`: a merge is a controller
-act, so a task diff cannot break the rule, and a task audit leaves it
-out. Delete the AGENTS.md paragraph once `houserules render` and both
+reach only the process index of the person who runs the work and a task
+brief that names its id. The entry also carries the tag `controller`: a
+merge is a coordinating act, so a task diff cannot break the rule, and a
+task audit leaves it out. Delete the AGENTS.md paragraph once `houserules render` and both
 checks pass.

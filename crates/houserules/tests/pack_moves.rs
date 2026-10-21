@@ -57,7 +57,9 @@ fn lines_of(dir: &Path, args: &[&str]) -> Vec<String> {
         .collect()
 }
 
-/// A scratch repository that `houserules init --target claude` installed.
+/// A scratch repository that `houserules init --target claude --tracker json`
+/// installed, with the four kit packs that a plain `init` leaves out added by
+/// `pack add`: all five kit packs are pinned copies.
 fn install() -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let status = Command::new("git")
@@ -66,7 +68,13 @@ fn install() -> tempfile::TempDir {
         .status()
         .expect("run git init");
     assert!(status.success(), "git init failed");
-    lines_of(dir.path(), &["init", "--target", "claude"]);
+    lines_of(
+        dir.path(),
+        &["init", "--target", "claude", "--tracker", "json"],
+    );
+    for pack in ["process", "quality", "security-hygiene", "writing-style"] {
+        lines_of(dir.path(), &["pack", "add", pack]);
+    }
     dir
 }
 

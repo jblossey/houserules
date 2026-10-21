@@ -2,15 +2,14 @@
   "version": "1.4.0",
   "idPrefix": "HR",
   "baselines": {
-    "tools/claude-session-start.sh": "5f9a0b3d4ea66540aeb93435b1d9119799b8f7da8cf800295a69b3645d5ba80a",
+    "tools/claude-session-start.sh": "9a35725d9b0a90f851bb7974b57f9d94769a78f7d544c472bcd216cc5d408f7d",
     ".githooks/commit-msg": "32b161b8b965d50eee8aad833fad1387a74a72be6ad008fff6a3c3eae0dc9739",
-    ".claude/agents/implementer.md": "17d0b6f97ce854b8622b5edb8e3fdba3adcbf08b4c75c4f0ed292a08c1bb3bd4",
-    ".claude/agents/task-reviewer.md": "472a222216f19a931dbe2c5add518ed59e13389170574aab7c4c258f3fe11d3f",
-    ".claude/agents/branch-reviewer.md": "b34307f95798bf67c61d9eec9325f64c38a1200a8337955ff77c81a59654cbc3",
-    ".claude/skills/orchestrating/SKILL.md": "38b5e474206524df83d8a5a73f28420e427f72042884577d32b80ee5a32c2d6c",
-    ".claude/skills/finishing-a-feature/SKILL.md": "93c6cf9fe1fb7bacb4e096068bb6f52ed1d06b0507fadc38d3c53b27584fc722",
-    ".claude/skills/migrating-knowledge/SKILL.md": "0aaa1133f01e5fbd2de0fd9c1d029ddff4760849cb213e9a6b91d25f4f5b5c81",
-    "knowledge/schema.json": "82cb954aa880f21491928b44548b633662b314c2ac00435ccf515315aafb5298"
+    ".claude/skills/migrating-knowledge/SKILL.md": "5b1be62f4c270182ac843afb8ff853a9a7a687febcc6b84a3c54e4a48a358ce5",
+    "knowledge/schema.json": "b343d0d45a51cd54eeaa1f26674343e6942c5307f6fbdb9288e53a954cbf7988",
+    ".claude/skills/houserules-step/SKILL.md": "179fa0482dbc454c5239363c20fc981504a34b96ed99309be3c0972951f9f256",
+    "tools/houserules-step.sh": "a31a59cbb03a6fd862c08c667b62cc1988dc95719fe9b805f7fa477641fff74f",
+    ".claude/schemas/deliverables.json": "b7f8ab03567fd1924333a070136bf629163f88ab6e34c798615c30ca9506c3a1",
+    "backlog/schema.json": "bd1d0e7e14513f9e5db68941665b3eacf1e79fe946e7aca17740608af9548944"
   },
   "ownedPaths": [
     "backlog/items/general.json",
@@ -20,38 +19,68 @@
   ],
   "packs": {
     "knowledge-base": {
-      "version": "1.0.0",
+      "version": "2.0.1",
       "source": "kit",
-      "sha256": "c12230319b6e588e39ed13c54835ee7104c1c832f1e3287fa404f8e3b7e7da0f",
+      "sha256": "7105d8be3f70c9dcb94905d0e4f6d17ce0dd0d233757e0607f83ac5dd03523b8",
       "addedAreas": []
     },
     "process": {
-      "version": "1.0.2",
+      "version": "1.2.2",
       "source": "kit",
-      "sha256": "2be8834438ac89ae3c27febee5fa99003a278185fdf591b82ffd0dadafe6e916",
+      "sha256": "9c16794badec10cc6b6b43b158d9ea124fe664eb42cc6e5c5188a63bb8291903",
       "addedAreas": []
     },
     "quality": {
-      "version": "1.0.1",
+      "version": "1.0.2",
       "source": "kit",
-      "sha256": "33b16f693bc0ecf178bcb681d5f67078e41d006f0a8b0d3a330a874787e7a99e",
+      "sha256": "acc2b51463fb65122f5c7d4bae520db0e79255fae282e48e83f23f05b17f1ec6",
       "addedAreas": []
     },
     "security-hygiene": {
-      "version": "1.0.0",
+      "version": "3.0.0",
       "source": "kit",
-      "sha256": "28683a1a05caafcd62d30a0a8b134d01d6fbe71843384d4bc692646ce9c3269e",
+      "sha256": "37cd88eeed6a85bbb4ae11933fbbe5e0128c3bf7350aeb8c5651323887f93e24",
       "addedAreas": []
     },
     "writing-style": {
-      "version": "1.0.0",
+      "version": "1.0.1",
       "source": "kit",
-      "sha256": "8b6ecd936a0fc3fbac4380ce82531c8653165c1b01138d4120e45dec3d971bae",
+      "sha256": "37288facc38829050413653f66881b64f43167110ed8e9eeb878d4a054d5841a",
       "addedAreas": []
     }
   },
   "renderers": [
     "claude"
   ],
-  "schema": "houserules/install@2.0.0"
+  "schema": "houserules/install@2.1.0",
+  "tracker": {
+    "adapter": "json"
+  },
+  "optInOffered": [
+    "process.every-commit-names-a-work-item"
+  ],
+  "workflow": {
+    "name": "reference",
+    "version": "1.4.0",
+    "files": {
+      ".claude/agents/branch-reviewer.md": "1e2c887f671c27526f4a871cf1d9258b634f670dd69cabde8daa7698f7220a56",
+      ".claude/agents/implementer.md": "5a74b07380ad7bb2b8b988b877f1df02356f6810a402db4880aad75d075e6d0f",
+      ".claude/agents/spec-reviewer.md": "86fd63663c010ceb80954af8dc4cf07f137e8862a3674907a9ded0c3c017fac9",
+      ".claude/agents/task-reviewer.md": "f5b09cdb110997578a1a6a62bde3fa42714eb5f903ec5922a38aa75188ab5688",
+      ".claude/evals/dependency-add.json": "8006e37011fea7b8be468c6b61f309ee1d862c4680921891060a1dcded966e4e",
+      ".claude/evals/docs-edit.json": "4689e61fdb171c3df1dc42e3a47042feb65fc83c552aed29d64bf108c809ee73",
+      ".claude/evals/seeded-violations.json": "22f0f76c0f8bb18a1fcc5e2354bfeaab39aa52137d7e86e3c46019a16dbc61a7",
+      ".claude/skills/designing/SKILL.md": "c01b53c79fe0fecde61aee495894a46f1c941dc592ed8a889773733011ff93f6",
+      ".claude/skills/finishing-a-feature/SKILL.md": "43fc0817fb41d3582f057d4fd407f773dedcf1580e70e2667f012abc82eacb4c",
+      ".claude/skills/orchestrating/SKILL.md": "664eb74edfbf93a095b81390a0c1d2b7a6b5c49ce8df6184e35f713281893ac0",
+      ".claude/skills/planning/SKILL.md": "b5374372fad9412a2b19e050a78f595a972bc96140bde16d85e7a3dd0cc9738d",
+      "tools/reference-session-start.sh": "55993fb855bfd1117362b5eb60db6c6638176ea84dc69e48422ca7e29992b574"
+    },
+    "models": {
+      "branch-reviewer": "opus",
+      "implementer": "sonnet",
+      "spec-reviewer": "opus",
+      "task-reviewer": "opus"
+    }
+  }
 }

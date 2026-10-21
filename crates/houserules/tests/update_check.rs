@@ -47,8 +47,8 @@ fn houserules() -> Command {
 
 /// A scratch repository that `houserules init` installed: a 2.0 install,
 /// which D4 lets `get` read (this checkout is no such install while it
-/// still holds the 1.x layout). The id `process.tdd` is in the kit's
-/// `process` pack.
+/// still holds the 1.x layout). The id `knowledge-base.rules-need-a-loading-path` is in the kit's
+/// `knowledge-base` pack, the one pack a plain `init` installs.
 fn scratch_install() -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let init = Command::new("git")
@@ -131,7 +131,7 @@ fn the_update_header_never_reaches_stdout_for_a_json_command() {
 
     let output = houserules()
         .arg("get")
-        .arg("process.tdd")
+        .arg("knowledge-base.rules-need-a-loading-path")
         .current_dir(install.path())
         .env("XDG_CACHE_HOME", cache.path())
         .env("HOME", cache.path())
@@ -290,7 +290,7 @@ fn the_update_header_prints_only_on_a_real_stderr_terminal() {
     let mut command = houserules();
     command
         .arg("get")
-        .arg("process.tdd")
+        .arg("knowledge-base.rules-need-a-loading-path")
         .current_dir(install.path())
         .env("XDG_CACHE_HOME", cache.path())
         .env("HOME", cache.path())

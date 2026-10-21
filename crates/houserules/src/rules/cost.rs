@@ -1,18 +1,23 @@
 //! What `stats` measures in a workspace, and the cost profile built from
-//! it: the `workspaces` and `cost` keys.
+//! it: the `workspaces`, `models`, and `cost` keys.
 //!
 //! `stats.rs` reads the deliverables into one `Workspace` per directory.
 //! This module classifies a finding (`Severity`, `Target`) and renders
-//! the per-workspace rows and their totals. `proposals.rs` reads the
-//! same `Workspace` values to rate each knowledge entry.
+//! the per-workspace rows, the per-model rows, and their totals.
+//! `proposals.rs` reads the same `Workspace` values to rate each knowledge
+//! entry.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Map, Value, json};
 
 /// The designed rendering of a mean over zero tasks
 /// (`quality.absence-is-designed`).
 const NO_MEAN: &str = "none";
+
+/// The model row of a deliverable with no `model` field: one that an earlier
+/// kit wrote, before the field was required (`quality.absence-is-designed`).
+pub(super) const PRE_2_0: &str = "pre-2.0";
 
 /// How a reviewer rated a finding. A missing, non-string, or unknown
 /// `severity` is `Other`, so an old review shape is counted, never a
@@ -173,14 +178,40 @@ pub(super) struct AdherenceRow {
     pub counted: bool,
 }
 
+/// What the deliverables of one model cost in one workspace.
+#[derive(Debug, Default)]
+pub(super) struct ModelCost {
+    /// The `task-*-report.json` files the model wrote.
+    pub tasks: usize,
+    /// The review files the model wrote: task reviews, re-reviews, spec
+    /// reviews, and `branch-review.json`.
+    pub reviews: usize,
+    /// Of those, the files whose `kind` is `re-review`.
+    pub re_reviews: usize,
+    /// The sum of the model's reports' `fix_rounds` lengths.
+    pub fix_rounds: usize,
+    /// The sum of the model's report file sizes.
+    pub report_bytes: u64,
+    /// The findings of the model's reviews.
+    pub findings: Vec<Finding>,
+}
+
 /// Everything `stats` measured in one workspace directory.
+///
+/// `models` holds what the deliverables cost, by the `models` row of the model
+/// that wrote them (`stats::model_row`: the family of a model that names one).
+/// The counters below it, `tasks` to `findings`, are the sums over `models`:
+/// `sum_models` sets them once the workspace is read.
 #[derive(Debug, Default)]
 pub(super) struct Workspace {
     /// The path as the caller gave it.
     pub path: String,
-    /// Distinct task labels over the `task-*-report.json` files.
+    /// The cost of each model's deliverables, by `models` row name. A
+    /// deliverable with no `model` field counts under `PRE_2_0`.
+    pub models: BTreeMap<String, ModelCost>,
+    /// The `task-*-report.json` files.
     pub tasks: usize,
-    /// Task review files plus `branch-review.json`.
+    /// Task review files plus `branch-review.json` and the spec reviews.
     pub reviews: usize,
     /// Review files whose `kind` is `re-review`.
     pub re_reviews: usize,
@@ -194,6 +225,27 @@ pub(super) struct Workspace {
     pub injected: BTreeSet<String>,
     /// One id per report that names it in `knowledge_used`.
     pub cited: Vec<String>,
+}
+
+impl Workspace {
+    /// The cost slice of `model`, created empty on first use.
+    pub(super) fn model(&mut self, model: &str) -> &mut ModelCost {
+        self.models.entry(model.to_string()).or_default()
+    }
+
+    /// Sets the counters of the whole workspace to the sums over `models`.
+    pub(super) fn sum_models(&mut self) {
+        self.tasks = self.models.values().map(|cost| cost.tasks).sum();
+        self.reviews = self.models.values().map(|cost| cost.reviews).sum();
+        self.re_reviews = self.models.values().map(|cost| cost.re_reviews).sum();
+        self.fix_rounds = self.models.values().map(|cost| cost.fix_rounds).sum();
+        self.report_bytes = self.models.values().map(|cost| cost.report_bytes).sum();
+        self.findings = self
+            .models
+            .values()
+            .flat_map(|cost| cost.findings.iter().cloned())
+            .collect();
+    }
 }
 
 /// `true` when `locator` is `<line>` or `<line>-<line>`, numerals only.
@@ -334,6 +386,19 @@ impl Profile {
         profile
     }
 
+    /// Adds what one model's deliverables cost in one workspace.
+    fn add_model(&mut self, cost: &ModelCost) {
+        self.tasks += cost.tasks as u64;
+        self.reviews += cost.reviews as u64;
+        self.re_reviews += cost.re_reviews as u64;
+        self.fix_rounds += cost.fix_rounds as u64;
+        self.report_bytes += cost.report_bytes;
+        for finding in &cost.findings {
+            self.findings.add(finding.severity);
+            self.targets.add(finding.target);
+        }
+    }
+
     /// The counters as JSON fields, each count mapped through `leaf`;
     /// `tasks` is left out when `with_tasks` is false.
     fn fields(&self, leaf: &dyn Fn(u64) -> Value, with_tasks: bool) -> Map<String, Value> {
@@ -363,6 +428,30 @@ pub(super) fn workspace_rows(workspaces: &[Workspace]) -> Value {
                     Profile::of(std::slice::from_ref(workspace))
                         .fields(&|count| json!(count), true),
                 );
+                Value::Object(row)
+            })
+            .collect(),
+    )
+}
+
+/// The `models` key: one row per model family or other model value, sorted by
+/// row name, each with the cost fields of a `workspaces` row summed over every
+/// workspace. Workspaces that hold no deliverable give an empty list, never a
+/// row of zeros.
+pub(super) fn model_rows(workspaces: &[Workspace]) -> Value {
+    let mut profiles: BTreeMap<&str, Profile> = BTreeMap::new();
+    for workspace in workspaces {
+        for (model, cost) in &workspace.models {
+            profiles.entry(model).or_default().add_model(cost);
+        }
+    }
+    Value::Array(
+        profiles
+            .into_iter()
+            .map(|(model, profile)| {
+                let mut row = Map::new();
+                row.insert("model".to_string(), json!(model));
+                row.extend(profile.fields(&|count| json!(count), true));
                 Value::Object(row)
             })
             .collect(),
@@ -742,5 +831,122 @@ mod tests {
         assert_eq!(value["per_task"]["findings"]["minor"], json!("none"));
         assert_eq!(value["per_task"]["targets"]["other"], json!("none"));
         assert_eq!(cost(&[])["per_task"]["reviews"], json!("none"));
+    }
+
+    /// A workspace that holds `cost` for `model`, with the counters of the
+    /// whole workspace set from it.
+    fn workspace_of_model(model: &str, cost: ModelCost) -> Workspace {
+        let mut workspace = Workspace::default();
+        workspace.models.insert(model.to_string(), cost);
+        workspace.sum_models();
+        workspace
+    }
+
+    /// The counters of a workspace are the sums over its models: tasks,
+    /// reviews, re-reviews, fix rounds, report bytes, and every finding.
+    #[test]
+    fn sum_models_sets_the_workspace_counters_from_its_models() {
+        let mut workspace = Workspace::default();
+        workspace.model("m1").tasks = 2;
+        workspace.model("m1").fix_rounds = 3;
+        workspace.model("m1").report_bytes = 100;
+        workspace.model("m2").reviews = 4;
+        workspace.model("m2").re_reviews = 1;
+        workspace
+            .model("m2")
+            .findings
+            .push(finding(Severity::Minor, Target::Code));
+        workspace.sum_models();
+        assert_eq!(
+            (
+                workspace.tasks,
+                workspace.reviews,
+                workspace.re_reviews,
+                workspace.fix_rounds,
+                workspace.report_bytes,
+                workspace.findings.len(),
+            ),
+            (2, 4, 1, 3, 100, 1)
+        );
+    }
+
+    /// `models` rows carry the model first, then the fields of a `workspaces`
+    /// row but its path, and sort by model name.
+    #[test]
+    fn model_rows_carry_the_model_then_the_cost_fields_sorted_by_model() {
+        let rows = model_rows(&[
+            workspace_of_model(
+                "zeta",
+                ModelCost {
+                    reviews: 1,
+                    ..ModelCost::default()
+                },
+            ),
+            workspace_of_model(
+                PRE_2_0,
+                ModelCost {
+                    tasks: 1,
+                    report_bytes: 10,
+                    ..ModelCost::default()
+                },
+            ),
+        ]);
+        let keys: Vec<&str> = rows[0]
+            .as_object()
+            .expect("row object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                "model",
+                "tasks",
+                "reviews",
+                "re_reviews",
+                "fix_rounds",
+                "report_bytes",
+                "findings",
+                "targets"
+            ]
+        );
+        let models: Vec<&Value> = rows
+            .as_array()
+            .expect("an array")
+            .iter()
+            .map(|row| &row["model"])
+            .collect();
+        assert_eq!(models, [&json!("pre-2.0"), &json!("zeta")]);
+    }
+
+    /// A model that wrote deliverables in two workspaces has one row, summed.
+    #[test]
+    fn model_rows_sum_a_model_over_the_workspaces() {
+        let one = |tasks, findings| ModelCost {
+            tasks,
+            findings,
+            ..ModelCost::default()
+        };
+        let rows = model_rows(&[
+            workspace_of_model("m", one(1, vec![finding(Severity::Critical, Target::Code)])),
+            workspace_of_model("m", one(2, vec![finding(Severity::Minor, Target::Prose)])),
+        ]);
+        assert_eq!(rows.as_array().expect("an array").len(), 1);
+        assert_eq!(rows[0]["tasks"], json!(3));
+        assert_eq!(
+            rows[0]["findings"],
+            json!({"critical": 1, "important": 0, "minor": 1, "other": 0})
+        );
+        assert_eq!(
+            rows[0]["targets"],
+            json!({"code": 1, "deliverable": 0, "prose": 1, "other": 0})
+        );
+    }
+
+    /// No workspace, or a workspace with no deliverable, gives no rows.
+    #[test]
+    fn model_rows_are_empty_with_no_deliverable() {
+        assert_eq!(model_rows(&[]), json!([]));
+        assert_eq!(model_rows(&[Workspace::default()]), json!([]));
     }
 }

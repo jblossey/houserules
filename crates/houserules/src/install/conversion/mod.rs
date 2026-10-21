@@ -28,7 +28,17 @@
 //!   C20), so a run that stopped between the three writes finishes the pack,
 //!   and an area that the stopped run added stays the pack's and never
 //!   becomes the project's own;
+//! - the entries that a pack lists under `optIn` are offered before the copy
+//!   that ships them (spec 3.7): the exclusion is written first, then the
+//!   marker holds the pin and the record in `optInOffered` in one write. A
+//!   stop before the marker write leaves the exclusion, and the next run
+//!   records the id; a stop after it leaves the record, and the next run
+//!   offers nothing again;
 //! - the `schema` key makes the tree a 2.0 install, so no step runs again.
+//!
+//! The conversion steps of batch 34 follow (`steps`): step 1, the JSON tracker
+//! of a `backlog/` directory, runs here before the `schema` key; the others run
+//! on every `update`.
 //!
 //! A tree whose `knowledge/` directory does not exist or is empty is not
 //! converted (spec C21). Under step 2 every entry of it would be absent with a
@@ -44,6 +54,7 @@
 
 mod d3;
 mod plan;
+pub(super) mod steps;
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -54,18 +65,23 @@ use serde_json::{Map, Value, json};
 use crate::archive::{json_file_names, list_archive_json_files, read_json, write_json};
 use crate::baseline;
 use crate::pack::areas::{add_pack_areas, areas_to_add};
+use crate::pack::opt_in;
 use crate::packs::{PackCopy, pack_sha256};
 use crate::rules::RESERVED;
 
+use crate::tracker::{Adapter, TrackerConfig};
+
+use super::ci_workflow::Workflow;
 use super::hand_steps;
-use super::marker::{Marker, Pin};
-use super::workflow::Workflow;
+use super::marker::{INSTALL_SCHEMA, Marker, Pin};
 use super::{
     AREAS_FILE, SCHEMA_FILE, join_components, payload_content, read_if_present, write_if_changed,
     write_into,
 };
 use d3::{Action, Decision};
 use plan::{CopyState, OverridesFile, Plan, TopicFile, Tree};
+
+pub(crate) use d3::known_contents;
 
 /// The file that holds the standing rules of 1.x for Claude Code. The Claude
 /// renderer of 2.0 no longer writes it.
@@ -192,6 +208,7 @@ fn read_tree(root: &Path, marker: &Marker, prefix: &str) -> Result<Tree, String>
         overrides: marker.overrides(),
         owned_paths: marker.owned_paths(),
         baselines: marker.baselines(),
+        version: marker.version().map(str::to_string),
         pinned: marker
             .pins()?
             .into_iter()
@@ -285,6 +302,7 @@ pub(super) fn convert(
         println!("removed {STANDING_RULES}");
     }
     marker.set_renderers(&["claude"]);
+    adopt_the_json_tracker(ctx.root, marker)?;
     if plan.claude_md_hand_step {
         hand_steps.push(hand_steps::claude_md_import());
     }
@@ -311,8 +329,28 @@ pub(super) fn convert(
 
     marker.stamp_schema();
     marker.write()?;
-    println!("converted .houserules.json to the install schema houserules/install@2.0.0");
+    println!(
+        "converted .houserules.json to the install schema {}",
+        INSTALL_SCHEMA
+    );
     Ok(hand_steps)
+}
+
+/// Step 1 of the conversion steps of batch 34 (spec 4.7): a 1.x install with a
+/// `backlog/` directory gets the JSON tracker, because the directory is the
+/// data of that tracker. An install with no such directory gets none: there is
+/// no data to adopt, and `update` prints the tracker hand step instead
+/// (`steps`). The step runs in the conversion only, and before its completion
+/// marker, the `schema` key, so a run that stopped finishes at the next run. A
+/// marker that has a `tracker` key keeps it.
+fn adopt_the_json_tracker(root: &Path, marker: &mut Marker) -> Result<(), String> {
+    if root.join("backlog").is_dir() && marker.tracker()?.is_none() {
+        marker.set_tracker(&TrackerConfig {
+            adapter: Adapter::Json,
+            repo: None,
+        });
+    }
+    Ok(())
 }
 
 /// Refuses a `knowledge/areas.json` that is no JSON object before the
@@ -408,13 +446,18 @@ fn seed_absent_areas_file(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Step 5: installs each kit pack that the plan names, in three writes. The
-/// pin comes first, with the areas that the pack is about to add in its
-/// `addedAreas`; then the areas are added to `knowledge/areas.json`; then the
-/// copy is written. A run that stops after any write leaves a pin that the
-/// plan reads as step 5's state again (a pin whose copy is absent), and the
-/// next run adds no area that the record already names. A pin that an earlier
-/// run wrote keeps its record.
+/// Step 5: installs each kit pack that the plan names. The exclusion of each
+/// opt-in entry of the pack comes first (`opt_in::offer`, spec 3.7), so that no
+/// stop leaves the entry live. Then the pin is written, with the areas that the
+/// pack is about to add in its `addedAreas` and the record of the offer in
+/// `optInOffered`, in one write of the marker; the offer lines print after that
+/// write. Then the areas are added to `knowledge/areas.json`, and the copy is
+/// written. A run that stops after any write leaves a pin that the plan reads
+/// as step 5's state again (a pin whose copy is absent), and the next run adds
+/// no area that the record already names and offers no entry that the marker
+/// records. A run that stops before the marker write finds the exclusion in
+/// place, records the id, and prints the line. A pin that an earlier run wrote
+/// keeps its record.
 fn install_packs(
     ctx: &Context<'_>,
     marker: &mut Marker,
@@ -450,7 +493,11 @@ fn install_packs(
             },
         );
         marker.set_pins(&pins);
+        let offered = opt_in::offer(ctx.root, marker, pack)?;
         marker.write()?;
+        for line in offered {
+            println!("{line}");
+        }
         let area_lines = add_pack_areas(ctx.root, pack, &mut added_areas)?;
         let relative = format!("knowledge/packs/{name}.json");
         write_json(&join_components(ctx.root, &relative), &pack.raw)?;
@@ -506,10 +553,13 @@ mod tests {
 
     /// The overrides that the conversion writes for this repository at the
     /// base of batch 33 Task 7, each with its sorted field names. The 34
-    /// rows below `knowledge-base.cite-durable-refs` are the result of the
-    /// corpus run `plan-corpus-conversion.py` (steps 1 and 2); that id is a
-    /// project-only id of the 1.x tree that a kit pack of 2.0 ships, so step 2
-    /// compares it with the pack entry, as L8 does.
+    /// rows below `knowledge-base.cite-durable-refs` hold the fields that the
+    /// project changed from the text of its release, 1.4.0. A field that the
+    /// kit changed after that release and that the project left alone reaches
+    /// the install through the pack. `knowledge-base.cite-durable-refs` is a
+    /// project-only id of the 1.x tree that a kit pack of 2.0 ships. No
+    /// release shipped it, so step 2 compares it with the pack entry, as L8
+    /// does.
     const EXPECTED_OVERRIDES: [(&str, &[&str]); 35] = [
         (
             "knowledge-base.cite-durable-refs",
@@ -572,12 +622,12 @@ mod tests {
             "quality.gates-derive-their-scope",
             &["area", "body", "source", "standing", "tags"],
         ),
-        ("quality.no-compat-softening", &["see", "source"]),
+        ("quality.no-compat-softening", &["source"]),
         (
             "quality.pin-copies-byte-exact",
             &["area", "body", "source", "standing", "tags", "verify"],
         ),
-        ("quality.principles", &["body", "see"]),
+        ("quality.principles", &["body"]),
         ("quality.well-maintained-libraries", &["body", "source"]),
         ("security-hygiene.exact-pins", &["body", "summary"]),
         ("writing-style.doc-comments", &["body"]),

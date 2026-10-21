@@ -6,8 +6,9 @@
 //! filesystem alone: no git setting (`GIT_DIR`, `GIT_WORK_TREE`,
 //! `core.worktree`) changes which directory it names. [`other_installs`]
 //! lists the other `.houserules.json` files of the repository, and
-//! [`refuse_overlap`] refuses an install that nests with one of them or
-//! that would write the CI workflow file of one of them.
+//! [`refuse_overlap`] refuses a new install that nests with one of them or
+//! that would write the CI workflow file of one of them. `init` calls it for
+//! a root with no marker yet only: an existing install is no new root.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -16,7 +17,7 @@ use std::process::Command;
 use crate::node_path::resolve_like_node;
 use crate::root::INSTALL_MARKER;
 
-use super::workflow::workflow_path;
+use super::ci_workflow::workflow_path;
 
 /// An install root's place in its git repository.
 #[derive(Debug, PartialEq, Eq)]

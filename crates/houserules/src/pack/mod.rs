@@ -6,7 +6,9 @@
 //! `.houserules.json` (`install::marker`); every other command reads the copies.
 //! `source` holds the three source forms and the git fetch; `areas` holds
 //! the area rules of spec section 6; `one_source` holds the one-id-one-source
-//! step (L8, L9) that every add and upgrade runs.
+//! step (L8, L9) that every add and upgrade runs; `opt_in` holds the offer of
+//! the entries that a pack lists under `optIn`, which `add` and `upgrade`
+//! make and `remove` withdraws (spec 3.7).
 //!
 //! Each command checks every refusal before it writes a file. A refusal is
 //! one stderr line and exit 2, and it changes nothing. `add`, `remove`, and
@@ -15,6 +17,7 @@
 
 pub(crate) mod areas;
 pub(crate) mod one_source;
+pub(crate) mod opt_in;
 pub(crate) mod source;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -34,7 +37,7 @@ use areas::{add_pack_areas, remove_pack_areas};
 use source::{PackSource, fetch_git, read_pack_file};
 
 /// The pack that needs a tracker (design.md 5.149).
-const TRACKER_PACK: &str = "process";
+pub(crate) const TRACKER_PACK: &str = "process";
 
 /// What every command reads: the merged base and the pins.
 struct Install {
@@ -80,6 +83,26 @@ fn copy_path(root: &Path, name: &str) -> PathBuf {
     root.join("knowledge")
         .join("packs")
         .join(format!("{name}.json"))
+}
+
+/// Plans the one-id-one-source step of `pack add` and `pack upgrade` for the
+/// installed `packs`, `copy` among them. The step decides on the project's own
+/// overrides. The offer of `copy` writes its exclusions before the copy and
+/// the step writes `knowledge/overrides.json` again at the end, so the plan
+/// takes the exclusions on top of its own edits: its write keeps them, also
+/// for an id that a local entry carries.
+fn plan_the_step(
+    root: &Path,
+    install: &Install,
+    packs: &[PackCopy],
+    copy: &PackCopy,
+) -> Result<one_source::Plan, String> {
+    let overrides = &install.base.overrides_raw;
+    let mut step = one_source::plan(root, &install.base.topic_files, packs, overrides)?;
+    step.edit_overrides(root, overrides, |document| {
+        opt_in::with_offered_exclusions(document, &install.marker, copy)
+    });
+    Ok(step)
 }
 
 /// Resolves the install root, runs `action`, prints the text it returns on
@@ -353,8 +376,10 @@ fn refuse_shared_ids(verb: &str, copy: &PackCopy, others: &[PackCopy]) -> Result
     ))
 }
 
-/// `pack add`: installs the pack that `argument` names.
-fn add(root: &Path, argument: &str) -> Result<Vec<String>, String> {
+/// `pack add`: installs the pack that `argument` names. `init --workflow`
+/// calls it for each pack that the workflow requires, so that every path that
+/// brings a pack onto an install makes the same offer of its opt-in entries.
+pub(crate) fn add(root: &Path, argument: &str) -> Result<Vec<String>, String> {
     let mut install = Install::open(root)?;
     let (source, fetched) = read_argument(root, argument)?;
     let copy = parse_pack(fetched.raw, argument)?;
@@ -364,24 +389,19 @@ fn add(root: &Path, argument: &str) -> Result<Vec<String>, String> {
             copy.name
         ));
     }
-    if copy.name == TRACKER_PACK && !root.join("backlog").is_dir() {
-        return Err(format!(
-            "pack {TRACKER_PACK} needs a tracker, and this install has no backlog/ directory; install a tracker with --tracker first"
-        ));
+    if copy.name == TRACKER_PACK && install.marker.tracker()?.is_none() {
+        return Err(crate::tracker::lines::pack_needs_tracker(TRACKER_PACK));
     }
     refuse_shared_ids("add", &copy, &install.base.packs)?;
     let mut packs = install.base.packs.clone();
     packs.push(copy.clone());
     packs.sort_by(|left, right| left.name.cmp(&right.name));
-    let step = one_source::plan(
-        root,
-        &install.base.topic_files,
-        &packs,
-        &install.base.overrides_raw,
-    )?;
+    let step = plan_the_step(root, &install, &packs, &copy)?;
 
+    let active = opt_in::active_lines(&install.marker, &copy);
     let mut added_areas = Vec::new();
     let area_lines = add_pack_areas(root, &copy, &mut added_areas)?;
+    let offered = opt_in::offer(root, &mut install.marker, &copy)?;
     write_json(&copy_path(root, &copy.name), &copy.raw)?;
     install.pins.insert(
         copy.name.clone(),
@@ -403,6 +423,8 @@ fn add(root: &Path, argument: &str) -> Result<Vec<String>, String> {
     )];
     lines.extend(area_lines);
     lines.extend(step.lines().iter().cloned());
+    lines.extend(active);
+    lines.extend(offered);
     Ok(lines)
 }
 
@@ -416,7 +438,11 @@ fn remove(root: &Path, name: &str) -> Result<Vec<String>, String> {
         (None, Some(copy)) => copy.version.as_str(),
     };
     if let Some(copy) = copy {
-        let named = named_in_overrides(&install.base.overrides_raw, &ids_of(copy));
+        let offers = opt_in::untaken_offers(&install.base.overrides_raw, copy);
+        let named: Vec<&str> = named_in_overrides(&install.base.overrides_raw, &ids_of(copy))
+            .into_iter()
+            .filter(|id| !offers.iter().any(|offer| offer == id))
+            .collect();
         if !named.is_empty() {
             return Err(format!(
                 "cannot remove pack {name}: knowledge/overrides.json names {}; remove those overrides and exclusions first",
@@ -426,6 +452,7 @@ fn remove(root: &Path, name: &str) -> Result<Vec<String>, String> {
     }
     let mut lines = vec![format!("removed pack {name} {version}")];
     if let Some(copy) = copy {
+        opt_in::withdraw(root, &mut Marker::read(root)?, copy)?;
         let remaining = install.other_packs(name);
         lines.extend(remove_pack_areas(root, copy, &remaining, &install.base)?);
         let path = copy_path(root, name);
@@ -495,10 +522,17 @@ fn upgrade(root: &Path, name: &str, tag: Option<&str>) -> Result<Vec<String>, St
     let (old_ids, new_ids) = (ids_of(&old), ids_of(&new));
     let dropped: Vec<&str> = old_ids.difference(&new_ids).copied().collect();
     let added: Vec<&str> = new_ids.difference(&old_ids).copied().collect();
-    let named = named_in_overrides(
+    let mut packs = others;
+    packs.push(new.clone());
+    packs.sort_by(|left, right| left.name.cmp(&right.name));
+    let orphans = opt_in::orphaned_offers(&install.base.overrides_raw, &packs);
+    let named: Vec<&str> = named_in_overrides(
         &install.base.overrides_raw,
         &dropped.iter().copied().collect(),
-    );
+    )
+    .into_iter()
+    .filter(|id| !orphans.iter().any(|orphan| orphan == id))
+    .collect();
     if !named.is_empty() {
         return Err(format!(
             "cannot upgrade pack {name}: knowledge/overrides.json names {}, which version {} drops; remove those overrides and exclusions first",
@@ -506,24 +540,17 @@ fn upgrade(root: &Path, name: &str, tag: Option<&str>) -> Result<Vec<String>, St
             new.version
         ));
     }
-    let mut packs = others;
-    packs.push(new.clone());
-    packs.sort_by(|left, right| left.name.cmp(&right.name));
-    let step = one_source::plan(
-        root,
-        &install.base.topic_files,
-        &packs,
-        &install.base.overrides_raw,
-    )?;
+    let step = plan_the_step(root, &install, &packs, &new)?;
 
     let mut record = pin.added_areas.clone();
     let area_additions = add_pack_areas(root, &new, &mut record)?;
-    write_json(&copy_path(root, name), &new.raw)?;
     let Install {
         mut marker,
         mut pins,
         ..
     } = install;
+    let offered = opt_in::offer(root, &mut marker, &new)?;
+    write_json(&copy_path(root, name), &new.raw)?;
     pins.insert(
         name.to_string(),
         Pin {
@@ -539,6 +566,7 @@ fn upgrade(root: &Path, name: &str, tag: Option<&str>) -> Result<Vec<String>, St
     step.apply()?;
     let upgraded = load_base(root).map_err(|error| error.to_string())?;
     let area_removals = remove_pack_areas(root, &old, &packs, &upgraded)?;
+    opt_in::withdraw_orphans(root, &mut Marker::read(root)?, &packs)?;
 
     let mut lines = vec![format!(
         "upgraded pack {name} from {} to {}",
@@ -549,5 +577,6 @@ fn upgrade(root: &Path, name: &str, tag: Option<&str>) -> Result<Vec<String>, St
     lines.extend(area_removals);
     lines.extend(area_additions);
     lines.extend(step.lines().iter().cloned());
+    lines.extend(offered);
     Ok(lines)
 }

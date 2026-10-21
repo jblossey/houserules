@@ -60,7 +60,7 @@
 //!   follow.
 //! - `.claude/evals/` -- eval scenarios model adopter repositories across
 //!   ecosystems and are governed by `process.evals-rerun`, never touched
-//!   by an unrelated gate. (`template/.claude/evals/` is NOT under this
+//!   by an unrelated gate. (`template/workflows/reference/.claude/evals/` is NOT under this
 //!   prefix -- it stays walked, with its own named exception below,
 //!   because it ships inside the payload template/ itself covers.)
 //!
@@ -292,12 +292,15 @@ fn exceptions() -> Vec<Exception> {
             matches: |hit, _file_text| hit.file == "template/packs/process.json",
         },
         Exception {
-            label: "template/.claude/evals/ (whole subtree)",
+            label: "template/workflows/reference/.claude/evals/ (whole subtree)",
             reason: "eval scenarios model a hypothetical adopter's own repository across \
                 ecosystems (a seeded package.json is scratch-worktree fixture data, not this \
                 repository's own manifest); governed by process.evals-rerun, never silently \
                 touched by an unrelated gate.",
-            matches: |hit, _file_text| hit.file.starts_with("template/.claude/evals/"),
+            matches: |hit, _file_text| {
+                hit.file
+                    .starts_with("template/workflows/reference/.claude/evals/")
+            },
         },
     ]
 }
@@ -620,7 +623,7 @@ mod tests {
             ".github/workflows/ci.yml",
             "template/CLAUDE.md",
             "template/packs/quality.json",
-            "template/.claude/evals/dependency-add.json",
+            "template/workflows/reference/.claude/evals/dependency-add.json",
             "release-please-config.json",
         ];
         for path in not_excluded {
@@ -800,11 +803,11 @@ mod tests {
         assert!(!excepted(&hit("docs/AGENTS.md", 4)), "another file");
     }
 
-    /// Every file under `template/.claude/evals/` is excepted, by prefix.
+    /// Every file under `template/workflows/reference/.claude/evals/` is excepted, by prefix.
     #[test]
     fn template_evals_subtree_is_excepted_by_prefix() {
         let hit = Hit {
-            file: "template/.claude/evals/dependency-add.json".to_string(),
+            file: "template/workflows/reference/.claude/evals/dependency-add.json".to_string(),
             line: 1,
             text: "commit a package.json".to_string(),
         };

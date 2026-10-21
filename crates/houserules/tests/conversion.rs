@@ -125,6 +125,8 @@ fn passes(dir: &Path, args: &[&str]) {
 /// `check-knowledge`, `check-backlog`, and `render --check`: the three gates
 /// that read the tree and that a converted tree must pass. `audit`,
 /// `check-commit`, and `validate` need a range or a report and do not run.
+/// The conversion gives the `backlog/` directory of 1.x the JSON tracker (batch
+/// 34, spec 4.7 step 1), so the three gates pass at once.
 fn check_knowledge_check_backlog_and_render_check_pass(dir: &Path) {
     passes(dir, &["check-knowledge"]);
     passes(dir, &["check-backlog"]);
@@ -283,12 +285,28 @@ fn update_leaves_no_standing_rules_file_after_it_converts_an_install() {
     passes(dir.path(), &["render", "--check"]);
 }
 
+/// The one exclusion that the conversion writes for an unmodified install: the
+/// offer of the opt-in entry of the process pack (spec 3.7).
+fn opt_in_exclusion() -> Value {
+    json!({"id": "process.every-commit-names-a-work-item", "reason": "opt-in"})
+}
+
+/// An unmodified 1.4.0 install converts with no override and no exclusion of a
+/// project entry: the overrides document holds the exclusion of the opt-in
+/// entry alone (spec 3.7), and every topic file is a pack.
 #[test]
-fn an_unmodified_1_4_0_install_converts_with_no_override_and_no_exclusion() {
+fn an_unmodified_1_4_0_install_converts_with_no_override_and_only_the_opt_in_exclusion() {
     let dir = install_1_4_0(true);
     let lines = update(dir.path());
 
-    assert!(!path_of(dir.path(), "knowledge/overrides.json").exists());
+    assert_eq!(
+        read_json(dir.path(), "knowledge/overrides.json"),
+        json!({
+            "schema": "houserules/overrides@1.0.0",
+            "overrides": [],
+            "exclusions": [opt_in_exclusion()],
+        })
+    );
     for topic in TOPICS {
         assert!(
             !path_of(dir.path(), &format!("knowledge/{topic}.json")).exists(),
@@ -297,7 +315,7 @@ fn an_unmodified_1_4_0_install_converts_with_no_override_and_no_exclusion() {
         assert!(path_of(dir.path(), &format!("knowledge/packs/{topic}.json")).is_file());
     }
     let marker = read_json(dir.path(), ".houserules.json");
-    assert_eq!(marker["schema"], json!("houserules/install@2.0.0"));
+    assert_eq!(marker["schema"], json!("houserules/install@2.1.0"));
     assert_eq!(marker["renderers"], json!(["claude"]));
     assert!(marker.get("overrides").is_none());
     assert!(marker.get("ownedPaths").is_none());
@@ -317,19 +335,19 @@ fn an_unmodified_1_4_0_install_converts_with_no_override_and_no_exclusion() {
     assert_eq!(
         baselines,
         [
-            ".claude/agents/branch-reviewer.md",
-            ".claude/agents/implementer.md",
-            ".claude/agents/task-reviewer.md",
-            ".claude/skills/finishing-a-feature/SKILL.md",
+            ".claude/schemas/deliverables.json",
+            ".claude/skills/houserules-step/SKILL.md",
             ".claude/skills/migrating-knowledge/SKILL.md",
-            ".claude/skills/orchestrating/SKILL.md",
-            ".githooks/commit-msg",
             ":/.github/workflows/knowledge.yml",
+            "backlog/schema.json",
             "knowledge/schema.json",
             "tools/claude-session-start.sh",
+            "tools/houserules-step.sh",
         ],
-        "only path baselines stay"
+        "only path baselines stay, the two schemas of batch 34 join them, and the pins of the workflow replace the baselines of its files"
     );
+    assert_eq!(marker["tracker"], json!({"adapter": "json"}));
+    assert_eq!(marker["workflow"]["name"], json!("reference"));
     assert!(
         lines.contains(
             &"removed 58 entry baselines from .houserules.json; the pins of the packs replace them"
@@ -339,7 +357,7 @@ fn an_unmodified_1_4_0_install_converts_with_no_override_and_no_exclusion() {
     );
     assert!(
         lines.contains(
-            &"converted .houserules.json to the install schema houserules/install@2.0.0"
+            &"converted .houserules.json to the install schema houserules/install@2.1.0"
                 .to_string()
         ),
         "{lines:?}"
@@ -418,8 +436,8 @@ fn a_1_4_0_install_in_every_state_converts_and_passes_check_knowledge_check_back
     edit_entries(root, "knowledge/process.json", |entries| {
         let entry = entries
             .iter_mut()
-            .find(|entry| entry["id"] == json!("process.tdd"))
-            .expect("process.tdd");
+            .find(|entry| entry["id"] == json!("process.conventional-commits"))
+            .expect("process.conventional-commits");
         entry["summary"] = json!("Write the test first, always.");
     });
     // An `overrides`-listed id, modified.
@@ -519,11 +537,14 @@ fn a_1_4_0_install_in_every_state_converts_and_passes_check_knowledge_check_back
         json!({
             "schema": "houserules/overrides@1.0.0",
             "overrides": [
+                {"id": "process.conventional-commits", "fields": {"summary": "Write the test first, always."}},
                 {"id": "process.skills-for-procedures", "fields": {"status": "retired"}},
-                {"id": "process.tdd", "fields": {"summary": "Write the test first, always."}},
                 {"id": "writing-style.principles", "fields": {"body": ["Our own style rule."]}},
             ],
-            "exclusions": [{"id": "security-hygiene.no-focused-tests"}],
+            "exclusions": [
+                {"id": "security-hygiene.no-focused-tests"},
+                opt_in_exclusion(),
+            ],
         })
     );
     let marker = read_json(root, ".houserules.json");
@@ -569,6 +590,37 @@ fn a_1_4_0_install_in_every_state_converts_and_passes_check_knowledge_check_back
     let second = update(root);
     assert_no_change_lines(&second);
     assert_eq!(porcelain(root), "", "a second update changes no file");
+}
+
+/// A converted override of a modified 1.x entry carries only the fields that
+/// the project changed from the text that its 1.x release shipped. A 1.4.0
+/// install whose `process.tdd` summary alone is edited gets an override of
+/// `summary` alone, so the fields that the kit changed after 1.4.0 (the body
+/// of the entry) reach it.
+#[test]
+fn a_modified_summary_converts_to_an_override_of_the_summary_alone() {
+    let dir = install_1_4_0(false);
+    edit_entries(dir.path(), "knowledge/process.json", |entries| {
+        let entry = entries
+            .iter_mut()
+            .find(|entry| entry["id"] == json!("process.tdd"))
+            .expect("process.tdd");
+        entry["summary"] = json!("Write the test first, always.");
+    });
+    commit_all(dir.path());
+
+    update(dir.path());
+
+    assert_eq!(
+        read_json(dir.path(), "knowledge/overrides.json"),
+        json!({
+            "schema": "houserules/overrides@1.0.0",
+            "overrides": [
+                {"id": "process.tdd", "fields": {"summary": "Write the test first, always."}}
+            ],
+            "exclusions": [opt_in_exclusion()],
+        })
+    );
 }
 
 #[test]
@@ -618,6 +670,9 @@ fn a_claude_md_without_the_import_gets_the_hand_step_and_fails_check_knowledge_u
         "Our own notes.\n\n@AGENTS.md\n",
     )
     .expect("add the import");
+    // The converted tree has the process pack and no tracker, which
+    // `check-knowledge` names (spec 3.10); the project adopts the JSON tracker.
+    passes(dir.path(), &["init", "--tracker", "json"]);
 
     passes(dir.path(), &["check-knowledge"]);
 }
@@ -653,7 +708,8 @@ fn update_after_pack_remove_and_a_local_copy_of_the_entries_changes_nothing() {
 #[test]
 fn update_converts_a_hand_written_local_entry_with_a_pack_id_into_an_override() {
     let dir = scratch_git_repo();
-    passes(dir.path(), &["init"]);
+    passes(dir.path(), &["init", "--tracker", "json"]);
+    passes(dir.path(), &["pack", "add", "process"]);
     let mut entry = read_json(dir.path(), "knowledge/packs/process.json")["entries"]
         .as_array()
         .expect("entries")
@@ -717,7 +773,7 @@ fn a_tree_with_knowledge_and_no_marker_needs_the_id_prefix_flag() {
     assert_eq!(output.status.code(), Some(0), "{output:?}");
     let marker = read_json(dir.path(), ".houserules.json");
     assert_eq!(marker["idPrefix"], json!("HR"));
-    assert_eq!(marker["schema"], json!("houserules/install@2.0.0"));
+    assert_eq!(marker["schema"], json!("houserules/install@2.1.0"));
 }
 
 /// This repository's own marker and knowledge files at the base of batch 33
@@ -1073,8 +1129,14 @@ fn fresh_install_arguments(line: &str) -> Vec<String> {
 
 /// The second way out of the refusal: the project removes `.houserules.json`
 /// and runs the command that the line prints, exactly as printed. `init` then
-/// writes a fresh install of the 2.0 layout that the reading gates accept, and
-/// its marker keeps the prefix of the marker that was removed.
+/// writes a fresh install of the 2.0 layout, and its marker keeps the prefix of
+/// the marker that was removed. It replaces the migrating-knowledge skill of
+/// 1.4.0, which equals a content that the kit shipped (spec C35), so the skill
+/// cites no rule that the minimal install lacks. The printed command alone
+/// leaves a tree where `check-knowledge` and `render --check` pass.
+/// `check-backlog` prints line B (spec 3.4) and exits 1, because the
+/// `backlog/` directory of 1.x has no tracker in that install; the remedy that
+/// line names is `init --tracker json`.
 #[test]
 fn init_as_the_line_prints_it_gives_a_fresh_install_with_the_old_prefix() {
     for (install_prefix, prefix) in [(None, "WI"), (Some("XY"), "XY")] {
@@ -1094,10 +1156,29 @@ fn init_as_the_line_prints_it_gives_a_fresh_install_with_the_old_prefix() {
         passes(dir.path(), &words);
 
         let marker = read_json(dir.path(), ".houserules.json");
-        assert_eq!(marker["schema"], json!("houserules/install@2.0.0"));
+        assert_eq!(marker["schema"], json!("houserules/install@2.1.0"));
         assert_eq!(marker["idPrefix"], json!(prefix));
         assert!(marker.get("overrides").is_none());
-        check_knowledge_check_backlog_and_render_check_pass(dir.path());
+        let skill = ".claude/skills/migrating-knowledge/SKILL.md";
+        assert_eq!(
+            fs::read(path_of(dir.path(), skill)).expect("read the skill"),
+            fs::read(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../template")
+                    .join(skill)
+            )
+            .expect("read the kit skill"),
+            "init replaced the skill of 1.4.0"
+        );
+
+        passes(dir.path(), &["check-knowledge"]);
+        passes(dir.path(), &["render", "--check"]);
+        let backlog = run(dir.path(), &["check-backlog"]);
+        assert_eq!(backlog.status.code(), Some(1));
+        assert_eq!(
+            String::from_utf8_lossy(&backlog.stderr),
+            "backlog/ exists but no tracker is installed; run houserules init --tracker json\n"
+        );
     }
 }
 
@@ -1118,7 +1199,7 @@ fn a_deleted_topic_file_converts_to_an_exclusion_for_each_of_its_entries() {
 
     let lines = update(dir.path());
 
-    let exclusions: Vec<Value> = ids.iter().map(|id| json!({"id": id})).collect();
+    let mut exclusions: Vec<Value> = ids.iter().map(|id| json!({"id": id})).collect();
     assert!(
         lines.contains(&format!(
             "wrote knowledge/overrides.json (0 overrides, {} exclusions)",
@@ -1126,6 +1207,7 @@ fn a_deleted_topic_file_converts_to_an_exclusion_for_each_of_its_entries() {
         )),
         "{lines:?}"
     );
+    exclusions.push(opt_in_exclusion());
     assert_eq!(
         read_json(dir.path(), "knowledge/overrides.json")["exclusions"],
         json!(exclusions)
@@ -1168,16 +1250,23 @@ fn a_1_4_0_install_without_its_areas_file_converts_with_the_areas_of_the_packs()
         &tree_snapshot::snapshot(dir.path()),
         "the conversion of an install without areas.json",
     );
-    let fresh = scratch_git_repo();
-    passes(fresh.path(), &["init"]);
     assert_eq!(
         read_json(dir.path(), "knowledge/areas.json"),
-        read_json(fresh.path(), "knowledge/areas.json"),
+        read_json(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../template"),
+            "knowledge/areas.json"
+        ),
         "areas.json"
     );
     assert_eq!(
         added_areas_by_pack(dir.path()),
-        added_areas_by_pack(fresh.path()),
+        json!({
+            "knowledge-base": ["docs"],
+            "process": ["global", "process"],
+            "quality": ["tools"],
+            "security-hygiene": [],
+            "writing-style": [],
+        }),
         "addedAreas"
     );
     check_knowledge_check_backlog_and_render_check_pass(dir.path());
@@ -1279,21 +1368,42 @@ fn an_update_that_stops_after_step_5_finishes_at_the_next_update() {
     );
 }
 
+/// Writes a `knowledge/overrides.json` that holds no override and no exclusion.
+/// The offer of the opt-in entry then rewrites a file that exists, so it needs
+/// no new file in `knowledge/`.
+#[cfg(unix)]
+fn seed_an_empty_overrides_document(dir: &Path) {
+    write_json(
+        dir,
+        "knowledge/overrides.json",
+        &json!({
+            "schema": "houserules/overrides@1.0.0",
+            "overrides": [],
+            "exclusions": []
+        }),
+    );
+}
+
 /// The same stop between the pins and the move of the entries, where the
 /// topic files still hold the entries of the packs and the baselines still
 /// stand. The next run must not read the entries as deleted ones, and the
 /// tree equals the tree of an uninterrupted conversion. The stop is a
-/// `knowledge/` directory that cannot lose a file. A user with the right to
-/// write anywhere (`root`) cannot stop the run this way, so the test ends.
+/// `knowledge/` directory that cannot lose a file. The install holds its
+/// overrides document already (`seed_an_empty_overrides_document`), so that the
+/// first write that the directory refuses is the removal of a topic file. A
+/// user with the right to write anywhere (`root`) cannot stop the run this
+/// way, so the test ends.
 #[cfg(unix)]
 #[test]
 fn an_update_that_stops_before_the_entries_move_finishes_at_the_next_update() {
     use std::os::unix::fs::PermissionsExt;
 
     let control = install_1_4_0(false);
+    seed_an_empty_overrides_document(control.path());
     update(control.path());
 
     let dir = install_1_4_0(false);
+    seed_an_empty_overrides_document(dir.path());
     let knowledge = path_of(dir.path(), "knowledge");
     fs::create_dir(knowledge.join("packs")).expect("create packs/");
     fs::set_permissions(&knowledge, fs::Permissions::from_mode(0o555)).expect("lock knowledge/");

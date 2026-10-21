@@ -172,10 +172,12 @@ fn regex_validity_message(pattern: &str, flags: &str) -> Option<String> {
 
 /// Validates one entry's `check` object's shape: every field its `type`
 /// requires (`check_fields`), the `commits` type's own "needs one of
-/// three" rule, and that `pattern`,
-/// `subject`, and `body_absent` (whichever are present as strings) compile
-/// as regular expressions. `at` prefixes every message the same way the
-/// caller's other per-entry messages are prefixed.
+/// four" rule (`subject`, `body_absent`, `body_line_max`, or
+/// `require_trailer`), and that `pattern`, `subject`, `body_absent`, and each
+/// string of `exempt_subjects` (whichever are present) compile as regular
+/// expressions, the patterns the commit evaluator compiles. `at` prefixes
+/// every message the same way the caller's other per-entry messages are
+/// prefixed.
 fn check_shape(check: &Value, at: &str, errors: &mut Vec<String>) {
     let check_type = check.get("type").and_then(Value::as_str).unwrap_or("");
     let Some(fields) = check_fields(check_type) else {
@@ -190,9 +192,10 @@ fn check_shape(check: &Value, at: &str, errors: &mut Vec<String>) {
         && falsy(check.get("subject"))
         && falsy(check.get("body_absent"))
         && falsy(check.get("body_line_max"))
+        && falsy(check.get("require_trailer"))
     {
         errors.push(format!(
-            "{at}: check \"commits\" needs \"subject\", \"body_absent\", or \"body_line_max\""
+            "{at}: check \"commits\" needs \"subject\", \"body_absent\", \"body_line_max\", or \"require_trailer\""
         ));
     }
     // Only an absent key or an explicit `null` defaults `flags` to empty;
@@ -209,6 +212,19 @@ fn check_shape(check: &Value, at: &str, errors: &mut Vec<String>) {
         if let Some(message) = regex_validity_message(pattern, &flags) {
             errors.push(format!(
                 "{at}: check {field} is not a valid regex ({message})"
+            ));
+        }
+    }
+    for pattern in check
+        .get("exempt_subjects")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+    {
+        if let Some(message) = regex_validity_message(pattern, &flags) {
+            errors.push(format!(
+                "{at}: check exempt_subjects is not a valid regex ({message})"
             ));
         }
     }
@@ -850,6 +866,7 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
     errors.extend(pack_see_findings(base));
     let mut trailing_errors = pack_findings(base, &archive_files);
     trailing_errors.extend(claude_import_finding(&base.root));
+    trailing_errors.extend(crate::workflow::requirements::findings(base));
     trailing_errors.extend(marker_errors);
     trailing_errors.extend(archive_errors);
     if !errors.is_empty() {
@@ -1214,8 +1231,12 @@ mod tests {
         }
         fs::write(
             root.join(".houserules.json"),
-            serde_json::to_string(&json!({"schema": "houserules/install@2.0.0", "packs": pins}))
-                .unwrap(),
+            serde_json::to_string(&json!({
+                "schema": "houserules/install@2.0.0",
+                "packs": pins,
+                "tracker": {"adapter": "json"},
+            }))
+            .unwrap(),
         )
         .unwrap();
         // `AGENTS.md` is the one instruction file the `docs` area's glob
@@ -1232,27 +1253,32 @@ mod tests {
             )
             .unwrap();
         }
-        // Every path here is a real file `houserules init` itself writes --
-        // nothing stands in for one. The seed's `docs`/`tools` areas
-        // (`template/knowledge/areas.json`) declare `docs/**`, `tools/**`,
-        // and `.github/**`; `docs/README.md`, `tools/claude-session-
-        // start.sh`, and `.github/workflows/knowledge.yml` are what a real
-        // `init` puts under each, so copying them is what keeps this seed
-        // a fixture that pins the shipped product rather than a fixture
-        // padded to pass around it.
-        for path in [
-            ".claude/schemas/deliverables.json",
-            ".claude/evals/record.json",
-            "backlog/schema.json",
-            ".claude/skills/finishing-a-feature/SKILL.md",
-            ".claude/skills/orchestrating/SKILL.md",
-            "tools/claude-session-start.sh",
-            ".github/workflows/knowledge.yml",
-            "docs/README.md",
+        // Every path here is a real file `houserules init --tracker json
+        // --workflow reference` writes -- nothing stands in for one. A plain
+        // `init` writes no `backlog/` file and no workflow file, so this
+        // fixture models the install of the JSON tracker and the reference
+        // workflow. The seed's `docs`/`tools` areas
+        // (`template/knowledge/areas.json`) declare `docs/**`,
+        // `backlog/**`, and `tools/**`; `docs/README.md`,
+        // `backlog/schema.json`, and `tools/claude-session-start.sh` are
+        // what that install puts under each, so copying them is what keeps
+        // this seed a fixture that pins the shipped product rather than a
+        // fixture padded to pass around it. The workflow files come from the
+        // package, which holds them at their install paths.
+        let package = template.join("workflows/reference");
+        for (source, path) in [
+            (&template, ".claude/schemas/deliverables.json"),
+            (&package, ".claude/evals/record.json"),
+            (&template, "backlog/schema.json"),
+            (&package, ".claude/skills/finishing-a-feature/SKILL.md"),
+            (&package, ".claude/skills/orchestrating/SKILL.md"),
+            (&template, "tools/claude-session-start.sh"),
+            (&template, ".github/workflows/knowledge.yml"),
+            (&template, "docs/README.md"),
         ] {
             let dest = root.join(path);
             fs::create_dir_all(dest.parent().unwrap()).unwrap();
-            fs::copy(template.join(path), &dest).unwrap();
+            fs::copy(source.join(path), &dest).unwrap();
         }
     }
 
@@ -1417,7 +1443,7 @@ mod tests {
             "knowledge/process.json process.dup: verify path \"missing.txt\" does not exist",
             "knowledge/process.json process.bad-check: check \"grep-absent\" needs \"files\"",
             "knowledge/process.json process.bad-check: check \"grep-absent\" needs \"scope\"",
-            "knowledge/process.json process.bad-commits: check \"commits\" needs \"subject\", \"body_absent\", or \"body_line_max\"",
+            "knowledge/process.json process.bad-commits: check \"commits\" needs \"subject\", \"body_absent\", \"body_line_max\", or \"require_trailer\"",
         ] {
             assert!(
                 errors.contains(&expected.to_string()),
@@ -1429,6 +1455,83 @@ mod tests {
                 .iter()
                 .any(|e| e.contains("process.bad-check: check pattern is not a valid regex")),
             "{errors:#?}"
+        );
+    }
+
+    /// The `check_base` findings for one entry whose `check` is `check`, in a
+    /// repository whose generated files are up to date.
+    fn findings_of_a_check(check: Value) -> Vec<String> {
+        let dir = tempfile::tempdir().expect("tempdir");
+        make_repo(
+            dir.path(),
+            &[entry(
+                json!({"id": "process.a", "standing": false, "check": check}),
+            )],
+        );
+        let base = load_base(dir.path()).expect("loads");
+        crate::rules::render::render(&base, false).expect("render");
+        check_base(&load_base(dir.path()).expect("loads"))
+    }
+
+    /// A `commits` check passes the shape check with any one rule field that
+    /// the evaluator runs: `subject`, `body_absent`, `body_line_max`, or
+    /// `require_trailer` (spec 3.7). The fields that only narrow a rule,
+    /// `exempt_authors` and `exempt_subjects`, are no rule: a check with only
+    /// those still needs one.
+    #[test]
+    fn check_base_accepts_a_commits_check_with_any_one_rule_field() {
+        for fields in [
+            json!({"subject": "^feat"}),
+            json!({"body_absent": "WIP"}),
+            json!({"body_line_max": 100}),
+            json!({"require_trailer": "Work-Item"}),
+        ] {
+            let mut check = json!({"type": "commits", "level": "fail"});
+            check
+                .as_object_mut()
+                .expect("an object")
+                .extend(fields.as_object().expect("an object").clone());
+            assert_eq!(findings_of_a_check(check.clone()), Vec::<String>::new());
+        }
+        for fields in [
+            json!({"exempt_authors": ["dependabot[bot]"]}),
+            json!({"exempt_subjects": ["^chore"]}),
+        ] {
+            let mut check = json!({"type": "commits", "level": "fail"});
+            check
+                .as_object_mut()
+                .expect("an object")
+                .extend(fields.as_object().expect("an object").clone());
+            assert_eq!(
+                findings_of_a_check(check),
+                vec![
+                    "knowledge/process.json process.a: check \"commits\" needs \"subject\", \"body_absent\", \"body_line_max\", or \"require_trailer\""
+                        .to_string()
+                ]
+            );
+        }
+    }
+
+    /// `exempt_subjects` holds regular expressions that the evaluator
+    /// compiles under the check's flags, so the shape check compiles each one
+    /// and names a malformed one, as it names a malformed `subject`. A valid
+    /// item in the same list adds no line.
+    #[test]
+    fn check_base_compiles_each_exempt_subjects_pattern() {
+        let errors = findings_of_a_check(json!({
+            "type": "commits",
+            "level": "fail",
+            "require_trailer": "Work-Item",
+            "exempt_subjects": ["^chore\\(.+\\): release ", "(unclosed", "[a-"],
+        }));
+        assert_eq!(
+            errors,
+            vec![
+                "knowledge/process.json process.a: check exempt_subjects is not a valid regex (Invalid regular expression: /(unclosed/: Unterminated group)"
+                    .to_string(),
+                "knowledge/process.json process.a: check exempt_subjects is not a valid regex (Invalid regular expression: /[a-/: Unterminated character class)"
+                    .to_string(),
+            ]
         );
     }
 
