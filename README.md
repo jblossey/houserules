@@ -12,10 +12,11 @@ Claude Code (or any harness that reads plain files) at your project;
 houserules installs the machinery, and your project supplies the rules.
 
 Every rule, decision, and gotcha your team has learned lives in
-`knowledge/*.json`, addressable by id. Every unit of work traces to a
-backlog item. Three agent templates carry the rules into every change and
-audit the result against them, so the rules stay enforced instead of
-drifting into a wiki nobody reads.
+`knowledge/*.json`, addressable by id. Your work items live in the tracker
+that you choose: JSON files, GitHub Issues, or Beads. A commit names the
+item it delivers. An optional reference workflow adds agent templates that
+carry the rules into every change and audit the result against them, so the
+rules stay enforced instead of drifting into a wiki nobody reads.
 
 ## Table of contents
 
@@ -25,8 +26,10 @@ drifting into a wiki nobody reads.
 - [Adding to an existing project](#adding-to-an-existing-project)
 - [What it installs](#what-it-installs)
 - [Packs](#packs)
+- [Trackers](#trackers)
+- [The houserules step](#the-houserules-step)
 - [Ownership model](#ownership-model)
-- [The agent workflow](#the-agent-workflow)
+- [The reference workflow](#the-reference-workflow)
 - [Measure process cost](#measure-process-cost)
 - [CLI reference](#cli-reference)
 - [Stability](#stability)
@@ -113,7 +116,9 @@ binary you already have.
 Either way, the repository sync writes the files houserules owns —
 keeping any you changed — and re-renders the generated files. It moves
 each kit pack to the version of the binary and keeps your overrides and
-exclusions. When a pack ships the id of one of your own entries, it moves that entry
+exclusions. Where the install runs the reference workflow, it moves the files
+of the workflow with the binary and keeps a file that you changed.
+When a pack ships the id of one of your own entries, it moves that entry
 into an override (one id, one source) and removes a topic file left empty. It prints the version
 drift it just synced, `kit <old> -> <new>`. It also backfills any
 seed-once file a later kit release adds that your install never
@@ -130,15 +135,16 @@ An install of houserules 1.x converts to the 2.0 layout in the same run.
 [docs/upgrading-to-2.md](docs/upgrading-to-2.md) lists what changes and
 each hand step that `update` can print.
 
-The knowledge schema, `knowledge/schema.json`, and the CI workflow,
-`.github/workflows/knowledge.yml`, are a kind of file that `houserules
+The knowledge schema (`knowledge/schema.json`), the deliverables schema
+(`.claude/schemas/deliverables.json`), and the CI workflow
+(`.github/workflows/knowledge.yml`) are a kind of file that `houserules
 files` lists as `d3Files`. `init` writes each once and records a
 baseline for it. `update` keeps each current through that baseline: it
 rewrites a copy that still equals its baseline, keeps and lists a copy
 that you changed, and leaves a copy that you list in `ownedPaths` as it
-is. The workflow installs the release that `.houserules.json` records.
-`update` replaces a workflow of houserules 1.x that equals the workflow
-of a release. It keeps a workflow with steps of your own and prints a
+is. The CI workflow installs the release that `.houserules.json` records.
+`update` replaces a CI workflow of houserules 1.x that equals the workflow
+of a release. It keeps a CI workflow with steps of your own and prints a
 hand step. Copy the install step from the kit's
 [`template/.github/workflows/knowledge.yml`](https://github.com/jblossey/houserules/blob/main/template/.github/workflows/knowledge.yml)
 into it, or compare the two files.
@@ -165,8 +171,8 @@ Remove the binary through the channel you installed with:
 Everything houserules put into a project is plain files tracked by your
 repository — there is no hidden state. To remove the kit from a project,
 delete the files it manages (`houserules files` lists them) plus the
-seeded `knowledge/` and `backlog/` data, or keep the knowledge files:
-they are readable JSON and useful without the binary.
+seeded `knowledge/` data and the `backlog/` data of a JSON tracker, or keep
+the knowledge files: they are readable JSON and useful without the binary.
 
 ## Quick start
 
@@ -177,11 +183,20 @@ houserules check-knowledge && houserules check-backlog
 git add -A && git commit -m 'chore: install houserules knowledge setup'
 ```
 
-`init` writes the kit-owned machinery, installs the five kit packs
-(your starting rules), and seeds your backlog and schemas (plus a CI
-workflow, on a GitHub-hosted origin). It then renders the harness files
-and stamps `.houserules.json` with the binary's version. Look at what
-you got:
+`init` installs the minimal default: the `knowledge-base` pack (your
+starting rules), the schemas, `AGENTS.md` and `CLAUDE.md`, the
+`migrating-knowledge` and `houserules-step` skills, and a CI workflow on a
+GitHub-hosted origin. It installs no tracker and no workflow. It then
+renders the harness files and stamps `.houserules.json` with the binary's
+version. Both gates pass on this install:
+
+```text
+knowledge: ok
+no tracker installed; run houserules init --tracker json|github|beads to add one
+```
+
+`check-backlog` has no tracker to check, so it prints its line and exits 0.
+Look at what you got:
 
 ```sh
 houserules topics
@@ -189,20 +204,28 @@ houserules topics
 
 ```json
 [
-  { "topic": "knowledge-base",   "entries": 7,  "title": "Authoring knowledge entries" },
-  { "topic": "process",          "entries": 38, "title": "How work runs: batches, dispatch, reviews, rulings" },
-  { "topic": "quality",          "entries": 6,  "title": "Quality principles" },
-  { "topic": "security-hygiene", "entries": 4,  "title": "Dependency, commit, and test hygiene" },
-  { "topic": "writing-style",    "entries": 5,  "title": "Writing style for docs, comments, commits, reports" }
+  {
+    "topic": "knowledge-base",
+    "entries": 7,
+    "title": "Authoring knowledge entries"
+  }
 ]
 ```
 
 ```sh
-houserules get process.tdd   # one entry, in full
+houserules get knowledge-base.ids-are-permanent   # one entry, in full
 ```
 
-Set `git config core.hooksPath .githooks` to activate the commit-msg
-Conventional Commits gate.
+Add more of the kit when you need it:
+
+```sh
+houserules pack add quality                                  # one more pack of starting rules
+houserules init --tracker json                               # a tracker for your work items
+houserules init --workflow reference --add-required-packs    # agent templates and skills
+```
+
+The reference workflow installs a commit-msg hook that gates Conventional
+Commits. Set `git config core.hooksPath .githooks` to activate it.
 
 For Claude Code, add the Claude files:
 
@@ -210,13 +233,12 @@ For Claude Code, add the Claude files:
 houserules init --target claude
 ```
 
-This seeds the agent templates, the session-start script and its hook
-entry in `.claude/settings.json`, and enables the Claude renderer, which
-writes the area rules under `.claude/rules/` and the `project-knowledge`
-skill. Restart Claude Code once afterward (the first `.claude/agents/`
-file and the new hook need a fresh session). Other harnesses need
-nothing more: the standing rules sit in the `houserules` block of
-`AGENTS.md`.
+This seeds the session-start script and its hook entry in
+`.claude/settings.json`, and enables the Claude renderer, which writes the
+area rules under `.claude/rules/` and the `project-knowledge` skill.
+Restart Claude Code once afterward (a new hook or a new `.claude/agents/`
+file needs a fresh session). Other harnesses need nothing more: the
+standing rules sit in the `houserules` block of `AGENTS.md`.
 
 ## Adding to an existing project
 
@@ -225,7 +247,7 @@ cd my-project
 houserules init --id-prefix ABC
 ```
 
-- `--id-prefix ABC` sets your backlog id prefix (`ABC-001`); default `WI`.
+- `--id-prefix ABC` sets the id prefix of the JSON tracker (`ABC-001`); default `WI`.
 - An existing `AGENTS.md` keeps its text: `init` reports `kept
   AGENTS.md`. `render` then adds the `houserules` block at its end, between
   `<!-- houserules:begin -->` and `<!-- houserules:end -->`. Move the
@@ -236,18 +258,19 @@ houserules init --id-prefix ABC
   `@AGENTS.md` line if you use Claude Code. `check-knowledge` fails a
   `CLAUDE.md` that lacks the line.
 - With `--target claude`, an existing `.claude/settings.json` is merged:
-  the two SessionStart hook entries are appended only if their matchers
-  are absent. Nothing else in your settings is touched.
-- `.githooks/commit-msg` is kit-owned, but `init` keeps a hook of that
-  name that your project already has, and says so (`kept
-  .githooks/commit-msg`).
-- Existing files under `knowledge/`, `backlog/`, evals, or the workflow
-  are kept as they are.
+  `init` adds a hook entry only if the file lacks it. Nothing else in your
+  settings is touched.
+- `init --workflow reference` keeps a file that your project already has at
+  a path of the workflow, such as `.githooks/commit-msg` or an agent
+  template. It prints `hand step: <file> is not the kit's; the reference
+  workflow leaves it to the project`, and the file stays yours.
+- Existing files under `knowledge/` and `backlog/` are kept as they are.
 
 Then move your real rules in: add your entries as topic files
 `knowledge/<topic>.json` (an id starts with its topic name), add the
-areas they use to `knowledge/areas.json` with their globs, replace the
-example backlog item, and run `houserules render`. To change a rule of
+areas they use to `knowledge/areas.json` with their globs, choose a
+tracker for your work items (see [Trackers](#trackers)), and run
+`houserules render`. To change a rule of
 the kit, override or exclude it in `knowledge/overrides.json` (see
 [Packs](#packs)). The `migrating-knowledge` skill walks the move step by
 step, from inventory to entries to gates — including eliciting your
@@ -263,8 +286,9 @@ service in a monorepo:
 houserules init --dir services/api
 ```
 
-- The install root is the directory you give. `.claude/` and
-  `.githooks/` live in the install root, so launch Claude Code there.
+- The install root is the directory you give. `.claude/` lives in the
+  install root, so launch Claude Code there. `.githooks/` lives there too,
+  where the install runs the reference workflow.
 - Every other command works from anywhere inside the install. Its default
   root is the nearest directory at or above the current one that holds
   `.houserules.json`, no higher than the git top level.
@@ -276,24 +300,27 @@ houserules init --dir services/api
   install root's path with each `/` replaced by `-` (`knowledge-services-api.yml`
   here). It carries a `working-directory` and a `paths` filter for the
   subdirectory. A repository can hold several installs, each with its own
-  workflow; `init` refuses a root that nests with another install or
-  reuses a workflow file name.
-- houserules never sets `core.hooksPath`. Activate the commit-msg hook
-  with `git config core.hooksPath services/api/.githooks`, or call it
-  from your hook manager in one line: `sh services/api/.githooks/commit-msg
-  "$1"`.
+  workflow; `init` refuses a new root that nests with another install or
+  reuses a workflow file name. A root that already holds its
+  `.houserules.json` is no new root: `init` there runs no such check.
+- houserules never sets `core.hooksPath`. Where the install runs the
+  reference workflow, activate its commit-msg hook with `git config
+  core.hooksPath services/api/.githooks`, or call it from your hook manager
+  in one line: `sh services/api/.githooks/commit-msg "$1"`.
 
 ## What it installs
+
+A plain `init` installs the core. A tracker, the reference workflow, and
+the Claude Code files are opt-in.
 
 - **A knowledge base** (`knowledge/`): addressable entries (`id`,
   `kind`, `area`, `summary`, `body`, `tags`, `source`, `see`, `verify`,
   optional deterministic `check`). The kit's entries come as five packs
-  in `knowledge/packs/`. Your own entries live in one JSON file per
+  in `knowledge/packs/`, and a plain `init` installs the `knowledge-base`
+  pack. Your own entries live in one JSON file per
   topic, `knowledge/<topic>.json`. Your changes to pack entries live in
   `knowledge/overrides.json`, and your areas in `knowledge/areas.json`.
   A schema validates the entries, and `update` keeps it current.
-- **A backlog** (`backlog/`): typed work items, one JSON file per
-  section, driving every change.
 - **Project instructions** (`AGENTS.md`): the cross-harness instruction
   file every agent reads, plus a one-line `CLAUDE.md` (`@AGENTS.md`) that
   bridges Claude Code to the same text.
@@ -307,12 +334,24 @@ houserules init --dir services/api
   `AGENTS.md`; and, for Claude Code (`houserules init --target claude`),
   path-scoped area rules (`.claude/rules/<area>.md`) and a preloaded
   `project-knowledge` skill.
-- **An agent layer**: an `orchestrating` skill, a `finishing-a-feature`
-  skill, a `migrating-knowledge` skill, a commit-msg hook that gates
-  Conventional Commits, a JSON deliverables contract, and eval
-  scenarios. With `--target claude`, also three agent templates
-  (`implementer`, `task-reviewer`, `branch-reviewer`) with rule-adherence
-  audits, and a SessionStart hook.
+- **Skills and a report format**: a `migrating-knowledge` skill, a
+  `houserules-step` skill with the script `tools/houserules-step.sh` (see
+  [The houserules step](#the-houserules-step)), and a JSON deliverables
+  contract, `.claude/schemas/deliverables.json`, that every report and
+  review follows.
+- **A tracker** (`houserules init --tracker`): the store of your work
+  items, in JSON files, GitHub Issues, or Beads. See
+  [Trackers](#trackers).
+- **The reference workflow** (`houserules init --workflow reference`): four
+  agent templates (`implementer`, `task-reviewer`, `branch-reviewer`,
+  `spec-reviewer`) with rule-adherence audits; the `orchestrating`,
+  `finishing-a-feature`, `designing`, and `planning` skills; a commit-msg
+  hook that gates Conventional Commits; eval scenarios; and a session-start
+  script. See [The reference workflow](#the-reference-workflow).
+- **Claude Code files** (`houserules init --target claude`): a
+  session-start script that prints the standing rules again after a
+  compaction, its hook entry in `.claude/settings.json`, and the Claude
+  renderer.
 - **Seed rules**: five packs with a generic standing-rule set (TDD,
   conventional commits, no tech debt, dependency vetting, exact pins,
   doc comments, ASD-STE100 writing style, and more). Your project adds
@@ -327,7 +366,10 @@ houserules init --dir services/api
   `.houserules.json` is missing or has no such line (a minified or
   re-indented stamp, or a null version), the gate installs the latest
   release and prints a notice that says so; run `houserules update` to
-  write the stamp, or to name the error in it. On other hosts `init`
+  write the stamp, or to name the error in it. The steps that run the
+  gates follow your tracker: the GitHub form adds the `issues: read`
+  permission and a `GH_TOKEN`, and the Beads form installs `bd` at a pinned
+  release and bootstraps the store. On other hosts `init`
   prints a skip note and the `migrating-knowledge` skill covers
   generating the equivalent gate.
 
@@ -353,6 +395,10 @@ An upstream pack comes through your own `git` command, so any host and
 your git credentials work. The tag must be a tag, never a branch or a
 commit: a pin is exact. `update` moves the kit packs to the version of
 the binary, and `pack upgrade` moves an upstream pack.
+
+The `process` pack names the work items of your tracker, so `pack add
+process` needs one. Without a tracker it refuses: `pack process needs a
+tracker; run houserules init --tracker json|github|beads`.
 
 Never edit a pack copy: `check-knowledge` fails a copy that differs from
 its pin. Put your changes in `knowledge/overrides.json` instead:
@@ -383,9 +429,132 @@ id of one of your own entries, they move that entry into an override.
 An id has one source: `pack add`
 refuses a pack that ships an id of another installed pack.
 
+## Trackers
+
+A tracker holds your work items. `init` installs none until you choose one:
+
+```sh
+houserules init --tracker json     # the backlog/*.json files of your repository
+houserules init --tracker github   # the issues of a GitHub repository, through gh
+houserules init --tracker beads    # a Beads store, through bd
+```
+
+- **JSON** keeps typed items, batches, amendments, and parked polish in
+  `backlog/`, with a schema. `--id-prefix` sets the item id prefix.
+- **GitHub Issues** runs the `gh` CLI. `--repo <owner>/<name>` names the
+  repository; without it, `init` reads the `origin` remote. houserules never
+  reads or stores a token: `gh` keeps its own login. An item is an issue
+  with a `type:<t>` label. `check-backlog` names each `houserules:` label
+  that your repository lacks.
+- **Beads** runs the `bd` CLI. Run `bd init` first, or `bd bootstrap` in a
+  clone: `init --tracker beads` refuses without a store. houserules sets
+  `BD_DISABLE_METRICS=1` and `DO_NOT_TRACK=1` on every `bd` it starts, so an
+  adopter never sends bd usage events through houserules. A user's own `bd`
+  calls keep bd's own setting. The seeded CI workflow of a Beads install
+  installs `bd` and bootstraps the store.
+
+The work-item commands are the same on every tracker: `list`, `batch`,
+`get`, `set`, `defer`, `check-backlog`, and `archive`. An install keeps its
+tracker, so `init --tracker` with another tracker refuses. `github` and
+`beads` also refuse an install that has a `backlog/` directory. The
+`migrating-knowledge` skill describes how to move the data. Every tracker
+writes the `backlogId` pattern of the deliverables schema for its id shapes.
+
+With no tracker, `list`, `batch`, `set`, `defer`, and `get` of a work item
+print one line that says so and exit 2. `check-backlog` prints that line and
+exits 0. Where a `backlog/` directory exists, `list`, `batch`, `set`,
+`defer`, and `get` of a work item print
+`backlog/ exists but no tracker is installed; run houserules init --tracker json`
+and exit 2, and `check-backlog` and `audit` print it and exit 1. A tracker
+that the gates cannot reach is never a pass: `check-backlog` and `audit`
+print `tracker <adapter> cannot be reached: <cause>; <setup step>` and exit 1.
+
+### Deferrals
+
+`defer` files work that waits. `--title` files a new item (a chore, open,
+with the reason as its body). `--item <id>` marks an existing item as a
+deferral.
+
+```sh
+houserules defer --title "Split the parser module" \
+  --reason "The split changes the public API and waits for a major version." \
+  --origin "review of the parser change" \
+  --file src/parser.rs --file src/lexer.rs
+```
+
+```text
+WI-002
+```
+
+`list --deferred` shows each deferral with its `reason`, `origin`, and
+`files`. A title has at most 120 characters.
+
+### Trailers
+
+A commit names the work item it delivers in a `Work-Item:` trailer. A
+commit that files a deferral names it in a `Deferred:` trailer:
+
+```text
+fix(parser): read a quoted key
+
+Work-Item: WI-012
+Deferred: WI-015 the split changes the public API
+```
+
+A commit that delivers several items writes one `Work-Item:` trailer for
+each. `audit` resolves every trailer of its range through the installed
+tracker. A `Work-Item:` id must name an item. A `Deferred:` id must name a
+filed deferral with a reason. Each failure prints one line, and `audit`
+exits 1:
+
+```text
+<short-sha>: Work-Item WI-099 does not resolve in the json tracker
+```
+
+With no tracker, `audit` resolves nothing. It prints `skipped <n> work-item
+references: no tracker installed (houserules init --tracker)`. Where a
+`backlog/` directory exists, it prints the `backlog/ exists` line of the
+section [Trackers](#trackers) and exits 1.
+
+The JSON result of `audit` holds the same verdict. `references.failures`
+lists each failure line, `references.resolved` and `references.skipped` count
+the references, and `summary.reference_fail` counts the failures. The
+`backlog/ exists` line and the line of a tracker that cannot be reached are
+failures too. `summary.fail` counts only the rule rows.
+
+The process pack ships `process.every-commit-names-a-work-item`, which fails
+a commit that has no `Work-Item:` trailer. It is an opt-in entry. When
+a command brings the process pack onto an install, houserules excludes the
+entry in `knowledge/overrides.json` with the reason `opt-in`, and prints
+`process.every-commit-names-a-work-item is an opt-in entry;
+knowledge/overrides.json excludes it until you delete its exclusion`. Delete
+the exclusion to opt in. The install then keeps the entry, whatever a later
+command does.
+
+## The houserules step
+
+Every install holds the `houserules-step` skill and the script
+`tools/houserules-step.sh`. Any workflow, or none, calls the script around
+a change. The script runs the `houserules` on your `PATH`:
+
+```sh
+tools/houserules-step.sh before src/parser.rs     # the rules for the files you will change
+tools/houserules-step.sh after main report.json   # the audit since main, and the report check
+```
+
+`before` runs `houserules for` and writes the rule package to
+`.houserules/step/rules.json`. `after <base>` runs `houserules audit --base
+<base>` and writes the result to `.houserules/step/audit.json`. With a
+report as the second argument, it also runs `houserules validate` and
+writes `.houserules/step/validate.json`. The script prints the path of each
+output file, and `after` prints each exit status, so an agent reads the
+output with its file-read tool. Paths and refs are relative to the install
+root. `.houserules/step/` holds scratch output, and `init` adds it to
+`.gitignore`.
+
 ## Ownership model
 
-Every path houserules writes falls into one of four classes, and
+Every path houserules writes falls into one of seven classes, and
 `houserules files` prints the exact manifest of each as JSON:
 
 - **Kit-owned** (`kitOwned`) — `update` writes a missing file and
@@ -394,19 +563,34 @@ Every path houserules writes falls into one of four classes, and
 - **Seed-once** (`seedOnce`) — `init` writes it only if it is absent,
   then leaves it alone. It is yours from the first write on.
   `.claude/settings.json` is the one exception: with `--target claude`,
-  `init` merges its two SessionStart hook entries into an existing file
-  instead of skipping it.
-- **Kept current through a baseline** (`d3Files`) — the knowledge schema
-  and the CI workflow. `init` writes each once and baselines it, and
-  `update` keeps it at the content of the kit unless you changed it. The
-  CI workflow is written only when your `origin` resolves to GitHub;
-  `update` backfills it if your origin becomes GitHub-hosted later.
+  `init` merges its hook entries into an existing file instead of
+  skipping it.
+- **Kept current through a baseline** (`d3Files`) — the knowledge schema,
+  the deliverables schema, and the CI workflow. `init` writes each once and
+  baselines it, and `update` keeps it at the content of the kit unless you
+  changed it. The CI workflow is written only when your `origin` resolves
+  to GitHub; `update` backfills it if your origin becomes GitHub-hosted
+  later.
+- **Tracker files** (`trackerFiles`) — the JSON tracker: its five data
+  files are seed-once, and `backlog/schema.json` is kept current through a
+  baseline. `init --tracker json` writes them, and `update` restores or
+  delivers them only where the tracker is `json`.
+- **Workflow files** (`workflowFiles`) — the files of the reference
+  workflow. `init --workflow reference` writes them and pins each one in
+  `.houserules.json` under `workflow`. `update` writes a file whose bytes
+  equal its pin and moves the pin with the binary. It keeps a file that you
+  changed and prints `kept <file> (locally modified; reference workflow
+  <version>)` on every run, until you merge the change by hand. A file at a
+  workflow path that the kit did not write is yours and gets no pin.
+- **Workflow data** (`workflowData`) — `.claude/evals/record.json`, your
+  record of eval runs. `init --workflow reference` writes it empty, and
+  nothing pins or replaces it.
 - **Pack copies** (`packCopies`) — `knowledge/packs/<pack>.json`.
   `update` moves each kit pack to the version of the binary and rewrites
   its copy. You change a pack entry through `knowledge/overrides.json`,
   never in the copy.
-- **Yours** — everything else: your knowledge entries, your backlog
-  items, your project code. houserules never touches it.
+- **Yours** — everything else: your knowledge entries, your work items
+  in a tracker you keep, your project code. houserules never touches it.
 
 To keep a file for good, list its path in `ownedPaths` in
 `.houserules.json`: `update` leaves a listed file as it finds it and
@@ -424,30 +608,67 @@ generated by `houserules render` from `knowledge/`, and so is the
 
 | Class | Files |
 |---|---|
-| kit-owned | `tools/claude-session-start.sh` and `.claude/agents/*.md` (both with `--target claude`), the `orchestrating`, `finishing-a-feature`, and `migrating-knowledge` skills in `.claude/skills/`, `.githooks/commit-msg` |
-| seed-once | `knowledge/areas.json`; the `backlog/` schema and data; `.claude/schemas/deliverables.json` and the evals; `docs/README.md`, `AGENTS.md`, `CLAUDE.md` |
-| kept current through a baseline | `knowledge/schema.json`, `.github/workflows/knowledge.yml` |
-| pack copies | `knowledge/packs/<pack>.json`, one for each installed pack |
+| kit-owned (`kitOwned`) | `tools/claude-session-start.sh` (with `--target claude`), `.claude/skills/migrating-knowledge/SKILL.md`, `.claude/skills/houserules-step/SKILL.md`, `tools/houserules-step.sh` |
+| seed-once (`seedOnce`) | `knowledge/areas.json`, `docs/README.md`, `AGENTS.md`, `CLAUDE.md` |
+| kept current through a baseline (`d3Files`) | `knowledge/schema.json`, `.claude/schemas/deliverables.json`, `.github/workflows/knowledge.yml` (GitHub-hosted origin only) |
+| tracker files (`trackerFiles`) | `backlog/batches.json`, `backlog/amendments.json`, `backlog/decisions.json`, `backlog/parked.json`, `backlog/items/general.json`, `backlog/schema.json` |
+| workflow files (`workflowFiles`) | `.claude/agents/implementer.md`, `.claude/agents/task-reviewer.md`, `.claude/agents/branch-reviewer.md`, `.claude/agents/spec-reviewer.md`, `.claude/skills/orchestrating/SKILL.md`, `.claude/skills/finishing-a-feature/SKILL.md`, `.claude/skills/designing/SKILL.md`, `.claude/skills/planning/SKILL.md`, `.claude/evals/dependency-add.json`, `.claude/evals/docs-edit.json`, `.claude/evals/seeded-violations.json`, `.githooks/commit-msg`, `tools/reference-session-start.sh` |
+| workflow data (`workflowData`) | `.claude/evals/record.json` |
+| pack copies (`packCopies`) | `knowledge/packs/knowledge-base.json`, `knowledge/packs/process.json`, `knowledge/packs/quality.json`, `knowledge/packs/security-hygiene.json`, `knowledge/packs/writing-style.json` |
 
-## The agent workflow
+## The reference workflow
 
-Three agent templates, installed with `--target claude` and each on a
-different model tier, carry the rules into every change:
+The reference workflow is an optional set of lifecycle files for a project
+that hands tasks to agents. It needs a tracker and the rules that its files
+cite:
 
-- **implementer** (the cheapest model that fits the task): implements
-  one task from a brief, test-driven, and writes a JSON report.
-- **task-reviewer** (a stronger model than the implementer it reviews):
-  reviews one task's diff for spec compliance, code quality, and rule
-  adherence.
-- **branch-reviewer** (the strongest model): reviews the whole branch
-  before merge and proposes knowledge-base improvements drawn from the
-  batch's reviews.
+```sh
+houserules init --workflow reference --tracker json --add-required-packs
+```
 
-An `orchestrating` skill drives the batch lifecycle — brainstorm or
-spec, a decision gate from the project's owner or decider, plan,
-dispatch, live run, finish, rollout. Every dispatched agent runs
-`houserules audit` against its own diff and records the result in its
-JSON report, so rule adherence is checked, not just asserted.
+Without a tracker, `init` refuses: `the reference workflow needs a tracker;
+run houserules init --workflow reference --tracker json|github|beads`.
+Without `--add-required-packs`, `init` names the packs that hold the rules
+the workflow cites and adds none. `check-knowledge` fails while a rule that
+the workflow requires is missing or excluded.
+
+Four agent templates, each on a configured model, carry the rules into
+every change:
+
+- **implementer** (default model `sonnet`): implements one task from a
+  brief, test-driven, and writes a JSON report.
+- **task-reviewer** (default `opus`): reviews one task's diff for spec
+  compliance, code quality, and rule adherence.
+- **branch-reviewer** (default `opus`): reviews the whole branch before
+  merge and proposes knowledge-base improvements drawn from the batch's
+  reviews.
+- **spec-reviewer** (default `opus`): attacks a spec before a human reads
+  it and files its findings in a `spec-review` deliverable.
+
+The model of each role sits in `workflow.models` in `.houserules.json`.
+The templates carry no `model:` line. The `orchestrating` skill names the
+configured model in every dispatch, and each report and review records it
+in its `model` field.
+
+Four skills drive the lifecycle. `designing` drafts a spec from what the
+project already holds, has it reviewed, and takes it to the project's owner
+or decider. `planning` turns the approved spec into tasks with declared
+file sets. `orchestrating` dispatches the agents, runs the live run, and
+drives the batch to its finish. `finishing-a-feature` merges the branch.
+The risk of the change picks one of two tiers, light or standard. A task is
+critical when it changes the commands, flags, or output of a command-line
+interface, a schema, authentication or security code, or the data that an
+install keeps on disk: its tests come first, and it gets one review. Every
+dispatched agent runs `houserules audit` against its own diff and records
+the result in its JSON report, so rule adherence is checked, not just
+asserted.
+
+The workflow also installs a commit-msg hook that gates Conventional
+Commits, three eval scenarios with their record, and
+`tools/reference-session-start.sh`, which prints the session ritual. The
+block that `render` writes into `AGENTS.md` points every harness at the
+`orchestrating` skill. A harness with no subagents does the work directly,
+in its own session.
 
 ## Measure process cost
 
@@ -465,6 +686,14 @@ output keeps the keys `violations`, `unused_ids`, `audits`, and
 
 - `workspaces`: one row per workspace with its tasks, reviews, fix
   rounds, report bytes, and findings by severity and by target.
+- `models`: one row per model that wrote a deliverable, sorted by row
+  name. A `model` value that names one family (`fable`, `haiku`, `opus`,
+  or `sonnet`) as a whole word counts in the row of that family: the
+  alias `opus` and the id `claude-opus-5-5` share the row `opus`. A value
+  that names no family keeps its own row, as `human` and `unknown` do. A
+  row has `model` in place of `path` and the other fields of a
+  `workspaces` row. A deliverable with no `model` field counts in the
+  row `pre-2.0`.
 - `cost`: the sums of those rows and the mean per task.
 - `rules`: one row per active knowledge entry. `source` names where the
   entry comes from: `local`, or the name of the pack that ships it.
@@ -490,15 +719,46 @@ output keeps the keys `violations`, `unused_ids`, `audits`, and
   `demote`, `retire`, `narrow`, or `mechanize` for it; the entry still
   counts toward the standing budget.
 
-One `proposals` row, abbreviated:
+One `models` row, for a workspace whose only deliverable is a task review
+that `claude-opus-5-5` wrote, with one important finding on code and one
+minor finding on prose. The row is named after the family, `opus`:
+
+```json
+{
+  "model": "opus",
+  "tasks": 0,
+  "reviews": 1,
+  "re_reviews": 0,
+  "fix_rounds": 0,
+  "report_bytes": 0,
+  "findings": {
+    "critical": 0,
+    "important": 1,
+    "minor": 1,
+    "other": 0
+  },
+  "targets": {
+    "code": 1,
+    "deliverable": 0,
+    "prose": 1,
+    "other": 0
+  }
+}
+```
+
+One `proposals` row, for a workspace whose only deliverable is a task review
+with four minor findings on prose that cite `process.claims-match-artifacts`:
 
 ```json
 {
   "action": "narrow",
   "id": "process.claims-match-artifacts",
   "owner_gate": true,
-  "reason": "4 of 4 findings are minor or hit a deliverable or prose. Narrow the rule to contract surfaces.",
-  "evidence": {"findings": 4, "soft_findings": 4}
+  "reason": "4 of 4 findings are minor or hit a deliverable. Narrow the rule to contract surfaces.",
+  "evidence": {
+    "findings": 4,
+    "soft_findings": 4
+  }
 }
 ```
 
@@ -510,46 +770,47 @@ Working with knowledge:
 |---|---|
 | `topics` | Lists every knowledge topic with its entry count and title |
 | `index` | Lists knowledge-entry index rows, optionally filtered |
-| `get <id>` | Prints items by id: a backlog item, amendment, parked item, or knowledge entry |
+| `get <id>` | Prints items by id: a knowledge entry, or a work item of the installed tracker |
 | `for <path>` | Prints the rule package a set of changed paths pulls in |
 | `standing` | Lists the standing rules |
 | `render` | Rewrites stale generated harness files (`--check` lists them instead) |
 | `pack <list\|add\|upgrade\|remove>` | Lists, adds, upgrades, and removes the knowledge packs of an install |
 
-Working with the backlog:
+Working with work items:
 
 | Command | What it does |
 |---|---|
-| `list` | Lists backlog items, optionally filtered |
+| `list` | Lists the work items of the installed tracker, optionally filtered; `--deferred` lists the deferrals with their reasons |
 | `batch <n>` | Prints one development batch's summary and item rows |
-| `set <id> k=v` | Applies field assignments to a backlog item |
-| `archive` | Sweeps done/dropped items, done batches, and retired or superseded entries of your topic files into `archive/` mirrors; a pack entry stays in its pack copy |
+| `set <id> k=v` | Applies field assignments (`status`, `batch`, `milestone`) to a work item |
+| `defer` | Files a deferral: `--title` files a new item, and `--item <id>` marks an existing one; both name a reason and an origin |
+| `archive` | Sweeps done/dropped items and done batches of the JSON tracker, and retired or superseded entries of your topic files, into `archive/` mirrors; a pack entry stays in its pack copy |
 
 Gates:
 
 | Command | What it does |
 |---|---|
 | `check-knowledge` | Validates the knowledge base, its packs against their pins, its overrides and exclusions, generated-file freshness, and that kit-owned files cite only entries it holds |
-| `check-backlog` | Validates the backlog |
+| `check-backlog` | Validates the work items of the installed tracker |
 | `check-commit` | Runs commit-message checks against a message file or git range |
-| `audit` | Builds a git range's rule package and runs every deterministic check; a task audit (`--report`) leaves out an entry tagged `controller` unless `--ids` names it |
-| `validate` | Validates deliverable JSON files against the schema |
-| `check-report-claims` | Cross-checks a report's claims against the artifacts it cites |
+| `audit` | Builds a git range's rule package and runs every deterministic check, and resolves each `Work-Item:` and `Deferred:` trailer of the range through the installed tracker; a task audit (`--report`) leaves out an entry tagged `controller` unless `--ids` names it |
+| `validate` | Validates deliverable JSON files against the schema, which requires a `model` field |
+| `check-report-claims` | Cross-checks a report's claims against the artifacts it cites; with `--doc <path>` or `--item <id>` it checks a spec or a backlog item for cited workspace paths that do not exist |
 | `stats <workspace>...` | Aggregates rule violations, process cost, and knowledge-base proposals across one or more workspaces |
 
 Installing:
 
 | Command | What it does |
 |---|---|
-| `init` | Seeds the kit into a git repository from the embedded payload; `--target claude` adds the Claude Code files, and `--dir <subdir>` installs in a subdirectory |
-| `update` | Syncs kit-owned files, moves the kit packs, converts an install of houserules 1.x, removes retired files, reports version drift |
-| `files` | Prints the four file classes of the kit as JSON: kit-owned, seed-once, pack copies, and the files kept current through a baseline |
+| `init` | Seeds the minimal default into a git repository from the embedded payload; `--tracker json\|github\|beads` (with `--repo` for GitHub) installs a tracker, `--workflow reference` installs the reference workflow (`--add-required-packs` adds the packs it needs), `--target claude` adds the Claude Code files, and `--dir <subdir>` installs in a subdirectory |
+| `update` | Syncs kit-owned files, moves the kit packs and the workflow files, converts an install of houserules 1.x, removes retired files, reports version drift |
+| `files` | Prints the file classes of the kit as JSON: kit-owned, seed-once, pack copies, kept current through a baseline, tracker files, workflow files, and workflow data |
 
 Run any command with `--help` for its flags.
 
 ## Stability
 
-The CLI surface (the 21 subcommands above and their flags) and the
+The CLI surface (the subcommands above and their flags) and the
 schema constraint surface are frozen: a change to either is a breaking
 change and ships only with a major version bump.
 Within a major version, `update` never rewrites your project's own data
