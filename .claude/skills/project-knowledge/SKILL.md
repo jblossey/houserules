@@ -18,7 +18,7 @@ Save the output of every `houserules` command to a file, then read the file with
 
 houserules  46  Working in the houserules kit repository
 knowledge-base  7  Authoring knowledge entries
-process  55  How work runs: batches, dispatch, reviews, rulings
+process  56  How work runs: batches, dispatch, reviews, rulings
 quality  11  Quality principles
 security-hygiene  5  Dependency, commit, and test hygiene
 writing-style  5  Writing style for docs, comments, commits, reports

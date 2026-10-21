@@ -583,10 +583,5 @@
       }
     }
   ],
-  "exclusions": [
-    {
-      "id": "process.every-commit-names-a-work-item",
-      "reason": "opt-in"
-    }
-  ]
+  "exclusions": []
 }
