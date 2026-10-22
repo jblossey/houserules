@@ -2791,3 +2791,133 @@ Each item records the ruling with its date, or stays marked open.
     the location, how `init` and `update` write the ignore line, how an
     install that tracks its workspaces today moves, and what a `verify`
     path into a workspace becomes. Source: owner, 2026-10-21.
+196. **Batches 30 to 34 are accepted; the batch-34 scratch repository is
+    deleted - ruled 2026-10-21.** The owner, verbatim: "batches are
+    accepted and repo is deleted." The acceptance rulings of batches 30,
+    31, 32, 33, and 34 are homed here, so the archive sweep of the
+    finishing skill (step 3) runs on this branch. The private scratch
+    repository jblossey/houserules-b34-live of the batch-34 live run no
+    longer exists (process.scratch-repos-are-private-and-reported).
+    Source: owner, 2026-10-21.
+197. **The batch-34 rulings sheet - ruled 2026-10-21.** The owner ruled every
+    card of the batch-34 ruling sheet with the controller's recommendation
+    (33 cards on the sheet, the last one in chat: "Confirm the decline").
+    (1) A commit that records a ruling or an acceptance names the work items
+    it concerns; a ruling about no item files one first
+    (process.ruling-commits-name-their-items). (2) The twelve standing rules
+    the stats run proposed to demote stay standing. (3) Eight of the nine
+    mechanize rows keep the checks HR-204 already approved;
+    process.gates-cover-generated-commits folds into HR-219 as the planning
+    skill's paper-walk row. (4) The eight narrow rows are declined. (5) The
+    three narrow rows the controller left unapplied stay declined. (6) Every
+    entry the rulings keep (23) carries the tag ruled-keep, set in its own
+    file or, for a pack entry, through knowledge/overrides.json. (7) The
+    corrected body of houserules.template-is-the-source is approved.
+    Source: owner, 2026-10-21, the ruling sheet
+    https://claude.ai/artifact/JQEoWYpwuDZpnEvAdR7p2i and the chat.
+198. **Batch 35 may merge to main without a further owner word; no
+    release - ruled 2026-10-21.** The owner, verbatim, to the question
+    whether ruling 190's leave also covers batch 35: "yes and start".
+    Ruling 190 (1) and (2) apply to batch 35 word for word: the controller
+    merges fast-forward only from the CLI once batch 35's planned
+    lifecycle has run, with no step skipped or reordered, and releases no
+    version (release PR #83 stays held until batch 38, design.md 193). The
+    owner still approves batch 35's spec at its gate. Source: owner,
+    2026-10-21.
+199. **Batch 35's design questions - ruled 2026-10-21.** Asked after the
+    first design review (spec-review.json), as quick answers. (1) Tool
+    arguments: "Project only (Recommended)": the project's
+    `.houserules.json` holds each tool's whole command line; a pack's check
+    names only the tool key, the parser, and the files, so no text from a
+    pack reaches a process's argv. (2) HR-173: "Parser in HR-183
+    (Recommended)": the exit-code parser ships with HR-183 in batch 35;
+    HR-173 is rescoped to its rustdoc, ruff, and eslint recipes and the
+    split of `writing-style.doc-comments`, and stays 2.x. (3) The JSON
+    parser of issue 63: "Defer to 2.x (Recommended)": filed as a 2.x item;
+    at the release issue 63 gets the comment of 193(3) and stays open.
+    (4) The default workspace home: ".houserules/work/ (Recommended)",
+    under the one ignored `.houserules/` directory, with a location a
+    project can set. (5) SARIF parsing, verbatim: "check if it had no
+    release because it is considered stable or because it is stale. If
+    stale, i want you to research an alternative that is well-maintained
+    and well-adopted. If there is none, only then we own the minimal
+    types." (6) The six judged rules of HR-219 (1)
+    (houserules.crash-paths-are-named, knowledge-base.state-only-the-source,
+    quality.exclusive-pins-are-mutation-proven,
+    quality.gates-derive-their-scope, quality.user-facing-text-is-contract,
+    writing-style.instructions-cover-the-state-space): "ruled-keep all six
+    (Recommended)": each stays judged, with a per-row reason in the spec,
+    and carries the tag ruled-keep. Source: owner, 2026-10-21.
+200. **Batch 35's second-review questions - ruled 2026-10-22.** (1) The
+    parser and the install line of an external tool: "Project's runners
+    entry (Recommended)": the project's `.houserules.json` `runners` entry
+    holds a tool's command, its parser, and its install line together; a
+    pack's check names only the tool key, the files, and the scope. This
+    amends 199(1), which named the parser in the pack's check. (2) The
+    check-report-claims checks of HR-219 part 4 (commit-body counts,
+    closure words, scratchpad paths): "HR-204 in batch 36 (Recommended)":
+    HR-204, with its items 1 to 10, joins batch 36 (evidence and report
+    claims). Source: owner, 2026-10-22.
+201. **The batch-35 spec is approved once its design review holds no
+    Critical finding - ruled 2026-10-22.** The owner, verbatim: "once the
+    reviews find no criticals anymore, the spec is approved from my side
+    and you can proceed." When a design review of
+    `docs/specs/2026-10-21-batch-35-audit-and-checks.md` holds no Critical
+    finding, the controller folds that review's Important and Minor
+    findings into the spec (designing skill, step 3.3), marks the spec
+    approved under this ruling, and proceeds to the plan without a
+    further owner gate. A finding that needs an owner ruling still goes
+    to the owner. Source: owner, 2026-10-22.
+202. **HR-175's report checks stay warnings - ruled 2026-10-22.** The new
+    `non_empty` option on `security-hygiene.verify-current-docs` and the
+    new `covers_ids` option on `process.knowledge-first` keep their
+    entries' level warn: "Stay warnings (Recommended)". A violation is a
+    warn row with its evidence lines, which the task reviewer reads; it
+    fails no audit and is no upgrade red. Source: owner, 2026-10-22.
+203. **Runner checks in CI judge the PR head - ruled 2026-10-22.** On a
+    pull request, the seeded `knowledge.yml` and this repository's `ci.yml`
+    check out the merge commit but audit `--head` the PR head, so the tree
+    test of a runner check would exit 2 on every PR. The owner chose
+    "Check out the PR head (Recommended)": both workflows check out
+    `github.event.pull_request.head.sha`, so every row of the audit judges
+    one tree. The seeded file reaches installs through `update`'s
+    baseline. Source: owner, 2026-10-22.
+204. **The controller decides alone until 08:00 local on 2026-10-22 -
+    ruled 2026-10-22.** The owner, verbatim: "I want you to work
+    autonomously until i come back at 8am. If during that time you would
+    have needed decisions from me, decide those for me and provide me with
+    a complete page of these decisions in the morning when i come back so
+    i can veto in case some diverge from how i want things to be decided.
+    We will accept that you possibly have to rewrite some things in case
+    of diverging decisions." Each decision that would have gone to the
+    owner is taken by the controller, written to its home file as usual,
+    marked "decided under 204", and listed with its options and reasons in
+    `.superpowers/sdd/2026-10-21-batch-35/delegated-decisions.md`, which
+    becomes the morning page. A veto reopens the decision; the rework it
+    causes is accepted. The owner's limits, verbatim: "These decisions do
+    not include critical steps like releasing a version, spending money,
+    or interacting with external systems beyond what i have granted you
+    sensibly in the past. Your privileges are scoped to the current work
+    in houserules only. You may not autonomously change specs except if a
+    review finds issues with it (like we already operate) and you may in
+    no case autonomously change the meta-spec." So: no release, no spend,
+    no external action beyond the earlier grants (the ff-only merge of
+    198, private scratch repositories); a spec changes only to fold a
+    review's findings; the meta-spec never changes under 204, and a
+    finding that would amend it goes to the morning page as an open
+    question. Source: owner, 2026-10-22.
+205. **The batch-35 live run installs Semgrep in a throwaway venv - ruled
+    2026-10-22.** Spec case 12 needs a real Semgrep and none is installed.
+    The owner chose "Throwaway venv (Recommended)": `pip install
+    semgrep==<exact version>` into a venv under `~/.cache`, run with
+    `--metrics off` and a local rule file, and delete the venv after. The
+    download from PyPI is the only outward action; nothing in the
+    repository changes. Source: owner, 2026-10-22.
+206. **The owner keeps the batch-35 night decisions - ruled 2026-10-22.**
+    Asked before the merge whether the decisions taken alone under ruling
+    204 (D1 to D11 of `.superpowers/sdd/2026-10-21-batch-35/delegated-decisions.md`)
+    and the five meta-spec edits of spec revisions 4 and 5 (M1) stand, the
+    owner chose "Keep all (Recommended)". Each stands as recorded; D7 (the
+    `url` and `percent-encoding` crates as direct dependencies) is now the
+    owner's choice under `quality.well-maintained-libraries`. Source: owner,
+    2026-10-22.
