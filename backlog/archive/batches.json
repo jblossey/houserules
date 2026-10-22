@@ -424,6 +424,92 @@
         "state": "done",
         "text": "Built 2026-10-02 (spec section 7 holds the outcomes, section 8 the owner's checkpoint rulings): HR-142, HR-143, HR-145, and HR-146 delivered. HR-141 partial: the template step and a range fix shipped; the checker rule failed its corpus gate and stays open. HR-147 partial: the refusal text shipped; the subdirectory install stays open. HR-154 partial: the seeded workflow installs the stamped version; its seeded-repository run and its release-note text are due at the first release that carries it. HR-098 stays partial until the first minor or patch Dependabot PR merges with no owner action. Follow-ups filed: HR-148 to HR-153 and HR-155. Rollout 2026-10-02 (design.md 5.89): the owner reviewed and merged PR #46 and released 1.2.0; HR-154 closed with the seeded-repository run and the release note; HR-156 filed for the Dependabot PR that falls behind main."
       }
+    },
+    {
+      "number": 30,
+      "items": [
+        "HR-156"
+      ],
+      "summary": "A Dependabot PR that falls behind main gets its rebase without the owner; the batch-28 rollout record rides the branch.",
+      "kickoff": "docs/specs/2026-10-02-batch-30-dependabot-rebase.md",
+      "status": {
+        "state": "done",
+        "text": "Built and reviewed 2026-10-02 (spec section 9). Before the merge the owner stores the token as an Actions secret. HR-156 stays partial: it and HR-098 close on the first run that finds a behind pull request with auto-merge on and ends in a merge with no owner action (spec section 5). Resolved 2026-10-10 on the owner's ruling (design.md 5.96, D8): the owner stored the token in the Actions store; the controller rebased the branch onto main at v1.4.0 (the branch's code and workflow changes byte-identical to the reviewed head), CI passed, and the controller merged it fast-forward from the CLI as df1f228. The first run that found a behind pull request ended in a merge with no owner action (PR #53, HR-156): HR-156 and HR-098 are done. Acceptance waits for the owner."
+      }
+    },
+    {
+      "number": 31,
+      "items": [
+        "HR-159",
+        "HR-140",
+        "HR-160",
+        "HR-161"
+      ],
+      "summary": "Process cost: a risk-tiered pipeline, review severity by impact and a bounded review loop, a self-optimizing knowledge base, and the cost analysis shipped to adopters.",
+      "kickoff": "docs/specs/2026-10-09-batch-31-process-cost.md",
+      "status": {
+        "state": "done",
+        "text": "Built 2026-10-09: risk tiers, severity by impact, the bounded review loop, parallel agents on disjoint files, the self-optimizing knowledge loop, and stats over several workspaces (design.md 5.90-5.93). HR-164 (Task 1's findings at its cap) and HR-166 (the fix wave's findings at its cap) are deferred; HR-158, HR-162, HR-163, HR-165 are filed. Merged 2026-10-09 as PR #54 and released as 1.3.0; acceptance pending the owner."
+      }
+    },
+    {
+      "number": 32,
+      "items": [
+        "HR-167",
+        "HR-168",
+        "HR-169",
+        "HR-170"
+      ],
+      "summary": "The adopter lead-time audit, minor-release half: template defects and several workspaces, controller rules out of task audits, a loading path for non-standing process rules, and findings that name their caller and their check.",
+      "kickoff": "docs/specs/2026-10-10-batch-32-audit-follow-ups.md",
+      "status": {
+        "state": "done",
+        "text": "Built 2026-10-10 as release 1.4.0 (design.md 5.94): template defects and several workspaces (HR-167), controller rules out of task audits through the `controller` tag (HR-168; the mechanism replaced the proposal's area-pattern test after the corpus run, spec 3.1 and 6), loading paths for non-standing process rules (HR-169), and findings that name their caller and their check (HR-170). Evals 15 of 15. Filed from the retrospective: HR-174, HR-175 (batch 33), HR-176. Merge, release, and acceptance pending the owner."
+      }
+    },
+    {
+      "number": 33,
+      "items": [
+        "HR-182",
+        "HR-184",
+        "HR-191",
+        "HR-147",
+        "HR-178",
+        "HR-131",
+        "HR-162",
+        "HR-151",
+        "HR-195"
+      ],
+      "summary": "2.0.0, batch 1 of 5: the knowledge layer - packs and upstream packs, render targets, the subdirectory install, the seed and default-branch fixes, and the start of the upgrade machinery.",
+      "kickoff": "docs/specs/2026-10-19-batch-33-knowledge-layer.md",
+      "status": {
+        "state": "done",
+        "text": "Built and reviewed 2026-10-20 under the approved spec and plan (design.md 5.169, 5.170): nine tasks, the eval run (15 of 15), a live run of every spec 16 case (20 of 20, case 17 with its accepted red), and the branch review on opus with its fix wave. The owner purged the full tier mid-batch (172, 173); Task 9 and the batch close ran the standard tier. HR-182 stays partial (5.152 ships in batch 34). Merged to main 2026-10-20 through PR #82 after four Windows CI fix rounds; the release PR (#83) stays held until batch 37 (5.99)."
+      }
+    },
+    {
+      "number": 34,
+      "items": [
+        "HR-180",
+        "HR-181",
+        "HR-144",
+        "HR-129",
+        "HR-153",
+        "HR-165",
+        "HR-166",
+        "HR-150",
+        "HR-194",
+        "HR-196",
+        "HR-172",
+        "HR-198",
+        "HR-199"
+      ],
+      "summary": "2.0.0, batch 2 of 6: the workflow and work items - the reference workflow, the work-item contract, the design-phase review gate, and the template and skill riders.",
+      "kickoff": "docs/specs/2026-10-20-batch-34-workflow-and-work-items.md",
+      "status": {
+        "state": "done",
+        "text": "Merged ff-only after the planned lifecycle, with no release (design.md 190); acceptance by the owner follows the rollout."
+      }
     }
   ]
 }

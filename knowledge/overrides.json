@@ -73,7 +73,11 @@
       "id": "process.ask-when-missing",
       "fields": {
         "summary": "Ask the user when information is missing. Do not assume.",
-        "body": []
+        "body": [],
+        "tags": [
+          "users",
+          "ruled-keep"
+        ]
       }
     },
     {
@@ -115,7 +119,13 @@
           "date": "2026-09-04",
           "by": "review",
           "ref": "batch 16 task 2 re-review r1 trend note; owner ruling at the batch 16 report"
-        }
+        },
+        "tags": [
+          "reports",
+          "evidence",
+          "review",
+          "ruled-keep"
+        ]
       }
     },
     {
@@ -125,7 +135,13 @@
           "date": "2026-09-05",
           "by": "user",
           "ref": "batch 17 report ruling; branch review retrospective"
-        }
+        },
+        "tags": [
+          "reports",
+          "evidence",
+          "review",
+          "ruled-keep"
+        ]
       }
     },
     {
@@ -191,7 +207,13 @@
           "date": "2026-08-31",
           "by": "user",
           "ref": "tag-pilot fc3241b"
-        }
+        },
+        "tags": [
+          "evals",
+          "templates",
+          "agents",
+          "ruled-keep"
+        ]
       }
     },
     {
@@ -207,7 +229,13 @@
           "date": "2026-09-04",
           "by": "review",
           "ref": "batch 16 task 5 review finding 5; owner ruling at the batch 16 report"
-        }
+        },
+        "tags": [
+          "evidence",
+          "reports",
+          "workspace",
+          "ruled-keep"
+        ]
       }
     },
     {
@@ -359,7 +387,12 @@
           "date": "2026-09-05",
           "by": "user",
           "ref": "batch 17 report ruling; branch review retrospective"
-        }
+        },
+        "tags": [
+          "review",
+          "evidence",
+          "ruled-keep"
+        ]
       }
     },
     {
@@ -393,7 +426,12 @@
           "date": "2026-09-12",
           "by": "user",
           "ref": "batch 22 report, standing proposal 3"
-        }
+        },
+        "tags": [
+          "reports",
+          "reviews",
+          "ruled-keep"
+        ]
       }
     },
     {
@@ -457,7 +495,8 @@
         "tags": [
           "gates",
           "tooling",
-          "dev-bins"
+          "dev-bins",
+          "ruled-keep"
         ],
         "source": {
           "date": "2026-09-08",
@@ -474,7 +513,12 @@
           "date": "2026-09-02",
           "by": "user",
           "ref": "owner instruction of 2026-09-02, batch 7"
-        }
+        },
+        "tags": [
+          "quality",
+          "compatibility",
+          "ruled-keep"
+        ]
       }
     },
     {
@@ -514,6 +558,10 @@
           "A dedicated compliance pass over the existing codebase is its own backlog item; new code complies immediately.",
           "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test; an auto-restore setting covers only spies, so a mock created in a module-mock factory gets its own explicit afterEach reset.",
           "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided (batch 16: the glob translator missed nested braces and panicked; the regex scan flipped four verdicts against V8)."
+        ],
+        "tags": [
+          "quality",
+          "ruled-keep"
         ]
       }
     },
@@ -530,7 +578,14 @@
           "date": "2026-09-05",
           "by": "user",
           "ref": "owner ruling at the batch 18 spec gate; docs/design.md §5.31"
-        }
+        },
+        "tags": [
+          "libraries",
+          "dependencies",
+          "process",
+          "controller",
+          "ruled-keep"
+        ]
       }
     },
     {
@@ -539,8 +594,12 @@
         "summary": "Pin exact versions. Install only with a CLI (`cargo add <crate>@=<version>`, `pnpm add --save-exact`). Never write a version number by hand.",
         "body": [
           "Ranges (`^`, `~`) widen the attack surface. Resolve to the latest stable version at install time.",
-          "The deterministic check covers `package.json` and `Cargo.toml`; ranges inside the `engines` object are floors, not dependency pins, and are exempt. Other ecosystems are judged by the reviewer under the same rule.",
-          "A bare Cargo range (\"2.14\", an implicit caret) is invisible to the pattern without false-positiving the [package] version line; it stays judged material (batch 17: a Cargo dependency landed while the check read zero files)."
+          "The deterministic check covers `package.json` and `Cargo.toml`; ranges inside the `engines` object are floors, not dependency pins, and are exempt. In `Cargo.toml` it misses a table header with inner spaces (`[ dependencies ]`) and a dotted key (`serde.version = \"1\"`). Other ecosystems and the missed forms are judged by the reviewer under the same rule."
+        ],
+        "tags": [
+          "dependencies",
+          "supply-chain",
+          "ruled-keep"
         ]
       }
     },
@@ -572,7 +631,8 @@
         "tags": [
           "templates",
           "instructions",
-          "enums"
+          "enums",
+          "ruled-keep"
         ],
         "source": {
           "date": "2026-09-03",
@@ -580,6 +640,76 @@
           "ref": "batch 10 task 2 review, round 0 Important; HR-036"
         },
         "standing": null
+      }
+    },
+    {
+      "id": "process.no-tech-debt",
+      "fields": {
+        "tags": [
+          "review",
+          "debt",
+          "ruled-keep"
+        ]
+      }
+    },
+    {
+      "id": "security-hygiene.verify-current-docs",
+      "fields": {
+        "tags": [
+          "docs",
+          "dependencies",
+          "ruled-keep"
+        ]
+      }
+    },
+    {
+      "id": "writing-style.principles",
+      "fields": {
+        "tags": [
+          "docs",
+          "style",
+          "ruled-keep"
+        ]
+      }
+    },
+    {
+      "id": "process.tdd",
+      "fields": {
+        "tags": [
+          "testing",
+          "ruled-keep"
+        ]
+      }
+    },
+    {
+      "id": "writing-style.code-comments",
+      "fields": {
+        "tags": [
+          "comments",
+          "ruled-keep"
+        ]
+      }
+    },
+    {
+      "id": "writing-style.doc-comments",
+      "fields": {
+        "tags": [
+          "docs",
+          "comments",
+          "naming",
+          "ruled-keep"
+        ]
+      }
+    },
+    {
+      "id": "knowledge-base.state-only-the-source",
+      "fields": {
+        "tags": [
+          "knowledge",
+          "authoring",
+          "fidelity",
+          "ruled-keep"
+        ]
       }
     }
   ],

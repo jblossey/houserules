@@ -72,88 +72,6 @@
       }
     },
     {
-      "id": "process.full-tier-measures-cost",
-      "kind": "procedure",
-      "area": "process",
-      "summary": "Every batch measures its token and time cost per phase and per dispatch, so later process changes can be compared with batch 33.",
-      "body": [
-        "Keep `<workspace>/efficiency-windows.json` current: one window (`phase`, `start`, `end`, UTC) per phase: spec, plan, each task wave with its reviews and fix rounds, the live run, and the branch review.",
-        "Run `python3 -I .superpowers/sdd/2026-10-10-batch-33/efficiency.py <workspace>` at each phase end and save the output as `<workspace>/efficiency.json`. It sums the controller's model usage (main-session assistant messages, each message id once) and the subagent dispatches that finished in each window (tokens, tool uses, duration), plus wall-clock time.",
-        "Record every dispatch's tokens, tool uses, and duration from its completion notification in the ledger row that closes it.",
-        "The baseline is batch 33, the first full-tier batch measured this way, and `efficiency-baseline.json` (every dispatch of batches 28 to 33 that the transcripts hold; a dispatch whose call the transcripts lost has no role). Compare a later batch per phase and per dispatch with it, never as one total."
-      ],
-      "tags": [
-        "controller",
-        "cost",
-        "tiers"
-      ],
-      "source": {
-        "date": "2026-10-19",
-        "by": "user",
-        "ref": "design.md 170, 172(6)"
-      },
-      "status": "retired",
-      "see": [
-        "process.batches-measure-cost"
-      ]
-    },
-    {
-      "id": "process.critical-tasks-test-first",
-      "kind": "procedure",
-      "area": "process",
-      "summary": "A critical task gets the spec's cases as tests before any code, one RED run at BASE, the whole suite green at HEAD, and one review with no re-review.",
-      "body": [
-        "Owner ruling 2026-10-20 (design.md 173), in place of the purged full tier. A critical task changes the CLI's commands, flags, or output, a schema, authentication or security code, or the data on disk of an install.",
-        "The plan writes the spec's cases for the task as tests. The implementer commits them first and records one run that shows them failing at BASE, then makes them pass. The implementer still works test-first for every further change (`process.tdd`); only the evidence shrinks: that RED run and the whole suite passing at HEAD, with no recorded per-step RED and GREEN and no disclosed-mutation proof.",
-        "One task review on opus, never a re-review. The controller checks each fix by re-running the reviewer's own reproduction and records it in the ledger (`process.fix-round-verification-record`). A Critical or Important finding goes to a fresh implementer; the controller fixes a Minor one itself."
-      ],
-      "tags": [
-        "controller",
-        "cost",
-        "tiers"
-      ],
-      "source": {
-        "date": "2026-10-20",
-        "by": "user",
-        "ref": "design.md 173"
-      },
-      "see": [
-        "process.no-full-tier",
-        "process.tdd",
-        "process.fix-round-verification-record"
-      ],
-      "status": "retired"
-    },
-    {
-      "id": "process.no-full-tier",
-      "kind": "rule",
-      "area": "process",
-      "summary": "No batch or task runs a full tier, and nothing escalates to one; work runs the light or the standard tier.",
-      "body": [
-        "Owner ruling 2026-10-20 (design.md 172): \"Purge the full tier completely for us as well as for the reference workflow. Instead, for critical tasks, find other a different, faster, more efficient way to assert quality and correctness.\"",
-        "From batch 33's Task 9 on, this repository runs the standard tier: one task review, at most one re-review, and a branch review on opus for a batch of two or more tasks.",
-        "The controller fixes a small Minor finding itself and closes it with a verification note (`process.fix-round-verification-record`), instead of dispatching a fix round for it.",
-        "The kit's `process.risk-tiers` and the orchestrating skill name a full tier; in this repository this entry wins over them (HR-198 removes the kit's full tier). A critical task runs `process.critical-tasks-test-first` (design.md 173)."
-      ],
-      "tags": [
-        "controller",
-        "cost",
-        "tiers"
-      ],
-      "source": {
-        "date": "2026-10-20",
-        "by": "user",
-        "ref": "design.md 172"
-      },
-      "see": [
-        "process.risk-tiers",
-        "process.bounded-review-loop",
-        "process.full-tier-measures-cost",
-        "process.critical-tasks-test-first"
-      ],
-      "status": "retired"
-    },
-    {
       "id": "process.fresh-fix-round-implementers",
       "kind": "procedure",
       "area": "process",
@@ -285,13 +203,61 @@
       }
     },
     {
+      "id": "process.ruling-commits-name-their-items",
+      "kind": "rule",
+      "area": "process",
+      "summary": "A commit that records a ruling, an acceptance, or a ledger fact names the work items it concerns; a ruling about no item files one first.",
+      "body": [
+        "The every-commit trailer rule has no exemption for such a commit. An acceptance commit names the items of the accepted batches; a ruling commit names the items the ruling changes or books; a ruling that concerns no item files a work item before the commit that records it.",
+        "Owner ruling 2026-10-21 (batch 34 ruling sheet, trailer card): \"Name the items it concerns\"."
+      ],
+      "tags": [
+        "commits",
+        "rulings",
+        "controller"
+      ],
+      "see": [
+        "process.every-commit-names-a-work-item",
+        "process.rulings-to-file"
+      ],
+      "source": {
+        "date": "2026-10-21",
+        "by": "user",
+        "ref": "owner ruling, batch 34 ruling sheet"
+      }
+    },
+    {
+      "id": "process.spec-reviews-cover-the-whole-meta-spec",
+      "kind": "rule",
+      "area": "process",
+      "summary": "A spec review under a meta-spec compares the spec against every section of the meta-spec and lists the sections it compared, with a coverage table.",
+      "body": [
+        "The dispatch names the meta-spec and says to cover all of it: the goal, the method, the inventory rows, the batch row and its amendments, the interactions, every function row the batch touches, the upgrade path, this repository, the coverage check, every ruling, and the out-of-scope list. The review's scope lists each section it compared, and a coverage table maps each section to what binds the batch and where the spec carries it, or the gap.",
+        "Owner, 2026-10-22, verbatim: \"The whole meta spec must be taken into account to be sure that nothing was missed.\""
+      ],
+      "tags": [
+        "reviews",
+        "specs",
+        "dispatch",
+        "controller"
+      ],
+      "see": [
+        "process.rulings-to-file"
+      ],
+      "source": {
+        "date": "2026-10-22",
+        "by": "user",
+        "ref": "owner ruling, batch 35 spec review"
+      }
+    },
+    {
       "id": "process.batches-measure-cost",
       "kind": "procedure",
       "area": "process",
       "summary": "Every batch measures its token and time cost per phase and per dispatch, so a later process change can be compared with an earlier batch.",
       "body": [
         "Keep `<workspace>/efficiency-windows.json` current: one window (`phase`, `start`, `end`, UTC) per phase: spec, plan, each task wave with its reviews and fix rounds, the live run, and the branch review.",
-        "Run `python3 -I .superpowers/sdd/2026-10-10-batch-33/efficiency.py <workspace>` at each phase end and save the output as `<workspace>/efficiency.json`. It sums the controller's model usage (main-session assistant messages, each message id once) and the subagent dispatches that finished in each window (tokens, tool uses, duration), plus wall-clock time.",
+        "Run `python3 -I .superpowers/sdd/2026-10-10-batch-33/efficiency.py <workspace>` at each phase end and save the output as `<workspace>/efficiency.json`. It sums the controller's model usage (main-session assistant messages, each message id once) and the subagent dispatches that finished in each window (tokens, tool uses, duration), plus wall-clock time. Run it once more before the branch review dispatches, so that the branch reviewer reads the batch's `efficiency.json`.",
         "Record every dispatch's tokens, tool uses, and duration from its completion notification in the ledger row that closes it.",
         "The baseline is batch 33, the first full-tier batch measured this way, and `efficiency-baseline.json` (every dispatch of batches 28 to 33 that the transcripts hold; a dispatch whose call the transcripts lost has no role). Compare a later batch per phase and per dispatch with it, never as one total."
       ],

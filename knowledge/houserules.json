@@ -17,7 +17,8 @@
       "tags": [
         "dogfood",
         "template",
-        "update"
+        "update",
+        "ruled-keep"
       ],
       "source": {
         "date": "2026-08-31",
@@ -42,7 +43,8 @@
       "tags": [
         "tag-pilot",
         "upstream",
-        "release"
+        "release",
+        "ruled-keep"
       ],
       "source": {
         "date": "2026-08-31",
@@ -361,7 +363,8 @@
       "tags": [
         "rust",
         "tier2",
-        "error-handling"
+        "error-handling",
+        "ruled-keep"
       ],
       "source": {
         "date": "2026-09-05",
@@ -587,7 +590,7 @@
         "crates/houserules/payload.stamp",
         "mise.toml",
         "crates/houserules/src/rules/check_commit.rs",
-        "crates/houserules/src/rules/audit.rs"
+        "crates/houserules/src/rules/runner/co_change.rs"
       ],
       "see": [
         "houserules.payload-embeds-checkout-bytes"
@@ -1103,6 +1106,38 @@
         "date": "2026-10-20",
         "by": "review",
         "ref": "batch 34 task 3 implementer concern 8; task 3 review issues 3 and 13"
+      }
+    },
+    {
+      "id": "houserules.comments-name-no-review-history",
+      "kind": "rule",
+      "area": "rust",
+      "summary": "A comment in crates/ names no review round, task review, or batch event; a warn check flags the history phrases beside the judged code-comments rule.",
+      "body": [
+        "`writing-style.code-comments` stays a judged rule as a whole (design.md 177(4)); this entry carries the deterministic part only, as a warn check on changed Rust files. An entry with a check gets a deterministic row in place of a judged one, so the check lives here, not on the judged rule (batch-35 spec 9 (3)).",
+        "The pattern matches `//` comments that name a fix round, a numbered round of review, a task review, or a batch and task (`Batch 35, Task 2`, `this batch`, `plan Task 9`). Git, the specs, and the knowledge base hold that history."
+      ],
+      "tags": [
+        "comments",
+        "history",
+        "warn-check"
+      ],
+      "source": {
+        "date": "2026-10-22",
+        "by": "review",
+        "ref": "batch-34 branch re-review retrospective; batch-35 spec 9 (3), HR-219 (3), HR-204 item 8"
+      },
+      "see": [
+        "writing-style.code-comments"
+      ],
+      "check": {
+        "type": "grep-absent",
+        "level": "warn",
+        "files": [
+          "crates/**/*.rs"
+        ],
+        "pattern": "//.*\\b([Ff]ix round [0-9]|[Rr]ound [0-9] (parsed|called|of)|Task [0-9]+ review|review \\(batch [0-9]+|batch [0-9]+ Task [0-9]+:|[Bb]atch[ -][0-9]+,? Task [0-9]+|this batch\\b|plan Task [0-9]+)",
+        "scope": "changed"
       }
     }
   ]
