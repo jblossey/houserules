@@ -116,7 +116,8 @@ its own `history` entry when it is long enough to want one.
   checkable. It needs `type` and `level` (`fail` or `warn`); see
   `$defs.check.type` in `knowledge/schema.json` for the current list of
   types (`grep-absent`, `commits`, `co-change`, `diff-append-only`,
-  `report-field`). Most migrated rules stay text-only.
+  `report-field`, `durable-sha`, `runner`). Most migrated rules stay
+  text-only.
 - State only what the source states (`knowledge-base.state-only-the-source`).
   A paragraph that hints at a rule without stating it is not yet an entry —
   ask, or leave it for the next pass.
@@ -236,6 +237,53 @@ do not satisfy until you run `houserules update` and commit the result.
 Name the job and its trigger once written, so the wiring is a claim
 someone can grep against. Prove it with a real run before trusting it, not
 a syntax check alone.
+
+Check out the head of the pull or merge request, not a merge commit, before
+the audit when the project uses `runner` checks: `audit` needs the working
+tree to be the tree at `--head`. The seeded GitHub workflow does this with
+`ref: ${{ github.event.pull_request.head.sha }}` on its checkout step. Add the
+install step of each tool of `runners` to the job as well; the seeded workflow
+installs none.
+
+## Run an external tool with a runner check
+
+A `runner` check runs a tool that your project names, such as Semgrep or
+ast-grep, over the files of a change. The project defines the tool in the
+`runners` key of `.houserules.json`: its command, its parser, and one install
+line. The check names only the tool key, the files, and the scope:
+
+```json
+{
+  "runners": {
+    "semgrep": {
+      "command": ["semgrep", "scan", "--sarif", "--metrics", "off", "--disable-version-check", "--config", "tools/semgrep-rules.yml"],
+      "parser": "sarif",
+      "install": "python3 -m pip install semgrep==<exact version>"
+    }
+  }
+}
+```
+
+```json
+{ "type": "runner", "level": "fail", "tool": "semgrep", "files": ["src/**"], "scope": "changed" }
+```
+
+Run the tool with no network access by default:
+
+- Use rule files in the repository (`--config <file>`), never a registry
+  config: Semgrep sends usage metrics when it pulls rules from the registry.
+- Switch the metrics and every other call home off in the command (`--metrics off` and `--disable-version-check` for Semgrep: the version check asks Semgrep's servers on each run).
+- Pin an exact version of the tool in the `install` line and in your CI.
+
+Choose the parser by what the tool prints. A tool that prints SARIF 2.1.0 on
+stdout (`semgrep scan --sarif`, `ast-grep scan --format sarif`) takes
+`"parser": "sarif"`: each result is a finding, and the exit status does not
+matter when stdout holds valid SARIF. A tool that exits with a non-zero status
+when it finds something takes `"parser": "exit-code"`.
+`houserules check-knowledge` names a check whose tool `runners` does not
+define, and each malformed entry of `runners`. `houserules audit` runs a
+triggered check only when the working tree is the tree at `--head`, and exits
+2 with the install line of the tool when the program is not found.
 
 ## Read houserules output through files
 

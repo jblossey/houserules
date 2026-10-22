@@ -19,7 +19,7 @@ use serde_json::{Value, json};
 
 use crate::archive::is_inactive_status;
 
-use super::cost::{SeverityCounts, TargetCounts, Workspace};
+use super::cost::{SeverityCounts, TargetCounts, Workspace, recency_cmp};
 use super::model::{Base, CheckField, Source, raw_entry_has_tag};
 
 /// A standing entry audited in this many workspaces or more, with no
@@ -50,6 +50,14 @@ const NARROW_SOFT_DENOMINATOR: usize = 3;
 /// one `budget` proposal. `check-knowledge` keeps its own hard limit on
 /// the generated standing file.
 const STANDING_BUDGET: usize = 25;
+
+/// A judged entry earns a `mechanize` proposal only when a person overruled
+/// at most this share of its verdicts, or none exists. The share is an
+/// assumed reading of the "low override rate" of issue 68.
+const MECHANIZE_MAX_OVERRIDE_RATE: f64 = 0.2;
+
+/// The most review issues that a `mechanize` proposal quotes as samples.
+const MECHANIZE_SAMPLE_LIMIT: usize = 3;
 
 /// Whether an entry carries a valid `check` that `audit` runs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,16 +94,34 @@ pub(super) struct Usage {
     pub targets: TargetCounts,
     /// The findings that are minor or aimed at a deliverable.
     pub soft_findings: usize,
-    /// Workspaces with a failed row or a finding for the id.
+    /// Workspaces with a failed row, a sanctioned fail, or a finding for the
+    /// id: the workspaces where the rule fired.
     pub flagged_workspaces: usize,
     /// Reports whose `knowledge_used` names the id.
     pub cited: usize,
+    /// Counted judged rows of reviews whose `result` is `pass` or `fail`.
+    pub verdicts: usize,
+    /// Those verdicts that carry an `override`.
+    pub overrides: usize,
+    /// The cost of the id in bytes: for each review that judged it, once
+    /// whatever number of its rows judge the id, the review file's bytes
+    /// divided by its judged rows, rounded down, summed
+    /// (`AdherenceRow::cost`); `None` when no review judged it.
+    pub cost: Option<u64>,
+    /// Counted `fail` rows that a sanction accepts. They are in no count of
+    /// `fails`, and they fire the rule for every proposal: they flag their
+    /// workspace, block `retire` and `demote`, and count in `caught`.
+    pub sanctioned: usize,
+    /// Up to `MECHANIZE_SAMPLE_LIMIT` entries of `Workspace::issues` whose
+    /// `rule` is the id, the most recent workspace first and each workspace in
+    /// file order.
+    pub samples: Vec<Value>,
 }
 
 impl Usage {
-    /// Failed rows plus findings: what the entry caught.
+    /// Failed rows, sanctioned fails, and findings: what the entry caught.
     fn caught(&self) -> usize {
-        self.fails + self.findings.total()
+        self.fails + self.sanctioned + self.findings.total()
     }
 }
 
@@ -123,6 +149,15 @@ pub(super) struct RuleRow {
     pub usage: Usage,
 }
 
+impl RuleRow {
+    /// The share of the entry's verdicts that a person overruled: `overrides`
+    /// over `verdicts`, or `None` when the entry has no verdict.
+    pub(super) fn override_rate(&self) -> Option<f64> {
+        let usage = &self.usage;
+        (usage.verdicts > 0).then(|| usage.overrides as f64 / usage.verdicts as f64)
+    }
+}
+
 /// Counts how each id was used across `workspaces`. The map holds ids
 /// the knowledge base may not know; `rule_rows` looks up only the ones it
 /// does.
@@ -138,7 +173,21 @@ fn tally(workspaces: &[Workspace]) -> BTreeMap<&str, Usage> {
                 counts.rows += 1;
                 if row.failed {
                     counts.fails += 1;
+                }
+                if row.sanctioned.is_some() {
+                    counts.sanctioned += 1;
+                }
+                if row.failed || row.sanctioned.is_some() {
                     flagged.insert(row.id.as_str());
+                }
+                if row.verdict {
+                    counts.verdicts += 1;
+                }
+                if row.overridden {
+                    counts.overrides += 1;
+                }
+                if let Some(share) = row.cost {
+                    counts.cost = Some(counts.cost.unwrap_or(0) + share);
                 }
             }
         }
@@ -165,6 +214,19 @@ fn tally(workspaces: &[Workspace]) -> BTreeMap<&str, Usage> {
         }
         for id in flagged {
             usage.entry(id).or_default().flagged_workspaces += 1;
+        }
+    }
+    let mut newest_first: Vec<&Workspace> = workspaces.iter().collect();
+    newest_first.sort_by(|left, right| recency_cmp(&right.label, &left.label));
+    for workspace in newest_first {
+        for finding in &workspace.issues {
+            let Some(id) = finding.rule.as_deref() else {
+                continue;
+            };
+            let counts = usage.entry(id).or_default();
+            if counts.samples.len() < MECHANIZE_SAMPLE_LIMIT {
+                counts.samples.push(finding.issue.clone());
+            }
         }
     }
     usage
@@ -233,6 +295,11 @@ pub(super) fn rules_json(rows: &[RuleRow]) -> Value {
                     "findings": row.usage.findings.to_json(),
                     "targets": row.usage.targets.to_json(),
                     "cited": row.usage.cited,
+                    "verdicts": row.usage.verdicts,
+                    "overrides": row.usage.overrides,
+                    "override_rate": row.override_rate(),
+                    "cost": row.usage.cost,
+                    "sanctioned": row.usage.sanctioned,
                 })
             })
             .collect(),
@@ -351,6 +418,7 @@ fn demote(row: &RuleRow) -> Option<Proposal> {
     (row.standing
         && usage.workspaces >= DEMOTE_MIN_WORKSPACES
         && usage.fails == 0
+        && usage.sanctioned == 0
         && usage.findings.total() == 0)
         .then(|| {
             about(
@@ -372,6 +440,7 @@ fn retire(row: &RuleRow) -> Option<Proposal> {
     (!row.standing
         && usage.injected >= RETIRE_MIN_INJECTIONS
         && usage.fails == 0
+        && usage.sanctioned == 0
         && usage.findings.total() == 0
         && usage.cited == 0)
         .then(|| {
@@ -383,30 +452,46 @@ fn retire(row: &RuleRow) -> Option<Proposal> {
                      No report cited it. No row failed and no finding cited it.",
                     usage.injected
                 ),
-                json!({"injected": usage.injected, "fails": 0, "findings": 0, "cited": 0}),
+                json!({
+                    "injected": usage.injected,
+                    "fails": 0,
+                    "findings": 0,
+                    "cited": 0,
+                    "cost": usage.cost,
+                }),
             )
         })
 }
 
-/// A judged entry that keeps failing or drawing findings.
+/// A judged entry that keeps failing or drawing findings, and whose verdicts
+/// a person rarely overrules: the override rate is at most
+/// `MECHANIZE_MAX_OVERRIDE_RATE` or unknown.
 fn mechanize(row: &RuleRow) -> Option<Proposal> {
     let usage = &row.usage;
-    (row.mode == Mode::Judged && usage.flagged_workspaces >= MECHANIZE_MIN_WORKSPACES).then(|| {
-        about(
-            row,
-            Action::Mechanize,
-            format!(
-                "This judged rule failed or drew a finding in {} workspaces. \
-                 Add a deterministic check.",
-                usage.flagged_workspaces
-            ),
-            json!({
-                "flagged_workspaces": usage.flagged_workspaces,
-                "fails": usage.fails,
-                "findings": usage.findings.total(),
-            }),
-        )
-    })
+    let rarely_overruled = row
+        .override_rate()
+        .is_none_or(|rate| rate <= MECHANIZE_MAX_OVERRIDE_RATE);
+    (row.mode == Mode::Judged
+        && usage.flagged_workspaces >= MECHANIZE_MIN_WORKSPACES
+        && rarely_overruled)
+        .then(|| {
+            about(
+                row,
+                Action::Mechanize,
+                format!(
+                    "This judged rule failed or drew a finding in {} workspaces. \
+                     Add a deterministic check.",
+                    usage.flagged_workspaces
+                ),
+                json!({
+                    "flagged_workspaces": usage.flagged_workspaces,
+                    "fails": usage.fails,
+                    "findings": usage.findings.total(),
+                    "override_rate": row.override_rate(),
+                    "samples": usage.samples,
+                }),
+            )
+        })
 }
 
 /// An entry whose findings are mostly minor or aimed at deliverables.
@@ -512,6 +597,7 @@ mod tests {
             id: id.to_string(),
             failed,
             counted: true,
+            ..AdherenceRow::default()
         }
     }
 
@@ -528,6 +614,7 @@ mod tests {
             severity,
             target,
             rule: Some(rule.to_string()),
+            issue: Value::Null,
         }
     }
 
@@ -600,6 +687,7 @@ mod tests {
                     severity: Severity::Minor,
                     target: Target::Code,
                     rule: None,
+                    issue: Value::Null,
                 },
             ],
             injected: ["a.one", "b.two", "ghost.id"]
@@ -760,6 +848,8 @@ mod tests {
                 "findings": {"critical": 1, "important": 1, "minor": 1, "other": 0},
                 "targets": {"code": 1, "deliverable": 1, "prose": 1, "other": 0},
                 "cited": 2,
+                "verdicts": 0, "overrides": 0, "override_rate": null, "cost": null,
+                "sanctioned": 0,
             })
         );
         let keys: Vec<&str> = json[0]
@@ -781,7 +871,12 @@ mod tests {
                 "fails",
                 "findings",
                 "targets",
-                "cited"
+                "cited",
+                "verdicts",
+                "overrides",
+                "override_rate",
+                "cost",
+                "sanctioned"
             ]
         );
     }
@@ -993,7 +1088,7 @@ mod tests {
         assert_eq!(rows[0]["owner_gate"], json!(true));
         assert_eq!(
             rows[0]["evidence"],
-            json!({"injected": 4, "fails": 0, "findings": 0, "cited": 0})
+            json!({"injected": 4, "fails": 0, "findings": 0, "cited": 0, "cost": null})
         );
         assert!(
             rows[0]["reason"]
@@ -1037,7 +1132,10 @@ mod tests {
         });
         assert_eq!(
             proposals(&[row])[0]["evidence"],
-            json!({"flagged_workspaces": 2, "fails": 1, "findings": 2})
+            json!({
+                "flagged_workspaces": 2, "fails": 1, "findings": 2,
+                "override_rate": null, "samples": [],
+            })
         );
     }
 
@@ -1357,6 +1455,167 @@ mod tests {
                 pair("mechanize", "b.both"),
                 pair("narrow", "b.both"),
                 pair("budget", "standing"),
+            ]
+        );
+    }
+
+    /// A counted judged row of a review adds a verdict, an override, and its
+    /// cost; a sanctioned fail adds to `sanctioned` and to no fail; a copy
+    /// that is not counted adds nothing.
+    #[test]
+    fn tally_counts_verdicts_overrides_cost_and_sanctioned_fails_of_counted_rows() {
+        let judged = |overridden: bool| AdherenceRow {
+            verdict: true,
+            overridden,
+            cost: Some(100),
+            ..adherence("j.one", false)
+        };
+        let workspace = Workspace {
+            rows: vec![
+                judged(true),
+                judged(false),
+                AdherenceRow {
+                    cost: Some(7),
+                    ..adherence("j.one", false)
+                },
+                AdherenceRow {
+                    sanctioned: Some("owner ruling 12".to_string()),
+                    ..adherence("j.one", false)
+                },
+                AdherenceRow {
+                    verdict: true,
+                    overridden: true,
+                    cost: Some(900),
+                    sanctioned: Some("copy".to_string()),
+                    ..copied_row("j.one", true)
+                },
+            ],
+            ..Workspace::default()
+        };
+        let workspaces = [workspace];
+        let usage = &tally(&workspaces)["j.one"];
+        assert_eq!(usage.rows, 4);
+        assert_eq!(usage.fails, 0);
+        assert_eq!(usage.verdicts, 2);
+        assert_eq!(usage.overrides, 1);
+        assert_eq!(usage.cost, Some(207));
+        assert_eq!(usage.sanctioned, 1);
+    }
+
+    /// The override rate is the share of verdicts that carry an override, and
+    /// `None` with no verdict.
+    #[test]
+    fn override_rate_is_none_without_a_verdict_and_the_share_otherwise() {
+        let none = blank("r.one");
+        assert_eq!(none.override_rate(), None);
+        let some = with_usage(blank("r.two"), |usage| {
+            usage.verdicts = 4;
+            usage.overrides = 1;
+        });
+        assert_eq!(some.override_rate(), Some(0.25));
+    }
+
+    /// `mechanize` fires at the override rate 0.2 and not above it.
+    #[test]
+    fn mechanize_fires_at_the_override_limit_and_not_above() {
+        let flagged = |verdicts: usize| {
+            with_usage(blank("m.one"), |usage| {
+                usage.flagged_workspaces = 2;
+                usage.verdicts = verdicts;
+                usage.overrides = 1;
+            })
+        };
+        assert_eq!(actions(&[flagged(5)]), [pair("mechanize", "m.one")]);
+        assert_eq!(actions(&[flagged(4)]), []);
+    }
+
+    /// A rule that a sanctioned fail accepted fired, so it earns neither
+    /// `retire` nor `demote`.
+    #[test]
+    fn a_sanctioned_fail_blocks_retire_and_demote() {
+        let retired = with_usage(blank("r.one"), |usage| {
+            usage.injected = 3;
+            usage.sanctioned = 1;
+        });
+        let demoted = with_usage(standing("s.one"), |usage| {
+            usage.workspaces = 3;
+            usage.sanctioned = 1;
+        });
+        assert_eq!(actions(&[retired, demoted]), []);
+    }
+
+    /// A sanctioned fail is a fail that fired the rule, so it flags its
+    /// workspace for `mechanize` as an unsanctioned fail does, and it stays out
+    /// of the rule's `fails`.
+    #[test]
+    fn a_sanctioned_fail_flags_its_workspace() {
+        let fail = |sanctioned: Option<&str>| AdherenceRow {
+            failed: sanctioned.is_none(),
+            sanctioned: sanctioned.map(String::from),
+            ..adherence("j.one", false)
+        };
+        let workspace = |label: &str, sanctioned: Option<&str>| Workspace {
+            label: label.to_string(),
+            rows: vec![fail(sanctioned)],
+            ..Workspace::default()
+        };
+        let workspaces = [
+            workspace("2026-10-01-a", Some("owner ruling 9")),
+            workspace("2026-10-02-b", None),
+        ];
+        let usage = &tally(&workspaces)["j.one"];
+        assert_eq!(usage.flagged_workspaces, 2);
+        assert_eq!(usage.fails, 1);
+        assert_eq!(usage.sanctioned, 1);
+    }
+
+    /// A sanctioned fail counts in the catch rate of the `budget` candidates,
+    /// as a fail does: the entry that it fired ranks last.
+    #[test]
+    fn a_sanctioned_fail_counts_in_the_catch_rate() {
+        let mut rows = standing_rows(26);
+        rows[0].usage.rows = 1;
+        rows[0].usage.sanctioned = 1;
+        let proposals = proposals(&rows);
+        let candidates = proposals[0]["evidence"]["candidates"]
+            .as_array()
+            .expect("candidates");
+        assert_eq!(candidates.last(), Some(&json!("s.01")));
+    }
+
+    /// The samples of a rule are the review issues that cite it, the most
+    /// recent workspace first, three at most; an issue that cites no rule, and
+    /// a finding that is no issue, are no sample.
+    #[test]
+    fn samples_are_the_newest_workspaces_issues_up_to_three() {
+        let finding = |rule: Option<&str>, what: &str| Finding {
+            severity: Severity::Minor,
+            target: Target::Code,
+            rule: rule.map(String::from),
+            issue: json!({"what": what}),
+        };
+        let workspace = |label: &str| Workspace {
+            label: label.to_string(),
+            issues: vec![
+                finding(Some("s.one"), &format!("{label} first")),
+                finding(None, &format!("{label} no rule")),
+                finding(Some("s.one"), &format!("{label} second")),
+            ],
+            findings: vec![finding(Some("s.one"), &format!("{label} breakage"))],
+            ..Workspace::default()
+        };
+        let workspaces = [
+            workspace("2026-10-02-b"),
+            workspace("2026-10-03-c"),
+            workspace("2026-10-01-a"),
+        ];
+        let usage = tally(&workspaces);
+        assert_eq!(
+            usage["s.one"].samples,
+            [
+                json!({"what": "2026-10-03-c first"}),
+                json!({"what": "2026-10-03-c second"}),
+                json!({"what": "2026-10-02-b first"}),
             ]
         );
     }

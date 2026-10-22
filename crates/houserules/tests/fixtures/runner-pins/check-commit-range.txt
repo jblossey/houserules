@@ -1,0 +1,13 @@
+== check-commit --from base --to topic-4
+exit: 1
+-- stdout
+-- stderr
+pins.commit-format: commit "Rewrite the log" does not match ^(feat|fix|chore|docs|test): .+
+85f272c: no Work-Item trailer (pins.trailer)
+pins.commit-format: commit "feat: touch the source" has a body line over 40 characters
+pins.cochange: src/a.rs changed without docs/changelog.md
+== check-commit --from base --to topic-1
+exit: 0
+-- stdout
+check-commit: ok
+-- stderr

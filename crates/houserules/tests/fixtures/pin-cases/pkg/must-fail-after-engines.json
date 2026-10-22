@@ -1,0 +1,4 @@
+{
+  "engines": {"node": ">=22"},
+  "dependencies": {"x": "~1.2"}
+}

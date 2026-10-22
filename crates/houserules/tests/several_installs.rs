@@ -563,8 +563,10 @@ fn a_subdirectory_install_without_a_github_origin_skips_its_workflow() {
     assert!(!top.join(".github").exists());
 }
 
-/// A directory below the top level that holds no install is no install
-/// root: `update` there refuses with one line and changes nothing.
+/// A directory below the top level that holds no install, with none above it
+/// within the top level, is no install root: `update` there refuses with the
+/// line for a tree with no install (HR-216), whose remedy names the directory
+/// that `--dir` gave, and changes nothing.
 #[test]
 fn update_in_a_subdirectory_without_an_install_refuses() {
     let (_dir, top) = github_repo();
@@ -582,9 +584,7 @@ fn update_in_a_subdirectory_without_an_install_refuses() {
     assert_eq!(
         String::from_utf8(output.stderr).unwrap(),
         format!(
-            "{}: this directory is inside the git repository at {} and holds no .houserules.json; run houserules init --dir {} to install there\n",
-            top.join("sub").display(),
-            top.display(),
+            "no houserules install here (no .houserules.json); run houserules init --dir {}\n",
             top.join("sub").display()
         )
     );

@@ -234,6 +234,75 @@
         },
         "evidence": {
           "type": "string"
+        },
+        "sanctioned": {
+          "description": "The reference that books a sanctioned row: the value of `--sanctioned <rule>=<ref>`.",
+          "$ref": "#/$defs/text"
+        },
+        "findings": {
+          "description": "The results of a runner check's tool that count, in call order.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/auditFinding"
+          }
+        },
+        "override": {
+          "$ref": "#/$defs/rowOverride"
+        }
+      }
+    },
+    "auditFinding": {
+      "description": "One result of a runner check's tool: where it is, the rule that found it, and the message of the tool. A result with no location has a null `path` and a null `line`.",
+      "type": "object",
+      "required": [
+        "path",
+        "line",
+        "rule",
+        "message"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "rule": {
+          "$ref": "#/$defs/text"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "rowOverride": {
+      "description": "A ruling of the person who runs the work or of the owner against the verdict of a judged row: the verdict that stands, who ruled, and why.",
+      "type": "object",
+      "required": [
+        "result",
+        "by",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "result": {
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        },
+        "by": {
+          "$ref": "#/$defs/text"
+        },
+        "reason": {
+          "$ref": "#/$defs/text"
         }
       }
     },

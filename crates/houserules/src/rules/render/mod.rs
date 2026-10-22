@@ -42,8 +42,8 @@ use crate::install::marker::{RenderInputs, read_render_inputs_for_gate};
 use super::budget;
 use super::model::{Base, Entry, load_base};
 
-pub(super) use location::git_location_in;
 pub(crate) use location::{GitLocation, git_location_from_cwd};
+pub(super) use location::{LocateError, git_location_in};
 
 /// Header stamped on every file `render` writes, so an editor knows not to hand-edit it.
 pub(crate) const GENERATED: &str = "Generated from knowledge/ by houserules render. Do not edit.";

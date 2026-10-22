@@ -7,7 +7,11 @@
 //! `baselines`, `schema`, `defaultBranch`, `tracker`, `optInOffered`,
 //! `workflow`) and hands out the `packs` key as [`Pin`]s, the `tracker` key as
 //! a `TrackerConfig`, and the `workflow` key as found (`workflow::pins` reads
-//! its shape). A command names the file by its path. [`read_pins_for_gate`]
+//! its shape). The project writes the keys `runners` ([`runners`] has its
+//! shape) and `workspaces`; no writer validates or changes them, and
+//! `check-knowledge` reads them through [`Marker::runner_lines`],
+//! [`Marker::runner`], and [`Marker::workspaces`]. A command names the file by
+//! its path. [`read_pins_for_gate`]
 //! reads the same pins for `check-knowledge`, which names the file by its
 //! relative name; [`Marker::read_or_default_for_gate`] reads the whole marker
 //! for its kit-owned citation lint the same way.
@@ -30,6 +34,10 @@ use crate::archive::{read_json, read_json_as, write_json};
 use crate::root::INSTALL_MARKER;
 use crate::tracker::{Adapter, TrackerConfig};
 
+pub(crate) mod runners;
+
+use runners::RunnerDef;
+
 /// The shared constraint text for both `idPrefix` rejection messages.
 pub(super) const ID_PREFIX_HINT: &str = "must be 1-8 characters, A-Z then A-Z0-9";
 
@@ -50,6 +58,17 @@ pub(super) fn is_id_prefix(value: &str) -> bool {
         }
         _ => false,
     }
+}
+
+/// `true` when `path` is a relative path that stays inside the install root:
+/// it is not empty, does not start at a root or a drive, and holds no `..`
+/// segment. The text decides, with both separators, so a `workspaces` value
+/// means one thing on every platform.
+fn is_path_inside_the_root(path: &str) -> bool {
+    let rooted = path.starts_with(['/', '\\']);
+    let bytes = path.as_bytes();
+    let drive = bytes.get(1) == Some(&b':') && bytes[0].is_ascii_alphabetic();
+    !path.is_empty() && !rooted && !drive && !path.split(['/', '\\']).any(|segment| segment == "..")
 }
 
 /// One installed pack's pin.
@@ -146,8 +165,18 @@ pub(crate) struct Marker {
 
 /// The install schema id that `init` stamps and the 1.x conversion writes:
 /// 2.1.0 adds the `tracker`, `workflow`, and `optInOffered` keys to the
-/// marker (batch 34, spec 3.7).
-pub(super) const INSTALL_SCHEMA: &str = "houserules/install@2.1.0";
+/// marker (batch 34, spec 3.7), and 2.2.0 adds the `runners` and `workspaces`
+/// keys (batch 35, spec 10).
+pub(super) const INSTALL_SCHEMA: &str = "houserules/install@2.2.0";
+
+/// The folder, relative to the install root, that holds the batch workspaces
+/// while the marker sets no `workspaces` key (batch 35, spec 7). The ignore
+/// line `.houserules/` covers it.
+pub(crate) const DEFAULT_WORKSPACES: &str = ".houserules/work";
+
+/// The install schema id that [`Marker::restamp_install_schema`] replaces
+/// with [`INSTALL_SCHEMA`].
+const PREVIOUS_INSTALL_SCHEMA: &str = "houserules/install@2.1.0";
 
 /// The text that an install schema id starts with.
 const INSTALL_SCHEMA_PREFIX: &str = "houserules/install@";
@@ -367,6 +396,43 @@ impl Marker {
         self.map.insert("optInOffered".to_string(), json!(ids));
     }
 
+    /// One line for each fault of the `runners` key, as `check-knowledge`
+    /// prints them: a value that is no object, or the first fault of each
+    /// entry, in the order of the file. A marker with no such key gives none.
+    pub(crate) fn runner_lines(&self) -> Vec<String> {
+        self.map
+            .get("runners")
+            .map(|runners| runners::faults(&self.file, runners))
+            .unwrap_or_default()
+    }
+
+    /// The entry of `tool` in `runners`, or `None` when the marker has no
+    /// `runners` key or the key has no such entry. Only that entry is read: a
+    /// fault in another entry is no fault of this call. A `runners` value that
+    /// is no object, or a fault in the entry of `tool`, is its line from
+    /// [`Marker::runner_lines`].
+    pub(crate) fn runner(&self, tool: &str) -> Result<Option<RunnerDef>, String> {
+        runners::find(&self.file, self.map.get("runners"), tool)
+    }
+
+    /// The `workspaces` key: the folder, relative to the install root, that
+    /// holds the batch workspaces. `None` when the marker has no such key: the
+    /// workspaces are then at [`DEFAULT_WORKSPACES`]. A
+    /// value that is no non-empty string, is absolute, or holds a `..` segment
+    /// is one line that names the marker.
+    pub(crate) fn workspaces(&self) -> Result<Option<String>, String> {
+        let Some(value) = self.map.get("workspaces") else {
+            return Ok(None);
+        };
+        match value.as_str() {
+            Some(path) if is_path_inside_the_root(path) => Ok(Some(path.to_string())),
+            _ => Err(format!(
+                "{}: workspaces must be a relative path inside the install root",
+                self.file
+            )),
+        }
+    }
+
     /// The `workflow` key as found, or `None` when the marker has none.
     /// `workflow::pins::read` checks its shape.
     pub(crate) fn workflow_value(&self) -> Option<&Value> {
@@ -580,6 +646,19 @@ impl Marker {
     /// place when it exists and goes last when it does not.
     pub(crate) fn stamp_schema(&mut self) {
         self.map.insert("schema".to_string(), json!(INSTALL_SCHEMA));
+    }
+
+    /// Restamps the install schema `houserules/install@2.1.0` to the id that
+    /// this binary writes, in the place of the key. Returns `true` when it
+    /// changed the key, and `false` for a marker that has another schema or
+    /// none, so a second call changes nothing.
+    pub(crate) fn restamp_install_schema(&mut self) -> bool {
+        let previous =
+            self.map.get("schema").and_then(Value::as_str) == Some(PREVIOUS_INSTALL_SCHEMA);
+        if previous {
+            self.stamp_schema();
+        }
+        previous
     }
 
     /// The `baselines` object: the hex SHA-256 the kit last wrote for each
@@ -1455,6 +1534,141 @@ mod tests {
             read_default_branch_for_gate(dir.path()),
             Err(DefaultBranchFault::Unreadable(os_error))
         );
+    }
+
+    /// A tool of `runners` that is sound.
+    fn sound_tool(parser: &str) -> Value {
+        json!({"command": ["semgrep", "scan"], "parser": parser, "install": "pip install semgrep"})
+    }
+
+    /// `runner` reads the entry of one tool into its definition, and gives
+    /// `None` for a marker with no `runners` key and for a tool it lacks.
+    #[test]
+    fn runner_reads_the_entry_of_one_tool_into_its_definition() {
+        use runners::Parser;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let marker = marker_in(
+            dir.path(),
+            &json!({"runners": {"semgrep": sound_tool("sarif"), "make": sound_tool("exit-code")}}),
+        );
+
+        assert_eq!(
+            marker.runner("semgrep"),
+            Ok(Some(RunnerDef {
+                command: vec!["semgrep".to_string(), "scan".to_string()],
+                parser: Parser::Sarif,
+                install: "pip install semgrep".to_string(),
+            }))
+        );
+        assert_eq!(
+            marker
+                .runner("make")
+                .map(|tool| tool.map(|tool| tool.parser)),
+            Ok(Some(Parser::ExitCode))
+        );
+        assert_eq!(marker.runner("absent"), Ok(None));
+        assert_eq!(marker.runner_lines(), Vec::<String>::new());
+
+        let without = marker_in(dir.path(), &json!({"idPrefix": "WI"}));
+        assert_eq!(without.runner("semgrep"), Ok(None));
+        assert_eq!(without.runner_lines(), Vec::<String>::new());
+    }
+
+    /// `runner` reads only the entry it is asked for: a fault in another entry
+    /// is no fault of the call. The fault of the entry is its line from
+    /// `runner_lines`, and a `runners` value that is no object is the line for
+    /// every tool.
+    #[test]
+    fn runner_gives_the_line_of_a_fault_in_its_own_entry_only() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let marker = marker_in(
+            dir.path(),
+            &json!({"runners": {"bad": {"command": []}, "good": sound_tool("sarif")}}),
+        );
+        let line = format!(
+            "{}: runners.bad.command must be a non-empty array of strings",
+            marker.file_name()
+        );
+
+        assert_eq!(marker.runner("bad"), Err(line.clone()));
+        assert_eq!(marker.runner_lines(), [line]);
+        assert!(matches!(marker.runner("good"), Ok(Some(_))));
+
+        let not_an_object = marker_in(dir.path(), &json!({"runners": "semgrep"}));
+        let line = format!("{}: runners must be an object", not_an_object.file_name());
+        assert_eq!(not_an_object.runner("semgrep"), Err(line.clone()));
+        assert_eq!(not_an_object.runner_lines(), [line]);
+    }
+
+    /// `workspaces` gives the folder as written, `None` without the key, and
+    /// the line of a value that is no relative path inside the root.
+    #[test]
+    fn workspaces_gives_a_relative_path_and_names_every_other_value() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        assert_eq!(
+            marker_in(dir.path(), &json!({"idPrefix": "WI"})).workspaces(),
+            Ok(None)
+        );
+        for path in [".superpowers/sdd", "work/", "./work", "a..b", "a/.hidden/b"] {
+            let marker = marker_in(dir.path(), &json!({"workspaces": path}));
+            assert_eq!(marker.workspaces(), Ok(Some(path.to_string())), "{path}");
+        }
+        let marker = marker_in(dir.path(), &json!({"workspaces": "/abs"}));
+        let line = format!(
+            "{}: workspaces must be a relative path inside the install root",
+            marker.file_name()
+        );
+        for value in [
+            json!("/abs"),
+            json!("\\rooted"),
+            json!("C:\\work"),
+            json!("c:work"),
+            json!(".."),
+            json!("../up"),
+            json!("a/../b"),
+            json!("a\\..\\b"),
+            json!(""),
+            json!(5),
+            json!(null),
+            json!(["a"]),
+        ] {
+            let marker = marker_in(dir.path(), &json!({"workspaces": value}));
+            assert_eq!(marker.workspaces(), Err(line.clone()), "{value}");
+        }
+    }
+
+    /// The restamp changes the schema `houserules/install@2.1.0` to the id that
+    /// this binary writes, in the place of the key, and nothing else: a second
+    /// call, another schema, and a marker with no schema change nothing.
+    #[test]
+    fn restamp_install_schema_changes_only_the_previous_schema_once() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut marker = marker_in(
+            dir.path(),
+            &json!({"idPrefix": "WI", "schema": "houserules/install@2.1.0", "version": "1.4.0"}),
+        );
+
+        assert!(marker.restamp_install_schema());
+        assert_eq!(
+            marker.map.get("schema"),
+            Some(&json!("houserules/install@2.2.0"))
+        );
+        let keys: Vec<&String> = marker.map.keys().collect();
+        assert_eq!(keys, ["idPrefix", "schema", "version"]);
+        assert!(!marker.restamp_install_schema());
+
+        for schema in [
+            json!("houserules/install@2.0.0"),
+            json!("houserules/install@3.0.0"),
+        ] {
+            let mut other = marker_in(dir.path(), &json!({"schema": schema}));
+            assert!(!other.restamp_install_schema(), "{schema}");
+            assert_eq!(other.map.get("schema"), Some(&schema));
+        }
+        let mut none = marker_in(dir.path(), &json!({"idPrefix": "WI"}));
+        assert!(!none.restamp_install_schema());
+        assert_eq!(none.map.get("schema"), None);
     }
 
     /// A marker that is no JSON object is one named line.

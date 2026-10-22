@@ -1,0 +1,27 @@
+{
+  "kind": "branch-review",
+  "model": "opus",
+  "base": "0000000",
+  "head": "0000002",
+  "strengths": [],
+  "issues": [],
+  "rule_adherence": [
+    {
+      "id": "j.one",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "fail",
+      "evidence": "The branch breaks the rule."
+    }
+  ],
+  "recommendations": [],
+  "retrospective": {
+    "violated_rules": [],
+    "uncovered_findings": [],
+    "stale_entries": [],
+    "unused_ids": [],
+    "template_defects": []
+  },
+  "assessment": { "ready": "yes", "text": "Done." }
+}

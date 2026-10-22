@@ -1,0 +1,7 @@
+[tools]
+rust = "1.90.0"
+"cargo:cargo-deny" = "0.18.3"
+[env]
+X = "1"
+[tasks.lint]
+run = ["x"]

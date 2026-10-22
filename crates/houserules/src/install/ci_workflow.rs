@@ -19,7 +19,10 @@
 //! `permissions` block and the token to the steps that run `check-backlog` and
 //! `audit`, because `gh` reads the issues of the repository. Beads adds a step
 //! that installs `bd` at the release that `mise.toml` pins and a step that
-//! runs `bd bootstrap`, because a fresh clone has no Beads store.
+//! runs `bd bootstrap`, because a fresh clone has no Beads store. Every form
+//! checks out the head of a pull request: the `actions/checkout` step carries
+//! `ref: ${{ github.event.pull_request.head.sha }}` (spec 3.2), so that every
+//! step of the job, the audit included, judges the tree that lands.
 //! [`template_for`] builds the text from the template, and [`write_for`] keeps
 //! the file of an install at the content that its tracker calls for: every
 //! command that sets `tracker` calls it, and so does `update`.
@@ -56,6 +59,11 @@ const GITHUB_MARKERS: [&str; 2] = ["issues: read", "GH_TOKEN: ${{ github.token }
 
 /// The text that the project must hold for the Beads form.
 const BEADS_MARKER: &str = "bd bootstrap";
+
+/// The text that the project must hold for every form: the `ref` input of the
+/// checkout step, which makes every step of the job judge the head of a pull
+/// request (spec 3.2).
+const HEAD_CHECKOUT_INPUT: &str = "ref: ${{ github.event.pull_request.head.sha }}";
 
 /// The steps of the Beads form, which go before the step that runs
 /// `check-backlog`: the release of `bd` that `mise.toml` pins is downloaded
@@ -144,26 +152,32 @@ pub(super) fn template_for(adapter: Option<Adapter>, prefix: &str) -> Result<Vec
     Ok(form.into_bytes())
 }
 
-/// The hand step for a seeded CI workflow that the project changed and that
-/// `update` kept (spec 4.8), or `None`. The file at `path` holds the bytes
-/// `current`. The hand step names the lines that the tracker `adapter` needs when
-/// the text lacks them. JSON, no tracker, and a file that holds the lines of its
-/// adapter get none.
+/// The hand steps for a seeded CI workflow that the project changed and that
+/// `update` kept (spec 4.8 and 3.2). The file at `path` holds the bytes
+/// `current`. The first hand step names the lines that the tracker `adapter`
+/// needs when the text lacks them; JSON, no tracker, and a file that holds the
+/// lines of its adapter get none. The last names the `ref` input of the
+/// checkout (`HEAD_CHECKOUT_INPUT`) for every tracker whose file lacks it.
 pub(super) fn hand_step_for_kept(
     adapter: Option<Adapter>,
     path: &str,
     current: &[u8],
-) -> Option<String> {
+) -> Vec<String> {
     let text = String::from_utf8_lossy(current);
+    let mut steps = Vec::new();
     match adapter {
         Some(Adapter::Github) if GITHUB_MARKERS.iter().any(|needle| !text.contains(needle)) => {
-            Some(hand_steps::ci_lacks_the_github_lines(path))
+            steps.push(hand_steps::ci_lacks_the_github_lines(path));
         }
         Some(Adapter::Beads) if !text.contains(BEADS_MARKER) => {
-            Some(hand_steps::ci_lacks_the_beads_steps(path, BD_VERSION))
+            steps.push(hand_steps::ci_lacks_the_beads_steps(path, BD_VERSION));
         }
-        _ => None,
+        _ => {}
     }
+    if !text.contains(HEAD_CHECKOUT_INPUT) {
+        steps.push(hand_steps::ci_lacks_the_head_checkout(path));
+    }
+    steps
 }
 
 /// Brings the seeded CI workflow of the install at `root` to the content that
@@ -172,7 +186,7 @@ pub(super) fn hand_step_for_kept(
 /// owns, is written when its bytes would change, and the baseline moves with
 /// it. A workflow with no baseline (an install that has none, or one that
 /// `init` skipped for a host other than GitHub) is left as found. Returns the
-/// lines that name each file written or kept, and the hand step of a kept file.
+/// lines that name each file written or kept, and the hand steps of a kept file.
 pub(super) fn write_for(
     root: &Path,
     marker: &mut Marker,
@@ -202,6 +216,7 @@ pub(super) fn write_for(
                 .map_err(|error| format!("{}: {error}", workflow.path))?;
             lines.extend(
                 hand_step_for_kept(adapter, &workflow.path, &current)
+                    .into_iter()
                     .map(|step| format!("{}{step}", hand_steps::PREFIX)),
             );
         }
@@ -552,6 +567,39 @@ mod tests {
         );
     }
 
+    /// Spec 3.2 (203): every form of the seeded workflow checks out the PR head,
+    /// in the top-level form and the subdirectory form of each tracker: the
+    /// `with:` of its checkout step opens with the `ref` input, once.
+    #[test]
+    fn every_seeded_workflow_form_carries_the_ref() {
+        let input = "ref: ${{ github.event.pull_request.head.sha }}";
+        let adapters = [
+            None,
+            Some(Adapter::Json),
+            Some(Adapter::Github),
+            Some(Adapter::Beads),
+        ];
+        for adapter in adapters {
+            let template = template_for(adapter, "WI").expect("a template");
+            for components in [&[][..], &["sub"][..]] {
+                let workflow =
+                    Workflow::for_install(&placement(components), &template).expect("a workflow");
+                let text = String::from_utf8(workflow.content).expect("UTF-8");
+                let after_checkout = text
+                    .split_once("uses: actions/checkout@")
+                    .and_then(|(_, rest)| rest.split_once('\n'))
+                    .map(|(_, rest)| rest)
+                    .expect("the workflow checks out the repository");
+
+                assert!(
+                    after_checkout.starts_with(&format!("        with:\n          {input}\n")),
+                    "{adapter:?} {components:?}: {text}"
+                );
+                assert_eq!(text.matches(input).count(), 1, "{adapter:?} {components:?}");
+            }
+        }
+    }
+
     /// JSON and no tracker keep the template as it is.
     #[test]
     fn json_and_no_tracker_keep_the_template() {
@@ -607,32 +655,54 @@ mod tests {
     }
 
     /// A kept workflow gets the hand step of its adapter only while it lacks
-    /// what the adapter needs.
+    /// what the adapter needs, and the hand step of the PR-head checkout, after
+    /// the one of its adapter, only while it lacks the `ref` input.
     #[test]
-    fn a_kept_workflow_gets_the_hand_step_of_its_adapter_while_it_lacks_the_lines() {
+    fn a_kept_workflow_gets_the_hand_steps_it_lacks_the_tracker_first() {
         let path = "w.yml";
+        let head = hand_steps::ci_lacks_the_head_checkout(path);
+        let with_head = format!("{HEAD_CHECKOUT_INPUT}\n");
         assert_eq!(
             hand_step_for_kept(Some(Adapter::Github), path, b"name: mine\n"),
-            Some(hand_steps::ci_lacks_the_github_lines(path))
+            [hand_steps::ci_lacks_the_github_lines(path), head.clone()]
+        );
+        let github_lines = "permissions: issues: read\nGH_TOKEN: ${{ github.token }}\n";
+        assert_eq!(
+            hand_step_for_kept(Some(Adapter::Github), path, github_lines.as_bytes()),
+            std::slice::from_ref(&head)
         );
         assert_eq!(
             hand_step_for_kept(
                 Some(Adapter::Github),
                 path,
-                b"permissions: issues: read\nGH_TOKEN: ${{ github.token }}\n"
+                format!("{github_lines}{with_head}").as_bytes()
             ),
-            None
+            Vec::<String>::new()
         );
         assert_eq!(
             hand_step_for_kept(Some(Adapter::Beads), path, b"name: mine\n"),
-            Some(hand_steps::ci_lacks_the_beads_steps(path, BD_VERSION))
+            [
+                hand_steps::ci_lacks_the_beads_steps(path, BD_VERSION),
+                head.clone()
+            ]
         );
         assert_eq!(
-            hand_step_for_kept(Some(Adapter::Beads), path, b"run: bd bootstrap --yes\n"),
-            None
+            hand_step_for_kept(
+                Some(Adapter::Beads),
+                path,
+                format!("run: bd bootstrap --yes\n{with_head}").as_bytes()
+            ),
+            Vec::<String>::new()
         );
         for adapter in [None, Some(Adapter::Json)] {
-            assert_eq!(hand_step_for_kept(adapter, path, b"name: mine\n"), None);
+            assert_eq!(
+                hand_step_for_kept(adapter, path, b"name: mine\n"),
+                std::slice::from_ref(&head)
+            );
+            assert_eq!(
+                hand_step_for_kept(adapter, path, with_head.as_bytes()),
+                Vec::<String>::new()
+            );
         }
     }
 }

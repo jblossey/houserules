@@ -26,6 +26,9 @@
 //! - a `see` link is dangling only when no source holds its id: an excluded,
 //!   inactive, or archived id still resolves (`see_is_held`,
 //!   `pack_see_findings`);
+//! - the fields that the `check` of every active pack entry requires, with
+//!   an override applied: a pack copy and an override get the lines of a
+//!   local check, at the pack copy (`pack_check_findings`);
 //! - the `CLAUDE.md` import: a `CLAUDE.md` that does not hold `@AGENTS.md`
 //!   keeps the standing rules from Claude Code (`claude_import_finding`).
 //!
@@ -53,7 +56,8 @@ use crate::install::marker::read_pins_for_gate;
 use crate::packs::{pack_sha256, topic_of};
 use crate::root::INSTALL_MARKER;
 
-use super::model::{Base, Source};
+use super::check::required_field_findings;
+use super::model::{Base, Entry, Source};
 
 /// The file that holds the overrides and the exclusions.
 const OVERRIDES_FILE: &str = "knowledge/overrides.json";
@@ -191,8 +195,9 @@ fn local_topic<'a>(base: &'a Base, id: &'a str) -> &'a str {
         .unwrap_or_else(|| topic_of(id))
 }
 
-/// The file that `source` keeps the entry `id` in.
-fn source_file(base: &Base, id: &str, source: &Source) -> String {
+/// The file that `source` keeps the entry `id` in: the one name that every
+/// `check-knowledge` line about an entry uses.
+pub(super) fn source_file(base: &Base, id: &str, source: &Source) -> String {
     match source {
         Source::Local => format!("knowledge/{}.json", local_topic(base, id)),
         Source::Pack(name) => format!("knowledge/packs/{name}.json"),
@@ -321,31 +326,58 @@ pub(crate) fn see_is_held(base: &Base, id: &str) -> bool {
         || base.archived_ids.contains(id)
 }
 
+/// The active entries that the pack copies ship, in pack order and in the
+/// order of each copy. An entry that an exclusion, an inactive status, or
+/// another source keeps out of the active set is left out.
+fn active_pack_entries(base: &Base) -> impl Iterator<Item = &Entry> {
+    base.packs.iter().flat_map(move |pack| {
+        pack.entries.iter().filter_map(id_of).filter_map(move |id| {
+            base.entries
+                .get(id)
+                .filter(|entry| matches!(&entry.source, Source::Pack(name) if *name == pack.name))
+        })
+    })
+}
+
 /// One finding for each `see` link of an active pack entry that no source
 /// holds, naming the pack file. The links of a local entry are checked in
 /// `check_base`, which keeps their 1.4.0 coercion of a non-string link.
 pub(crate) fn pack_see_findings(base: &Base) -> Vec<String> {
     let mut findings = Vec::new();
-    for pack in &base.packs {
-        let source = Source::Pack(pack.name.clone());
-        for item in &pack.entries {
-            let Some(id) = id_of(item) else { continue };
-            if base
-                .entries
-                .get(id)
-                .is_none_or(|entry| entry.source != source)
-            {
-                continue;
-            }
-            for see in items(&base.raw_entries[id], "see").filter_map(Value::as_str) {
-                if !see_is_held(base, see) {
-                    findings.push(format!(
-                        "{} {id}: see \"{see}\" does not exist",
-                        source_file(base, id, &source)
-                    ));
-                }
+    for entry in active_pack_entries(base) {
+        for see in items(&base.raw_entries[&entry.id], "see").filter_map(Value::as_str) {
+            if !see_is_held(base, see) {
+                findings.push(format!(
+                    "{} {}: see \"{see}\" does not exist",
+                    source_file(base, &entry.id, &entry.source),
+                    entry.id
+                ));
             }
         }
+    }
+    findings
+}
+
+/// One finding for each field that the effective `check` of an active pack
+/// entry lacks (`check::required_field_findings`), naming the pack file. The
+/// effective check is the one in `base.raw_entries`, an override applied, so
+/// a pack copy and an override get the lines of a local check. The checks of
+/// a local entry are checked in `check_base`.
+pub(crate) fn pack_check_findings(base: &Base) -> Vec<String> {
+    let mut findings = Vec::new();
+    for entry in active_pack_entries(base) {
+        let Some(check) = base.raw_entries[&entry.id]
+            .get("check")
+            .filter(|check| check.is_object())
+        else {
+            continue;
+        };
+        let at = format!(
+            "{} {}",
+            source_file(base, &entry.id, &entry.source),
+            entry.id
+        );
+        required_field_findings(check, &at, &mut findings);
     }
     findings
 }

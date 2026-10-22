@@ -1,6 +1,6 @@
 {
   "name": "knowledge-base",
-  "version": "2.0.1",
+  "version": "3.0.0",
   "schema": "houserules/pack@1.0.0",
   "topics": {
     "knowledge-base": {
@@ -187,7 +187,9 @@
           "backlog/**",
           "knowledge/**",
           "docs/specs/**",
-          "docs/design.md"
+          "docs/design.md",
+          "docs/plans/**",
+          ".claude/evals/record.json"
         ]
       }
     },

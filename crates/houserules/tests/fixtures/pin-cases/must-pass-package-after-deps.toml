@@ -1,0 +1,9 @@
+[dependencies]
+serde = "=1.0.200"
+
+[features]
+default = []
+
+[package]
+version = "0.1.0"
+edition = "2021"

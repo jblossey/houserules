@@ -1,0 +1,77 @@
+{
+  "base": "4723faf",
+  "head": "23927fe",
+  "ids": [],
+  "changed_files": [
+    "docs/log.md"
+  ],
+  "areas": [
+    "docs",
+    "global"
+  ],
+  "area_files": {
+    "global": [],
+    "docs": [
+      "docs/log.md"
+    ]
+  },
+  "rules": [
+    {
+      "id": "pins.append-only",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "docs/log.md: no removed lines"
+    },
+    {
+      "id": "pins.cochange",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "not triggered"
+    },
+    {
+      "id": "pins.commit-format",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "1 commits checked"
+    },
+    {
+      "id": "pins.durable-sha",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "1 file(s) checked for in-branch sha citations (against the default branch, 4723faf02e488d720f2ad105f7fe094f39e36dce)"
+    },
+    {
+      "id": "pins.trailer",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "1 commits checked"
+    }
+  ],
+  "summary": {
+    "base": "4723faf",
+    "head": "23927fe",
+    "deterministic": 5,
+    "pass": 5,
+    "fail": 0,
+    "warn": 0,
+    "skipped": 0,
+    "judged": 0,
+    "reference_fail": 0
+  },
+  "references": {
+    "checked": 0,
+    "passed": 0,
+    "skipped": 1,
+    "failures": []
+  }
+}

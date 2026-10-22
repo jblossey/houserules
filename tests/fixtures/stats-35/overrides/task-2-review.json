@@ -1,0 +1,29 @@
+{
+  "kind": "task-review",
+  "model": "opus",
+  "task": 2,
+  "base": "0000001",
+  "head": "0000002",
+  "spec_compliance": { "verdict": "compliant", "items": [] },
+  "rule_adherence": [
+    {
+      "id": "j.one",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "fail",
+      "evidence": "The diff breaks the rule."
+    },
+    {
+      "id": "j.two",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The diff follows the rule."
+    }
+  ],
+  "strengths": [],
+  "issues": [],
+  "assessment": { "verdict": "needs-fixes", "text": "One rule fails." }
+}

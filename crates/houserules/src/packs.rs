@@ -28,8 +28,9 @@ pub(crate) const PACK_SCHEMA_MAJOR: u64 = 1;
 /// names. A copy that declares a newer minor has its unnamed keys set
 /// aside before validation. Minor 1 names the `optIn` list and the
 /// `require_trailer`, `exempt_authors`, and `exempt_subjects` fields of a
-/// `commits` check.
-const PACK_SCHEMA_MINOR: u64 = 1;
+/// `commits` check. Minor 2 names the `runner` check type and the `tool`,
+/// `non_empty`, and `covers_ids` fields of a check.
+const PACK_SCHEMA_MINOR: u64 = 2;
 
 /// The text that a pack's `schema` id starts with.
 const PACK_SCHEMA_PREFIX: &str = "houserules/pack@";
@@ -378,11 +379,12 @@ mod tests {
 
     /// The id of every entry that the kit's packs carry, sorted: the 58
     /// seeded entries of release 1.4.0, the two entries that release
-    /// 2.0.0 adds to `knowledge-base`, and the opt-in entry and the four
-    /// design-phase entries that it adds to `process`. A change to this list
+    /// 2.0.0 adds to `knowledge-base`, the opt-in entry and the four
+    /// design-phase entries that it adds to `process`, and the two pin
+    /// entries that it adds to `security-hygiene`. A change to this list
     /// is a change to a pack's content and needs a version change in
     /// `KIT_PACK_VERSIONS`.
-    const KIT_IDS: [&str; 65] = [
+    const KIT_IDS: [&str; 67] = [
         "knowledge-base.cite-durable-refs",
         "knowledge-base.context-proxy-output-is-lossy",
         "knowledge-base.controller-rules-are-tagged",
@@ -442,6 +444,8 @@ mod tests {
         "security-hygiene.dependency-vetting",
         "security-hygiene.exact-pins",
         "security-hygiene.no-focused-tests",
+        "security-hygiene.tool-pins-are-exact",
+        "security-hygiene.tool-versions-pins-are-exact",
         "security-hygiene.verify-current-docs",
         "writing-style.code-comments",
         "writing-style.doc-comments",
@@ -462,13 +466,13 @@ mod tests {
     const KIT_PACK_VERSIONS: [(&str, &str, &str); 5] = [
         (
             "knowledge-base",
-            "2.0.1",
-            "7105d8be3f70c9dcb94905d0e4f6d17ce0dd0d233757e0607f83ac5dd03523b8",
+            "3.0.0",
+            "fccdf3f7f38ffdc3d3f45e3d99b3d52d84f44e83f0636d56963cb4712b9f33d9",
         ),
         (
             "process",
-            "1.2.2",
-            "9c16794badec10cc6b6b43b158d9ea124fe664eb42cc6e5c5188a63bb8291903",
+            "2.0.0",
+            "38fb6a43b1057f9227e4ac1a60afaae2c9c1206599914d686b9f5859f7d80a78",
         ),
         (
             "quality",
@@ -477,8 +481,8 @@ mod tests {
         ),
         (
             "security-hygiene",
-            "3.0.0",
-            "37cd88eeed6a85bbb4ae11933fbbe5e0128c3bf7350aeb8c5651323887f93e24",
+            "5.0.0",
+            "ddda662be06eff51dd80afc62e3caec14f89b4c2177e22da870a76883892128e",
         ),
         (
             "writing-style",
@@ -538,7 +542,7 @@ mod tests {
         json!({
             "name": "demo",
             "version": "1.2.3",
-            "schema": "houserules/pack@1.1.0",
+            "schema": "houserules/pack@1.2.0",
             "topics": {"demo": {"title": "Demo topic"}},
             "areas": {"docs": {"paths": ["docs/**", "AGENTS.md"]}, "global": {"paths": []}},
             "entries": [
@@ -697,7 +701,7 @@ mod tests {
     }
 
     #[test]
-    fn kit_pack_ids_are_the_1_4_0_ids_plus_the_seven_new_ids_each_once() {
+    fn kit_pack_ids_are_the_1_4_0_ids_plus_the_nine_new_ids_each_once() {
         let mut ids: Vec<String> = kit_packs()
             .iter()
             .flat_map(|pack| pack.entries.iter())
@@ -860,14 +864,9 @@ mod tests {
     #[test]
     fn cite_durable_refs_ships_with_its_fail_level_durable_sha_check_and_its_source() {
         let entry = kit_entry("knowledge-base", "knowledge-base.cite-durable-refs");
-        assert_eq!(
-            entry["check"],
-            json!({
-                "type": "durable-sha",
-                "level": "fail",
-                "files": ["backlog/**", "knowledge/**", "docs/specs/**", "docs/design.md"]
-            })
-        );
+        // The `files` of the check are pinned by `tests/pin_checks.rs`.
+        assert_eq!(entry["check"]["type"], json!("durable-sha"));
+        assert_eq!(entry["check"]["level"], json!("fail"));
         assert_eq!(
             entry["source"],
             json!({"date": "2026-10-19", "by": "docs", "ref": "HR-178, issue 50"})
@@ -1053,8 +1052,8 @@ mod tests {
     }
 
     #[test]
-    fn the_embedded_pack_schema_names_minor_1_and_holds_the_check_of_the_knowledge_schema() {
-        assert_eq!(PACK_SCHEMA_MINOR, 1);
+    fn the_embedded_pack_schema_names_minor_2_and_holds_the_check_of_the_knowledge_schema() {
+        assert_eq!(PACK_SCHEMA_MINOR, 2);
         let pack: Value = serde_json::from_str(PACK_SCHEMA).expect("the embedded schema is JSON");
         let knowledge: Value =
             serde_json::from_str(include_str!("../../../template/knowledge/schema.json"))
@@ -1065,13 +1064,36 @@ mod tests {
         );
     }
 
+    /// An override may set every field of a check that a knowledge entry may
+    /// hold: the two definitions list the same properties, require the same
+    /// ones, and refuse the same others. Only the `null` that removes a check
+    /// differs.
     #[test]
-    fn the_process_pack_lists_the_every_commit_entry_under_opt_in_at_pack_schema_1_1_0() {
+    fn the_embedded_overrides_schema_holds_every_property_of_the_check_of_the_knowledge_schema() {
+        let overrides: Value =
+            serde_json::from_str(OVERRIDES_SCHEMA).expect("the embedded schema is JSON");
+        let knowledge: Value =
+            serde_json::from_str(include_str!("../../../template/knowledge/schema.json"))
+                .expect("the knowledge schema is JSON");
+        let override_check =
+            &overrides["$defs"]["override"]["properties"]["fields"]["properties"]["check"];
+        let knowledge_check = &knowledge["$defs"]["check"];
+
+        for key in ["properties", "required", "additionalProperties"] {
+            assert_eq!(
+                override_check[key], knowledge_check[key],
+                "the override check and the knowledge check differ in {key}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_process_pack_lists_the_every_commit_entry_under_opt_in_at_pack_schema_1_2_0() {
         let process = five_kit_packs()
             .into_iter()
             .find(|pack| pack.name == "process")
             .expect("the kit carries the process pack");
-        assert_eq!(process.schema, "houserules/pack@1.1.0");
+        assert_eq!(process.schema, "houserules/pack@1.2.0");
         assert_eq!(process.opt_in(), ["process.every-commit-names-a-work-item"]);
         for other in five_kit_packs()
             .iter()
@@ -1079,6 +1101,107 @@ mod tests {
         {
             assert_eq!(other.opt_in(), Vec::<String>::new(), "{}", other.name);
         }
+    }
+
+    /// Case 14: the two kit packs whose checks use the report-field options of
+    /// pack schema 1.2.0 declare that schema. The other three keep their id.
+    #[test]
+    fn the_kit_packs_that_use_the_report_field_options_declare_pack_schema_1_2_0() {
+        let declared: Vec<(String, String)> = five_kit_packs()
+            .into_iter()
+            .map(|pack| (pack.name, pack.schema))
+            .collect();
+        assert_eq!(
+            declared,
+            [
+                ("knowledge-base", "houserules/pack@1.0.0"),
+                ("process", "houserules/pack@1.2.0"),
+                ("quality", "houserules/pack@1.0.0"),
+                ("security-hygiene", "houserules/pack@1.2.0"),
+                ("writing-style", "houserules/pack@1.0.0"),
+            ]
+            .map(|(name, schema)| (name.to_string(), schema.to_string()))
+        );
+    }
+
+    /// Spec 5 and 202: the kit entries that read a report field hold the
+    /// content options and keep level `warn`; the entry that reads
+    /// `self_audit` keeps its check, because the comparison needs no field.
+    #[test]
+    fn the_kit_entries_that_read_report_fields_hold_the_content_options_at_level_warn() {
+        assert_eq!(
+            kit_entry("process", "process.knowledge-first")["check"],
+            json!({
+                "type": "report-field", "level": "warn", "if": "**",
+                "field": "knowledge_used", "non_empty": true, "covers_ids": true,
+            })
+        );
+        let mut docs =
+            kit_entry("security-hygiene", "security-hygiene.verify-current-docs")["check"].clone();
+        docs.as_object_mut()
+            .expect("a check is an object")
+            .remove("if");
+        assert_eq!(
+            docs,
+            json!({
+                "type": "report-field", "level": "warn", "field": "docs_verified",
+                "non_empty": true,
+            })
+        );
+        assert_eq!(
+            kit_entry("process", "process.deliverables-json")["check"],
+            json!({
+                "type": "report-field", "level": "fail", "if": "**", "field": "self_audit",
+            })
+        );
+    }
+
+    /// Spec 6 and 12: the body of `process.deliverables-json` states the
+    /// comparison, and the body of `process.knowledge-earns-its-place` names
+    /// the window of `stats`.
+    #[test]
+    fn the_bodies_of_two_process_entries_state_the_comparison_and_the_window() {
+        let body = |id: &str| -> Vec<String> {
+            kit_entry("process", id)["body"]
+                .as_array()
+                .expect("a body is an array")
+                .iter()
+                .map(|line| line.as_str().expect("a body line is text").to_string())
+                .collect()
+        };
+        let deliverables = body("process.deliverables-json");
+        for sentence in [
+            "It leaves out the row of this check.",
+            "It takes the result of that row out of the result counts of the summary (`pass`, `fail`, \
+             `warn`, and `skipped`) on each side; a copy that lacks the row keeps its counts.",
+            "A difference fails the row with `self_audit differs at <JSON path>`.",
+            "A `--workspace` audit does not compare.",
+            "After the last edit to the report, run the audit again and copy `self_audit` again.",
+        ] {
+            assert!(
+                deliverables.iter().any(|line| line.contains(sentence)),
+                "process.deliverables-json lacks {sentence:?}"
+            );
+        }
+        assert!(
+            !deliverables.iter().any(|line| line.contains(
+                "the result counts of the summary (`pass`, `fail`, `warn`, and `skipped`), and"
+            )),
+            "process.deliverables-json still leaves out every result count"
+        );
+        let stats = body("process.knowledge-earns-its-place");
+        assert!(
+            stats
+                .iter()
+                .any(|line| line.contains("`houserules stats --window 5 <WORKSPACE>...`")),
+            "process.knowledge-earns-its-place names no window"
+        );
+        assert!(
+            !stats
+                .iter()
+                .any(|line| line.contains("`houserules stats <WORKSPACE>...`")),
+            "process.knowledge-earns-its-place still names the run without a window"
+        );
     }
 
     #[test]

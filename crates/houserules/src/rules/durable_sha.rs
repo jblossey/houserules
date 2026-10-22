@@ -74,14 +74,14 @@
 //! re-litigate history `knowledge-base.cite-durable-refs`'s own "nine
 //! pre-batch-21 bare historical markers... dispositioned as accepted
 //! history" clause already settled. [`find_violation`]'s caller
-//! (`audit.rs`'s `run_check`) narrows `files` to the check's own
+//! (`runner/durable_sha.rs`'s `run`) narrows `files` to the check's own
 //! declared `files` glob before calling in, so this module never
 //! hardcodes `backlog/`/`knowledge/` itself.
 
 use std::path::Path;
 use std::process::Command;
 
-use super::audit::{git_diff, range};
+use super::git::{git_diff, range};
 
 /// One line a hunk added: the file it belongs to, its 1-based line
 /// number in the new (head-side) file, and its text (the leading `+`
@@ -94,7 +94,7 @@ struct AddedLine {
 
 /// Every line `git diff <range> -- <files>` adds, across every hunk of
 /// every file in `files`, in the order the diff prints them --
-/// `audit.rs`'s own `removed_lines` is the sibling reader for `-` lines;
+/// `git.rs`'s own `removed_lines` is the sibling reader for `-` lines;
 /// this one also tracks the new-side line number from each hunk's own
 /// `@@ -a,b +c,d @@` header, since evidence naming a bare file with no
 /// line number is far less useful for a citation review. A line before
@@ -264,7 +264,7 @@ fn configured_default_branch(root: &Path) -> Result<Option<String>, String> {
 /// did not name. Without the key, the candidates this module's doc lists
 /// are tried in order. `Err` names the failure; this function never
 /// falls back to substituting some other ref when none of these resolve.
-/// `pub(super)`: `audit.rs`'s own `run_check` resolves the default branch
+/// `pub(super)`: `runner/durable_sha.rs`'s `run` resolves the default branch
 /// once per `CheckType::DurableSha` evaluation through this same
 /// function.
 pub(super) fn resolve_default_branch(root: &Path) -> Result<String, String> {
@@ -612,7 +612,7 @@ mod tests {
         assert!(violation.is_none(), "{violation:?}");
     }
 
-    /// `files` empty (the check's own `run_check` already handles "not
+    /// `files` empty (the check's own `run` already handles "not
     /// triggered" before calling in, but this module's own function
     /// stays correct standalone too).
     #[test]

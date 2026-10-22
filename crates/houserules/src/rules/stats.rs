@@ -5,12 +5,13 @@
 //! deliverable model.
 //!
 //! This module reads the files and keeps the four original keys
-//! (`violations`, `unused_ids`, `audits`, `reviews`). `cost.rs` renders
-//! the `workspaces`, `models`, and `cost` keys; `proposals.rs` renders
-//! `rules`, `packs`, and `proposals`.
+//! (`violations`, `unused_ids`, `audits`, `reviews`) and the `sanctioned`
+//! list. `cost.rs` renders the `workspaces`, `models`, and `cost` keys;
+//! `proposals.rs` renders `rules`, `packs`, and `proposals`.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -18,7 +19,7 @@ use serde_json::{Value, json};
 
 use crate::emit::emit;
 
-use super::cost::{self, AdherenceRow, Finding, ModelCost, Workspace};
+use super::cost::{self, AdherenceRow, Finding, Sanction, Workspace};
 use super::deliverable::{
     BRANCH_REVIEW_FILE, array_field, read_deliverable_value, stats_reads_phrase, workspace_files,
 };
@@ -136,8 +137,10 @@ fn workspace_label(given: &Path, canonical: &Path) -> String {
 /// Resolves the command-line paths into the workspaces to read, in the
 /// order given. A path whose canonical form an earlier path already named
 /// is dropped, so one directory is read once. A path that cannot be
-/// resolved is a named error with the operating system's own text.
-fn resolve_sources(dirs: &[PathBuf]) -> Result<Vec<Source<'_>>, String> {
+/// resolved is a named error with the operating system's own text. With a
+/// `window`, only the most recent workspaces stay (`newest`), before any
+/// workspace is read.
+fn resolve_sources(dirs: &[PathBuf], window: Option<usize>) -> Result<Vec<Source<'_>>, String> {
     let mut seen: HashSet<PathBuf> = HashSet::new();
     let mut sources = Vec::with_capacity(dirs.len());
     for given in dirs {
@@ -151,7 +154,31 @@ fn resolve_sources(dirs: &[PathBuf]) -> Result<Vec<Source<'_>>, String> {
             label: workspace_label(given, &canonical),
         });
     }
-    Ok(sources)
+    Ok(match window {
+        Some(window) => newest(sources, window),
+        None => sources,
+    })
+}
+
+/// The `window` most recent of `sources` by `cost::recency_cmp` of their
+/// labels, in the order given. A `window` above the count keeps every source.
+fn newest(sources: Vec<Source<'_>>, window: usize) -> Vec<Source<'_>> {
+    if sources.len() <= window {
+        return sources;
+    }
+    let mut by_recency: Vec<usize> = (0..sources.len()).collect();
+    by_recency
+        .sort_by(|&left, &right| cost::recency_cmp(&sources[left].label, &sources[right].label));
+    let kept: HashSet<usize> = by_recency
+        .split_off(sources.len() - window)
+        .into_iter()
+        .collect();
+    sources
+        .into_iter()
+        .enumerate()
+        .filter(|(index, _)| kept.contains(index))
+        .map(|(_, source)| source)
+        .collect()
 }
 
 /// What the four original keys aggregate across every workspace read.
@@ -194,43 +221,142 @@ impl Reader<'_> {
 /// One audit or `rule_adherence` row that names an entry.
 struct Row<'a> {
     id: &'a str,
+    /// The row's `result` is `fail` and no sanction accepts it.
     failed: bool,
     deterministic: bool,
     judged: bool,
+    /// The row's `result` is `pass` or `fail`.
+    verdict: bool,
+    /// The reference of the sanction that accepts the row, when its `result`
+    /// is `fail`.
+    sanction: Option<String>,
+    /// The row carries an `override`.
+    overridden: bool,
+}
+
+/// The text before a reference in the suffix that ends the evidence of a
+/// deterministic `fail` row that a `--sanctioned` booking accepted. An audit
+/// file can hold the suffix on a row that has no `sanctioned` field.
+const SANCTION_SUFFIX_OPENER: &str = "(sanctioned: ";
+
+/// The reference at the end of `evidence`, when the evidence ends with
+/// `(sanctioned: <reference>)`.
+fn sanction_in_evidence(evidence: &str) -> Option<&str> {
+    let (_, reference) = evidence
+        .strip_suffix(')')?
+        .rsplit_once(SANCTION_SUFFIX_OPENER)?;
+    (!reference.is_empty()).then_some(reference)
+}
+
+/// The `sanctioned` field of `row`: `None` when it is absent or `null`, else
+/// the reference. A field that is no non-empty string is an error text.
+fn sanctioned_field(row: &Value) -> Result<Option<String>, &'static str> {
+    match row.get("sanctioned") {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(reference)) if !reference.is_empty() => Ok(Some(reference.clone())),
+        Some(_) => Err("sanctioned is not a non-empty string"),
+    }
+}
+
+/// Whether `row` carries an `override`: `false` when the field is absent or
+/// `null`. A field that is no object is an error text.
+fn has_override(row: &Value) -> Result<bool, &'static str> {
+    match row.get("override") {
+        None | Some(Value::Null) => Ok(false),
+        Some(Value::Object(_)) => Ok(true),
+        Some(_) => Err("override is not an object"),
+    }
 }
 
 /// The rows of `data[field]` that carry a string `id`, or an error naming
-/// `name` and the field when the field is no array.
+/// `name` and the field when the field is no array, and naming the row when
+/// its `sanctioned` or `override` field has the wrong type.
 fn rows_of<'a>(data: &'a Value, field: &str, name: &str) -> Result<Vec<Row<'a>>, String> {
     let rows = array_field(data, field).map_err(|error| format!("{name}: {error}"))?;
-    Ok(rows
-        .into_iter()
-        .filter_map(|row| {
-            Some(Row {
-                id: row.get("id").and_then(Value::as_str)?,
-                failed: row.get("result").and_then(Value::as_str) == Some("fail"),
-                deterministic: row.get("mode").and_then(Value::as_str) == Some("deterministic"),
-                judged: row.get("mode").and_then(Value::as_str) == Some("judged"),
+    let mut parsed = Vec::with_capacity(rows.len());
+    for row in rows {
+        let Some(id) = row.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        let named = |fault: &str| format!("{name}: {field} row \"{id}\": {fault}");
+        let reference = sanctioned_field(row).map_err(named)?;
+        let overridden = has_override(row).map_err(named)?;
+        let result = row.get("result").and_then(Value::as_str);
+        let mode = row.get("mode").and_then(Value::as_str);
+        let deterministic = mode == Some("deterministic");
+        let sanction = if result == Some("fail") {
+            reference.or_else(|| {
+                let evidence = row.get("evidence").and_then(Value::as_str)?;
+                let reference = sanction_in_evidence(evidence)?;
+                deterministic.then(|| reference.to_string())
             })
-        })
-        .collect())
+        } else {
+            None
+        };
+        parsed.push(Row {
+            id,
+            failed: result == Some("fail") && sanction.is_none(),
+            deterministic,
+            judged: mode == Some("judged"),
+            verdict: matches!(result, Some("pass" | "fail")),
+            sanction,
+            overridden,
+        });
+    }
+    Ok(parsed)
 }
 
-/// Appends the findings of `data[field]` to `cost`.
+/// Where a row came from decides which rows count and what a counted row
+/// costs.
+#[derive(Clone, Copy)]
+enum RowSource {
+    /// An audit file: its deterministic rows count.
+    Audit,
+    /// A review file: its judged rows count, and the row adds `share` bytes
+    /// of the file to the cost of its rule.
+    Review { share: u64 },
+}
+
+/// Adds `row` of the deliverable of `task` to `workspace`. A counted row that
+/// a sanction accepts also joins the workspace's `sanctions`. A judged row of
+/// a review with a `pass` or `fail` result is a verdict; an override counts
+/// only on a verdict.
+fn record_row(workspace: &mut Workspace, task: &str, row: &Row, source: RowSource) {
+    let (counted, cost) = match source {
+        RowSource::Audit => (row.deterministic, None),
+        RowSource::Review { share } => (row.judged, row.judged.then_some(share)),
+    };
+    let verdict = cost.is_some() && row.verdict;
+    if counted && let Some(reference) = &row.sanction {
+        workspace.sanctions.push(Sanction {
+            id: row.id.to_string(),
+            task: task.to_string(),
+            reference: reference.clone(),
+        });
+    }
+    workspace.rows.push(AdherenceRow {
+        id: row.id.to_string(),
+        failed: row.failed,
+        counted,
+        verdict,
+        overridden: verdict && row.overridden,
+        sanctioned: row.sanction.clone(),
+        cost,
+    });
+}
+
+/// The findings of `data[field]`, in file order.
 fn read_findings(
     data: &Value,
     field: &str,
     name: &str,
     label: &str,
-    cost: &mut ModelCost,
-) -> Result<(), String> {
+) -> Result<Vec<Finding>, String> {
     let issues = array_field(data, field).map_err(|error| format!("{name}: {error}"))?;
-    cost.findings.extend(
-        issues
-            .into_iter()
-            .map(|issue| Finding::from_issue(issue, label)),
-    );
-    Ok(())
+    Ok(issues
+        .into_iter()
+        .map(|issue| Finding::from_issue(issue, label))
+        .collect())
 }
 
 /// Reads the audits: injected ids and failed rules.
@@ -254,11 +380,7 @@ fn read_audits(
             if row.failed {
                 stats_hit(&mut tally.violations, row.id, &task);
             }
-            workspace.rows.push(AdherenceRow {
-                id: row.id.to_string(),
-                failed: row.failed,
-                counted: row.deterministic,
-            });
+            record_row(workspace, &task, &row, RowSource::Audit);
         }
     }
     Ok(())
@@ -278,8 +400,13 @@ enum ReviewFile {
 /// the findings, and the model that wrote the file -- into `workspace`. The
 /// findings of a spec review are its `findings` rows; those of a `re-review`
 /// are its `new_breakage` rows; those of any other review are its `issues`.
-/// Returns the judged failed rows, which only a task review counts as
-/// violations.
+/// The first judged row of a rule costs the rule the file's bytes divided by
+/// all the judged rows of the review, rounded down; each further judged row of
+/// the same rule in the review costs it nothing, so a review adds one share to
+/// the cost of a rule whatever number of its rows judge the rule. The
+/// `issues` of a task review and of the branch review also join the
+/// workspace's `issues`, in file order. Returns the judged failed rows, which
+/// only a task review counts as violations.
 fn read_review<'a>(
     reader: &Reader,
     name: &str,
@@ -290,24 +417,37 @@ fn read_review<'a>(
     let model = model_of(data, name)?;
     let re_review = data.get("kind").and_then(Value::as_str) == Some("re-review");
     let rows = rows_of(data, "rule_adherence", name)?;
+    let path = reader.dir.join(name);
+    let bytes = fs::metadata(&path)
+        .map_err(|error| format!("{}: {error}", path.display()))?
+        .len();
+    let judged_rows = rows.iter().filter(|row| row.judged).count() as u64;
+    let share = bytes.checked_div(judged_rows).unwrap_or(0);
+    let task = reader.task(name);
+    let mut charged: BTreeSet<&str> = BTreeSet::new();
     for row in &rows {
-        workspace.rows.push(AdherenceRow {
-            id: row.id.to_string(),
-            failed: row.failed,
-            counted: row.judged,
-        });
+        let share = if row.judged && !charged.insert(row.id) {
+            0
+        } else {
+            share
+        };
+        record_row(workspace, &task, row, RowSource::Review { share });
     }
-    let findings = match file {
-        ReviewFile::Spec => "findings",
-        ReviewFile::Task if re_review => "new_breakage",
-        ReviewFile::Task => "issues",
+    let (field, is_issues) = match file {
+        ReviewFile::Spec => ("findings", false),
+        ReviewFile::Task if re_review => ("new_breakage", false),
+        ReviewFile::Task => ("issues", true),
     };
+    let findings = read_findings(data, field, name, reader.label)?;
+    if is_issues {
+        workspace.issues.extend(findings.iter().cloned());
+    }
     let cost = workspace.model(&model);
     cost.reviews += 1;
     if re_review {
         cost.re_reviews += 1;
     }
-    read_findings(data, findings, name, reader.label, cost)?;
+    cost.findings.extend(findings);
     Ok(rows)
 }
 
@@ -401,10 +541,38 @@ fn read_reports(
     Ok(())
 }
 
+/// The ledger of a workspace, whose `Reversal:` lines `stats` counts.
+const PROGRESS_FILE: &str = "progress.md";
+
+/// Whether `line` records a reversal: it starts with `Reversal:` after
+/// optional leading spaces and an optional list marker (`- `, `* `, or
+/// `+ `), the form that `process.reversals-are-recorded` teaches.
+fn is_reversal(line: &str) -> bool {
+    let line = line.trim_start_matches(' ');
+    let line = ["- ", "* ", "+ "]
+        .iter()
+        .find_map(|marker| line.strip_prefix(marker))
+        .unwrap_or(line);
+    line.starts_with("Reversal:")
+}
+
+/// Counts the reversals that the `progress.md` of the workspace `dir` records.
+/// A workspace with no such file has none; a file that cannot be read as text
+/// is a named error with the operating system's own text.
+fn count_reversals(dir: &Path) -> Result<usize, String> {
+    let path = dir.join(PROGRESS_FILE);
+    match fs::read_to_string(&path) {
+        Ok(text) => Ok(text.lines().filter(|line| is_reversal(line)).count()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(0),
+        Err(error) => Err(format!("{}: {error}", path.display())),
+    }
+}
+
 /// Reads one workspace: audits, task reviews, the branch review, spec
 /// reviews, then reports, each in this order so a malformed file is named
-/// the way it always was. The counters of the whole workspace are the sums
-/// over its models (`Workspace::sum_models`).
+/// the way it always was, and last the reversals of its ledger. The counters
+/// of the whole workspace are the sums over its models
+/// (`Workspace::sum_models`).
 fn read_workspace(
     source: &Source,
     prefix_tasks: bool,
@@ -418,6 +586,7 @@ fn read_workspace(
     };
     let mut workspace = Workspace {
         path: source.given.display().to_string(),
+        label: source.label.clone(),
         ..Workspace::default()
     };
     read_audits(&reader, &files.audits, tally, &mut workspace)?;
@@ -425,8 +594,35 @@ fn read_workspace(
     read_branch_review(&reader, &mut workspace)?;
     read_spec_reviews(&reader, &files.spec_reviews, &mut workspace)?;
     read_reports(&reader, &files.reports, tally, &mut workspace)?;
+    workspace.reversals = count_reversals(source.given)?;
     workspace.sum_models();
     Ok(workspace)
+}
+
+/// The `sanctioned` key: one object per counted fail that a sanction accepts
+/// -- the entry `id`, the `workspace` path as given, the `task` label, and
+/// the `ref` that books the sanction -- sorted by those four in that order.
+fn sanctioned_json(workspaces: &[Workspace]) -> Vec<Value> {
+    let mut entries: Vec<(&str, &str, &str, &str)> = workspaces
+        .iter()
+        .flat_map(|workspace| {
+            workspace.sanctions.iter().map(move |sanction| {
+                (
+                    sanction.id.as_str(),
+                    workspace.path.as_str(),
+                    sanction.task.as_str(),
+                    sanction.reference.as_str(),
+                )
+            })
+        })
+        .collect();
+    entries.sort_unstable();
+    entries
+        .into_iter()
+        .map(|(id, workspace, task, reference)| {
+            json!({"id": id, "workspace": workspace, "task": task, "ref": reference})
+        })
+        .collect()
 }
 
 /// Aggregates the JSON deliverables of `dirs`: `task-*-audit*.json` for
@@ -440,9 +636,16 @@ fn read_workspace(
 ///
 /// With one workspace a task label is the task id; with several it is
 /// `<workspace directory name>/<task id>`. A directory named twice, by
-/// any spelling, is read once.
-pub(super) fn stats(dirs: &[PathBuf], base: &Base) -> Result<Value, String> {
-    let sources = resolve_sources(dirs)?;
+/// any spelling, is read once. With a `window`, only the `window` most
+/// recent workspaces are read (`newest`), and the labels follow the count
+/// that remains.
+///
+/// A fail that a sanction accepts is in the `sanctioned` list and the rule's
+/// `sanctioned` count, and in neither `violations` nor the rule's `fails`. It
+/// fires the rule for every proposal all the same, as a fail did before the
+/// sanction existed.
+pub(super) fn stats(dirs: &[PathBuf], base: &Base, window: Option<usize>) -> Result<Value, String> {
+    let sources = resolve_sources(dirs, window)?;
     let prefix_tasks = sources.len() > 1;
     let mut tally = Tally::default();
     let mut workspaces = Vec::with_capacity(sources.len());
@@ -468,6 +671,7 @@ pub(super) fn stats(dirs: &[PathBuf], base: &Base) -> Result<Value, String> {
         "unused_ids": unused_ids_json,
         "audits": {"files": tally.audit_files, "tasks": tally.audit_tasks.len()},
         "reviews": {"files": tally.review_files},
+        "sanctioned": sanctioned_json(&workspaces),
         "workspaces": cost::workspace_rows(&workspaces),
         "models": cost::model_rows(&workspaces),
         "cost": cost::cost(&workspaces),
@@ -477,12 +681,21 @@ pub(super) fn stats(dirs: &[PathBuf], base: &Base) -> Result<Value, String> {
     }))
 }
 
-/// Runs the `stats` subcommand: resolves `root` (`--dir`, or the
-/// nearest install root), loads the knowledge base there
+/// Runs the `stats` subcommand: refuses a `window` of 0, resolves `root`
+/// (`--dir`, or the nearest install root), loads the knowledge base there
 /// before it reads any workspace -- so a repository whose knowledge base
 /// fails to load fails `stats` too, not only `audit` -- then runs `stats`
-/// over `workspaces` and prints its JSON result.
-pub(crate) fn cmd_stats(dir: Option<PathBuf>, workspaces: Vec<PathBuf>) -> ExitCode {
+/// over the `window` most recent of `workspaces`, or all of them with no
+/// window, and prints its JSON result.
+pub(crate) fn cmd_stats(
+    dir: Option<PathBuf>,
+    workspaces: Vec<PathBuf>,
+    window: Option<usize>,
+) -> ExitCode {
+    if window == Some(0) {
+        eprintln!("--window must be 1 or more");
+        return ExitCode::from(2);
+    }
     let root = match crate::root::resolve_root(dir) {
         Ok(root) => root,
         Err(code) => return code,
@@ -494,7 +707,7 @@ pub(crate) fn cmd_stats(dir: Option<PathBuf>, workspaces: Vec<PathBuf>) -> ExitC
             return ExitCode::from(2);
         }
     };
-    match stats(&workspaces, &base) {
+    match stats(&workspaces, &base, window) {
         Ok(value) => {
             print!("{}", emit(&value));
             ExitCode::SUCCESS
@@ -529,7 +742,7 @@ mod tests {
     fn run_with(entries: &[Value], dirs: &[&Path]) -> Value {
         let (_guard, base) = base_with(entries);
         let dirs: Vec<PathBuf> = dirs.iter().map(|dir| dir.to_path_buf()).collect();
-        stats(&dirs, &base).unwrap()
+        stats(&dirs, &base, None).unwrap()
     }
 
     fn run(dirs: &[&Path]) -> Value {
@@ -632,8 +845,8 @@ mod tests {
         );
     }
 
-    /// The four old keys come first, then `workspaces`, `models`, `cost`,
-    /// `rules`, `packs`, and `proposals`, in this order.
+    /// The four old keys come first, then `sanctioned`, `workspaces`,
+    /// `models`, `cost`, `rules`, `packs`, and `proposals`, in this order.
     #[test]
     fn the_new_keys_follow_the_four_old_keys() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -651,6 +864,7 @@ mod tests {
                 "unused_ids",
                 "audits",
                 "reviews",
+                "sanctioned",
                 "workspaces",
                 "models",
                 "cost",
@@ -711,7 +925,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         fs::write(dir.path().join("task-3-audit.json"), "{\"ids\": [").unwrap();
         let (_guard, base) = empty_base();
-        let error = stats(&[dir.path().to_path_buf()], &base).unwrap_err();
+        let error = stats(&[dir.path().to_path_buf()], &base, None).unwrap_err();
         assert!(error.contains("task-3-audit.json"), "{error}");
     }
 
@@ -724,7 +938,7 @@ mod tests {
         let path = dir.path().join(name);
         fs::write(&path, "not json").unwrap();
         let (_guard, base) = empty_base();
-        let error = stats(&[dir.path().to_path_buf()], &base).unwrap_err();
+        let error = stats(&[dir.path().to_path_buf()], &base, None).unwrap_err();
         assert!(
             error.starts_with(&format!("{}: invalid JSON (", path.display())),
             "{error}"
@@ -777,7 +991,7 @@ mod tests {
         )
         .unwrap();
         let (_guard, base) = empty_base();
-        let error = stats(&[dir.path().to_path_buf()], &base).unwrap_err();
+        let error = stats(&[dir.path().to_path_buf()], &base, None).unwrap_err();
         assert!(error.contains("task-1-audit.json"), "{error}");
         assert!(error.contains("rules"), "{error}");
     }
@@ -793,7 +1007,7 @@ mod tests {
         )
         .unwrap();
         let (_guard, base) = empty_base();
-        let error = stats(&[dir.path().to_path_buf()], &base).unwrap_err();
+        let error = stats(&[dir.path().to_path_buf()], &base, None).unwrap_err();
         assert!(error.contains("task-1-audit.json"), "{error}");
         assert!(error.contains("ids"), "{error}");
     }
@@ -809,7 +1023,7 @@ mod tests {
         )
         .unwrap();
         let (_guard, base) = empty_base();
-        let error = stats(&[dir.path().to_path_buf()], &base).unwrap_err();
+        let error = stats(&[dir.path().to_path_buf()], &base, None).unwrap_err();
         assert!(error.contains("task-1-review.json"), "{error}");
         assert!(error.contains("rule_adherence"), "{error}");
     }
@@ -825,7 +1039,7 @@ mod tests {
         )
         .unwrap();
         let (_guard, base) = empty_base();
-        let error = stats(&[dir.path().to_path_buf()], &base).unwrap_err();
+        let error = stats(&[dir.path().to_path_buf()], &base, None).unwrap_err();
         assert!(error.contains("task-1-report.json"), "{error}");
         assert!(error.contains("knowledge_used"), "{error}");
     }
@@ -859,7 +1073,7 @@ mod tests {
             let dir = tempfile::tempdir().expect("tempdir");
             write(dir.path(), name, &body);
             let (_guard, base) = empty_base();
-            let error = stats(&[dir.path().to_path_buf()], &base).unwrap_err();
+            let error = stats(&[dir.path().to_path_buf()], &base, None).unwrap_err();
             assert!(error.contains(name), "{error}");
             assert!(error.contains(field), "{error}");
         }
@@ -948,7 +1162,7 @@ mod tests {
         let parent = tempfile::tempdir().expect("tempdir");
         let missing = parent.path().join("missing");
         let (_guard, base) = empty_base();
-        let error = stats(std::slice::from_ref(&missing), &base).unwrap_err();
+        let error = stats(std::slice::from_ref(&missing), &base, None).unwrap_err();
         assert!(
             error.starts_with(&format!("{}: ", missing.display())),
             "{error}"
@@ -962,7 +1176,7 @@ mod tests {
         let file = parent.path().join("notes.txt");
         fs::write(&file, "text").unwrap();
         let (_guard, base) = empty_base();
-        let error = stats(std::slice::from_ref(&file), &base).unwrap_err();
+        let error = stats(std::slice::from_ref(&file), &base, None).unwrap_err();
         assert!(
             error.starts_with(&format!("{}: ", file.display())),
             "{error}"
@@ -977,7 +1191,7 @@ mod tests {
         let dir = workspace_dir(parent.path(), "batch-9");
         let branch_review = workspace_dir(&dir, BRANCH_REVIEW_FILE);
         let (_guard, base) = empty_base();
-        let error = stats(std::slice::from_ref(&dir), &base).unwrap_err();
+        let error = stats(std::slice::from_ref(&dir), &base, None).unwrap_err();
         assert!(
             error.starts_with(&format!("{}: ", branch_review.display())),
             "{error}"
@@ -1000,7 +1214,7 @@ mod tests {
         std::os::unix::fs::symlink(BRANCH_REVIEW_FILE, &branch_review).unwrap();
         let inspected = fs::metadata(&branch_review).unwrap_err();
         let (_guard, base) = empty_base();
-        let error = stats(std::slice::from_ref(&dir), &base).unwrap_err();
+        let error = stats(std::slice::from_ref(&dir), &base, None).unwrap_err();
         assert_eq!(error, format!("{}: {inspected}", branch_review.display()));
     }
 
@@ -1091,6 +1305,7 @@ mod tests {
                 "tasks": 0, "reviews": 0, "re_reviews": 0, "fix_rounds": 0, "report_bytes": 0,
                 "findings": {"critical": 0, "important": 0, "minor": 0, "other": 0},
                 "targets": {"code": 0, "deliverable": 0, "prose": 0, "other": 0},
+                "reversals": 0,
             }])
         );
     }
@@ -1394,6 +1609,8 @@ mod tests {
                     "findings": {"critical": 0, "important": 0, "minor": 0, "other": 0},
                     "targets": {"code": 0, "deliverable": 0, "prose": 0, "other": 0},
                     "cited": 0,
+                    "verdicts": 0, "overrides": 0, "override_rate": null, "cost": null,
+                    "sanctioned": 0,
                 },
                 {
                     "id": "b.two", "source": "local", "standing": true, "mode": "deterministic",
@@ -1401,6 +1618,8 @@ mod tests {
                     "findings": {"critical": 0, "important": 1, "minor": 0, "other": 0},
                     "targets": {"code": 1, "deliverable": 0, "prose": 0, "other": 0},
                     "cited": 1,
+                    "verdicts": 0, "overrides": 0, "override_rate": null, "cost": null,
+                    "sanctioned": 0,
                 },
             ])
         );
@@ -1526,7 +1745,7 @@ mod tests {
             &[],
         );
 
-        let value = stats(std::slice::from_ref(&dir), &base).unwrap();
+        let value = stats(std::slice::from_ref(&dir), &base, None).unwrap();
 
         let sources: Vec<(&str, &str)> = value["rules"]
             .as_array()
@@ -1670,5 +1889,110 @@ mod tests {
             proposals[0]["evidence"],
             json!({"workspaces": 3, "fails": 0, "findings": 0})
         );
+    }
+
+    /// A line records a reversal when it starts with `Reversal:` after
+    /// optional spaces and an optional list marker.
+    #[test]
+    fn is_reversal_reads_the_word_after_spaces_and_a_list_marker() {
+        for line in [
+            "Reversal: a",
+            "- Reversal: a",
+            "* Reversal: a",
+            "+ Reversal: a",
+            "  * Reversal: a",
+            "    Reversal: a",
+            "Reversal:",
+        ] {
+            assert!(is_reversal(line), "{line}");
+        }
+        for line in [
+            "",
+            "reversal: a",
+            "Reversal a",
+            "the ledger has no Reversal: line",
+            "- a Reversal: in the middle",
+            "-Reversal: a",
+            "-- Reversal: a",
+        ] {
+            assert!(!is_reversal(line), "{line:?}");
+        }
+    }
+
+    /// The reference of a sanction is the text between the last
+    /// `(sanctioned: ` and the closing parenthesis that ends the evidence.
+    #[test]
+    fn sanction_in_evidence_reads_the_suffix_that_audit_appends() {
+        assert_eq!(
+            sanction_in_evidence("e (sanctioned: plan T8)"),
+            Some("plan T8")
+        );
+        assert_eq!(
+            sanction_in_evidence("e (sanctioned: step 4 (T8))"),
+            Some("step 4 (T8)")
+        );
+        for evidence in [
+            "",
+            "e",
+            "e (sanctioned: )",
+            "e (sanctioned: plan) and more",
+            "e sanctioned: plan)",
+        ] {
+            assert_eq!(sanction_in_evidence(evidence), None, "{evidence}");
+        }
+    }
+
+    /// A suffix on a judged row is no booking: only a deterministic row gets
+    /// the suffix from `audit`.
+    #[test]
+    fn a_suffix_on_a_judged_row_does_not_sanction_it() {
+        let data = json!({"rule_adherence": [
+            {"id": "j.one", "mode": "judged", "result": "fail",
+             "evidence": "e (sanctioned: plan)"},
+            {"id": "d.one", "mode": "deterministic", "result": "fail",
+             "evidence": "e (sanctioned: plan)"},
+            {"id": "d.two", "mode": "deterministic", "result": "pass",
+             "evidence": "e (sanctioned: plan)"},
+        ]});
+        let rows = rows_of(&data, "rule_adherence", "f.json").unwrap();
+        let outcome: Vec<(&str, bool, Option<&str>)> = rows
+            .iter()
+            .map(|row| (row.id, row.failed, row.sanction.as_deref()))
+            .collect();
+        assert_eq!(
+            outcome,
+            [
+                ("j.one", true, None),
+                ("d.one", false, Some("plan")),
+                ("d.two", false, None),
+            ]
+        );
+    }
+
+    /// The window keeps the most recent sources in the order given, and keeps
+    /// all of them when it is above the count.
+    #[test]
+    fn newest_keeps_the_most_recent_sources_in_the_order_given() {
+        let given: Vec<PathBuf> = ["x/2026-10-03-c", "x/2026-10-01-a", "x/2026-10-02-b"]
+            .iter()
+            .map(PathBuf::from)
+            .collect();
+        let sources = |window: usize| -> Vec<String> {
+            let all = given
+                .iter()
+                .map(|given| Source {
+                    given,
+                    label: workspace_label(given, given),
+                })
+                .collect();
+            newest(all, window)
+                .into_iter()
+                .map(|source| source.label)
+                .collect()
+        };
+        assert_eq!(sources(2), ["2026-10-03-c", "2026-10-02-b"]);
+        assert_eq!(sources(1), ["2026-10-03-c"]);
+        assert_eq!(sources(3).len(), 3);
+        assert_eq!(sources(9).len(), 3);
     }
 }

@@ -157,9 +157,22 @@ enum Command {
     /// compression markers that a context proxy left in a file. Checks each
     /// pack copy against its pin in `.houserules.json`, and each override and
     /// exclusion in `knowledge/overrides.json` against the installed packs.
-    /// Checks that every id a kit-owned file cites from a topic the kit seeds
-    /// is an entry of the knowledge base. Prints each override and exclusion
-    /// on stdout.
+    /// Checks that the `check` of each entry holds the fields that its type
+    /// requires: a local entry as written, and an active pack entry with its
+    /// override applied. Checks that every id a kit-owned file cites from a
+    /// topic the kit seeds is an entry of the knowledge base. Checks the
+    /// `runners` key of `.houserules.json`: it must be an object, and each
+    /// tool in it needs a non-empty `command` array of strings, a `parser` of
+    /// `sarif` or `exit-code`, a non-empty `install` string, and no other key;
+    /// one line names the first fault of each tool. Checks that each `runner`
+    /// check names a tool that `runners` defines. Checks that `workspaces`,
+    /// when set, is a relative path inside the install root. While
+    /// `workspaces` is not set, it names the default location
+    /// `.houserules/work` when that folder exists and git does not ignore it.
+    /// Names each `verify` path that git ignores, since a fresh clone lacks
+    /// it: commit a copy under a tracked path and verify that. Outside a git
+    /// work tree it runs no ignore test. Prints each override and exclusion on
+    /// stdout.
     CheckKnowledge {
         /// Install root to check; defaults to the nearest directory at or
         /// above the current one that holds `.houserules.json`, no higher
@@ -303,19 +316,35 @@ enum Command {
     },
     /// Builds the rule package for a git range and runs every member's
     /// deterministic check. Every path it matches is relative to the install
-    /// root; a changed path outside the install root is out of scope. It also
-    /// resolves each `Work-Item:` and `Deferred:` trailer of the range's
-    /// commits, and each `issues[].backlog` id of the deliverables it reads
-    /// (`--report` and `--workspace`), through the installed tracker. It
-    /// prints one line on stderr for each reference that fails, and exits 1
-    /// when one does, when a member's check fails, or when the tracker cannot
-    /// be reached. With no tracker it resolves nothing: it prints one line
-    /// that counts the references it skipped, or, when a `backlog/`
-    /// directory exists, the line that asks for a tracker, and exits 1. The
-    /// JSON result holds the same verdict: `references.failures` lists each
-    /// failure line, `references.resolved` and `references.skipped` count the
-    /// references, and `summary.reference_fail` counts the failures. The line
-    /// that asks for a tracker, and the line of a tracker that cannot be
+    /// root; a changed path outside the install root is out of scope. A
+    /// `runner` check starts the tool that the `runners` key of
+    /// `.houserules.json` defines for the `tool` of the check, when a changed
+    /// file matches the `files` of the check; an untriggered check starts no
+    /// process. The tool reads the working tree, so a triggered `runner` check
+    /// needs the working tree to be the tree at `--head`: `--head` must be the
+    /// checked-out commit, and no file that the tool reads may differ from its
+    /// content there. A triggered `runner` check that cannot run stops the
+    /// audit before it has any row, with one line on stderr and exit 2: a
+    /// check with no `tool`, a tool that `runners` does not define, a
+    /// malformed `runners` entry, a program that is not installed (the line
+    /// holds the `install` text of the entry) or cannot start, a working tree
+    /// that is not the tree at `--head`, or SARIF output that is missing,
+    /// invalid, or reports a failed run. The audit also resolves each
+    /// `Work-Item:` and `Deferred:` trailer of the range's commits, and each
+    /// `issues[].backlog` id of the deliverables it reads (`--report` and
+    /// `--workspace`), through the installed tracker. It prints one line on
+    /// stderr for each reference that fails, and exits 1 when one does, when a
+    /// member's check fails, or when the tracker cannot be reached. With no
+    /// tracker it resolves nothing: it prints one line that counts the
+    /// references it skipped, or, when a `backlog/` directory exists, the line
+    /// that asks for a tracker, and exits 1. The JSON result holds the same
+    /// verdict: `references.failures` lists each failure line,
+    /// `references.checked` counts the references that the tracker judged,
+    /// `references.passed` counts those among them that passed,
+    /// `references.skipped` counts those that the audit did not judge (no
+    /// tracker, a tracker that cannot be reached, or a tracker that answered
+    /// with an error), and `summary.reference_fail` counts the failures. The
+    /// line that asks for a tracker, and the line of a tracker that cannot be
     /// reached, are failures too.
     Audit {
         /// The range's base ref.
@@ -325,12 +354,20 @@ enum Command {
         #[arg(long)]
         head: Option<String>,
         /// Extra knowledge ids to include in the package, comma-separated.
+        /// With `--report`, a `report-field` check with `covers_ids` also
+        /// requires that its field lists each of these ids.
         #[arg(long)]
         ids: Option<String>,
         /// A single JSON deliverable a `report-field` check reads directly.
         /// The audit also resolves the `issues[].backlog` ids of the file.
         /// With `--report` (a task audit), an entry tagged `controller`
-        /// joins the package only when `--ids` names it.
+        /// joins the package only when `--ids` names it. When the
+        /// `self_audit` of the report records the range of this run, the
+        /// audit compares the recorded summary and deterministic rows with
+        /// this run, and the check that reads `self_audit` reports
+        /// `self_audit differs at <JSON path>` for a difference; for another
+        /// range it reports `not compared`, and a `self_audit` of `null`
+        /// passes.
         #[arg(long)]
         report: Option<PathBuf>,
         /// A directory of `task-*-report.json` and `task-*-review*.json`
@@ -343,11 +380,14 @@ enum Command {
         #[arg(long)]
         json: Option<PathBuf>,
         /// Declares a spec-booked interim fail, `<rule>=<ref>`; repeatable.
-        /// The rule's row keeps its true `fail` result and gains
-        /// `(sanctioned: <ref>)` in its evidence; the summary's
-        /// `sanctioned_fail` counts it. A rule named here that did not fail
-        /// is reported in `stale_sanctions`, not silently accepted. A rule
-        /// outside the audit's package is an error: add it to `--ids`.
+        /// A deterministic row that failed gains `sanctioned`, which holds
+        /// `<ref>`. It keeps its true `fail` result and gains `(sanctioned:
+        /// <ref>)` in its evidence; the summary's `sanctioned_fail` counts it.
+        /// A judged rule is accepted too: its row gains `sanctioned`, and the
+        /// booking is never stale. A deterministic rule that did not fail
+        /// gains no `sanctioned`: it is reported in `stale_sanctions`, not
+        /// silently accepted. A rule outside the audit's package is an error:
+        /// add it to `--ids`.
         #[arg(long)]
         sanctioned: Vec<String>,
         /// Install root to audit; defaults to the nearest directory at or
@@ -369,16 +409,27 @@ enum Command {
         #[arg(long)]
         dir: Option<PathBuf>,
     },
-    /// Aggregates rule violations, unused injected ids, process cost, and
-    /// knowledge-base proposals across one or more workspace directories'
-    /// JSON deliverables. Each `rules` row names its `source`: `local`, or
-    /// the name of the pack that ships the entry. The `packs` key sums
-    /// entries, standing entries, judged rows, and violations for `local`
-    /// and for each installed pack.
+    /// Aggregates rule violations, sanctioned fails, unused injected ids,
+    /// process cost, and knowledge-base proposals across one or more
+    /// workspace directories' JSON deliverables. Each `rules` row names its
+    /// `source`: `local`, or the name of the pack that ships the entry. Each
+    /// `rules` row also counts its `verdicts`, `overrides`, the
+    /// `override_rate`, and the `cost`: the sum of each judging review's
+    /// share of its bytes. A fail that a sanction accepts counts under
+    /// `sanctioned`, not under `violations`. Each workspace row counts
+    /// `reversals`: the `Reversal:` lines of the `progress.md` in that
+    /// workspace. The `packs` key sums entries, standing entries, judged
+    /// rows, and violations for `local` and for each installed pack.
     Stats {
         /// One or more workspace directories to aggregate.
         #[arg(required = true, value_name = "WORKSPACE")]
         workspaces: Vec<PathBuf>,
+        /// Reads only the N most recent of the workspaces. A workspace is
+        /// more recent by the YYYY-MM-DD prefix of its folder name, then by
+        /// name; a folder with no date prefix is the oldest. N above the
+        /// number of workspaces reads all of them. N must be 1 or more.
+        #[arg(long, value_name = "N")]
+        window: Option<usize>,
         /// Install root to check the knowledge base under; defaults to the
         /// nearest directory at or above the current one that holds
         /// `.houserules.json`, no higher than the git top level, else the git
@@ -486,14 +537,22 @@ enum Command {
     /// `--workflow` asks for one.
     /// Without `--target claude` it leaves out the Claude Code files and the
     /// hook entries, and prints the line that enables them. Running it again
-    /// seeds what is missing and keeps what exists. On an existing install it
-    /// installs no pack and adds no area: only the `pack` commands and
-    /// `update` change the pins. It never seeds a path that `ownedPaths` in
-    /// `.houserules.json` lists; the files that `render` generates follow the
-    /// knowledge base, not `ownedPaths`. It refuses an install whose schema is
-    /// newer than the binary writes, with a line that names the release it
-    /// needs, and an install whose schema is no install schema id, with a line
-    /// that names the value; it changes nothing then.
+    /// seeds what is missing and keeps what exists. It writes the line
+    /// `.houserules/` to `.gitignore`: the folder holds the output of the
+    /// houserules step and, by default, the batch workspaces. A
+    /// `.houserules/step/` line becomes `.houserules/` in its place, a
+    /// `.gitignore` that holds neither gets the line at its end, and one that
+    /// holds `.houserules/` stays; a `.gitignore` that `ownedPaths` lists stays
+    /// as found. Where `init` writes the deliverables schema and `--tracker`
+    /// is absent, the `backlogId` pattern comes from the tracker that
+    /// `.houserules.json` names, else it accepts any token. On an existing
+    /// install it installs no pack and adds no area: only the `pack`
+    /// commands and `update` change the pins. It never seeds a path that
+    /// `ownedPaths` in `.houserules.json` lists; the files that `render`
+    /// generates follow the knowledge base, not `ownedPaths`. It refuses an
+    /// install whose schema is newer than the binary writes, with a line that
+    /// names the release it needs, and an install whose schema is no install
+    /// schema id, with a line that names the value; it changes nothing then.
     Init {
         /// The install root; defaults to the current directory. Unlike
         /// every read command's `--dir` above, this is not resolved against
@@ -569,9 +628,15 @@ enum Command {
     /// install. After the self-update and before any write, it refuses an
     /// install whose schema is newer than the binary writes, with a line that
     /// names the release it needs, and an install whose schema is no install
-    /// schema id, with a line that names the value. An install of houserules
-    /// 1.x is converted to the 2.0 layout: the seeded entries become the five
-    /// kit packs in `knowledge/packs/`, the `overrides` of `.houserules.json`
+    /// schema id, with a line that names the value. A directory with no
+    /// `.houserules.json` and no `knowledge/` directory, at or above it within
+    /// the git top level, is no install: `update` prints `no houserules
+    /// install here (no .houserules.json); run houserules init`, exits 2, and
+    /// writes nothing. When `--dir` names a directory other than the working
+    /// directory, the line names it: `run houserules init --dir <dir>`, with
+    /// `<dir>` as written. An install of houserules 1.x is converted to the
+    /// 2.0 layout: the seeded entries become the five kit packs in
+    /// `knowledge/packs/`, the `overrides` of `.houserules.json`
     /// become `ownedPaths` and `knowledge/overrides.json`, and the `schema` key
     /// is written last. A 1.x install with a `backlog/` directory gets the JSON
     /// tracker in the same run, and one without gets none. An opt-in entry of
@@ -616,14 +681,26 @@ enum Command {
     /// issue prefix again: where `bd` cannot be reached, it keeps the pattern,
     /// prints one line on stderr, and finishes. It prints a hand step for a
     /// seeded CI workflow that the project changed and that lacks what the
-    /// tracker needs. It writes each seed-once file that is missing and, on an
-    /// install with the JSON tracker, each tracker data file that is missing.
-    /// While `renderers` lacks `claude`, it skips the Claude Code files. It
-    /// deletes any retired kit file still present, prints each hand step that
-    /// the project has left (`hand step: ...`), and reports the
-    /// stamped-to-running version drift. Every other command that reads the
-    /// install refuses an install of 1.x with one line that names this
-    /// command.
+    /// tracker needs or the PR-head checkout (`ref: ${{
+    /// github.event.pull_request.head.sha }}` under `with:` of its
+    /// `actions/checkout` step). It writes each seed-once file that is missing
+    /// and, on an install with the JSON tracker, each tracker data file that
+    /// is missing. While `renderers` lacks `claude`, it skips the Claude Code
+    /// files. It brings `.gitignore` to hold the line `.houserules/`: it
+    /// replaces a `.houserules/step/` line in its place (`merged .gitignore
+    /// (.houserules/step/ replaced by .houserules/)`), adds the line at the
+    /// end where neither line is present (`merged .gitignore (.houserules/
+    /// added)`), writes the file when it is absent (`wrote .gitignore`), and
+    /// prints no line for a `.gitignore` that holds `.houserules/` already. A
+    /// `.gitignore` that `ownedPaths` lists stays as found. It restamps the
+    /// install schema `houserules/install@2.1.0` to `houserules/install@2.2.0`
+    /// and prints `wrote .houserules.json (houserules/install@2.2.0)` once; a
+    /// second run prints no such line. The keys `runners` and `workspaces` of
+    /// `.houserules.json` keep their values. It deletes any retired kit file
+    /// still present, prints each hand step that the project has left (`hand
+    /// step: ...`), and reports the stamped-to-running version drift. Every
+    /// other command that reads the install refuses an install of 1.x with
+    /// one line that names this command.
     Update {
         /// The install root; defaults to the current directory. Resolved the
         /// same way `init`'s own `--dir` is. A directory below the git top
@@ -648,7 +725,11 @@ enum Command {
     /// files the report changed. With `--doc` or `--item` in place of a
     /// report, it reads a spec or a backlog item and names every cited
     /// workspace path that does not exist; a workspace path is a cited path
-    /// that git ignores.
+    /// that git ignores, such as a path below the default `workspaces`
+    /// location `.houserules/work/`. It skips a cited path under
+    /// `.houserules/step/`, which holds tool output. It judges a cited path
+    /// through a symlink inside the install root at the target of the link, so
+    /// a missing target is a missing file.
     #[command(group(
         clap::ArgGroup::new("claims_source")
             .required(true)
@@ -888,7 +969,11 @@ fn main() -> ExitCode {
             dir,
         }) => rules::cmd_audit(dir, base, head, ids, report, workspace, json, sanctioned),
         Some(Command::Validate { files, dir }) => rules::cmd_validate(dir, files),
-        Some(Command::Stats { workspaces, dir }) => rules::cmd_stats(dir, workspaces),
+        Some(Command::Stats {
+            workspaces,
+            window,
+            dir,
+        }) => rules::cmd_stats(dir, workspaces, window),
         Some(Command::Index {
             area,
             topic,
@@ -1425,6 +1510,9 @@ mod tests {
                 "It installs no tracker and no workflow unless `--tracker` or `--workflow` asks for one",
                 "Without `--target claude` it leaves out the Claude Code files and the hook entries, and prints the line that enables them",
                 "Running it again seeds what is missing and keeps what exists",
+                "It writes the line `.houserules/` to `.gitignore`: the folder holds the output of the houserules step and, by default, the batch workspaces",
+                "A `.houserules/step/` line becomes `.houserules/` in its place, a `.gitignore` that holds neither gets the line at its end, and one that holds `.houserules/` stays; a `.gitignore` that `ownedPaths` lists stays as found",
+                "Where `init` writes the deliverables schema and `--tracker` is absent, the `backlogId` pattern comes from the tracker that `.houserules.json` names, else it accepts any token",
                 "On an existing install it installs no pack and adds no area: only the `pack` commands and `update` change the pins",
                 "It never seeds a path that `ownedPaths` in `.houserules.json` lists; the files that `render` generates follow the knowledge base, not `ownedPaths`",
                 "It refuses an install whose schema is newer than the binary writes, with a line that names the release it needs, and an install whose schema is no install schema id, with a line that names the value; it changes nothing then",
@@ -1451,7 +1539,7 @@ mod tests {
             "It removes the startup hook entry that the kit seeded before, where `.claude/settings.json` holds it unchanged",
             "It delivers the deliverables schema and, with the JSON tracker, the backlog schema, and writes the `backlogId` pattern of the tracker of the install into the deliverables schema (a pattern that accepts any token, for an install with no tracker); a schema that differs from every content of it that the kit shipped stays, with a hand step",
             "With the Beads tracker it reads the issue prefix again: where `bd` cannot be reached, it keeps the pattern, prints one line on stderr, and finishes",
-            "It prints a hand step for a seeded CI workflow that the project changed and that lacks what the tracker needs",
+            "It prints a hand step for a seeded CI workflow that the project changed and that lacks what the tracker needs or the PR-head checkout (`ref: ${{ github.event.pull_request.head.sha }}` under `with:` of its `actions/checkout` step)",
             "It writes each seed-once file that is missing and, on an install with the JSON tracker, each tracker data file that is missing",
         ] {
             assert!(

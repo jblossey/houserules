@@ -315,7 +315,7 @@ fn an_unmodified_1_4_0_install_converts_with_no_override_and_only_the_opt_in_exc
         assert!(path_of(dir.path(), &format!("knowledge/packs/{topic}.json")).is_file());
     }
     let marker = read_json(dir.path(), ".houserules.json");
-    assert_eq!(marker["schema"], json!("houserules/install@2.1.0"));
+    assert_eq!(marker["schema"], json!("houserules/install@2.2.0"));
     assert_eq!(marker["renderers"], json!(["claude"]));
     assert!(marker.get("overrides").is_none());
     assert!(marker.get("ownedPaths").is_none());
@@ -357,7 +357,7 @@ fn an_unmodified_1_4_0_install_converts_with_no_override_and_only_the_opt_in_exc
     );
     assert!(
         lines.contains(
-            &"converted .houserules.json to the install schema houserules/install@2.1.0"
+            &"converted .houserules.json to the install schema houserules/install@2.2.0"
                 .to_string()
         ),
         "{lines:?}"
@@ -773,7 +773,7 @@ fn a_tree_with_knowledge_and_no_marker_needs_the_id_prefix_flag() {
     assert_eq!(output.status.code(), Some(0), "{output:?}");
     let marker = read_json(dir.path(), ".houserules.json");
     assert_eq!(marker["idPrefix"], json!("HR"));
-    assert_eq!(marker["schema"], json!("houserules/install@2.1.0"));
+    assert_eq!(marker["schema"], json!("houserules/install@2.2.0"));
 }
 
 /// This repository's own marker and knowledge files at the base of batch 33
@@ -1156,7 +1156,7 @@ fn init_as_the_line_prints_it_gives_a_fresh_install_with_the_old_prefix() {
         passes(dir.path(), &words);
 
         let marker = read_json(dir.path(), ".houserules.json");
-        assert_eq!(marker["schema"], json!("houserules/install@2.1.0"));
+        assert_eq!(marker["schema"], json!("houserules/install@2.2.0"));
         assert_eq!(marker["idPrefix"], json!(prefix));
         assert!(marker.get("overrides").is_none());
         let skill = ".claude/skills/migrating-knowledge/SKILL.md";

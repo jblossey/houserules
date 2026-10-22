@@ -12,7 +12,7 @@
 //! of each commit, and the `issues[].backlog` ids of the reviews it reads.
 //! [`judge`] decides what the audit says of them: an install with a tracker
 //! resolves each reference through it; an install without one counts the
-//! references it did not resolve.
+//! references it did not judge.
 
 use std::io::Write;
 use std::path::Path;
@@ -22,8 +22,8 @@ use serde_json::Value;
 
 use crate::tracker::{Lookup, NoTracker, Resolution, Tracker, TrackerError};
 
-use super::audit::Commit;
 use super::deliverable::array_field;
+use super::git::Commit;
 
 /// The trailer key of a work item that a commit delivers.
 const WORK_ITEM: &str = "Work-Item";
@@ -275,9 +275,14 @@ fn verdict(tracker: &dyn Tracker, references: &[Reference]) -> Result<Vec<String
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Verdict {
     /// The references that the tracker judged, passed or failed.
-    pub(super) resolved: usize,
-    /// The references that the audit did not resolve: all of them when the
-    /// install has no tracker, or when the tracker answered with an error.
+    pub(super) checked: usize,
+    /// The references among those `checked` that passed. A reference fails
+    /// with at most one line, so this is `checked` less the number of lines
+    /// in `failures` when the tracker judged every reference.
+    pub(super) passed: usize,
+    /// The references that the audit did not judge: all of them when the
+    /// install has no tracker, when the tracker cannot be reached, or when the
+    /// tracker answered with an error.
     pub(super) skipped: usize,
     /// One line for each failure, in the order that `audit` prints them. Line
     /// B and the line of a tracker error are failures.
@@ -313,14 +318,16 @@ pub(super) fn judge(lookup: &Lookup, references: &[Reference]) -> Verdict {
     match lookup {
         Lookup::Installed(tracker) => match verdict(tracker.as_ref(), references) {
             Ok(failures) => Verdict {
-                resolved: total,
+                checked: total,
+                passed: total.saturating_sub(failures.len()),
                 skipped: 0,
                 failures,
                 skipped_line: None,
                 exit_code: None,
             },
             Err(error) => Verdict {
-                resolved: 0,
+                checked: 0,
+                passed: 0,
                 skipped: total,
                 failures: vec![error.to_string()],
                 skipped_line: None,
@@ -328,14 +335,16 @@ pub(super) fn judge(lookup: &Lookup, references: &[Reference]) -> Verdict {
             },
         },
         Lookup::Absent(state @ NoTracker::BacklogDir) => Verdict {
-            resolved: 0,
+            checked: 0,
+            passed: 0,
             skipped: total,
             failures: vec![state.line().to_string()],
             skipped_line: None,
             exit_code: None,
         },
         Lookup::Absent(NoTracker::Bare) => Verdict {
-            resolved: 0,
+            checked: 0,
+            passed: 0,
             skipped: total,
             failures: Vec::new(),
             skipped_line: Some(crate::tracker::lines::audit_skipped(total)),
@@ -896,11 +905,12 @@ mod tests {
     const UNREACHABLE_LINE: &str =
         "tracker github cannot be reached: gh is not installed; install gh";
 
-    /// An installed tracker judges every reference: each counts as resolved,
-    /// passed or failed, and the failure lines keep the order of the
-    /// references. No tracker error sets the exit code.
+    /// An installed tracker judges every reference: each counts as checked,
+    /// and the failure lines keep the order of the references. None passes
+    /// here, because the tracker holds nothing. No tracker error sets the exit
+    /// code.
     #[test]
-    fn judge_counts_each_reference_of_an_installed_tracker_as_resolved() {
+    fn judge_counts_each_reference_of_an_installed_tracker_as_checked() {
         let lookup = Lookup::Installed(Box::new(Recorder::new(Holds::Nothing)));
         let verdict = judge(
             &lookup,
@@ -909,7 +919,8 @@ mod tests {
         assert_eq!(
             verdict,
             Verdict {
-                resolved: 3,
+                checked: 3,
+                passed: 0,
                 skipped: 0,
                 failures: vec![
                     "abc1234: Work-Item #1 does not resolve in the github tracker".to_string(),
@@ -917,6 +928,25 @@ mod tests {
                         .to_string(),
                     "abc1234: Deferred #3 names no reason".to_string(),
                 ],
+                skipped_line: None,
+                exit_code: None,
+            }
+        );
+    }
+
+    /// HR-221: a passing and a failing reference give `checked` 2 and `passed`
+    /// 1. The `Work-Item` resolves, and the `Deferred` trailer names no reason.
+    #[test]
+    fn judge_counts_a_passing_and_a_failing_reference() {
+        let lookup = Lookup::Installed(Box::new(Recorder::new(Holds::Item)));
+        let verdict = judge(&lookup, &[work_item("#1"), deferred("#2", "")]);
+        assert_eq!(
+            verdict,
+            Verdict {
+                checked: 2,
+                passed: 1,
+                skipped: 0,
+                failures: vec!["abc1234: Deferred #2 names no reason".to_string()],
                 skipped_line: None,
                 exit_code: None,
             }
@@ -932,7 +962,8 @@ mod tests {
         assert_eq!(
             verdict,
             Verdict {
-                resolved: 0,
+                checked: 0,
+                passed: 0,
                 skipped: 2,
                 failures: vec![UNREACHABLE_LINE.to_string()],
                 skipped_line: None,
@@ -950,7 +981,8 @@ mod tests {
         assert_eq!(
             verdict,
             Verdict {
-                resolved: 0,
+                checked: 0,
+                passed: 0,
                 skipped: 1,
                 failures: vec!["gh printed a mess".to_string()],
                 skipped_line: None,
@@ -959,7 +991,7 @@ mod tests {
         );
     }
 
-    /// With no tracker and no `backlog/` directory, nothing is resolved and
+    /// With no tracker and no `backlog/` directory, nothing is checked and
     /// nothing fails: the count of the skipped references is a line of
     /// stderr only.
     #[test]
@@ -968,7 +1000,8 @@ mod tests {
         assert_eq!(
             verdict,
             Verdict {
-                resolved: 0,
+                checked: 0,
+                passed: 0,
                 skipped: 1,
                 failures: Vec::new(),
                 skipped_line: Some(
@@ -991,7 +1024,8 @@ mod tests {
         assert_eq!(
             verdict,
             Verdict {
-                resolved: 0,
+                checked: 0,
+                passed: 0,
                 skipped: 2,
                 failures: vec![
                     "backlog/ exists but no tracker is installed; run houserules init --tracker json"
@@ -1008,7 +1042,8 @@ mod tests {
     #[test]
     fn stderr_lines_print_the_failures_and_then_the_skipped_line() {
         let verdict = Verdict {
-            resolved: 0,
+            checked: 0,
+            passed: 0,
             skipped: 0,
             failures: vec!["one".to_string(), "two".to_string()],
             skipped_line: Some("three".to_string()),

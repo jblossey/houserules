@@ -1177,7 +1177,7 @@ fn a_second_init_keeps_every_file_that_exists_a_changed_kit_owned_file_included(
         .collect();
     assert!(wrote.is_empty(), "got {wrote:?}");
     assert!(stdout.contains("kept .claude/settings.json (hooks already present)\n"));
-    assert!(stdout.contains("kept .gitignore (.houserules/step/ already present)\n"));
+    assert!(stdout.contains("kept .gitignore (.houserules/ already present)\n"));
     assert!(
         fs::read(dir.path().join(changed)).expect("read the script") == b"the adopter's own hook",
         "{changed} changed"

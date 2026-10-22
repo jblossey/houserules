@@ -1,5 +1,5 @@
 //! The knowledge-check-shape model: `knowledge/schema.json`'s `$defs/check`
-//! typed, for the audit engine's `run_check` to match on instead of
+//! typed, for the audit engine's `runner::run` to match on instead of
 //! reading raw `serde_json::Value` fields by name. `check.rs`'s existing
 //! `check_shape`/`check_fields` functions are a different concern and
 //! stay as they are: they validate a knowledge entry's `check` object
@@ -10,7 +10,7 @@
 //! actually pin.
 //!
 //! `CheckDef` wires into `rules::model::Entry.check` and the `audit`
-//! engine's `run_check`, so every type here has a real caller.
+//! engine's `runner::run`, so every type here has a real caller.
 
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +27,7 @@ pub(crate) enum Glob {
 }
 
 /// A knowledge entry's `check.type` -- which deterministic check
-/// `run_check` runs, and which of `CheckDef`'s other fields it reads.
+/// `runner::run` runs, and which of `CheckDef`'s other fields it reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum CheckType {
@@ -37,6 +37,9 @@ pub(crate) enum CheckType {
     DiffAppendOnly,
     ReportField,
     DurableSha,
+    /// An external tool that the project defines in `.houserules.json`
+    /// `runners`; `CheckDef::tool` names its key.
+    Runner,
 }
 
 /// A knowledge entry's `check.level`: whether a `fail` result blocks an
@@ -105,13 +108,23 @@ pub(crate) struct CheckDef {
     /// A `co-change` check's opt-in into per-commit evaluation
     /// (`check_commit`'s own module doc has the reason it is opt-in, not
     /// the default): absent or `false` leaves the check range-level only
-    /// (`run_check`'s own `CheckType::CoChange` arm, unaffected either
+    /// (the `co_change` runner's own `run`, unaffected either
     /// way); `true` additionally runs it per commit on `check-commit`'s
     /// range arm.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub per_commit: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
+    /// A `runner` check's tool: a key of `.houserules.json` `runners`, which
+    /// holds the command, the parser, and the install line of the tool.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool: Option<String>,
+    /// The `non_empty` option of a `report-field` check.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub non_empty: Option<bool>,
+    /// The `covers_ids` option of a `report-field` check.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub covers_ids: Option<bool>,
 }
 
 #[cfg(test)]
@@ -138,8 +151,8 @@ mod tests {
     /// while still touching every property `$defs/check` declares (`files`,
     /// `pattern`, `flags`, `scope`, `subject`, `body_absent`,
     /// `body_line_max`, `require_trailer`, `exempt_authors`,
-    /// `exempt_subjects`, `if`, `then`, `per_commit`, `field`, plus
-    /// `type`/`level`).
+    /// `exempt_subjects`, `if`, `then`, `per_commit`, `field`, `tool`,
+    /// `non_empty`, `covers_ids`, plus `type`/`level`).
     fn full_sample() -> Value {
         json!({
             "type": "report-field",
@@ -158,6 +171,9 @@ mod tests {
             "then": ["**/*.rs"],
             "per_commit": true,
             "field": "concerns",
+            "tool": "semgrep",
+            "non_empty": true,
+            "covers_ids": true,
         })
     }
 
@@ -178,6 +194,7 @@ mod tests {
                 CheckType::DiffAppendOnly,
                 CheckType::ReportField,
                 CheckType::DurableSha,
+                CheckType::Runner,
             ],
         );
     }

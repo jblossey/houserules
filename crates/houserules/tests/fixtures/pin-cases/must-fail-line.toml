@@ -1,0 +1,5 @@
+[package]
+name = "x"
+
+[dependencies]
+regex = "1.11"

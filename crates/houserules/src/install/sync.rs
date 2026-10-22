@@ -86,8 +86,9 @@ pub(super) struct Plan<'a> {
 
 /// Syncs every file of `plan` that the project does not own, restamps
 /// `baselines`, pushes one line for each file written or kept to `lines`, and
-/// pushes the hand step of a seeded CI workflow that the project changed and
-/// that lacks what its tracker needs to `hand_steps`. The lines stay in `lines`
+/// pushes the hand steps of a seeded CI workflow that the project changed and
+/// that lacks what its tracker needs, or the PR-head checkout, to `hand_steps`
+/// (`ci_workflow::hand_step_for_kept`). The lines stay in `lines`
 /// when the sync fails, so the caller prints what happened before the failure.
 /// An unreadable file is one named error.
 pub(super) fn sync_owned_files(

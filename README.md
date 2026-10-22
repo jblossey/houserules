@@ -28,6 +28,7 @@ rules stay enforced instead of drifting into a wiki nobody reads.
 - [Packs](#packs)
 - [Trackers](#trackers)
 - [The houserules step](#the-houserules-step)
+- [Runners](#runners)
 - [Ownership model](#ownership-model)
 - [The reference workflow](#the-reference-workflow)
 - [Measure process cost](#measure-process-cost)
@@ -516,11 +517,14 @@ references: no tracker installed (houserules init --tracker)`. Where a
 `backlog/` directory exists, it prints the `backlog/ exists` line of the
 section [Trackers](#trackers) and exits 1.
 
-The JSON result of `audit` holds the same verdict. `references.failures`
-lists each failure line, `references.resolved` and `references.skipped` count
-the references, and `summary.reference_fail` counts the failures. The
-`backlog/ exists` line and the line of a tracker that cannot be reached are
-failures too. `summary.fail` counts only the rule rows.
+The JSON result of `audit` holds the same verdict. `references.failures` lists
+each failure line, `references.checked` counts the references that the tracker
+judged, `references.passed` counts those among them that passed,
+`references.skipped` counts those that the audit did not judge (no tracker, a
+tracker that cannot be reached, or a tracker that answered with an error), and
+`summary.reference_fail` counts the failures. The `backlog/ exists` line and
+the line of a tracker that cannot be reached are failures too. `summary.fail`
+counts only the rule rows.
 
 The process pack ships `process.every-commit-names-a-work-item`, which fails
 a commit that has no `Work-Item:` trailer. It is an opt-in entry. When
@@ -549,8 +553,83 @@ report as the second argument, it also runs `houserules validate` and
 writes `.houserules/step/validate.json`. The script prints the path of each
 output file, and `after` prints each exit status, so an agent reads the
 output with its file-read tool. Paths and refs are relative to the install
-root. `.houserules/step/` holds scratch output, and `init` adds it to
-`.gitignore`.
+root. `.houserules/` holds the scratch output of the step and, by default, the
+batch workspaces, and `init` adds it to `.gitignore`.
+
+## Runners
+
+A runner check runs an external tool over a change and fails the audit on what
+the tool reports. Your project defines the tool; the kit ships none.
+
+Define the tool in the `runners` key of `.houserules.json`:
+
+```json
+{
+  "runners": {
+    "shellcheck": {
+      "command": ["shellcheck"],
+      "parser": "exit-code",
+      "install": "install shellcheck from https://www.shellcheck.net"
+    }
+  }
+}
+```
+
+`command` is the program and its arguments. No shell starts, and a program
+with a path separator resolves against the install root. `parser` is
+`exit-code` or `sarif`. `install` is one line that tells a person how to
+install the tool. `init` and `update` keep the values of the key.
+
+Name the tool in the `check` of a knowledge entry:
+
+```json
+{ "type": "runner", "level": "fail", "tool": "shellcheck", "files": ["**/*.sh"], "scope": "changed" }
+```
+
+- `tool` is a key of `runners`.
+- `files` lists the globs that trigger the check; the default is every file.
+  A check with no matching changed file passes with `not triggered` and starts
+  no process.
+- `scope: "changed"` (the default) appends the matching changed files to the
+  command, one argument each and at most 200 for each call. `scope: "tree"`
+  appends nothing and makes one call; the tool reads the install root.
+- The tool runs with the install root as its working directory and the
+  environment of `audit`. No timeout applies.
+
+The row of the entry shows the result:
+
+- An `exit-code` tool passes when every call exits 0 (`exited 0 in 1 call`).
+  Otherwise the row fails with the evidence of the failing call: the first
+  non-blank line of its stderr, trimmed; `exited <n>` when stderr holds no text;
+  or `ended by a signal` when a signal ended the tool.
+- A `sarif` tool prints a SARIF 2.1.0 document on stdout, and its exit status
+  does not matter then. Each result is a finding at the level that SARIF gives
+  it: `error` and `warning` count, `note` and `none` do not. The row fails with
+  the first finding as `<path>:<line> <rule>: <message>` and `and <n> more`,
+  and it holds a `findings` array. A clean run passes with
+  `no findings in 1 call`. Semgrep (`semgrep scan --sarif`) and ast-grep
+  (`ast-grep scan --format sarif`) print SARIF.
+
+The tool reads the working tree, so a triggered runner check needs the tree at
+`--head` checked out: `--head` is the checked-out commit, and no file that the
+tool reads differs from its content there. The seeded CI workflow checks out
+the head of a pull request for this reason. It installs no tool: add the
+install step of your tools to your own CI.
+
+`audit` stops with exit 2, one line on stderr, and no rows when a triggered
+check cannot run:
+
+```text
+runner tool "shellcheck" is not defined in .houserules.json runners
+runner tool "shellcheck" (shellcheck) is not installed: install shellcheck from https://www.shellcheck.net
+runner tool "shellcheck" needs the tree at --head checked out: HEAD is 7d1e99b, --head is cfef028
+```
+
+The same exit covers a malformed `runners` entry, a program that cannot start,
+and SARIF output that is missing, invalid, or reports a failed run.
+`check-knowledge` names a `runner` check whose tool `runners` does not define,
+and each malformed entry of `runners`. The `migrating-knowledge` skill covers
+how to run such a tool without network access.
 
 ## Ownership model
 
@@ -670,6 +749,14 @@ block that `render` writes into `AGENTS.md` points every harness at the
 `orchestrating` skill. A harness with no subagents does the work directly,
 in its own session.
 
+The workflow keeps the deliverables of a batch in a workspace, a folder of the
+`workspaces` location. The default location is `.houserules/work/`, and git
+ignores it through the `.houserules/` line of `.gitignore`. Set the key
+`workspaces` in `.houserules.json` to another relative folder inside the
+install root to keep the workspaces elsewhere. A fresh clone lacks an ignored
+file, so `check-knowledge` names a `verify` path into an ignored folder: commit
+a copy under a tracked path and verify that.
+
 ## Measure process cost
 
 `houserules stats` reads the deliverables that agents write into a batch
@@ -677,23 +764,38 @@ workspace and prints one JSON document. Give it one or more workspace
 directories:
 
 ```sh
-houserules stats .superpowers/sdd/*/
+houserules stats .houserules/work/*/
 ```
 
-With several workspaces, a task label reads `<workspace>/<task>`. The
+`--window <n>` reads only the `n` most recent workspaces. A workspace is more
+recent by the `YYYY-MM-DD` prefix of its folder name, then by name; a folder
+with no date prefix is the oldest. `n` above the number of workspaces reads all
+of them, and `n` must be 1 or more:
+
+```sh
+houserules stats --window 5 .houserules/work/*/
+```
+
+With several workspaces, a task label reads `<workspace>/<task>`; a window of
+one workspace drops the prefix, as a single named workspace does. The
 output keeps the keys `violations`, `unused_ids`, `audits`, and
 `reviews`. It adds these keys:
 
 - `workspaces`: one row per workspace with its tasks, reviews, fix
-  rounds, report bytes, and findings by severity and by target.
+  rounds, report bytes, findings by severity and by target, and `reversals`.
+  `reversals` counts the `Reversal:` lines of the `progress.md` of the
+  workspace: a line counts when it starts with `Reversal:`, after optional
+  spaces and an optional list marker with its space (`- `, `* `, or `+ `).
+- `sanctioned`: one row for each fail that a sanction accepts, with the rule
+  `id`, the `workspace`, the `task`, and the `ref` of the sanction.
 - `models`: one row per model that wrote a deliverable, sorted by row
   name. A `model` value that names one family (`fable`, `haiku`, `opus`,
   or `sonnet`) as a whole word counts in the row of that family: the
   alias `opus` and the id `claude-opus-5-5` share the row `opus`. A value
   that names no family keeps its own row, as `human` and `unknown` do. A
   row has `model` in place of `path` and the other fields of a
-  `workspaces` row. A deliverable with no `model` field counts in the
-  row `pre-2.0`.
+  `workspaces` row, except `reversals`. A deliverable with no `model` field
+  counts in the row `pre-2.0`.
 - `cost`: the sums of those rows and the mean per task.
 - `rules`: one row per active knowledge entry. `source` names where the
   entry comes from: `local`, or the name of the pack that ships it.
@@ -702,7 +804,12 @@ output keeps the keys `violations`, `unused_ids`, `audits`, and
   deterministic audit rows and the judged review rows that rated it, and
   `fails` those that failed. `findings` and `targets` count the findings
   that cite it, by severity and by target. `cited` counts the reports
-  that cited it.
+  that cited it. `verdicts` counts the judged rows with a `pass` or `fail`
+  result, `overrides` those that a person overruled, and `override_rate` is
+  `overrides` over `verdicts` (`null` at zero verdicts). `cost` is the sum,
+  over the reviews that judged the rule, of each review's share of its bytes
+  (`null` for a rule with no judged rows). `sanctioned` counts the fails that a
+  sanction accepts, which `violations` and `fails` leave out.
 - `packs`: one row for `local` and one for each installed pack, with
   the sums of its source. `entries` counts its active entries and
   `standing` the standing ones. `judged_rows` counts the review rows that
@@ -717,7 +824,10 @@ output keeps the keys `violations`, `unused_ids`, `audits`, and
   `backlog/` text counts as a contract finding. Tag an entry
   `ruled-keep` when you decide to keep it, and `stats` stops proposing
   `demote`, `retire`, `narrow`, or `mechanize` for it; the entry still
-  counts toward the standing budget.
+  counts toward the standing budget. `mechanize` also needs an
+  `override_rate` of at most 0.2, or `null`; its `evidence` adds
+  `override_rate` and `samples`, up to three `issues` of task reviews and
+  branch reviews that name the rule. The `evidence` of `retire` adds `cost`.
 
 One `models` row, for a workspace whose only deliverable is a task review
 that `claude-opus-5-5` wrote, with one important finding on code and one
@@ -790,20 +900,20 @@ Gates:
 
 | Command | What it does |
 |---|---|
-| `check-knowledge` | Validates the knowledge base, its packs against their pins, its overrides and exclusions, generated-file freshness, and that kit-owned files cite only entries it holds |
+| `check-knowledge` | Validates the knowledge base, its packs against their pins, its overrides and exclusions, the fields of each check, the `runners` and `workspaces` keys of `.houserules.json` and the tool of each `runner` check, generated-file freshness, and that kit-owned files cite only entries it holds; it names a `verify` path that git ignores |
 | `check-backlog` | Validates the work items of the installed tracker |
 | `check-commit` | Runs commit-message checks against a message file or git range |
-| `audit` | Builds a git range's rule package and runs every deterministic check, and resolves each `Work-Item:` and `Deferred:` trailer of the range through the installed tracker; a task audit (`--report`) leaves out an entry tagged `controller` unless `--ids` names it |
+| `audit` | Builds a git range's rule package and runs every deterministic check, the tool of each `runner` check included, and resolves each `Work-Item:` and `Deferred:` trailer of the range through the installed tracker; a task audit (`--report`) leaves out an entry tagged `controller` unless `--ids` names it, and compares the `self_audit` of the report with its own run |
 | `validate` | Validates deliverable JSON files against the schema, which requires a `model` field |
-| `check-report-claims` | Cross-checks a report's claims against the artifacts it cites; with `--doc <path>` or `--item <id>` it checks a spec or a backlog item for cited workspace paths that do not exist |
-| `stats <workspace>...` | Aggregates rule violations, process cost, and knowledge-base proposals across one or more workspaces |
+| `check-report-claims` | Cross-checks a report's claims against the artifacts it cites; with `--doc <path>` or `--item <id>` it checks a spec or a backlog item for cited workspace paths that do not exist, and skips a cited path under `.houserules/step/` |
+| `stats <workspace>...` | Aggregates rule violations, sanctioned fails, process cost, and knowledge-base proposals across one or more workspaces; `--window <n>` reads the `n` most recent |
 
 Installing:
 
 | Command | What it does |
 |---|---|
-| `init` | Seeds the minimal default into a git repository from the embedded payload; `--tracker json\|github\|beads` (with `--repo` for GitHub) installs a tracker, `--workflow reference` installs the reference workflow (`--add-required-packs` adds the packs it needs), `--target claude` adds the Claude Code files, and `--dir <subdir>` installs in a subdirectory |
-| `update` | Syncs kit-owned files, moves the kit packs and the workflow files, converts an install of houserules 1.x, removes retired files, reports version drift |
+| `init` | Seeds the minimal default into a git repository from the embedded payload; `--tracker json\|github\|beads` (with `--repo` for GitHub) installs a tracker, `--workflow reference` installs the reference workflow (`--add-required-packs` adds the packs it needs), `--target claude` adds the Claude Code files, and `--dir <subdir>` installs in a subdirectory; it adds `.houserules/` to `.gitignore` |
+| `update` | Syncs kit-owned files, moves the kit packs and the workflow files, converts an install of houserules 1.x, removes retired files, brings `.gitignore` to hold `.houserules/`, reports version drift; it refuses a directory that holds no install |
 | `files` | Prints the file classes of the kit as JSON: kit-owned, seed-once, pack copies, kept current through a baseline, tracker files, workflow files, and workflow data |
 
 Run any command with `--help` for its flags.

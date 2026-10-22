@@ -40,9 +40,9 @@ const MINIMAL_FILES: [&str; 12] = [
 /// pass.
 const CHECKED_NOTHING: &str = "check-commit: no commits check is installed; checked nothing";
 
-/// The line of the `.gitignore` that keeps the scratch output of the step
-/// out of the repository (spec 4.4a).
-const STEP_IGNORE_LINE: &str = ".houserules/step/";
+/// The line of the `.gitignore` that keeps the scratch output of the step and
+/// the batch workspaces out of the repository (spec 4.4a; batch 35, spec 7).
+const IGNORE_LINE: &str = ".houserules/";
 
 /// A scratch install that a plain `init` made.
 fn plain_install() -> TempDir {
@@ -101,14 +101,14 @@ fn a_plain_init_pins_the_knowledge_base_pack_alone_and_records_no_tracker_or_wor
     assert!(marker.get("workflow").is_none(), "got {marker}");
 }
 
-/// Spec 4.4a: `init` adds the scratch directory of the step to a new
-/// `.gitignore`.
+/// Spec 4.4a and batch 35, spec 7: `init` adds `.houserules/`, the folder of
+/// the step and the workspaces, to a new `.gitignore`.
 #[test]
-fn a_plain_init_writes_the_step_line_to_a_new_gitignore() {
+fn a_plain_init_writes_the_ignore_line_to_a_new_gitignore() {
     let dir = plain_install();
     assert_eq!(
         fs::read_to_string(dir.path().join(".gitignore")).expect("read .gitignore"),
-        format!("{STEP_IGNORE_LINE}\n")
+        format!("{IGNORE_LINE}\n")
     );
 }
 
@@ -116,20 +116,20 @@ fn a_plain_init_writes_the_step_line_to_a_new_gitignore() {
 /// keeps every line the project wrote, also when the file ends with no
 /// newline.
 #[test]
-fn init_appends_the_step_line_to_an_existing_gitignore() {
+fn init_appends_the_ignore_line_to_an_existing_gitignore() {
     let dir = scratch_git_repo();
     fs::write(dir.path().join(".gitignore"), "target/\n*.log").expect("write .gitignore");
     run_ok(dir.path(), &["init"]);
     assert_eq!(
         fs::read_to_string(dir.path().join(".gitignore")).expect("read .gitignore"),
-        format!("target/\n*.log\n{STEP_IGNORE_LINE}\n")
+        format!("target/\n*.log\n{IGNORE_LINE}\n")
     );
 }
 
 /// A second `init` writes nothing: the line is there, and the file stays as
 /// it is.
 #[test]
-fn a_second_init_keeps_a_gitignore_that_holds_the_step_line() {
+fn a_second_init_keeps_a_gitignore_that_holds_the_ignore_line() {
     let dir = plain_install();
     let before = snapshot(dir.path());
     run_ok(dir.path(), &["init"]);

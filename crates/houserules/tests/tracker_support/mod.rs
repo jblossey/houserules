@@ -75,11 +75,62 @@ pub fn git(dir: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
+/// Runs `actionlint` on `file` and requires a clean exit. A missing tool fails
+/// the test and names the step that installs it.
+pub fn assert_actionlint_passes(file: &Path) {
+    let output = Command::new("actionlint")
+        .arg(file)
+        .output()
+        .unwrap_or_else(|error| {
+            panic!(
+                "actionlint is not installed ({error}): run mise install, which pins it in mise.toml"
+            )
+        });
+    assert!(
+        output.status.success(),
+        "actionlint rejects {}:\n{}{}",
+        file.display(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// The lowercase hex SHA-256 digest of `content`.
+pub fn sha256_hex(content: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(content)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
 /// A fresh scratch directory with `git init` already run.
 pub fn scratch_git_repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     git(dir.path(), &["init", "-q"]);
     dir
+}
+
+/// Adds the submodule `path` to the repository at `dir`. The repository of the
+/// submodule holds `file` in its first commit. The call allows the `file`
+/// protocol for itself alone: git refuses it by default for a submodule.
+pub fn add_submodule(dir: &Path, path: &str, file: &str) {
+    let upstream = scratch_git_repo();
+    fs::write(upstream.path().join(file), "text\n").expect("write the submodule file");
+    commit_all(upstream.path(), "chore: submodule");
+    let source = upstream.path().to_str().expect("a UTF-8 path");
+    git(
+        dir,
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            "-q",
+            source,
+            path,
+        ],
+    );
 }
 
 /// Commits every change in `dir` and returns the new commit's sha.

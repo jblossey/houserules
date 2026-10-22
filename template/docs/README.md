@@ -103,8 +103,9 @@ exclusion.
 
 ## Pruning the knowledge base
 
-When a body of work closes, `houserules stats <WORKSPACE>...` over the five
-most recent folders of deliverables prints a `proposals` key. Each row
+When a body of work closes, `houserules stats --window 5 <WORKSPACE>...` over
+the folders of deliverables reads the five most recent and prints a
+`proposals` key. Each row
 proposes to `demote`, `retire`, `mechanize`, or `narrow` an entry, or names
 the budget of the standing set. The person who runs the work applies the
 rows with `owner_gate: false` and sends the other rows to the project's

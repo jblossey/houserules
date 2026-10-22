@@ -239,7 +239,7 @@ mod tests {
         };
         parse_pack(
             json!({
-                "name": "demo", "version": "1.1.0", "schema": "houserules/pack@1.1.0",
+                "name": "demo", "version": "1.1.0", "schema": "houserules/pack@1.2.0",
                 "topics": {"demo": {"title": "Demo"}}, "areas": {"global": {"paths": []}},
                 "entries": [entry("demo.one"), entry("demo.two")], "optIn": opt_in,
             }),
@@ -257,7 +257,7 @@ mod tests {
         write_json(
             &root.join(".houserules.json"),
             &json!({
-                "schema": "houserules/install@2.1.0",
+                "schema": "houserules/install@2.2.0",
                 "packs": {"demo": {
                     "version": "1.0.0", "source": "kit", "sha256": "0", "addedAreas": []
                 }},

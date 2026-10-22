@@ -37,6 +37,13 @@ const FINISHING: &str = ".claude/skills/finishing-a-feature/SKILL.md";
 const DESIGNING: &str = ".claude/skills/designing/SKILL.md";
 const PLANNING: &str = ".claude/skills/planning/SKILL.md";
 const SESSION_START: &str = "tools/reference-session-start.sh";
+const DOCS_EDIT: &str = ".claude/evals/docs-edit.json";
+
+/// The step skill of the core kit, below `template/`.
+const STEP_SKILL: &str = ".claude/skills/houserules-step/SKILL.md";
+
+/// The workspace wording of spec 7, as it stands in the middle of a sentence.
+const WORKSPACES_LOCATION: &str = "the `workspaces` location (default `.houserules/work/`)";
 
 /// The four agent templates of the workflow.
 const AGENT_TEMPLATES: [&str; 4] = [IMPLEMENTER, TASK_REVIEWER, BRANCH_REVIEWER, SPEC_REVIEWER];
@@ -84,6 +91,14 @@ fn package_text(relative: &str) -> String {
     let path = relative
         .split('/')
         .fold(package_dir(), |path, part| path.join(part));
+    fs::read_to_string(&path).unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
+}
+
+/// The text of the file at `relative` (`/`-separated) below `template/`.
+fn core_text(relative: &str) -> String {
+    let path = relative
+        .split('/')
+        .fold(repo_root().join("template"), |path, part| path.join(part));
     fs::read_to_string(&path).unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
 }
 
@@ -609,7 +624,7 @@ fn the_task_reviewer_flips_a_cited_row_and_checks_the_gate_set_of_a_fix_round() 
     assert_holds(
         TASK_REVIEWER,
         &[
-            "An issue that cites a rule flips that rule's `rule_adherence` row to `fail` in the same review.",
+            "An issue that cites a judged rule flips that rule's `rule_adherence` row to `fail` in the same review; the row of a deterministic rule keeps its result.",
             "Compare the round's `gates_run` with the whole gate set of the task, the gates of the round-0 `tests` included: a shrunken list is a finding under `new_breakage`.",
         ],
     );
@@ -910,4 +925,152 @@ fn the_session_start_ritual_names_the_session_section_and_the_orchestrating_skil
         "{text}"
     );
     assert!(!text.contains("houserules list --batch"), "{text}");
+}
+
+/// HR-215: every agent template records the value of its `Model:` line as
+/// written, and `unknown` when the task has no such line.
+#[test]
+fn every_role_records_its_model_line_as_written() {
+    for template in AGENT_TEMPLATES {
+        assert_holds(
+            template,
+            &[
+                "`model` (the value of your `Model:` line as written, with no alias swapped for a model id or the reverse; `unknown` when your task has no `Model:` line)",
+            ],
+        );
+    }
+}
+
+/// HR-215 and spec 6: the implementer fixes every `fail` row and every line of
+/// `references.failures`, runs the audit again after the last edit to the
+/// report, and re-copies `self_audit`.
+#[test]
+fn the_implementer_fixes_reference_failures_and_recopies_the_self_audit() {
+    assert_holds(
+        IMPLEMENTER,
+        &[
+            "Fix a `fail` row in the code, the commits, or the report, and a line of `references.failures` in the commit trailer or the tracker item that it names; re-run until the audit shows no `fail` row other than a sanctioned one and an empty `references.failures`. Name a line that you cannot fix in `concerns`.",
+            "Run the audit of step 1 again after the last edit to the report, and re-copy `self_audit` from that run. A `self_audit differs at <path>` fail of `process.deliverables-json` means that your copy is stale.",
+        ],
+    );
+}
+
+/// HR-219 (5): the implementer hands a refused command back and never runs it
+/// another way.
+#[test]
+fn the_implementer_hands_a_refused_command_back() {
+    assert_holds(
+        IMPLEMENTER,
+        &[
+            "When the harness refuses a command, do not run it another way, through a wrapper, another shell, or another tool. Stop, and name the refused step in `concerns` so the person who runs the work takes it over.",
+        ],
+    );
+}
+
+/// HR-219 (6), HR-215, and spec 6: the task reviewer sets `result` on judged
+/// rows only, names a failing reference as a finding, and keeps `sanctioned`
+/// on a row it judges.
+#[test]
+fn the_task_reviewer_sets_result_on_judged_rows_only_and_reads_the_reference_counts() {
+    assert_holds(
+        TASK_REVIEWER,
+        &[
+            "Set `result` only on a judged row of `rule_adherence`. A deterministic row keeps the result the audit gave it; a finding against its rule goes into `issues[]`.",
+            "A judged row that carries `sanctioned` keeps that field.",
+            "A line in `references.failures`, or a `self_audit.summary.reference_fail` that differs from the audit, is a finding.",
+        ],
+    );
+    assert_lacks(
+        TASK_REVIEWER,
+        &["An issue that cites a rule flips that rule's `rule_adherence` row"],
+    );
+}
+
+/// HR-176, HR-188, and spec 6: the branch reviewer compares the read count of
+/// the evidence `set in <triggered> of <read> reports`, runs `stats` with
+/// `--window 5`, and keeps `sanctioned` on a row it judges.
+#[test]
+fn the_branch_reviewer_compares_the_read_count_and_names_the_stats_window() {
+    assert_holds(
+        BRANCH_REVIEWER,
+        &[
+            "compare the second number (`<read>`) of each report-field evidence that reads `set in <triggered> of <read> reports` with that workspace's `task-*-report.json` listing; a mismatch invalidates every report-field row. The first number counts only the reports that the check's `if` globs triggered, so it can be lower than the listing.",
+            "(the controller's `houserules stats --window 5` run over the workspaces)",
+            "run `houserules stats --window 5 <every WORKSPACE>` into a file only when no workspace holds that file",
+            "a judged row that carries `sanctioned` keeps that field",
+        ],
+    );
+    assert_lacks(BRANCH_REVIEWER, &["over the five most recent workspaces"]);
+}
+
+/// Spec 4, 7, 11, and 12: the orchestrating skill names the workspace, the
+/// ledger, the override of a judged row, the window of `stats`, and the binary
+/// of a template evaluation.
+#[test]
+fn the_orchestrating_skill_names_the_workspace_the_override_the_window_and_the_binary() {
+    assert_holds(
+        ORCHESTRATING,
+        &[
+            "The batch workspace is the folder `<YYYY-MM-DD>-batch-<n>` of the `workspaces` location (default `.houserules/work/`). A project sets another location with the `workspaces` key of `.houserules.json`. The folder holds the deliverables of the batch and its ledger, `progress.md`.",
+            "Git ignores the default location; `houserules check-knowledge` fails an entry whose `verify` path names a file in any ignored location, the default included: commit a copy under a tracked path and verify that.",
+            "read the ledger `progress.md` in the batch workspace",
+            "When you or the project's owner or decider rule against a reviewer's verdict on a judged row, record the ruling on that row of the review file as `override`: `{ \"result\": \"pass\" | \"fail\", \"by\": \"<person or role>\", \"reason\": \"<text>\" }`. The reviewer's `result` stays on the row. You write the `override`; a reviewer never writes one. `houserules stats` reads it into the `override_rate` of the rule.",
+            "Run `houserules stats --window 5 <WORKSPACE>...` with every batch workspace, this batch's included, and save the output as `<workspace>/stats.json`",
+            "The flag keeps the five most recent of the workspaces you name, and every workspace when fewer than five exist.",
+            "When the branch changes the houserules binary, replace `houserules` in the brief with the path of the binary built from the branch.",
+        ],
+    );
+    assert_lacks(
+        ORCHESTRATING,
+        &["over the five most recent batch workspaces"],
+    );
+}
+
+/// Spec 7: each skill that names the batch workspace names it as a folder of
+/// the `workspaces` location.
+#[test]
+fn every_skill_names_the_workspace_as_a_folder_of_the_workspaces_location() {
+    for skill in [ORCHESTRATING, PLANNING, DESIGNING, FINISHING] {
+        assert_holds(skill, &[WORKSPACES_LOCATION]);
+    }
+    for skill in [PLANNING, DESIGNING, FINISHING] {
+        assert_holds(
+            skill,
+            &[
+                "to a file in the batch workspace, a folder of the `workspaces` location (default `.houserules/work/`), and read the file with your file-read tool",
+            ],
+        );
+    }
+}
+
+/// HR-219 (7): the brief of the `docs-edit` scenario tells the agent to run
+/// every `houserules` command as `houserules`, so that a run against a branch
+/// that changes the binary can swap in the binary of the branch.
+#[test]
+fn the_docs_edit_scenario_names_the_binary() {
+    let scenario: Value =
+        serde_json::from_str(&package_text(DOCS_EDIT)).expect("docs-edit.json is JSON");
+    let query = scenario["query"].as_str().expect("a query");
+    assert!(
+        query.contains("Run every houserules command as `houserules`."),
+        "{query}"
+    );
+}
+
+/// Spec 7 and 12: the step skill, a core text, names the `.houserules/` ignore
+/// line and the `workspaces` location, and says that a runner check needs the
+/// change committed.
+#[test]
+fn the_step_skill_names_the_ignore_line_and_the_committed_change_of_a_runner_check() {
+    let skill = flat(&core_text(STEP_SKILL));
+    for phrase in [
+        "`init` adds `.houserules/` to `.gitignore`: this script writes its scratch output to `.houserules/step/`, and `.houserules/work/`, the default `workspaces` location, holds the workspaces of the project, which stay out of git.",
+        "Commit the change first: `audit` judges the commits from `<base>` to `HEAD`, and a runner check runs a project tool on the working tree. When a file that the tool reads differs from `HEAD`, `audit` exits 2 with no rows and a line that names the file.",
+    ] {
+        assert!(skill.contains(phrase), "{STEP_SKILL} lacks: {phrase}");
+    }
+    assert!(
+        !skill.contains("`init` adds `.houserules/step/` to `.gitignore`"),
+        "{STEP_SKILL} still names the older ignore line"
+    );
 }

@@ -1,0 +1,4 @@
+[package]
+version = "1.2.3"
+[target.'cfg(unix)'.dependencies]
+libc = { version = "0.2", default-features = false }

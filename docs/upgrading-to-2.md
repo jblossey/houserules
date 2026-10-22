@@ -341,7 +341,7 @@ Each failure prints one line, and `audit` exits 1:
 
 With no tracker, `audit` resolves no trailer and prints the `skipped` line of the table above.
 
-The JSON result of `audit` holds the same verdict. `references.failures` lists each failure line, `references.resolved` and `references.skipped` count the references, and `summary.reference_fail` counts the failures. Line B and the line of a tracker that cannot be reached are failures too. `summary.fail` counts only the rule rows. The `--json` file holds the same result as stdout.
+The JSON result of `audit` holds the same verdict. `references.failures` lists each failure line, `references.checked` counts the references that the tracker judged, `references.passed` counts those among them that passed, `references.skipped` counts those that the audit did not judge (no tracker, a tracker that cannot be reached, or a tracker that answered with an error), and `summary.reference_fail` counts the failures. Line B and the line of a tracker that cannot be reached are failures too. `summary.fail` counts only the rule rows. The `--json` file holds the same result as stdout.
 
 The process pack ships `process.every-commit-names-a-work-item`. The entry fails a commit that has no `Work-Item:` trailer. These commits pass: a commit by `dependabot[bot]`, `release-please[bot]`, or `github-actions[bot]`, and a commit whose subject starts `chore(<scope>): release `. A hook that reads the message before git knows the author applies the subject exemption only. A merge commit is checked like any other commit, and `git revert` writes no trailer. Add one with `git revert -e`.
 
@@ -416,7 +416,7 @@ Every install holds a core skill, `.claude/skills/houserules-step/SKILL.md`, and
 - `tools/houserules-step.sh before <path>...` writes the rule package of the paths to `.houserules/step/rules.json` and prints the path of the file.
 - `tools/houserules-step.sh after <base>` runs `houserules audit --base <base>`, writes `.houserules/step/audit.json`, and prints the path of the file and the exit status of the audit. With a report as the second argument, it also runs `houserules validate` on it.
 
-`init` adds `.houserules/step/` to `.gitignore`, and the script writes a `.gitignore` of `*` into that directory before its first output. The skill and the script name no workflow.
+`init` adds `.houserules/` to `.gitignore`, so the output of the script and the batch workspaces (`.houserules/work/` by default) stay out of git, and the script writes a `.gitignore` of `*` into `.houserules/step/` before its first output. The skill and the script name no workflow.
 
 ### The minimal default
 
@@ -425,7 +425,7 @@ Every install holds a core skill, `.claude/skills/houserules-step/SKILL.md`, and
 - `.houserules.json`
 - `knowledge/schema.json`, `knowledge/areas.json`, and `knowledge/packs/knowledge-base.json`
 - `.claude/skills/migrating-knowledge/SKILL.md`, `.claude/skills/houserules-step/SKILL.md`, and `tools/houserules-step.sh`
-- the line `.houserules/step/` in `.gitignore`
+- the line `.houserules/` in `.gitignore`
 - `.claude/schemas/deliverables.json`
 - `AGENTS.md` with its block, each directory `AGENTS.md` that `render` writes for the installed packs (none for the `knowledge-base` pack alone), `CLAUDE.md`, and `docs/README.md`
 - `.github/workflows/knowledge.yml`, on a GitHub-hosted origin
@@ -712,3 +712,65 @@ sh <subdir>/.githooks/commit-msg "$1"
 ```
 
 Use `.githooks/commit-msg` for an install at the top level.
+
+## Changes of install schema 2.2.0
+
+`update` stamps `houserules/install@2.2.0` on an install of `2.1.0` and prints `wrote .houserules.json (houserules/install@2.2.0)` once. It also brings `.gitignore` to hold the line `.houserules/`, which keeps the batch workspaces out of git too. The file decides what `update` does:
+
+- A `.houserules/step/` line becomes `.houserules/` in its place, and `update` prints `merged .gitignore (.houserules/step/ replaced by .houserules/)`.
+- A file that holds neither line gets `.houserules/` at its end, and `update` prints `merged .gitignore (.houserules/ added)`.
+- A file that is absent is written with the line, and `update` prints `wrote .gitignore`.
+- A file that holds `.houserules/` already stays, and `update` prints no line.
+- A file that `ownedPaths` lists stays as found, and `update` prints no line: replace its `.houserules/step/` line with `.houserules/` by hand, or add the line where neither is present.
+
+The keys `runners` and `workspaces`, which the project writes, keep their values. Do each hand step that `update` prints (see [Hand steps](#hand-steps)) and the hand steps below.
+
+### Hand step: a CI workflow that does not check out the PR head
+
+The seeded CI workflow checks out the head commit of a pull request, so that every step of the job, the audit included, judges the tree that lands. `update` rewrites a workflow that you did not change. It keeps a workflow that you changed, and prints this line on every run, after the hand step of your tracker, when `update` prints one, until the file holds the input:
+
+```text
+hand step: <path> lacks the PR-head checkout; add ref: ${{ github.event.pull_request.head.sha }} under with: of its actions/checkout step
+```
+
+Add the input under `with:` of the `actions/checkout` step:
+
+```yaml
+- uses: actions/checkout@v7
+  with:
+    ref: ${{ github.event.pull_request.head.sha }}
+    fetch-depth: 0
+```
+
+On a push the expression is empty, and the checkout keeps the ref of the event.
+
+### Hand step: workspaces that git tracks
+
+The kit named no location for the batch workspaces before 2.2.0, so `update` cannot tell that your install tracks them, and it prints nothing. Since 2.2.0 the workspaces live in `.houserules/work/` by default, and git ignores that folder. If your install keeps its workspaces in a tracked folder, take these steps. Set `workspaces` in `.houserules.json` to the folder, or move the folder under `.houserules/work/`. For a folder outside `.houserules/`, add its line to `.gitignore` first, so that `check-knowledge` finds the folder ignored. Run `git rm -r --cached <folder>` and commit. For each `verify` path that `check-knowledge` then names, commit a copy under a tracked path (for example `tests/fixtures/`) and point `verify` at it.
+
+`check-knowledge` names a `verify` path that git ignores, in place of the line for a missing path:
+
+```text
+knowledge/<topic>.json <id>: verify path "<path>" is ignored by git; commit a copy under a tracked path and verify that
+```
+
+A fresh clone lacks an ignored file, so a `verify` path into it fails the gates in CI. This is the reason for the copy.
+
+### The schemas of your own
+
+`update` rewrites the knowledge schema and the deliverables schema while each equals a content that houserules shipped. It keeps a copy that you changed, and prints the [hand step of a schema of your own](#hand-step-a-schema-of-your-own). A kept copy lacks the fields of 2.2.0, and you merge them by hand. In `knowledge/schema.json`, add `"runner"` to the `type` enum of `$defs.check`, and add the properties `tool` (a string of at least one character), `non_empty` (a boolean), and `covers_ids` (a boolean). In `.claude/schemas/deliverables.json`, `$defs.auditRow` gains the properties `sanctioned`, `findings`, and `override`, and the schema gains the definitions `auditFinding` and `rowOverride`. Compare each file with the reference install (see [Hand steps](#hand-steps)):
+
+```sh
+diff knowledge/schema.json ../kit-reference/knowledge/schema.json
+diff .claude/schemas/deliverables.json ../kit-reference/.claude/schemas/deliverables.json
+```
+
+### The reds of 2.2.0 by design
+
+The migration commit, or the first commits after it, can fail these checks. Each red is correct, and each has a remedy:
+
+- **`audit` of the update commit fails `process.evals-rerun`.** This holds for an install of the reference workflow, because `update` rewrote its templates. The remedy is the one in [the reds that an upgrade causes by design](#the-reds-that-an-upgrade-causes-by-design): run your scenarios and append the run to `.claude/evals/record.json`.
+- **`check-knowledge` fails a `verify` path into an ignored folder.** See [the hand step for workspaces that git tracks](#hand-step-workspaces-that-git-tracks): commit a copy under a tracked path and point `verify` at it.
+- **A schema of your own lacks the new fields.** `check-knowledge` fails a `runner` check against a knowledge schema that lacks the type, and `validate` fails an audit row that holds `sanctioned`, `findings`, or `override` against a deliverables schema that lacks them. See [the schemas of your own](#the-schemas-of-your-own).
+- **A stale `self_audit` copy fails the report.** `audit --report` compares the copy with its own run over the same range. It compares nothing when the copy records another range, and a draft with `self_audit` set to `null` passes. When you change the report or the tree after the copy, the `self_audit` of the next task report whose copy is stale fails `process.deliverables-json`: run the audit again and copy `self_audit` again.
+- **A change to a manifest that holds a pin that is not exact fails, whoever wrote the commit.** `security-hygiene.exact-pins` fails a change to a `Cargo.toml` that holds a dependency version that is not pinned with `=`: a bare version, which Cargo reads as a caret range, or a requirement that starts with `^`, `~`, `<`, or `>`, or that is `*`. Release-please and Dependabot commits are no exception. The remedy is to pin every dependency of that file exactly: run `cargo add <crate>@=<version>` for each. `security-hygiene.tool-pins-are-exact` and `security-hygiene.tool-versions-pins-are-exact` fail a change to a mise file or a `.tool-versions` file that holds a pin that is not a full version. Write the full version of each tool.

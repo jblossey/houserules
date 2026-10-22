@@ -200,7 +200,7 @@ pub(crate) fn get_entries(base: &Base, ids: &[String]) -> Result<Vec<Value>, Str
 /// -- unreachable in practice, since `model::load_base` already compiles
 /// every one eagerly at load time (`model.rs`'s own doc), but propagated
 /// as a named error rather than `.expect()`-panicking on that guarantee,
-/// matching `audit.rs`'s own `area_files`/`areas_for` call sites. Second,
+/// matching `audit.rs`'s own `area_files` call site. Second,
 /// an entry's `verify` array holding a non-string element REACHED BEFORE
 /// ANY MATCH is a named error (`houserules.crash-paths-are-named`; `check.
 /// rs`'s own `check_base` reports the same shape as a named finding for

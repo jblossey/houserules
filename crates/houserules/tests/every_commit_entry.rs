@@ -113,15 +113,15 @@ fn pack_add_excludes_the_every_commit_entry_and_records_the_offer() {
 }
 
 /// Spec 3.7: the process pack that the kit ships names the entry under
-/// `optIn`, at the pack schema that names the key, and the entry is a
-/// `commits` check with the three fields of the spec. The whole check is
-/// compared: no other field may stand beside them.
+/// `optIn`, at pack schema 1.2.0 (the schema of its report-field options, spec
+/// 10), and the entry is a `commits` check with the three fields of the spec.
+/// The whole check is compared: no other field may stand beside them.
 #[test]
 fn the_process_pack_ships_the_every_commit_entry_as_an_opt_in_commits_check() {
     let dir = install_without_the_process_pack();
     run_ok(dir.path(), &["pack", "add", "process"]);
     let copy = read_json(dir.path(), "knowledge/packs/process.json");
-    assert_eq!(copy["schema"], json!("houserules/pack@1.1.0"));
+    assert_eq!(copy["schema"], json!("houserules/pack@1.2.0"));
     assert_eq!(copy["optIn"], json!([ENTRY]));
     let entry = copy["entries"]
         .as_array()

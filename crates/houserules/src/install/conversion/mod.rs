@@ -552,18 +552,19 @@ mod tests {
     use plan::Home;
 
     /// The overrides that the conversion writes for this repository at the
-    /// base of batch 33 Task 7, each with its sorted field names. The 34
+    /// commit that the conversion fixture holds, each with its sorted field names. The 34
     /// rows below `knowledge-base.cite-durable-refs` hold the fields that the
     /// project changed from the text of its release, 1.4.0. A field that the
     /// kit changed after that release and that the project left alone reaches
     /// the install through the pack. `knowledge-base.cite-durable-refs` is a
     /// project-only id of the 1.x tree that a kit pack of 2.0 ships. No
     /// release shipped it, so step 2 compares it with the pack entry, as L8
-    /// does.
+    /// does. Its `check` differs too: the pack entry reads more paths than the
+    /// project's check.
     const EXPECTED_OVERRIDES: [(&str, &[&str]); 35] = [
         (
             "knowledge-base.cite-durable-refs",
-            &["body", "source", "summary", "verify"],
+            &["body", "check", "source", "summary", "verify"],
         ),
         ("knowledge-base.ids-are-permanent", &["body"]),
         (
@@ -638,7 +639,7 @@ mod tests {
     ];
 
     /// The copy of this repository's `.houserules.json` and `knowledge/` at
-    /// the base of batch 33 Task 7, a 1.x install with 34 overridden ids.
+    /// the commit that the fixture holds, a 1.x install with 34 overridden ids.
     fn repository_fixture() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests")
@@ -678,7 +679,7 @@ mod tests {
     }
 
     /// The corpus run (`plan-corpus-conversion.py`) over this repository at
-    /// the base of batch 33 Task 7: 34 overrides from the overrides of the
+    /// the commit that the conversion fixture holds: 34 overrides from the overrides of the
     /// marker, 24 pack entries, no exclusion, no retired entry, the topic file
     /// `writing-style.json` gone, and 4 paths in `ownedPaths`. The tree holds
     /// 53 project-only ids. One of them, `knowledge-base.cite-durable-refs`,

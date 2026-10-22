@@ -1,0 +1,5 @@
+[dependencies.serde]
+features = [
+  "derive",
+]
+version = "1.0"

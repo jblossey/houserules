@@ -1,0 +1,3 @@
+[tools]
+zig = "ref:master"
+python = "3.12.7"

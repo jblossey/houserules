@@ -21,12 +21,14 @@ clap = { version = "=4.6.7", features = ["derive"] }
 dirs = "=7.0.0"
 globset = "=0.4.20"
 indexmap = "=2.14.2"
+percent-encoding = "=2.3.2"
 regress = "=0.12.0"
 rust-embed = { version = "=8.13.0", features = ["debug-embed"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.151", features = ["preserve_order"] }
 sha2 = "=0.11.1"
 tokio = { version = "=1.53.2", default-features = false, features = ["rt", "time"] }
+url = "=2.5.8"
 walkdir = "=2.5.0"
 
 [dev-dependencies]

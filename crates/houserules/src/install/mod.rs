@@ -35,9 +35,9 @@
 //! `init` writes a 2.0 install (`seed`'s own doc has the steps): the minimal
 //! default of spec 4.6. It holds the `KIT_OWNED` files, the `SEED_ONCE` files,
 //! the `DEFAULT_PACKS` as copies in `knowledge/packs/` with their pins in
-//! `.houserules.json` (a new install only), the `.houserules/step/` line of
+//! `.houserules.json` (a new install only), the `.houserules/` line of
 //! `.gitignore`, the CI workflow, and the marker with `schema`
-//! `houserules/install@2.1.0`. It installs no tracker and no workflow, and so
+//! `houserules/install@2.2.0`. It installs no tracker and no workflow, and so
 //! writes none of the five 1.x topic files, no `backlog/` file, and no file of
 //! a workflow. `init --tracker json` installs the JSON tracker (`classes`' own
 //! module doc names the file classes; `tracker`'s names the trackers).
@@ -65,9 +65,10 @@
 //! finds it at the kit's bytes, so `update` still sees a change. Five writes
 //! to a file that exists remain, each by design: the hook entries that
 //! `--target claude` and `--workflow` add to a `.claude/settings.json` that
-//! `ownedPaths` does not list; the `.houserules/step/` line that `init` adds
-//! to a `.gitignore`
-//! that lacks it; the areas that a kit pack adds to `knowledge/areas.json`
+//! `ownedPaths` does not list; the `.houserules/` line that `init` adds to a
+//! `.gitignore` that lacks it, or puts in the place of the older line
+//! `.houserules/step/` (`ensure_ignore_line`); the areas that a kit pack adds
+//! to `knowledge/areas.json`
 //! when a new install gets the pack; the stamp of `.houserules.json`; and the
 //! files `render` generates.
 //!
@@ -120,6 +121,10 @@
 //! repository (`location::locate`), and reads and validates the marker
 //! (`Marker::read_or_default`). Its steps run in the order of spec section 5:
 //!
+//! - A directory with no `.houserules.json` and no `knowledge/`, at or above
+//!   it within the git top level, is refused with `NO_INSTALL_LINE` (and
+//!   `--dir` for a target that is not the working directory, `no_install_line`)
+//!   before any write (HR-216): `update` has no install to bring up to date.
 //! - A directory with a `knowledge/` directory and no `.houserules.json` is
 //!   refused unless `--id-prefix` is given (D4's remedy names the flag), so no
 //!   remedy stamps `WI` on a project with its own prefix.
@@ -162,8 +167,21 @@
 //!   and keeps `backlog/schema.json` current as a D3 file; with the
 //!   directory missing, `update` writes nothing under `backlog/`, so that the
 //!   tracker stays unreachable until the project restores its data.
+//! - The ignore line of `.gitignore` (`ensure_ignore_line`): `.houserules/`
+//!   replaces the older line `.houserules/step/` in its place, with the line
+//!   ending of the file, and is added where neither line is present. `update`
+//!   prints a line for a change and none for a file that holds `.houserules/`.
+//!   A `.gitignore` in `ownedPaths` stays as found.
 //! - Each hand step that the earlier steps left is printed as `hand step:
 //!   <text>` (`hand_steps` holds every text).
+//! - The restamp of the install schema: a marker with the schema
+//!   `houserules/install@2.1.0` gets `houserules/install@2.2.0` in the write of
+//!   the marker that ends `update`, and `update` prints `wrote .houserules.json
+//!   (houserules/install@2.2.0)` after that write. The step tests its own
+//!   state, so a run that stopped before the write restamps at the next run, and
+//!   a second `update` prints no such line (`houserules.migrations-finish-after-a-stop`).
+//!   The keys `runners` and `workspaces` stay as found (`marker`'s own module
+//!   doc).
 //!
 //! An install with no `baselines` recorded at all needs no separate migration
 //! step: `baseline::classify` treats an unrecorded item the same way whether
@@ -173,12 +191,13 @@
 //! overwritten by a bare reconciliation run; only a genuine at-baseline match
 //! triggers a write.
 //!
-//! An install that was never `init`ed at all -- no `.houserules.json` of 1.x
-//! and no `knowledge/schema.json` present before this run starts -- skips the
-//! conversion, the pack moves, and the `SEED_ONCE` backfill entirely and fails
-//! at the same render step every other `update` failure path already names
-//! (this module's own "Failure paths" section); there is no kit-shipped
-//! knowledge base yet to convert. A 1.x marker is enough to convert: the
+//! An install with a marker but no `knowledge/schema.json` present before
+//! this run starts skips the conversion, the pack moves, and the `SEED_ONCE`
+//! backfill entirely and fails at the same render step every other `update`
+//! failure path already names (this module's own "Failure paths" section);
+//! there is no kit-shipped knowledge base yet to convert. (A directory with
+//! neither a marker nor a `knowledge/` is no install: `update` refuses it
+//! before any write, `no_install_line`.) A 1.x marker is enough to convert: the
 //! schema file and `knowledge/areas.json` of such an install may be absent
 //! (spec C21), and the conversion puts them back, or stops before any write
 //! when `ownedPaths` lists the absent file. A 1.x marker with a `knowledge/`
@@ -277,13 +296,11 @@
 //! (`cmd_update` runs D4), so that it can install the release that the line
 //! names.
 //!
-//! `update` over a target that was never `init`ed is a failure path too:
-//! it prints one named line naming `<target>/knowledge/schema.json` and
-//! exits 2. The exact `io::Error` text and path separator are
-//! platform-specific; `tests/update.rs`'s own never-`init`ed test
-//! derives the expected line from a real error on the test's own
-//! platform instead of hardcoding one (its own doc comment and
-//! `seeded_repo`'s carry the fuller account).
+//! `update` over a target that was never `init`ed is a failure path too: a
+//! directory with no `.houserules.json` and no `knowledge/`, at or above it
+//! within the git top level, gets `no_install_line` and exit 2 before `update`
+//! writes any file (HR-216). `tests/update.rs`'s own never-`init`ed test pins
+//! the line (its own doc comment and `seeded_repo`'s carry the fuller account).
 
 mod ci_workflow;
 mod classes;
@@ -318,7 +335,9 @@ use classes::{
     KIT_OWNED, PREFIXED, RETIRED, SCHEMA_FILE, SEED_ONCE, TRACKER_DATA, TRACKER_SCHEMA,
 };
 use location::Placement;
-use marker::{ID_PREFIX_HINT, InstallStamp, Marker, Pin, is_id_prefix, unconverted_line};
+use marker::{
+    ID_PREFIX_HINT, INSTALL_SCHEMA, InstallStamp, Marker, Pin, is_id_prefix, unconverted_line,
+};
 
 pub(crate) use conversion::known_contents;
 pub(crate) use marker::{Guard, refuse_install_schema};
@@ -853,37 +872,119 @@ fn seed_packs(
     Ok(())
 }
 
-/// The line of `.gitignore` that keeps the scratch output of the step out of
-/// the repository (spec 4.4a).
+/// The line of `.gitignore` that keeps the scratch output of the step and the
+/// batch workspaces out of the repository (spec 4.4a and batch 35, spec 7).
+pub(crate) const IGNORE_LINE: &str = ".houserules/";
+
+/// The older line that `ensure_ignore_line` replaces with `IGNORE_LINE`: it
+/// ignores the output of the step and not the workspaces.
 const STEP_IGNORE_LINE: &str = ".houserules/step/";
 
-/// Adds `STEP_IGNORE_LINE` to the `.gitignore` of the install root: it writes
-/// a new file, or appends the line to a file that lacks it and keeps every
-/// line of the project. A `.gitignore` in `owned` is the project's own and
-/// stays as it is. It prints one line for the file.
-fn seed_gitignore(target: &Path, owned: &[String]) -> Result<(), String> {
-    const FILE: &str = ".gitignore";
-    if is_overridden(owned, FILE) {
-        return Ok(());
+/// The file that holds the ignore line.
+const GITIGNORE: &str = ".gitignore";
+
+/// What `ensure_ignore_line` did to the `.gitignore` of an install.
+#[derive(Debug, PartialEq, Eq)]
+enum IgnoreChange {
+    /// The file was absent: it now holds `IGNORE_LINE` alone.
+    Wrote,
+    /// A `STEP_IGNORE_LINE` line became `IGNORE_LINE`, in its place.
+    Replaced,
+    /// `IGNORE_LINE` went to the end of the file.
+    Added,
+    /// The file held `IGNORE_LINE`: nothing changed.
+    Present,
+}
+
+impl IgnoreChange {
+    /// The line that `init` and `update` print for the change. `update` prints
+    /// none for `Present`.
+    fn line(&self) -> String {
+        match self {
+            Self::Wrote => format!("wrote {GITIGNORE}"),
+            Self::Replaced => {
+                format!("merged {GITIGNORE} ({STEP_IGNORE_LINE} replaced by {IGNORE_LINE})")
+            }
+            Self::Added => format!("merged {GITIGNORE} ({IGNORE_LINE} added)"),
+            Self::Present => format!("kept {GITIGNORE} ({IGNORE_LINE} already present)"),
+        }
     }
-    let Some(mut bytes) = read_if_present(&target.join(FILE))? else {
-        write_into(target, FILE, format!("{STEP_IGNORE_LINE}\n").as_bytes())?;
-        println!("wrote {FILE}");
-        return Ok(());
+}
+
+/// `line`, a line of a file with its terminator, split into the text and the
+/// terminator (`\r\n`, `\n`, or none for the last line of a file).
+fn split_terminator(line: &[u8]) -> (&[u8], &[u8]) {
+    let body = line.strip_suffix(b"\n").unwrap_or(line);
+    let body = if body.len() < line.len() {
+        body.strip_suffix(b"\r").unwrap_or(body)
+    } else {
+        body
     };
-    if String::from_utf8_lossy(&bytes)
-        .lines()
-        .any(|line| line.trim() == STEP_IGNORE_LINE)
+    line.split_at(body.len())
+}
+
+/// `true` when the line `text` of `.gitignore` is the pattern `pattern` alone,
+/// as git reads it: unescaped trailing spaces do not count, and leading spaces
+/// and tabs do. No pattern of the kit holds a backslash, so none of its
+/// trailing spaces is escaped.
+fn is_ignore_line(text: &[u8], pattern: &str) -> bool {
+    let end = text
+        .iter()
+        .rposition(|byte| *byte != b' ')
+        .map_or(0, |last| last + 1);
+    &text[..end] == pattern.as_bytes()
+}
+
+/// Brings the `.gitignore` of the install root to hold `IGNORE_LINE`: it writes
+/// a new file, replaces the first `STEP_IGNORE_LINE` line in its place with the
+/// line ending of the file, or appends the line to a file that holds neither,
+/// and keeps every other line of the project byte for byte. A file that holds
+/// `IGNORE_LINE` stays as it is. A `.gitignore` in `owned` is the project's own
+/// and stays as it is: the result is then `None`.
+fn ensure_ignore_line(target: &Path, owned: &[String]) -> Result<Option<IgnoreChange>, String> {
+    if is_overridden(owned, GITIGNORE) {
+        return Ok(None);
+    }
+    let Some(mut bytes) = read_if_present(&target.join(GITIGNORE))? else {
+        write_into(target, GITIGNORE, format!("{IGNORE_LINE}\n").as_bytes())?;
+        return Ok(Some(IgnoreChange::Wrote));
+    };
+    let lines: Vec<&[u8]> = bytes.split_inclusive(|byte| *byte == b'\n').collect();
+    let texts: Vec<&[u8]> = lines.iter().map(|line| split_terminator(line).0).collect();
+    if texts.iter().any(|text| is_ignore_line(text, IGNORE_LINE)) {
+        return Ok(Some(IgnoreChange::Present));
+    }
+    if let Some(at) = texts
+        .iter()
+        .position(|text| is_ignore_line(text, STEP_IGNORE_LINE))
     {
-        println!("kept {FILE} ({STEP_IGNORE_LINE} already present)");
-        return Ok(());
+        let mut replaced = Vec::with_capacity(bytes.len());
+        for (index, line) in lines.iter().enumerate() {
+            if index == at {
+                replaced.extend_from_slice(IGNORE_LINE.as_bytes());
+                replaced.extend_from_slice(split_terminator(line).1);
+            } else {
+                replaced.extend_from_slice(line);
+            }
+        }
+        write_into(target, GITIGNORE, &replaced)?;
+        return Ok(Some(IgnoreChange::Replaced));
     }
     if !bytes.is_empty() && !bytes.ends_with(b"\n") {
         bytes.push(b'\n');
     }
-    bytes.extend_from_slice(format!("{STEP_IGNORE_LINE}\n").as_bytes());
-    write_into(target, FILE, &bytes)?;
-    println!("merged {FILE} ({STEP_IGNORE_LINE} added)");
+    bytes.extend_from_slice(format!("{IGNORE_LINE}\n").as_bytes());
+    write_into(target, GITIGNORE, &bytes)?;
+    Ok(Some(IgnoreChange::Added))
+}
+
+/// Brings the `.gitignore` of the install root to hold `IGNORE_LINE` and prints
+/// the line of the change (`ensure_ignore_line`), if the project does not own
+/// the file.
+fn seed_gitignore(target: &Path, owned: &[String]) -> Result<(), String> {
+    if let Some(change) = ensure_ignore_line(target, owned)? {
+        println!("{}", change.line());
+    }
     Ok(())
 }
 
@@ -990,10 +1091,11 @@ fn seed_workflow_hook(target: &Path, marker: &Marker) -> Result<(), String> {
 /// Seeds `target` as a 2.0 install from the embedded payload: the
 /// `KIT_OWNED` files (`seed_kit_owned`), the absent `SEED_ONCE` files, the
 /// `DEFAULT_PACKS` with their pins (a new install only: an existing 2.0 install
-/// gets no pack and no area, spec C18), the `.houserules/step/` line of
+/// gets no pack and no area, spec C18), the `.houserules/` line of
 /// `.gitignore`, the deliverables schema and the CI workflow for a GitHub-hosted
 /// origin (each in the form of the tracker that the same command installs, so
-/// that the tracker's own write of it finds it current), and
+/// that the tracker's own write of it finds it current; with no tracker flag,
+/// in the form of the tracker that the marker names, HR-220), and
 /// `.claude/settings.json` with the hook entry; then it stamps
 /// `.houserules.json` and renders the generated markdown. It writes no file
 /// that exists but five (this module's own doc names them), and it never
@@ -1068,7 +1170,7 @@ fn seed(
             tracker::install_backlog_id_pattern(target, &effective_prefix, install)
                 .map_err(|error| error.to_string())?,
         ),
-        None => sync::BacklogIdPattern::Kit,
+        None => tracker_backlog_id_pattern(target, &marker)?,
     };
     let claude = target_claude || (!marker.is_fresh() && marker.claude_enabled());
     let existing_install = marker.is_2_0();
@@ -1379,6 +1481,39 @@ pub(crate) fn cmd_init(
     }
 }
 
+/// The refusal of `update` for a directory that holds no install at or above
+/// it, within the git top level (spec 8.2, HR-216): there is nothing to bring
+/// up to date, and `init` starts an install in the working directory.
+/// `no_install_line` adds the target when it is another directory.
+const NO_INSTALL_LINE: &str =
+    "no houserules install here (no .houserules.json); run houserules init";
+
+/// The refusal line of `update` for `target`, the directory that `given` names
+/// (the value of `--dir`, `.` when the flag is absent). `init` installs in the
+/// working directory, so a target that is another directory gets the remedy
+/// `run houserules init --dir <given>`, with `given` as the user wrote it
+/// (spec 8.2, D9).
+fn no_install_line(target: &Path, given: &Path) -> String {
+    if std::env::current_dir().is_ok_and(|working| working == target) {
+        NO_INSTALL_LINE.to_string()
+    } else {
+        format!("{NO_INSTALL_LINE} --dir {}", given.display())
+    }
+}
+
+/// `true` when the install root of `placement`, or a directory between it and
+/// the git top level, holds a `.houserules.json` or a `knowledge/` directory.
+fn holds_an_install_at_or_above(placement: &Placement) -> bool {
+    (0..=placement.components.len()).any(|depth| {
+        let directory = placement.components[..depth]
+            .iter()
+            .fold(placement.top_level.clone(), |parent, part| {
+                parent.join(part)
+            });
+        directory.join(crate::root::INSTALL_MARKER).exists() || directory.join("knowledge").is_dir()
+    })
+}
+
 /// The refusal of `update` for a tree that has a `knowledge/` directory and
 /// no marker: the project passes its backlog id prefix, so that no remedy
 /// stamps `WI` on a project with its own prefix (spec C14).
@@ -1459,8 +1594,9 @@ fn backfill_missing_files(
 /// the pattern that its tracker names, the pattern of the kit (any token) for
 /// an install with no tracker, or the pattern that the schema holds for a
 /// tracker that cannot name its pattern (Beads with an unreachable `bd`):
-/// `update` prints the unreachable line of spec 3.4 on stderr and goes on
-/// (C38). A `tracker` key that cannot be read is an error.
+/// `init` with no tracker flag and `update` print the unreachable line of
+/// spec 3.4 on stderr and go on (C38). A `tracker` key that cannot be read is
+/// an error.
 fn tracker_backlog_id_pattern(
     root: &Path,
     marker: &Marker,
@@ -1484,15 +1620,17 @@ fn tracker_backlog_id_pattern(
 /// any write at step 0 and for a tree without entries in `knowledge/`; the
 /// pack moves (`pack_moves`) and the one-id-one-source step
 /// (`pack::one_source`); the file sync (`sync`); then the retired paths, the
-/// seed-once backfill, the restamp of `.houserules.json`, the render, and the
-/// stamped-to-running version drift.
+/// seed-once backfill, the restamp of `.houserules.json` (its install schema
+/// included), the render, and the stamped-to-running version drift.
 /// Every `KIT_OWNED` file is overwritten, kept, or -- unless the project
 /// owns it -- restored if the project deleted it, since kit machinery that
 /// the project has not claimed is always present after `update`. Every
 /// payload file this writes is rewritten with `Marker::id_prefix_or`'s
 /// resolution (`seed`'s own doc explains why the marker's stamped prefix
-/// wins over the flag).
-fn update(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
+/// wins over the flag). `given` is the `--dir` value as the user wrote it, `.`
+/// when the flag is absent: the refusal of a target with no install names it
+/// (`no_install_line`).
+fn update(target: &Path, given: &Path, id_prefix: Option<String>) -> Result<(), String> {
     let placement = location::locate(target)?;
     let id_prefix_given = id_prefix.is_some();
     let prefix = id_prefix.unwrap_or_else(|| "WI".to_string());
@@ -1500,6 +1638,9 @@ fn update(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
         return Err(format!("id-prefix {ID_PREFIX_HINT}"));
     }
     let mut marker = Marker::read_or_default(target, &prefix)?;
+    if marker.is_fresh() && !holds_an_install_at_or_above(&placement) {
+        return Err(no_install_line(target, given));
+    }
     if !placement.is_top_level() && marker.is_fresh() {
         let root = placement.root();
         return Err(format!(
@@ -1570,6 +1711,11 @@ fn update(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
     if previously_seeded {
         backfill_missing_files(&plan, &placement, &mut baselines)?;
     }
+    if let Some(change) = ensure_ignore_line(target, &owned)?
+        && change != IgnoreChange::Present
+    {
+        println!("{}", change.line());
+    }
 
     if let Some(line) = workflow::forget_pinned_baselines(&marker, &mut baselines)? {
         println!("{line}");
@@ -1579,8 +1725,12 @@ fn update(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
     }
     let stamped_version = marker.version().unwrap_or("none").to_string();
     let running_version = kit_version();
+    let restamped_schema = marker.restamp_install_schema();
     marker.restamp(&running_version, &effective_prefix, baselines);
     marker.write()?;
+    if restamped_schema {
+        println!("wrote {} ({INSTALL_SCHEMA})", crate::root::INSTALL_MARKER);
+    }
     crate::rules::render_and_report(target)?;
     println!("kit {stamped_version} -> {running_version}");
     println!("houserules: updated {}", target.display());
@@ -1600,7 +1750,8 @@ fn update(target: &Path, id_prefix: Option<String>) -> Result<(), String> {
 /// is one named stderr line and exit 2 (`houserules.crash-paths-are-named`).
 pub(crate) fn cmd_update(dir: Option<PathBuf>, id_prefix: Option<String>) -> ExitCode {
     crate::selfupdate::run_before_repo_phase();
-    let target = match resolve_like_node(dir.as_deref().unwrap_or_else(|| Path::new("."))) {
+    let given = dir.as_deref().unwrap_or_else(|| Path::new("."));
+    let target = match resolve_like_node(given) {
         Ok(target) => target,
         Err(error) => {
             eprintln!("{error}");
@@ -1608,7 +1759,7 @@ pub(crate) fn cmd_update(dir: Option<PathBuf>, id_prefix: Option<String>) -> Exi
         }
     };
     match refuse_install_schema(&target, Guard::ConvertsInstall)
-        .and_then(|()| update(&target, id_prefix))
+        .and_then(|()| update(&target, given, id_prefix))
     {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {

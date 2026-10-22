@@ -101,39 +101,10 @@ fn init_seeded_repo() -> tempfile::TempDir {
 
 /// `update` over a target that was never `init`ed is a named error, exit 2
 /// -- NOT a reproduced crash (`houserules.crash-paths-are-named`),
-/// `seeded_repo`'s own doc has the full account. `update` still writes
-/// every `KIT_OWNED` file before it fails: the marker-absent default seeds
-/// cleanly (`update_renders_none_when_the_marker_file_is_missing` already
-/// pins that), and only the render step, which needs the `SEED_ONCE`
-/// knowledge base `init` alone seeds, has nothing to read.
-///
-/// The expected stderr line is DERIVED, not hardcoded: this test performs
-/// the identical fallible call the binary's failing arm makes --
-/// `rules::model::load_base`'s own `fs::read_to_string` on the same
-/// `root.join("knowledge").join("schema.json")` path (`install/mod.rs`'s own
-/// "Failure paths" doc section has the fuller account) -- against the same
-/// path in the same directory, and formats the captured `io::Error`
-/// exactly as `rules::model::LoadError::Io`'s `Display` does (`"{path}:
-/// {source}"`).
-///
-/// On Windows, the real failure is `...\knowledge\schema.json: The system
-/// cannot find the path specified. (os error 3)`, not the
-/// `.../knowledge/schema.json: No such file or directory (os error 2)` a
-/// hardcoded Unix message would assume -- two independent divergences at once.
-/// The path separator differs because `PathBuf::join` inserts the platform's
-/// own `MAIN_SEPARATOR` (`\` on Windows, `/` on Unix) between components it
-/// joins itself, but a separator typed literally inside one string argument (a
-/// single `.join("knowledge/schema.json")` call) is never normalized -- this
-/// test joins `"knowledge"` and `"schema.json"` as two separate calls,
-/// matching production's own two `.join()` calls byte-for-byte. The message
-/// and code differ because a missing PARENT directory is a different Windows
-/// error than a missing leaf file: `ERROR_PATH_NOT_FOUND` (3, "The system
-/// cannot find the path specified.") applies here since `knowledge/` itself
-/// does not exist, where `ERROR_FILE_NOT_FOUND` (2, "The system cannot find
-/// the file specified.") would apply if only `schema.json` were missing
-/// (Microsoft's own System Error Codes reference, WinError.h, entries 2 and
-/// 3). Deriving the path and the error text from a real syscall on this
-/// platform, this run, keeps the assertion exact everywhere with zero `cfg`.
+/// `seeded_repo`'s own doc has the full account. The directory holds no
+/// `.houserules.json` and no `knowledge/`, at or above it, so `update` prints
+/// the line for a tree with no install (HR-216), whose remedy names the target
+/// that `--dir` gave, before it writes any file.
 #[test]
 fn update_over_a_never_init_ed_target_is_a_named_error_exit_2() {
     let dir = scratch_git_repo();
@@ -143,13 +114,18 @@ fn update_over_a_never_init_ed_target_is_a_named_error_exit_2() {
         .output()
         .expect("run update");
     assert_eq!(output.status.code(), Some(2));
-    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
-
-    let schema_path = dir.path().join("knowledge").join("schema.json");
-    let read_error = fs::read_to_string(&schema_path)
-        .expect_err("knowledge/schema.json must still be absent: update never seeds it");
-    let expected = format!("{}: {read_error}\n", schema_path.display());
-    assert_eq!(stderr, expected);
+    assert_eq!(output.stdout, b"");
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("utf8 stderr"),
+        format!(
+            "no houserules install here (no .houserules.json); run houserules init --dir {}\n",
+            dir.path().display()
+        )
+    );
+    assert!(
+        !dir.path().join("knowledge").exists(),
+        "update never seeds knowledge/"
+    );
 }
 
 /// Every `KIT_OWNED` path -- `install/mod.rs`'s own copy. `tools/kb.mjs`,

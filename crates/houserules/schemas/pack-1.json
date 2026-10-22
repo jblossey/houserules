@@ -120,7 +120,8 @@
             "co-change",
             "diff-append-only",
             "report-field",
-            "durable-sha"
+            "durable-sha",
+            "runner"
           ]
         },
         "level": {
@@ -189,6 +190,16 @@
         "field": {
           "type": "string",
           "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$"
+        },
+        "tool": {
+          "type": "string",
+          "minLength": 1
+        },
+        "non_empty": {
+          "type": "boolean"
+        },
+        "covers_ids": {
+          "type": "boolean"
         }
       }
     },

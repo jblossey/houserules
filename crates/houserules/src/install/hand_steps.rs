@@ -64,6 +64,15 @@ pub(super) fn ci_lacks_the_beads_steps(path: &str, bd_version: &str) -> String {
     )
 }
 
+/// The seeded CI workflow (batch 35, spec 3.2): the file at `path` is the
+/// project's, and its checkout step lacks the `ref` input that makes every step
+/// of the job judge the head of a pull request.
+pub(super) fn ci_lacks_the_head_checkout(path: &str) -> String {
+    format!(
+        "{path} lacks the PR-head checkout; add ref: ${{{{ github.event.pull_request.head.sha }}}} under with: of its actions/checkout step"
+    )
+}
+
 /// Step 0: a 1.x topic file `knowledge/overrides.json` holds the reserved
 /// name of the file that 2.0 reads as the overrides of the project. The
 /// conversion stops before it changes a file.
@@ -207,6 +216,10 @@ mod tests {
             (
                 "ci_lacks_the_beads_steps",
                 ci_lacks_the_beads_steps("<path>", "<bd-version>"),
+            ),
+            (
+                "ci_lacks_the_head_checkout",
+                ci_lacks_the_head_checkout("<path>"),
             ),
             ("kit_pack_shares_an_id", shared(Some(&git))),
             ("kit_pack_shares_an_id", shared(Some(&file))),

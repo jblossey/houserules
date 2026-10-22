@@ -1,7 +1,7 @@
 {
   "name": "process",
-  "version": "1.2.2",
-  "schema": "houserules/pack@1.1.0",
+  "version": "2.0.0",
+  "schema": "houserules/pack@1.2.0",
   "topics": {
     "process": {
       "title": "How work runs: batches, dispatch, reviews, rulings"
@@ -187,7 +187,9 @@
         "type": "report-field",
         "level": "warn",
         "if": "**",
-        "field": "knowledge_used"
+        "field": "knowledge_used",
+        "non_empty": true,
+        "covers_ids": true
       }
     },
     {
@@ -353,6 +355,7 @@
         "Every deliverable an agent writes is structured data in the folder where the project keeps its deliverables: `task-<N>-report.json`, `task-<N>-review.json`, `task-<N>-review-r<R>.json`, `branch-review.json`. The `kind` field names the definition.",
         "Write the file, run `houserules validate <file>`, fix every error, then audit. A deliverable that does not validate is incomplete; the person who runs the work hands the task out again.",
         "The `self_audit` of a task report starts as `null` and holds the audit's `summary` and deterministic rows after the audit. A single-report audit (`--report`) passes the check below while the field is `null`, the draft state; a `--workspace` audit fails it, and `houserules validate` rejects a `null` `self_audit` at status `DONE` or `DONE_WITH_CONCERNS`. `self_audit` always covers the whole task (`BASE..HEAD` at report time); a fix round's audit over the fix diff goes into that `fix_rounds` entry's `tests`.",
+        "Once the field holds a copy, a `--report` audit runs the same range again and compares the copy with that run, both parsed. The comparison reads the `summary` and the deterministic rows. It leaves out the row of this check. It takes the result of that row out of the result counts of the summary (`pass`, `fail`, `warn`, and `skipped`) on each side; a copy that lacks the row keeps its counts. It compares the counts that remain like any other key. It also leaves out `base` and `head`, which it reads as commits. A difference fails the row with `self_audit differs at <JSON path>`. A copy of another range is not compared: the evidence of the row names both ranges and ends with `not compared`. A `--workspace` audit does not compare. After the last edit to the report, run the audit again and copy `self_audit` again. A failed comparison means that the copy is stale.",
         "`houserules stats` and the branch retrospective read these files; prose is invisible to them."
       ],
       "tags": [
@@ -954,7 +957,7 @@
       "standing": false,
       "summary": "At every batch close, run `houserules stats` over recent workspaces and act on `proposals`: apply the ungated rows, report the owner-gated rows.",
       "body": [
-        "A rule earns its place by catching defects. At every batch close the person who runs the work runs `houserules stats <WORKSPACE>...` over the five most recent folders of batch deliverables, or over every such folder when fewer than five exist, and saves the output in the deliverables folder of the closing batch as `stats.json`. Once a work item cites a stats file, never overwrite that file: a later run in the same batch gets a name that states its window, `stats-batches-<a>-<b>.json`.",
+        "A rule earns its place by catching defects. At every batch close the person who runs the work runs `houserules stats --window 5 <WORKSPACE>...` over every folder of batch deliverables. The window reads the five most recent folders, or every folder when fewer than five exist. The person who runs the work saves the output in the deliverables folder of the closing batch as `stats.json`. Once a work item cites a stats file, never overwrite that file: a later run in the same batch gets a name that states its window, `stats-batches-<a>-<b>.json`.",
         "The branch review (a standard batch with one) or the person who runs the work (every other batch) reads `proposals` beside the retrospective.",
         "A proposal with `owner_gate: false` is applied in the batch's `docs(knowledge)` commit. The person who runs the work makes that commit after the branch review closes, or before the finish in a batch without one, so a row that only the batch-close run draws is applied too. `retire` sets `status: retired` and, for a local entry, runs `houserules archive`. A pack entry stays in its pack copy: a `retire`, `demote`, or `narrow` proposal for it is an override in `knowledge/overrides.json`, and `retire` is an override with `status: retired`. `demote` drops `standing` and gives the entry an area whose globs match the files it governs. `narrow` rewrites the entry's scope. `mechanize` files a work item for the check.",
         "A proposal with `owner_gate: true` goes to the project's owner or decider in the report that closes the batch. A `budget` proposal always has `owner_gate: true`.",

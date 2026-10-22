@@ -1,0 +1,9 @@
+[package]
+name = "x"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+regex = "1.11"

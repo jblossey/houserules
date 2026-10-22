@@ -17,11 +17,13 @@ use std::process::ExitCode;
 use regress::Regex;
 use serde_json::Value;
 
+use super::check_marker_keys;
 use super::check_packs::{
     area_findings, areas_at_their_pack_globs, claude_import_finding, override_listing,
-    pack_findings, pack_see_findings, see_is_held,
+    pack_check_findings, pack_findings, pack_see_findings, see_is_held,
 };
 use super::glob::compile;
+use super::ignored::{IgnoreFault, ignored_among};
 use super::kit_citations::{KitScope, kit_citation_findings};
 use super::markers::{base_marker_findings, marker_findings};
 use super::model::{Base, load_base};
@@ -39,6 +41,7 @@ fn check_fields(check_type: &str) -> Option<&'static [&'static str]> {
         "diff-append-only" => Some(&["files"]),
         "report-field" => Some(&["if", "field"]),
         "durable-sha" => Some(&["files"]),
+        "runner" => Some(&["tool"]),
         _ => None,
     }
 }
@@ -170,18 +173,17 @@ fn regex_validity_message(pattern: &str, flags: &str) -> Option<String> {
     }
 }
 
-/// Validates one entry's `check` object's shape: every field its `type`
-/// requires (`check_fields`), the `commits` type's own "needs one of
-/// four" rule (`subject`, `body_absent`, `body_line_max`, or
-/// `require_trailer`), and that `pattern`, `subject`, `body_absent`, and each
-/// string of `exempt_subjects` (whichever are present) compile as regular
-/// expressions, the patterns the commit evaluator compiles. `at` prefixes
-/// every message the same way the caller's other per-entry messages are
-/// prefixed.
-fn check_shape(check: &Value, at: &str, errors: &mut Vec<String>) {
+/// Reports, for one entry's `check` object, every field its `type` requires
+/// (`check_fields`) and the `commits` type's own "needs one of four" rule
+/// (`subject`, `body_absent`, `body_line_max`, or `require_trailer`). An
+/// unknown `type` gives none: the schema reports it. `at` prefixes every
+/// message. `check_shape` runs this on the checks of the local topic files;
+/// `check_packs::pack_check_findings` runs it on the effective checks of the
+/// active pack entries, an override applied.
+pub(super) fn required_field_findings(check: &Value, at: &str, errors: &mut Vec<String>) {
     let check_type = check.get("type").and_then(Value::as_str).unwrap_or("");
     let Some(fields) = check_fields(check_type) else {
-        return; // the schema already reported an unknown type
+        return;
     };
     for field in fields {
         if check.get(*field).is_none() {
@@ -198,6 +200,20 @@ fn check_shape(check: &Value, at: &str, errors: &mut Vec<String>) {
             "{at}: check \"commits\" needs \"subject\", \"body_absent\", \"body_line_max\", or \"require_trailer\""
         ));
     }
+}
+
+/// Validates one entry's `check` object's shape: every field its `type`
+/// requires (`required_field_findings`), and that `pattern`, `subject`,
+/// `body_absent`, and each string of `exempt_subjects` (whichever are
+/// present) compile as regular expressions, the patterns the commit
+/// evaluator compiles. `at` prefixes every message the same way the
+/// caller's other per-entry messages are prefixed.
+fn check_shape(check: &Value, at: &str, errors: &mut Vec<String>) {
+    let check_type = check.get("type").and_then(Value::as_str).unwrap_or("");
+    if check_fields(check_type).is_none() {
+        return; // the schema already reported an unknown type
+    }
+    required_field_findings(check, at, errors);
     // Only an absent key or an explicit `null` defaults `flags` to empty;
     // any other value -- including one the schema never sanctions, like a
     // number -- is coerced through `to_js_string` and used as-is.
@@ -747,6 +763,32 @@ fn check_archive(base: &Base, errors: &mut Vec<String>) -> BTreeMap<String, Stri
     files
 }
 
+/// The `verify` paths of the topic files of `base` that git ignores in the
+/// working tree of the install. The workspaces of a batch are ignored (spec 7),
+/// so a path there is no evidence that a fresh clone holds. Outside a git work
+/// tree the ignore test does not run: no path is ignored, and each path keeps
+/// the test of its existence alone. Any other failure of git is the one line
+/// that says the paths were not tested, with the text of git.
+fn ignored_verify_paths(base: &Base) -> Result<BTreeSet<String>, String> {
+    let paths: Vec<String> = base
+        .topic_files
+        .iter()
+        .flat_map(|(_, _, content)| content.get("entries").and_then(Value::as_array))
+        .flatten()
+        .flat_map(|entry| entry.get("verify").and_then(Value::as_array))
+        .flatten()
+        .map(to_js_string)
+        .collect();
+    let asked: Vec<&str> = paths.iter().map(String::as_str).collect();
+    match ignored_among(&base.root, &asked) {
+        Ok(ignored) => Ok(ignored),
+        Err(IgnoreFault::NotAWorkTree(_)) => Ok(BTreeSet::new()),
+        Err(fault) => Err(format!(
+            "knowledge: verify paths not tested against .gitignore: {fault}"
+        )),
+    }
+}
+
 /// Validates a loaded base against the schema and every cross-entry and
 /// generated-file invariant, in two stages: schema/id/area/standing/see/
 /// verify/check-shape errors accumulate first, and if any fired,
@@ -757,14 +799,22 @@ fn check_archive(base: &Base, errors: &mut Vec<String>) -> BTreeMap<String, Stri
 /// budgets), which need a valid `areas` list and a valid base to mean
 /// anything.
 ///
+/// A `verify` path that git ignores gets one line in place of the line for a
+/// missing path (`ignored_verify_paths`): a fresh clone does not hold it. A git
+/// that fails inside a work tree gives one line in the trailing group instead
+/// (`ignored_verify_paths`), and each path keeps the test of its existence.
+///
 /// The area of an active entry must be a key of `areas.json`: the schema
-/// holds no area enum to compare with. `area_findings` and
-/// `pack_see_findings`, both of the pack layer (`check_packs`), join the
-/// first stage, so a finding of either stops the second stage. The trailing
-/// group comes last in both cases, so it never hides the other stage: the
-/// findings of `pack_findings` (the pins, `overrides.json`, one id one
-/// source), the `CLAUDE.md` import, the compression markers, and the
-/// archive.
+/// holds no area enum to compare with. `area_findings`, `pack_see_findings`,
+/// and `pack_check_findings` (the fields that the check of an active pack
+/// entry requires, an override applied), all of the pack layer
+/// (`check_packs`), join the first stage, so a finding of any of them stops
+/// the second stage. The trailing group comes last in both cases, so it never
+/// hides the other stage: the findings of `pack_findings` (the pins,
+/// `overrides.json`, one id one source), the `CLAUDE.md` import, the lines
+/// about the `runners` and `workspaces` keys and the tools that runner checks
+/// name (`check_marker_keys`), the line of a git fault of the ignore test of
+/// the `verify` paths, the compression markers, and the archive.
 pub(crate) fn check_base(base: &Base) -> Vec<String> {
     let mut archive_errors = Vec::new();
     let archive_files = check_archive(base, &mut archive_errors);
@@ -785,6 +835,10 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
         &base.schema,
     );
 
+    let (ignored_verify, ignore_fault) = match ignored_verify_paths(base) {
+        Ok(ignored) => (ignored, None),
+        Err(line) => (BTreeSet::new(), Some(line)),
+    };
     let mut seen: HashMap<&str, &str> = HashMap::new();
     for (file, name, content) in &base.topic_files {
         validate(content, &base.schema, file, &mut errors, &base.schema);
@@ -851,7 +905,11 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
                 .flatten()
             {
                 let verify_path = to_js_string(verify_path);
-                if !base.root.join(&verify_path).exists() {
+                if ignored_verify.contains(&verify_path) {
+                    errors.push(format!(
+                        "{at}: verify path \"{verify_path}\" is ignored by git; commit a copy under a tracked path and verify that"
+                    ));
+                } else if !base.root.join(&verify_path).exists() {
                     errors.push(format!(
                         "{at}: verify path \"{verify_path}\" does not exist"
                     ));
@@ -864,9 +922,12 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
     }
     errors.extend(area_findings(base));
     errors.extend(pack_see_findings(base));
+    errors.extend(pack_check_findings(base));
     let mut trailing_errors = pack_findings(base, &archive_files);
     trailing_errors.extend(claude_import_finding(&base.root));
     trailing_errors.extend(crate::workflow::requirements::findings(base));
+    trailing_errors.extend(check_marker_keys::findings(base));
+    trailing_errors.extend(ignore_fault);
     trailing_errors.extend(marker_errors);
     trailing_errors.extend(archive_errors);
     if !errors.is_empty() {

@@ -1,0 +1,17 @@
+[package]
+name = "x"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+[package.metadata.release]
+tagged = "48.2.1"
+[dependencies]
+serde = { version = "=1.0.228", features = [
+    "derive",
+] }
+regex = "=1.11.1"
+local = { path = "../local" }
+[profile.release]
+opt-level = "3"
+[dev-dependencies]
+tempfile = "=3.10.0"

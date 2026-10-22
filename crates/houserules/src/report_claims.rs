@@ -322,10 +322,15 @@
 //!   is. Inside means that an ancestor of the path has the real path of the
 //!   root (`doc::root_relative`), so a symlinked directory, the real path that
 //!   git prints, and a Windows short name all name the same root. The names
-//!   below that ancestor reach git as the text spells them, so a symlink below
-//!   the root, to a directory outside it or inside it, makes git refuse the
-//!   path and fail the run with its own line (exit 2), as for a relative
-//!   citation of the same names.
+//!   below that ancestor are the names of a relative citation, so the two
+//!   spellings of one file get one verdict. A path through a symlink below the
+//!   root is judged at the target of the link (`rules::ignored_among`): git is
+//!   asked about the target when it lies inside the root, and about the link
+//!   itself when it does not, because git refuses a path beyond a symlink. The
+//!   disk lookup follows the link, so a missing target is a missing file. A
+//!   path inside a submodule is no workspace path of the install, because git
+//!   refuses it too; it is skipped. A path under `.houserules/step/` is the
+//!   output of the step script, not a workspace path, and is skipped.
 //!   A file cited in two spellings is named once, in the first spelling. A
 //!   token that starts with a letter, a colon, and a slash or backslash reads
 //!   as a Windows drive (`drive_prefix_len`), so its colon stays in the path
@@ -1385,11 +1390,9 @@ fn find_citations(text: &str) -> Vec<Citation> {
 /// and `text` are exactly `collect_narrative`'s own pair, and `citations`
 /// is `find_citations(&text)`, run here exactly once. `check_citation_lines`,
 /// `check_narrative_number_claims`, and `check_narrative_sweep_coverage`
-/// all read `citations` from this shared pass instead of each calling
-/// `find_citations` on the same text again -- fix round 1, minor issue 7:
-/// round 0 parsed a report's four narrative fields up to three times each
-/// (once per check) and recompiled `CITATION_EXTENSION_PATTERN` every
-/// time.
+/// all read `citations` from this shared pass. Each `find_citations` call
+/// compiles `CITATION_EXTENSION_PATTERN` and scans the whole text, so a field
+/// is parsed once, not once per check.
 struct NarrativeField {
     label: String,
     text: String,
@@ -1723,9 +1726,8 @@ fn check_narrative_sweep_coverage(
         // keyword match, deduplicated by citation identity (its own byte
         // range): a field naming "sweep" more than once near the same
         // citation still reads that citation's target file exactly once
-        // below (fix round 1, minor issue 7 -- round 0 called
-        // `load_citation` once per keyword match instead of once per
-        // qualifying citation).
+        // below: `load_citation` runs once per qualifying citation, not once
+        // per keyword match.
         let mut qualifying: Vec<&Citation> = Vec::new();
         for keyword_match in keyword.find_iter(text) {
             let keyword_range = keyword_match.range();
@@ -3017,7 +3019,7 @@ mod tests {
     /// every changed file floods a multi-file report with false
     /// positives), so a citation that would otherwise look like a
     /// vacuous sweep is not flagged -- pins the `files_changed.len() !=
-    /// 1` boundary (fix round 1, important issue 4).
+    /// 1` boundary.
     #[test]
     fn does_not_flag_a_vacuous_sweep_citation_when_files_changed_has_two_entries() {
         let (dir, head) = init_scratch_repo("check-report-claims-sweep-multi-file-");
@@ -3041,7 +3043,7 @@ mod tests {
     /// A `.md` artifact cited beside "sweep" is not a candidate sweep
     /// artifact (`SWEEP_ARTIFACT_EXTENSIONS`), so it is not flagged even
     /// though its content omits the report's own single changed file --
-    /// pins the artifact-shape boundary (fix round 1, important issue 4).
+    /// pins the artifact-shape boundary.
     #[test]
     fn does_not_flag_a_non_sweep_shaped_artifact_cited_beside_sweep_omitting_the_changed_file() {
         let (dir, head) = init_scratch_repo("check-report-claims-sweep-non-sweep-shape-");

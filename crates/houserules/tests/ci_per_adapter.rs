@@ -14,15 +14,14 @@ mod tracker_support;
 
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use serde_json::json;
 
 #[cfg(unix)]
 use tracker_support::hermetic_bd;
 use tracker_support::{
-    commit_all, edit_marker, git, houserules, read_json, repo_root, run_ok, scratch_git_repo,
-    stderr, stdout,
+    assert_actionlint_passes, commit_all, edit_marker, git, houserules, read_json, repo_root,
+    run_ok, scratch_git_repo, sha256_hex, stderr, stdout,
 };
 
 /// The workflow of an install at the git top level.
@@ -46,26 +45,6 @@ fn mise_pin(key: &str) -> String {
         .find_map(|line| line.strip_prefix(key)?.strip_prefix(" = \""))
         .unwrap_or_else(|| panic!("mise.toml pins {key}"));
     line.trim_end_matches('"').to_string()
-}
-
-/// Runs `actionlint` on `file` and requires a clean exit. A missing tool fails
-/// the test and names the step that installs it.
-fn assert_actionlint_passes(file: &Path) {
-    let output = Command::new("actionlint")
-        .arg(file)
-        .output()
-        .unwrap_or_else(|error| {
-            panic!(
-                "actionlint is not installed ({error}): run mise install, which pins it in mise.toml"
-            )
-        });
-    assert!(
-        output.status.success(),
-        "actionlint rejects {}:\n{}{}",
-        file.display(),
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
 }
 
 /// A scratch repository with a GitHub `origin`, so that `init` writes the CI
@@ -391,15 +370,6 @@ fn update_moves_a_workflow_at_its_baseline_to_the_content_of_the_adapter() {
     commit_all(dir.path(), "update");
     let second = run_ok(dir.path(), &["update"]);
     assert!(!stdout(&second).contains(WORKFLOW), "{}", stdout(&second));
-}
-
-/// The lowercase hex SHA-256 digest of `content`.
-fn sha256_hex(content: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    Sha256::digest(content)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
 }
 
 /// Spec 4.8: a workflow that the project changed stays, and `update` names the

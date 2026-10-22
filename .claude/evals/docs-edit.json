@@ -1,7 +1,7 @@
 {
   "agent": "implementer",
   "skills": ["project-knowledge"],
-  "query": "Add a short how-to section to a document under docs/ (pick or create a runbook) that explains one real procedure of this repository, including the commands to run. Report as your instructions require.",
+  "query": "Add a short how-to section to a document under docs/ (pick or create a runbook) that explains one real procedure of this repository, including the commands to run. Run every houserules command as `houserules`. Report as your instructions require.",
   "files": ["docs/"],
   "knowledge": [
     "writing-style.principles",

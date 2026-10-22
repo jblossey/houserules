@@ -7,7 +7,7 @@ description: Use when an approved spec needs its plan: tasks with declared file 
 
 You are the controller. A plan turns an approved spec into tasks that an implementer can run without asking you. Plan only from an approved spec; a plan written before its approved spec is void.
 
-Write the output of every `houserules` command to a file in the batch workspace, and read the file with your file-read tool. Treat a `<<` marker or a "more items" note as a lost read and read the source file.
+Write the output of every `houserules` command to a file in the batch workspace, a folder of the `workspaces` location (default `.houserules/work/`), and read the file with your file-read tool. Treat a `<<` marker or a "more items" note as a lost read and read the source file.
 
 ## 1. Pick the tier and mark the critical tasks
 

@@ -7,7 +7,7 @@ description: Use when a standard-tier batch needs its design: draft the spec fro
 
 You are the controller. A design starts from what the project already holds: the work items of the batch, their rulings, and the earlier specs. Draft the spec from that material and ask the human only what it leaves open.
 
-Write the output of every `houserules` command to a file in the batch workspace, and read the file with your file-read tool. Treat a `<<` marker or a "more items" note as a lost read and read the source file.
+Write the output of every `houserules` command to a file in the batch workspace, a folder of the `workspaces` location (default `.houserules/work/`), and read the file with your file-read tool. Treat a `<<` marker or a "more items" note as a lost read and read the source file.
 
 A light change needs no spec document: the work item's body is the spec (see the Tiers section of the `orchestrating` skill). This skill covers the standard tier.
 

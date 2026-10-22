@@ -371,7 +371,7 @@ mod tests {
             .collect();
         parse_pack(
             json!({
-                "name": "demo", "version": "1.0.0", "schema": "houserules/pack@1.1.0",
+                "name": "demo", "version": "1.0.0", "schema": "houserules/pack@1.2.0",
                 "topics": {"demo": {"title": "Demo"}}, "areas": {"global": {"paths": []}},
                 "entries": entries, "optIn": opt_in,
             }),
@@ -387,7 +387,7 @@ mod tests {
         write(
             dir.path(),
             ".houserules.json",
-            &json!({"schema": "houserules/install@2.1.0"}),
+            &json!({"schema": "houserules/install@2.2.0"}),
         );
         dir
     }

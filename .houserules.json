@@ -4,11 +4,11 @@
   "baselines": {
     "tools/claude-session-start.sh": "9a35725d9b0a90f851bb7974b57f9d94769a78f7d544c472bcd216cc5d408f7d",
     ".githooks/commit-msg": "32b161b8b965d50eee8aad833fad1387a74a72be6ad008fff6a3c3eae0dc9739",
-    ".claude/skills/migrating-knowledge/SKILL.md": "5b1be62f4c270182ac843afb8ff853a9a7a687febcc6b84a3c54e4a48a358ce5",
-    "knowledge/schema.json": "b343d0d45a51cd54eeaa1f26674343e6942c5307f6fbdb9288e53a954cbf7988",
-    ".claude/skills/houserules-step/SKILL.md": "179fa0482dbc454c5239363c20fc981504a34b96ed99309be3c0972951f9f256",
+    ".claude/skills/migrating-knowledge/SKILL.md": "746117bb956a6f43e0ef25df51e9e1f84f07881f84f8ac5fa33059764a7da853",
+    "knowledge/schema.json": "a1bc73a4c0741b95e3fd7dfeec26d587af64f125f4138f535b089a6d3c3bef73",
+    ".claude/skills/houserules-step/SKILL.md": "20774e5ef6bd59fa681eaed5de72463063000052dc78bc2f9d8048780e61c3b3",
     "tools/houserules-step.sh": "a31a59cbb03a6fd862c08c667b62cc1988dc95719fe9b805f7fa477641fff74f",
-    ".claude/schemas/deliverables.json": "b7f8ab03567fd1924333a070136bf629163f88ab6e34c798615c30ca9506c3a1",
+    ".claude/schemas/deliverables.json": "1abba48ce4da56c782d38a46ece46493bdf21dc5bfa2884980426ad9113ad963",
     "backlog/schema.json": "bd1d0e7e14513f9e5db68941665b3eacf1e79fe946e7aca17740608af9548944"
   },
   "ownedPaths": [
@@ -19,15 +19,15 @@
   ],
   "packs": {
     "knowledge-base": {
-      "version": "2.0.1",
+      "version": "3.0.0",
       "source": "kit",
-      "sha256": "7105d8be3f70c9dcb94905d0e4f6d17ce0dd0d233757e0607f83ac5dd03523b8",
+      "sha256": "fccdf3f7f38ffdc3d3f45e3d99b3d52d84f44e83f0636d56963cb4712b9f33d9",
       "addedAreas": []
     },
     "process": {
-      "version": "1.2.2",
+      "version": "2.0.0",
       "source": "kit",
-      "sha256": "9c16794badec10cc6b6b43b158d9ea124fe664eb42cc6e5c5188a63bb8291903",
+      "sha256": "38fb6a43b1057f9227e4ac1a60afaae2c9c1206599914d686b9f5859f7d80a78",
       "addedAreas": []
     },
     "quality": {
@@ -37,9 +37,9 @@
       "addedAreas": []
     },
     "security-hygiene": {
-      "version": "3.0.0",
+      "version": "5.0.0",
       "source": "kit",
-      "sha256": "37cd88eeed6a85bbb4ae11933fbbe5e0128c3bf7350aeb8c5651323887f93e24",
+      "sha256": "ddda662be06eff51dd80afc62e3caec14f89b4c2177e22da870a76883892128e",
       "addedAreas": []
     },
     "writing-style": {
@@ -52,7 +52,7 @@
   "renderers": [
     "claude"
   ],
-  "schema": "houserules/install@2.1.0",
+  "schema": "houserules/install@2.2.0",
   "tracker": {
     "adapter": "json"
   },
@@ -63,17 +63,17 @@
     "name": "reference",
     "version": "1.4.0",
     "files": {
-      ".claude/agents/branch-reviewer.md": "1e2c887f671c27526f4a871cf1d9258b634f670dd69cabde8daa7698f7220a56",
-      ".claude/agents/implementer.md": "5a74b07380ad7bb2b8b988b877f1df02356f6810a402db4880aad75d075e6d0f",
-      ".claude/agents/spec-reviewer.md": "86fd63663c010ceb80954af8dc4cf07f137e8862a3674907a9ded0c3c017fac9",
-      ".claude/agents/task-reviewer.md": "f5b09cdb110997578a1a6a62bde3fa42714eb5f903ec5922a38aa75188ab5688",
+      ".claude/agents/branch-reviewer.md": "735dafcdfe00e62b65f266215cdb9f945ac81bc4647ec86ed15ba8cfd2b1e34c",
+      ".claude/agents/implementer.md": "49cfc5c3bd805a96d2e41a4949ab219bc9ceb07fa68eda9a19174078e8cbe2d6",
+      ".claude/agents/spec-reviewer.md": "b3da2127a5443906885967bedaec9c7b06c9df5556033d09dfa32df1c8064cbb",
+      ".claude/agents/task-reviewer.md": "23db3391ea49d9af0313cbe6d0ce493ebefadafb32d217ac0664acb421ee9897",
       ".claude/evals/dependency-add.json": "8006e37011fea7b8be468c6b61f309ee1d862c4680921891060a1dcded966e4e",
-      ".claude/evals/docs-edit.json": "4689e61fdb171c3df1dc42e3a47042feb65fc83c552aed29d64bf108c809ee73",
+      ".claude/evals/docs-edit.json": "8be43f8c174b5ec65a95b6e1c84133521fed6a077fbae5516729f7e9e1c1f2f3",
       ".claude/evals/seeded-violations.json": "22f0f76c0f8bb18a1fcc5e2354bfeaab39aa52137d7e86e3c46019a16dbc61a7",
-      ".claude/skills/designing/SKILL.md": "c01b53c79fe0fecde61aee495894a46f1c941dc592ed8a889773733011ff93f6",
-      ".claude/skills/finishing-a-feature/SKILL.md": "43fc0817fb41d3582f057d4fd407f773dedcf1580e70e2667f012abc82eacb4c",
-      ".claude/skills/orchestrating/SKILL.md": "664eb74edfbf93a095b81390a0c1d2b7a6b5c49ce8df6184e35f713281893ac0",
-      ".claude/skills/planning/SKILL.md": "b5374372fad9412a2b19e050a78f595a972bc96140bde16d85e7a3dd0cc9738d",
+      ".claude/skills/designing/SKILL.md": "69299a19f668c06bdfc03b2829479d9e60d9789b91f72b519709d1742aa29499",
+      ".claude/skills/finishing-a-feature/SKILL.md": "c2d0c4b667abda4cdef64b64049b47ebc68218378a3c6d8acae395d6a3c73715",
+      ".claude/skills/orchestrating/SKILL.md": "b8ba62d9796c8d6e491a249c8b06580e10c1aa7d9e8a136deb0115b23fe1ea0d",
+      ".claude/skills/planning/SKILL.md": "80a5e1a9d9c86b4f57b535b45dac1b0c64be7ff3f22c27e1ef5bfaaadaba1762",
       "tools/reference-session-start.sh": "55993fb855bfd1117362b5eb60db6c6638176ea84dc69e48422ca7e29992b574"
     },
     "models": {
@@ -82,5 +82,6 @@
       "spec-reviewer": "opus",
       "task-reviewer": "opus"
     }
-  }
+  },
+  "workspaces": ".superpowers/sdd"
 }

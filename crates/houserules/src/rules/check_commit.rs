@@ -22,8 +22,8 @@
 //! final template state, not a rerun inside every interim commit that
 //! touches a template), so evaluating it per commit would turn its own
 //! legal, booked economy into a hard failure with no ruling behind it. An
-//! entry without `per_commit: true` is read here for nothing; `run_check`'s
-//! own range-level `CheckType::CoChange` arm still evaluates it,
+//! entry without `per_commit: true` is read here for nothing; the
+//! range-level `co_change::run` of the audit runners still evaluates it,
 //! unaffected either way.
 //!
 //! An opted-in check also only fires against a commit whose PARENT tree
@@ -60,13 +60,13 @@
 //!
 //! ## Reuse, not reimplementation
 //!
-//! `super::audit::CommitsCheck` is the one place `subject`/`body_absent`/
+//! `super::runner::CommitsCheck` is the one place `subject`/`body_absent`/
 //! `body_line_max` are evaluated against one `Commit`; both
-//! `run_check`'s `CheckType::Commits` arm and this file's own `check_commit`
+//! the audit's `commits::run` and this file's own `check_commit`
 //! call it, so the two commands can never independently drift on what
-//! counts as a violation (`audit.rs`'s own module doc has that struct's
-//! full account). The range arm reads its commits through `audit::rev` and
-//! `audit::commits_in`, the exact same git-plumbing `audit` itself uses for
+//! counts as a violation (`runner/commits.rs`'s own doc has that struct's
+//! full account). The range arm reads its commits through `git::rev` and
+//! `git::commits_in`, the exact same git-plumbing `audit` itself uses for
 //! a `commits`-type check -- no second `git log` invocation of this file's
 //! own. The message-file arm makes two git calls of its own on the raw
 //! message -- a repository-local `core.commentChar` lookup, then `git
@@ -136,13 +136,13 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 
-use super::audit::{
-    CoChangeCheck, Commit, CommitsCheck, changed_files_for, commits_in,
-    paths_changed_against_any_parent, rev, tree_files,
-};
 use super::check_shape::{CheckLevel, CheckType};
+use super::git::{
+    Commit, changed_files_for, commits_in, paths_changed_against_any_parent, rev, tree_files,
+};
 use super::git_paths::InstallPrefix;
 use super::model::{Base, CheckField, load_base};
+use super::runner::{CoChangeCheck, CommitsCheck};
 use super::trailers;
 
 /// `git commit --verbose`'s own "cut here" line's fixed second half; the
@@ -270,7 +270,7 @@ fn run_stripspace(root: &Path, text: &str) -> Result<String, String> {
 /// Splits a message into `(subject, body)`: the first line is the
 /// subject, and every line after it -- blank-line-separated from the
 /// subject or not -- is the body. This is deliberately simpler than `git
-/// log`'s own `%s`/`%b` split (`audit.rs`'s `commits_in`), which joins a
+/// log`'s own `%s`/`%b` split (`git.rs`'s `commits_in`), which joins a
 /// subject's wrapped continuation lines and can therefore drop a line
 /// that never reaches a blank separator into the subject instead of the
 /// body: safe for `subject`/`body_line_max` (a merged line only ever
@@ -390,8 +390,8 @@ fn changes_only_outside_the_install(
 /// (`changes_only_outside_the_install`). An install at the git top level
 /// checks every commit. A
 /// `co-change` entry lacking `per_commit: true` (`process.evals-rerun`'s
-/// own entry, say) is never evaluated here at all -- `run_check`'s own
-/// range-level `CheckType::CoChange` arm still reads it, unaffected either
+/// own entry, say) is never evaluated here at all -- the range-level
+/// `co_change::run` of the audit runners still reads it, unaffected either
 /// way (this file's own module doc has the reason the opt-in exists). An
 /// opted-in entry only ever evaluates on the range arm, and only against a
 /// commit whose PARENT tree already contains its own `then` target

@@ -16,8 +16,9 @@ interactive rebase is not available, commit aggregation uses `git reset
 --soft` instead.
 
 Write the output of every `houserules` command to a file in the batch
-workspace, and read the file with your file-read tool. Treat a `<<` marker
-or a "more items" note as a lost read and read the source file.
+workspace, a folder of the `workspaces` location (default
+`.houserules/work/`), and read the file with your file-read tool. Treat a
+`<<` marker or a "more items" note as a lost read and read the source file.
 
 ## When to Use
 

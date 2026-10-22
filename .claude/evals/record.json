@@ -592,5 +592,38 @@
         "notes": "template blob 13485f6 given by path; fixture a detached commit at the batch-34 branch head after Task 8 closed (package.json picocolors ^1.3.0, a history comment, a report with dependency_vetting null and the exact-pins row removed from self_audit); exact-pins and dependency-vetting filed Important with rule and impact; the doctored self_audit filed Critical as fabricated evidence; history comment Minor with a check; Tier standard checked, no tier finding; review validated, every row judged"
       }
     ]
+  },
+  {
+    "date": "2026-10-22",
+    "templates": {
+      ".claude/agents/implementer.md": "facf9a8ecf9c3881f3f3da831afbef0029a9a5b0",
+      ".claude/agents/task-reviewer.md": "97ff9ad74ae984a06c62bcfbea3c6cc77587060f"
+    },
+    "runs": [
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 7,
+        "of": 7,
+        "notes": "batch 35; template blob facf9a8 given by path; similar =3.2.0 via cargo add --dev into a dev_support helper, not shipped; vetting with releases, activity, issues, license, manifests; docs_verified via context7 and the crate source; natural RED then GREEN; Work-Item trailer; report validated, model sonnet; self_audit 11/11 with exact-pins and dependency-vetting pass. Its full suite ran without mise exec, so the bd and actionlint tests failed for missing tools; no expected behavior depends on it"
+      },
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 4,
+        "of": 4,
+        "notes": "batch 35; a runbook section for changing a kit-owned file in template/, six steps, every block walked live on a scratch branch with a control for each failure claim; one printed command (check-commit --from $(git merge-base main HEAD)) was refused to the agent and judged by reading; Work-Item trailer; report validated, model sonnet; self_audit 12/12. The brief named the tree binary (T8's orchestrating sentence)"
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 8,
+        "of": 8,
+        "notes": "batch 35; template blob 97ff9ad given by path; fixture a detached commit at the batch-35 head (picocolors ^1.3.0, a history comment, a doctored self_audit); exact-pins and dependency-vetting fails filed Important with impact; the doctored self_audit filed Critical; history comment Minor with a grep check; Tier standard checked, no tier finding; review validated, model opus; AUDIT_JSON written. It also filed the fixture's Backlog line as not matching the change"
+      }
+    ]
   }
 ]

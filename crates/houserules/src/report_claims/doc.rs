@@ -5,15 +5,20 @@
 //! the batch workspace no longer holds. The parent module doc's Limits list
 //! names what the check does not see.
 
-use std::io::Write;
 use std::path::{Component, Path};
-use std::process::{Command, Stdio};
 
 use serde_json::Value;
 
+use crate::rules::ignored_among;
 use crate::tracker::{self, Lookup};
 
 use super::{find_citations, read_utf8_lossy, resolve_against};
+
+/// The folder below the install root that holds the output of the step script
+/// (`rules.json`, `audit.json`, `validate.json`). A tool wrote it, and the
+/// checkout has not run the tool, so a citation of it names no evidence of the
+/// workspace.
+const STEP_OUTPUT_FOLDER: &str = ".houserules/step";
 
 /// The characters that make a cited token a pattern or a template, not one
 /// path: a glob, a set, or an angle-bracket placeholder.
@@ -44,11 +49,11 @@ struct Candidate<'a> {
 /// whatever the spelling of either (a symlinked directory, the real path that
 /// git prints, a Windows short name). The answer is then the names below that
 /// ancestor, as the text spells them, with `/` separators: an absolute
-/// citation gets the verdict of the relative citation of the same names, so a
-/// symlink below the root makes git refuse the path and fail the run with its
-/// own line. An absolute path with no such ancestor, and the root itself, have
-/// no answer: git refuses a path outside its repository. A `root` that cannot
-/// be resolved is the operating system's error.
+/// citation gets the verdict of the relative citation of the same names, also
+/// where a symlink below the root lies on the path (`ignored_among` judges it).
+/// An absolute path with no such ancestor, and the root itself, have no
+/// answer: git refuses a path outside its repository. A `root` that cannot be
+/// resolved is the operating system's error.
 fn root_relative(cited: &str, root: &Path) -> std::io::Result<Option<String>> {
     let location = Path::new(cited);
     if !location.is_absolute() {
@@ -74,53 +79,27 @@ fn root_relative(cited: &str, root: &Path) -> std::io::Result<Option<String>> {
 
 /// The members of `candidates` that git ignores in the working tree at
 /// `root`, in the order given. A failure to run git, or a git that fails, is a
-/// named error with git's own text.
+/// named error with git's own text. A candidate inside a submodule is no
+/// member (`ignored_among` has the rule).
 fn ignored_candidates<'a>(
     root: &Path,
     candidates: Vec<Candidate<'a>>,
 ) -> Result<Vec<Candidate<'a>>, String> {
-    if candidates.is_empty() {
-        return Ok(Vec::new());
-    }
-    let mut child = Command::new("git")
-        .args(["check-ignore", "-z", "--stdin"])
-        .current_dir(root)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("git check-ignore could not run: {error}"))?;
-    let mut stdin = child.stdin.take().expect("stdin is piped");
-    let input = candidates
+    let relatives: Vec<&str> = candidates
         .iter()
         .map(|candidate| candidate.relative.as_str())
-        .collect::<Vec<_>>()
-        .join("\0")
-        + "\0";
-    // Git answers while it reads, so a writer thread keeps a long list from
-    // filling both pipes at once. A write that fails means git has already
-    // stopped; its exit status below names the failure.
-    let output = std::thread::scope(|scope| {
-        scope.spawn(move || stdin.write_all(input.as_bytes()));
-        child.wait_with_output()
-    })
-    .map_err(|error| format!("git check-ignore could not run: {error}"))?;
-    // Exit 0: some path is ignored. Exit 1: none is. Anything else is a fault.
-    if !matches!(output.status.code(), Some(0 | 1)) {
-        return Err(format!(
-            "git check-ignore failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    let ignored: Vec<&[u8]> = output
-        .stdout
-        .split(|&byte| byte == 0)
-        .filter(|entry| !entry.is_empty())
         .collect();
+    let ignored = ignored_among(root, &relatives).map_err(|fault| fault.to_string())?;
     Ok(candidates
         .into_iter()
-        .filter(|candidate| ignored.contains(&candidate.relative.as_bytes()))
+        .filter(|candidate| ignored.contains(&candidate.relative))
         .collect())
+}
+
+/// `true` when `relative`, a path below the install root, lies in the folder of
+/// the step script's output.
+fn is_step_output(relative: &str) -> bool {
+    Path::new(relative).starts_with(STEP_OUTPUT_FOLDER)
 }
 
 /// Names each workspace path that `text` cites and that does not exist under
@@ -130,7 +109,11 @@ fn ignored_candidates<'a>(
 /// cited twice, in one spelling or two, is named once, in the spelling and the
 /// order of its first citation. A relative citation and an absolute citation
 /// inside `root` are candidates (`root_relative` defines inside); an absolute
-/// citation outside `root` is skipped. A cited path that exists but cannot be
+/// citation outside `root` is skipped, and so is a citation of the output of
+/// the step script (`STEP_OUTPUT_FOLDER`). A citation through a symlink is
+/// judged at the target of the link (`ignored_among` has the rule), and the
+/// disk lookup follows the link, so a missing target is a missing file. A
+/// cited path that exists but cannot be
 /// inspected is a line with the operating system's error text. An absolute
 /// citation with a `root` that cannot be resolved is the line `<label>:
 /// cannot resolve the install root <root>: <the operating system's error>`.
@@ -148,6 +131,7 @@ fn check_workspace_citations(root: &Path, label: &str, text: &str) -> Result<Vec
             )
         })?;
         if let Some(relative) = relative
+            && !is_step_output(&relative)
             && !candidates
                 .iter()
                 .any(|candidate| candidate.relative == relative)
@@ -233,6 +217,23 @@ mod tests {
             "a/b.c/d.json",
         ] {
             assert!(names_one_file(path), "{path}");
+        }
+    }
+
+    /// The output folder of the step script is matched by whole path
+    /// components, at the root only.
+    #[test]
+    fn the_step_output_folder_is_matched_by_components_at_the_root() {
+        for path in [".houserules/step/rules.json", ".houserules/step/a/b.json"] {
+            assert!(is_step_output(path), "{path}");
+        }
+        for path in [
+            ".houserules/steps/rules.json",
+            ".houserules/step.json",
+            ".houserules/work/step/rules.json",
+            "docs/.houserules/step/rules.json",
+        ] {
+            assert!(!is_step_output(path), "{path}");
         }
     }
 

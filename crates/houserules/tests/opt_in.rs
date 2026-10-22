@@ -13,9 +13,8 @@
 //! that every path calls are unit tests in `install/pack_moves.rs` and
 //! `pack/opt_in.rs`.
 //!
-//! Tests that assert behavior this batch adds fail at the commit before it
-//! (the RED of design.md 173(2)). A test that asserts behavior that did not
-//! change says so in its doc comment: it is a pin of unchanged behavior.
+//! A test whose doc comment calls it a pin asserts behavior that the code
+//! held before the change the file pins; every other test asserts the change.
 
 mod locked_file;
 mod tracker_support;
@@ -131,7 +130,7 @@ fn demo_pack(version: &str, ids: &[&str], opt_in: &[&str]) -> Value {
     json!({
         "name": "demo",
         "version": version,
-        "schema": "houserules/pack@1.1.0",
+        "schema": "houserules/pack@1.2.0",
         "topics": {"demo": {"title": "Demo rules"}},
         "areas": {"global": {"paths": []}},
         "entries": entries,

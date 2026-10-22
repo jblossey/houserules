@@ -11,9 +11,8 @@
 //! adapter and lives with it; the resolution of that line is a unit test in
 //! `rules/trailers.rs`.
 //!
-//! Tests that assert behavior this batch adds fail at the commit before it
-//! (the RED of design.md 173(2)). A test that asserts behavior that did not
-//! change says so in its doc comment: it is a pin of unchanged behavior.
+//! A test whose doc comment calls it a pin asserts behavior that the code
+//! held before the change the file pins; every other test asserts the change.
 
 mod tracker_support;
 
@@ -145,8 +144,8 @@ fn audit_of_a_range_with_no_trailer_prints_no_line() {
 
 /// Spec 3.7: trailers that resolve pass: a work item, an aggregated commit
 /// with two `Work-Item:` trailers, and a `Deferred:` trailer that names a
-/// filed deferral with a reason. Pin of unchanged behavior at the commit
-/// before this batch, which read no trailer; the test guards the verdict.
+/// filed deferral with a reason. A pin: the audit
+/// passes such a range whether or not it reads trailers; the test guards the verdict.
 #[test]
 fn audit_passes_trailers_that_resolve() {
     let (dir, base) = json_install();
@@ -278,8 +277,7 @@ fn audit_names_a_deferred_trailer_with_no_reason() {
 }
 
 /// Spec 3.7: the two texts of a `Deferred:` trailer are not compared. The
-/// reason of the trailer differs from the reason of the item and passes. It
-/// passes at the commit before this batch, which reads no trailer: a guard
+/// reason of the trailer differs from the reason of the item and passes. A guard
 /// against a verdict that compares the texts.
 #[test]
 fn audit_does_not_compare_the_reason_of_a_deferred_trailer_with_the_item() {
@@ -295,8 +293,7 @@ fn audit_does_not_compare_the_reason_of_a_deferred_trailer_with_the_item() {
 }
 
 /// Spec 3.7: only the last paragraph of a message holds trailers, by git's
-/// own rule. A `Work-Item:` line in an earlier paragraph is prose. It passes
-/// at the commit before this batch, which reads no trailer: a guard against
+/// own rule. A `Work-Item:` line in an earlier paragraph is prose. A guard against
 /// a reader that scans the whole body.
 #[test]
 fn audit_reads_only_the_last_paragraph_for_trailers() {
@@ -541,8 +538,7 @@ fn audit_report_resolves_each_backlog_id_of_the_issues() {
     assert_eq!(output.status.code(), Some(1));
 }
 
-/// Spec 3.7 (F13): with the ids fixed, the same audit exits 0. It passes at
-/// the commit before this batch, which reads no review: a guard against a
+/// Spec 3.7 (F13): with the ids fixed, the same audit exits 0. A guard against a
 /// reader that fails a filed deferral.
 #[test]
 fn audit_report_passes_when_every_backlog_id_is_a_filed_deferral() {
@@ -666,9 +662,9 @@ fn assert_verdict(result: &Value, references: &Value, reference_fail: usize) {
 
 /// The audit's JSON holds the verdict that stderr and the exit code carry:
 /// a failing `Work-Item:` trailer and two failing `Deferred:` trailers show
-/// in `references.failures`, newest commit first, and the references that
-/// the tracker judged count as resolved. The stderr lines and the exit code
-/// stay as they were.
+/// in `references.failures`, newest commit first. `references.checked` counts
+/// the four references that the tracker judged and `references.passed` the one
+/// that resolved. The stderr lines and the exit code stay as they were.
 #[test]
 fn audit_json_holds_each_failing_trailer_and_counts_the_references() {
     let (dir, base) = json_install();
@@ -692,7 +688,7 @@ fn audit_json_holds_each_failing_trailer_and_counts_the_references() {
     assert_eq!(output.status.code(), Some(1));
     assert_verdict(
         &result,
-        &json!({"resolved": 4, "skipped": 0, "failures": lines}),
+        &json!({"checked": 4, "passed": 1, "skipped": 0, "failures": lines}),
         3,
     );
 }
@@ -723,7 +719,7 @@ fn audit_json_holds_an_unfiled_backlog_id() {
     assert_eq!(output.status.code(), Some(1));
     assert_verdict(
         &result,
-        &json!({"resolved": 3, "skipped": 0, "failures": lines}),
+        &json!({"checked": 3, "passed": 1, "skipped": 0, "failures": lines}),
         2,
     );
 }
@@ -746,14 +742,14 @@ fn audit_json_holds_line_b() {
     assert_eq!(output.status.code(), Some(1));
     assert_verdict(
         &result,
-        &json!({"resolved": 0, "skipped": 2, "failures": [LINE_B]}),
+        &json!({"checked": 0, "passed": 0, "skipped": 2, "failures": [LINE_B]}),
         1,
     );
 }
 
 /// The line of a tracker that cannot be reached is a failure entry of the
-/// JSON, and no reference counts as resolved. The audit still prints its
-/// JSON and exits 1.
+/// JSON, and no reference counts as checked or passed. The audit still prints
+/// its JSON and exits 1.
 #[test]
 fn audit_json_holds_an_unreachable_tracker() {
     let (dir, base) = json_install();
@@ -764,7 +760,29 @@ fn audit_json_holds_an_unreachable_tracker() {
     assert_eq!(output.status.code(), Some(1));
     assert_verdict(
         &result,
-        &json!({"resolved": 0, "skipped": 1, "failures": [JSON_UNREACHABLE]}),
+        &json!({"checked": 0, "passed": 0, "skipped": 1, "failures": [JSON_UNREACHABLE]}),
+        1,
+    );
+}
+
+/// HR-221: `references.checked` counts every reference that the tracker
+/// judged, and `references.passed` counts those that resolved. One passing and
+/// one failing trailer give `checked` 2 and `passed` 1.
+#[test]
+fn audit_json_counts_one_passing_and_one_failing_trailer() {
+    let (dir, base) = json_install();
+    let sha = commit_with(
+        dir.path(),
+        "feat: add the lookup",
+        &["Work-Item: WI-001", "Work-Item: WI-099"],
+    );
+    let lines = [work_item_unresolved(&sha, "WI-099")];
+    let (output, result) = audit_result(dir.path(), &base, &[]);
+    assert_eq!(stderr(&output), printed(&lines));
+    assert_eq!(output.status.code(), Some(1));
+    assert_verdict(
+        &result,
+        &json!({"checked": 2, "passed": 1, "skipped": 0, "failures": lines}),
         1,
     );
 }
@@ -785,7 +803,7 @@ fn audit_json_of_a_clean_range_shows_zero_failures() {
     assert_eq!(output.status.code(), Some(0));
     assert_verdict(
         &result,
-        &json!({"resolved": 2, "skipped": 0, "failures": []}),
+        &json!({"checked": 2, "passed": 2, "skipped": 0, "failures": []}),
         0,
     );
 
@@ -794,7 +812,7 @@ fn audit_json_of_a_clean_range_shows_zero_failures() {
     assert_eq!(quiet.status.code(), Some(0));
     assert_verdict(
         &none,
-        &json!({"resolved": 0, "skipped": 0, "failures": []}),
+        &json!({"checked": 0, "passed": 0, "skipped": 0, "failures": []}),
         0,
     );
 }
@@ -817,7 +835,7 @@ fn audit_json_without_a_tracker_counts_the_references_it_skipped() {
     assert_eq!(output.status.code(), Some(0));
     assert_verdict(
         &result,
-        &json!({"resolved": 0, "skipped": 3, "failures": []}),
+        &json!({"checked": 0, "passed": 0, "skipped": 3, "failures": []}),
         0,
     );
 }
@@ -831,7 +849,9 @@ fn audit_help_names_where_the_verdict_sits() {
     for phrase in [
         "The JSON result holds the same verdict:",
         "`references.failures` lists each failure line",
-        "`references.resolved` and `references.skipped` count the references",
+        "`references.checked` counts the references that the tracker judged",
+        "`references.passed` counts those among them that passed",
+        "`references.skipped` counts those that the audit did not judge (no tracker, a tracker that cannot be reached, or a tracker that answered with an error)",
         "`summary.reference_fail` counts the failures",
         "The line that asks for a tracker, and the line of a tracker that cannot be reached, are failures too",
         "Also writes the JSON result that stdout prints to this file",
@@ -984,8 +1004,7 @@ fn check_commit_reads_trailers_under_a_repository_trailer_separators() {
 /// author, or one whose subject is exempt, passes. The authors are matched
 /// by name (`%an`), and the subject exemption holds for a human author: a
 /// release-please run with a personal token authors its commits as a human.
-/// It passes at the commit before this batch, which reads no such field: a
-/// guard against an exemption that is too narrow.
+/// A guard against an exemption that is too narrow.
 #[test]
 fn check_commit_exempts_the_authors_and_the_subjects_of_the_entry() {
     let (dir, base) = install_with_the_every_commit_check();

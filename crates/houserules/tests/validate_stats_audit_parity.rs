@@ -1557,7 +1557,7 @@ fn forwards_workspace_from_the_cli_to_audit() {
     assert_eq!(result["rules"][0]["result"], serde_json::json!("pass"));
     assert_eq!(
         result["rules"][0]["evidence"],
-        serde_json::json!("report field dependency_vetting is set in 1 reports")
+        serde_json::json!("report field dependency_vetting is set in 1 of 1 reports")
     );
 }
 

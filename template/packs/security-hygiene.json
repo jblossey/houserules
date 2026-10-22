@@ -1,7 +1,7 @@
 {
   "name": "security-hygiene",
-  "version": "3.0.0",
-  "schema": "houserules/pack@1.0.0",
+  "version": "5.0.0",
+  "schema": "houserules/pack@1.2.0",
   "topics": {
     "security-hygiene": {
       "title": "Dependency, commit, and test hygiene"
@@ -21,8 +21,7 @@
       "summary": "Pin exact versions. Install only with a CLI (`pnpm add --save-exact`, `cargo add <crate>@=<version>`). Never write a version number by hand.",
       "body": [
         "Ranges (`^`, `~`) widen the attack surface. Resolve to the latest stable version at install time.",
-        "The deterministic check covers `package.json` and `Cargo.toml`; ranges inside the `engines` object are floors, not dependency pins, and are exempt. Other ecosystems are judged by the reviewer under the same rule.",
-        "A bare Cargo range (\"2.14\", an implicit caret) is invisible to the pattern without false-positiving the [package] version line; it stays judged material."
+        "The deterministic check covers `package.json` and `Cargo.toml`; ranges inside the `engines` object are floors, not dependency pins, and are exempt. In `Cargo.toml` it misses a table header with inner spaces (`[ dependencies ]`) and a dotted key (`serde.version = \"1\"`). Other ecosystems and the missed forms are judged by the reviewer under the same rule."
       ],
       "tags": [
         "dependencies",
@@ -40,7 +39,78 @@
           "**/package.json",
           "**/Cargo.toml"
         ],
-        "pattern": "(?<!\"engines\":\\s*\\{[^}]*)(\"([\\^~]|>=?|<=?)\\s*\\d|\"\\*\"|\"latest\"|\"\\d+(\\.\\d+)*\\.x\")",
+        "flags": "m",
+        "pattern": "\"(?=(?:[\\^~]|>=?|<=?)\\s*\\d|\\*\"|latest\"|\\d+(?:\\.\\d+)*\\.x\")(?<!\"engines\":\\s*\\{[^}]*)|^(?=[ \\t]*(?:\"[^\"\\n]+\"|[A-Za-z0-9_-]+)[ \\t]*=[ \\t]*(?:[\"']\\d|\\{[^}\\n]*\\bversion[ \\t]*=[ \\t]*[\"']\\d))(?<=^[ \\t]*\\[(?:[^\\]\\n]*\\.)?(?:dev-|build-)?dependencies\\][ \\t]*(?:#[^\\n]*)?\\r?\\n(?:(?![ \\t]*\\[)[^\\n]*\\n)*?)[ \\t]*(?:\"[^\"\\n]+\"|[A-Za-z0-9_-]+)|^(?=[ \\t]*version[ \\t]*=[ \\t]*[\"']\\d)(?<=^[ \\t]*\\[(?:[^\\]\\n]*\\.)?(?:dev-|build-)?dependencies\\.[^\\]\\n]+\\][ \\t]*(?:#[^\\n]*)?\\r?\\n(?:(?![ \\t]*\\[)[^\\n]*\\n)*?)[ \\t]*version",
+        "scope": "changed"
+      }
+    },
+    {
+      "id": "security-hygiene.tool-pins-are-exact",
+      "kind": "rule",
+      "area": "global",
+      "summary": "Pin each tool of a mise `[tools]` table to a full version; a channel, a prefix, or a range admits an unvetted release.",
+      "body": [
+        "A channel (`latest`, `stable`, `lts`) follows new releases, and `system` takes whatever release the PATH holds. A prefix (`22`, `0.18`, `prefix:1.22`) matches the newest release of a line. A range (`~`, `^`, `<`, `>`, `=`, `*`) matches many releases. Each one installs a release that nobody vetted. Write the full version, for example `22.1.0`.",
+        "The check reads the `[tools]` table of each mise config file, a plain value or the `version` of an inline table. It misses a `[tools.<name>]` table, a version array, and the `ref:`, `path:`, and `sub-<n>:` prefixes. The reviewer judges those under the same rule."
+      ],
+      "tags": [
+        "dependencies",
+        "supply-chain"
+      ],
+      "source": {
+        "date": "2026-10-22",
+        "by": "docs",
+        "ref": "HR-214"
+      },
+      "check": {
+        "type": "grep-absent",
+        "level": "fail",
+        "files": [
+          "**/mise.toml",
+          "**/.mise.toml",
+          "**/.mise.*.toml",
+          "**/mise.*.toml",
+          "**/mise/config.toml",
+          "**/mise/config.*.toml",
+          "**/mise/conf.d/**/*.toml",
+          "**/.mise/config.toml",
+          "**/.mise/config.*.toml",
+          "**/.mise/conf.d/**/*.toml",
+          "**/.config/mise.toml",
+          "**/.config/mise/*.toml",
+          "**/.config/mise/conf.d/**/*.toml"
+        ],
+        "flags": "m",
+        "pattern": "^(?=[ \\t]*(?:\"[^\"\\n]+\"|[A-Za-z0-9_.:@/-]+)[ \\t]*=[ \\t]*(?:[\"'](?:latest|lts[^\"']*|stable|nightly|beta|system|prefix:[^\"']*|\\d+(?:\\.\\d+)?|[~^<>=*][^\"']*)[\"']|\\{[^}\\n]*\\bversion[ \\t]*=[ \\t]*[\"'](?:latest|lts[^\"']*|stable|nightly|beta|system|prefix:[^\"']*|\\d+(?:\\.\\d+)?|[~^<>=*][^\"']*)[\"']))(?<=^[ \\t]*\\[tools\\][ \\t]*(?:#[^\\n]*)?\\r?\\n(?:(?![ \\t]*\\[)[^\\n]*\\n)*?)[ \\t]*(?:\"[^\"\\n]+\"|[A-Za-z0-9_.:@/-]+)",
+        "scope": "changed"
+      }
+    },
+    {
+      "id": "security-hygiene.tool-versions-pins-are-exact",
+      "kind": "rule",
+      "area": "global",
+      "summary": "Pin each tool of a `.tool-versions` file to a full version; a channel, a prefix, or a range admits an unvetted release.",
+      "body": [
+        "A line of a `.tool-versions` file names a tool and a version. A channel (`latest`, `stable`, `lts`), `system` (whatever release the PATH holds), a bare major or major.minor, a `prefix:` value, or a range (`~`, `^`, `<`, `>`, `=`, `*`) admits a release that nobody vetted. Write the full version, for example `node 22.1.0`.",
+        "The check reads the first version of a line, with or without a trailing comment. It misses a line with a second version. The reviewer judges that line under the same rule."
+      ],
+      "tags": [
+        "dependencies",
+        "supply-chain"
+      ],
+      "source": {
+        "date": "2026-10-22",
+        "by": "docs",
+        "ref": "HR-214"
+      },
+      "check": {
+        "type": "grep-absent",
+        "level": "fail",
+        "files": [
+          "**/.tool-versions"
+        ],
+        "flags": "m",
+        "pattern": "^[^#\\s]\\S*[ \\t]+(?:latest|lts\\S*|stable|nightly|beta|system|prefix:\\S*|\\d+(?:\\.\\d+)?|[~^<>=*]\\S*)[ \\t]*(?:#[^\\n]*)?\\r?$",
         "scope": "changed"
       }
     },
@@ -171,7 +241,8 @@
           "**/pyproject.toml",
           "go.mod"
         ],
-        "field": "docs_verified"
+        "field": "docs_verified",
+        "non_empty": true
       }
     }
   ]

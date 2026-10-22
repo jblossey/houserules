@@ -1,0 +1,10 @@
+{
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
+  "files": ["*.md"],
+  "dependencies": {
+    "x": "1.0.0"
+  }
+}

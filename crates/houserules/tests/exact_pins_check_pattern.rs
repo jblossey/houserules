@@ -1,14 +1,15 @@
 //! Compiles the shipped `security-hygiene.exact-pins` knowledge entry's
 //! `check.pattern` -- the deterministic gate every `package.json`/
 //! `Cargo.toml` change runs under `houserules audit` -- with `regress`, the
-//! engine `rules::audit::compile_check_regex` uses in production, then
+//! engine `rules::runner::compile_check_regex` uses in production, then
 //! asserts it matches and rejects a fixed set of sample lines.
-//! `compile_check_regex` is private to the `audit` module and unreachable
+//! `compile_check_regex` is private to the `runner` module and unreachable
 //! from an integration test, so this file calls `regress::Regex::with_flags`
 //! directly instead of linking to it. The pattern is read live from the
 //! shipped payload file, not copied inline, so an edit to the entry's
 //! `check.pattern` changes what this test compiles the same way it changes
-//! what `houserules audit` compiles.
+//! what `houserules audit` compiles. The cost test times the compiled pattern
+//! on a generated `package.json` and a generated `Cargo.toml`.
 
 use std::path::{Path, PathBuf};
 
@@ -88,5 +89,66 @@ fn exact_pins_pattern_matches_the_shipped_lines_regress_compiles() {
     ];
     for line in non_matching {
         assert!(regex.find(line).is_none(), "expected no match: {line}");
+    }
+}
+
+/// The line count of each generated manifest of the cost test.
+const GENERATED_LINES: usize = 3000;
+
+/// A generated `package.json` of `GENERATED_LINES` lines: exact dependency
+/// pins and, on the last dependency line, a caret range. Returns the text and
+/// the line of the range.
+fn generated_package_json() -> (String, usize) {
+    let mut text = String::from("{\n  \"dependencies\": {\n");
+    let exact = GENERATED_LINES - 5;
+    for index in 0..exact {
+        text.push_str(&format!("    \"dep-{index}\": \"1.{index}.0\",\n"));
+    }
+    text.push_str("    \"dep-last\": \"^1.0.0\"\n  }\n}\n");
+    (text, GENERATED_LINES - 2)
+}
+
+/// A generated `Cargo.toml` of `GENERATED_LINES` lines: a `[features]` table
+/// whose values are arrays, so no value starts with a digit, then a `[dependencies]` table with an exact pin and,
+/// on its last line, a bare range. Returns the text and the line of the range.
+fn generated_cargo_toml() -> (String, usize) {
+    let mut text = String::from("[package]\nname = \"big\"\nversion = \"0.1.0\"\n\n[features]\n");
+    let features = GENERATED_LINES - 9;
+    for index in 0..features {
+        text.push_str(&format!("f{index} = [\"dep:a{index}\"]\n"));
+    }
+    text.push_str("\n[dependencies]\nserde = \"=1.0.200\"\nregex = \"1.11\"\n");
+    (text, GENERATED_LINES)
+}
+
+/// The line (1-based) where the first match of `regex` in `text` starts.
+fn first_match_line(regex: &regress::Regex, text: &str) -> Option<usize> {
+    let found = regex.find(text)?;
+    Some(text[..found.start()].matches('\n').count() + 1)
+}
+
+/// Spec 8.1, the cost test: the pattern scans a generated 3000-line
+/// `package.json` and a generated 3000-line `Cargo.toml` of features within two
+/// seconds in a debug build, and finds the range on the last line of each. The
+/// range on the last line forces a scan of the whole text.
+#[test]
+fn exact_pins_scans_a_3000_line_manifest_within_two_seconds() {
+    let (pattern, flags) = exact_pins_check_pattern();
+    let regex = regress::Regex::with_flags(&pattern, flags.as_str())
+        .unwrap_or_else(|error| panic!("compile check.pattern {pattern:?}: {error}"));
+
+    for (name, (text, range_line)) in [
+        ("package.json", generated_package_json()),
+        ("Cargo.toml", generated_cargo_toml()),
+    ] {
+        assert_eq!(text.lines().count(), GENERATED_LINES, "{name}");
+        let started = std::time::Instant::now();
+        let line = first_match_line(&regex, &text);
+        let elapsed = started.elapsed();
+        assert_eq!(line, Some(range_line), "{name}: the line of the range");
+        assert!(
+            elapsed < std::time::Duration::from_secs(2),
+            "{name}: the scan took {elapsed:?}"
+        );
     }
 }

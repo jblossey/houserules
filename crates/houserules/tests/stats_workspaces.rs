@@ -177,6 +177,7 @@ fn an_empty_workspace_among_others_is_a_zero_row_not_an_error() {
             "tasks": 0, "reviews": 0, "re_reviews": 0, "fix_rounds": 0, "report_bytes": 0,
             "findings": {"critical": 0, "important": 0, "minor": 0, "other": 0},
             "targets": {"code": 0, "deliverable": 0, "prose": 0, "other": 0},
+            "reversals": 0,
         })
     );
     assert_eq!(value["cost"]["totals"]["tasks"], json!(1));

@@ -3,7 +3,7 @@
 //! Every path a gate matches is relative to the install root, and a path
 //! outside the root is out of scope. git prints `diff --name-only` paths
 //! from the git top level, and `ls-tree` paths from the directory it runs
-//! in. The helpers in `audit.rs` ask git for top-level paths, NUL-separated
+//! in. The helpers in `git.rs` ask git for top-level paths, NUL-separated
 //! (`-z`: git never quotes a name then), and [`InstallPrefix::map`] is the
 //! one function that turns such a list into install-root paths. An install
 //! at the git top level has an empty prefix, and every path maps to

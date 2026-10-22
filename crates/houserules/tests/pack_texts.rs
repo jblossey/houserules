@@ -612,7 +612,7 @@ fn no_pack_entry_names_a_file_or_role_that_a_minimal_install_lacks() {
         findings.len(),
         findings.join("\n")
     );
-    assert_eq!(scanned_entries, 65, "the kit carries 65 entries");
+    assert_eq!(scanned_entries, 67, "the kit carries 67 entries");
 }
 
 #[test]

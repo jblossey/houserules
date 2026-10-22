@@ -1,0 +1,21 @@
+== commit-msg topic-1
+exit: 0
+-- stdout
+check-commit: ok
+-- stderr
+== commit-msg topic-2
+exit: 1
+-- stdout
+-- stderr
+pins.commit-format: commit "feat: touch the source" has a body line over 40 characters
+== commit-msg topic-3
+exit: 0
+-- stdout
+check-commit: ok
+-- stderr
+== commit-msg topic-4
+exit: 1
+-- stdout
+-- stderr
+pins.commit-format: commit "Rewrite the log" does not match ^(feat|fix|chore|docs|test): .+
+no Work-Item trailer (pins.trailer)

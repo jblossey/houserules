@@ -566,6 +566,7 @@ dependencies = [
  "globset",
  "indexmap",
  "libc",
+ "percent-encoding",
  "regress",
  "rust-embed",
  "serde",
@@ -573,6 +574,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "tokio",
+ "url",
  "walkdir",
 ]
 

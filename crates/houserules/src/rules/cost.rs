@@ -7,6 +7,7 @@
 //! `proposals.rs` reads the same `Workspace` values to rate each knowledge
 //! entry.
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Map, Value, json};
@@ -132,14 +133,17 @@ impl TargetCounts {
     }
 }
 
-/// One reviewer finding: an `issues` row of a task or branch review, or a
-/// `new_breakage` row of a re-review.
+/// One reviewer finding: an `issues` row of a task or branch review, a
+/// `new_breakage` row of a re-review, or a `findings` row of a spec review.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Finding {
     pub severity: Severity,
     pub target: Target,
     /// The knowledge entry the finding cites, when its `rule` is a string.
     pub rule: Option<String>,
+    /// The row as the review holds it: a `mechanize` proposal quotes it as a
+    /// sample.
+    pub issue: Value,
 }
 
 impl Finding {
@@ -152,6 +156,7 @@ impl Finding {
             severity: Severity::of(issue),
             target: target(issue.get("file").and_then(Value::as_str), workspace_label),
             rule: issue.get("rule").and_then(Value::as_str).map(String::from),
+            issue: issue.clone(),
         }
     }
 
@@ -164,10 +169,10 @@ impl Finding {
 }
 
 /// One row of an audit's `rules` or of a review's `rule_adherence`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct AdherenceRow {
     pub id: String,
-    /// `true` when the row's `result` is `fail`.
+    /// `true` when the row's `result` is `fail` and no sanction accepts it.
     pub failed: bool,
     /// `true` when the row is the one source of its mode: a deterministic
     /// row of an audit file, or a judged row of a review file. A reviewer
@@ -176,6 +181,33 @@ pub(super) struct AdherenceRow {
     /// uncounted row still puts its workspace among the entry's
     /// `workspaces`.
     pub counted: bool,
+    /// `true` when the row is a counted judged row of a review whose
+    /// `result` is `pass` or `fail`: a verdict that a person may overrule.
+    pub verdict: bool,
+    /// `true` when the row is a verdict that carries an `override`.
+    pub overridden: bool,
+    /// The reference of the sanction that accepts the row, when its `result`
+    /// is `fail` and a sanction accepts it.
+    pub sanctioned: Option<String>,
+    /// What the row adds to the cost of its rule: for the first judged row of
+    /// the rule in a review file, the file's bytes divided by all the judged
+    /// rows of the review, rounded down; `0` for each further judged row of
+    /// the rule in the same file, because a review costs a rule one share.
+    /// `None` for a row that is no judged row of a review.
+    pub cost: Option<u64>,
+}
+
+/// A fail that a sanction accepts, as the top-level `sanctioned` list names
+/// it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Sanction {
+    /// The knowledge entry that failed.
+    pub id: String,
+    /// The task label of the deliverable that holds the row. The branch
+    /// review and the spec reviews name no task: their label is the file name.
+    pub task: String,
+    /// The reference that books the sanction.
+    pub reference: String,
 }
 
 /// What the deliverables of one model cost in one workspace.
@@ -206,6 +238,9 @@ pub(super) struct ModelCost {
 pub(super) struct Workspace {
     /// The path as the caller gave it.
     pub path: String,
+    /// The last component of the path: the folder name that orders the
+    /// workspace by recency (`recency_cmp`).
+    pub label: String,
     /// The cost of each model's deliverables, by `models` row name. A
     /// deliverable with no `model` field counts under `PRE_2_0`.
     pub models: BTreeMap<String, ModelCost>,
@@ -221,6 +256,16 @@ pub(super) struct Workspace {
     pub report_bytes: u64,
     pub findings: Vec<Finding>,
     pub rows: Vec<AdherenceRow>,
+    /// The counted fails that a sanction accepts.
+    pub sanctions: Vec<Sanction>,
+    /// The `issues` rows of the task reviews and of the branch review, in the
+    /// order `stats` reads the files: the task reviews by file name, then the
+    /// branch review. A re-review's `new_breakage` and a spec review's
+    /// `findings` are in `findings` only. The `samples` of a `mechanize`
+    /// proposal come from these rows.
+    pub issues: Vec<Finding>,
+    /// The lines of the workspace's `progress.md` that record a reversal.
+    pub reversals: usize,
     /// The ids the audits injected.
     pub injected: BTreeSet<String>,
     /// One id per report that names it in `knowledge_used`.
@@ -416,7 +461,8 @@ impl Profile {
     }
 }
 
-/// The `workspaces` key: one row per workspace, in the order given.
+/// The `workspaces` key: one row per workspace, in the order given. Each row
+/// ends with the workspace's `reversals`; `0` when it holds no `progress.md`.
 pub(super) fn workspace_rows(workspaces: &[Workspace]) -> Value {
     Value::Array(
         workspaces
@@ -428,10 +474,33 @@ pub(super) fn workspace_rows(workspaces: &[Workspace]) -> Value {
                     Profile::of(std::slice::from_ref(workspace))
                         .fields(&|count| json!(count), true),
                 );
+                row.insert("reversals".to_string(), json!(workspace.reversals));
                 Value::Object(row)
             })
             .collect(),
     )
+}
+
+/// The `YYYY-MM-DD` prefix of a workspace folder name, when it has one.
+fn date_prefix(label: &str) -> Option<&str> {
+    let prefix = label.get(..10)?;
+    prefix
+        .bytes()
+        .enumerate()
+        .all(|(index, byte)| match index {
+            4 | 7 => byte == b'-',
+            _ => byte.is_ascii_digit(),
+        })
+        .then_some(prefix)
+}
+
+/// Orders two workspace folder names from the oldest to the most recent: by
+/// the `YYYY-MM-DD` prefix, then by name. A name with no date prefix sorts
+/// before every dated one, and two such names sort by name.
+pub(super) fn recency_cmp(left: &str, right: &str) -> Ordering {
+    date_prefix(left)
+        .cmp(&date_prefix(right))
+        .then_with(|| left.cmp(right))
 }
 
 /// The `models` key: one row per model family or other model value, sorted by
@@ -488,6 +557,7 @@ mod tests {
             severity,
             target,
             rule: None,
+            issue: Value::Null,
         }
     }
 
@@ -745,8 +815,9 @@ mod tests {
         }
     }
 
-    /// Each `workspaces` row carries the path as given, the counters, and
-    /// the findings by severity and by target, in this key order.
+    /// Each `workspaces` row carries the path as given, the counters, the
+    /// findings by severity and by target, and the reversals, in this key
+    /// order.
     #[test]
     fn workspace_rows_carry_every_field_in_order() {
         let rows = workspace_rows(&[workspace(
@@ -764,6 +835,7 @@ mod tests {
             "tasks": 2, "reviews": 4, "re_reviews": 1, "fix_rounds": 3, "report_bytes": 1000,
             "findings": {"critical": 1, "important": 0, "minor": 2, "other": 1},
             "targets": {"code": 1, "deliverable": 1, "prose": 1, "other": 1},
+            "reversals": 0,
         }]);
         assert_eq!(rows, expected);
         let keys: Vec<&str> = rows[0]
@@ -782,7 +854,8 @@ mod tests {
                 "fix_rounds",
                 "report_bytes",
                 "findings",
-                "targets"
+                "targets",
+                "reversals"
             ]
         );
     }
@@ -948,5 +1021,65 @@ mod tests {
     fn model_rows_are_empty_with_no_deliverable() {
         assert_eq!(model_rows(&[]), json!([]));
         assert_eq!(model_rows(&[Workspace::default()]), json!([]));
+    }
+
+    /// A workspace row ends with its `reversals`.
+    #[test]
+    fn a_workspace_row_ends_with_its_reversals() {
+        let rows = workspace_rows(&[Workspace {
+            reversals: 4,
+            ..Workspace::default()
+        }]);
+        let keys: Vec<&str> = rows[0]
+            .as_object()
+            .expect("a row object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(keys.last(), Some(&"reversals"));
+        assert_eq!(rows[0]["reversals"], json!(4));
+    }
+
+    /// A name that starts with `dddd-dd-dd` has a date prefix. A shorter name,
+    /// a name of another shape, and a name whose tenth byte is inside a
+    /// multi-byte character have none, and none of them panics.
+    #[test]
+    fn date_prefix_is_ten_characters_of_the_shape_dddd_dd_dd() {
+        assert_eq!(date_prefix("2026-10-21-batch-35"), Some("2026-10-21"));
+        assert_eq!(date_prefix("2026-10-21"), Some("2026-10-21"));
+        for name in [
+            "",
+            "batch-35",
+            "2026-10-2",
+            "2026/10/21-x",
+            "2026-1a-21-x",
+            "2026-10-1äx",
+        ] {
+            assert_eq!(date_prefix(name), None, "{name}");
+        }
+    }
+
+    /// Dated names sort by their date, then by name; an undated name sorts
+    /// before every dated one, and undated names sort by name.
+    #[test]
+    fn recency_orders_by_date_then_name_with_undated_names_first() {
+        let mut names = [
+            "2026-10-10-batch-33",
+            "zulu",
+            "2026-10-09-batch-34",
+            "alpha",
+            "2026-10-10-batch-32",
+        ];
+        names.sort_by(|left, right| recency_cmp(left, right));
+        assert_eq!(
+            names,
+            [
+                "alpha",
+                "zulu",
+                "2026-10-09-batch-34",
+                "2026-10-10-batch-32",
+                "2026-10-10-batch-33",
+            ]
+        );
     }
 }

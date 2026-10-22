@@ -1,14 +1,14 @@
 //! The `audit` command: builds the rule package for a git range, runs
-//! every member's deterministic check, and reports the result, plus the
-//! git-plumbing helpers it runs on (`rev`, `git_diff`, `changed_files`,
-//! `tree_files`, `show_file`, `commits_in`, `removed_lines`).
+//! every member's deterministic check through `runner::run`, and reports
+//! the result. The git helpers it runs on live in `git.rs`; the check types
+//! live in `runner/`.
 //!
 //! ## Data-layer decisions
 //!
 //! - Each entry's `check` object is read through `check_shape::CheckDef`
 //!   (`model::Entry.check`, typed `CheckField`), not raw `serde_json::Value`
 //!   field access: it is a fixed, closed schema (`knowledge/schema.json`'s
-//!   `$defs/check`), and `run_check` matches on its `type`/`level`/`scope`
+//!   `$defs/check`), and `runner::run` matches on its `type`/`level`/`scope`
 //!   for every branch, exactly the "match on a type instead of a Value"
 //!   case the rule favors. See `model::CheckField`'s own doc for how a
 //!   malformed `check` is told apart from an absent one: this file's own
@@ -50,7 +50,7 @@
 //! ## The crash-path extension this file adds
 //!
 //! A malformed check `pattern`/`subject`/`body_absent` regex, or a
-//! malformed `files`/`if`/`then` glob, reaching `run_check` would panic
+//! malformed `files`/`if`/`then` glob, reaching `runner::run` would panic
 //! if left unguarded. `check-knowledge` (`check.rs`'s
 //! `regex_validity_message`) already validates a check's
 //! `pattern`/`subject`/`body_absent` regex fields eagerly at load time,
@@ -64,938 +64,22 @@
 //! (`houserules.crash-paths-are-named`) -- reached, named, and exited,
 //! never a panic and never silently swallowed either.
 
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode};
+use std::path::PathBuf;
+use std::process::ExitCode;
 
-use regress::Regex;
 use serde_json::{Value, json};
 
 use crate::emit::emit;
 
-use super::check_shape::{CheckDef, CheckType, Glob, Scope};
 use super::deliverable::{read_deliverable_value, workspace_files};
+use super::git::{changed_files, rev};
 use super::git_paths::InstallPrefix;
-use super::glob::{area_files, glob_match};
+use super::glob::area_files;
 use super::model::{Base, Entry, load_base, raw_entry_has_tag};
 use super::render::RULE_KINDS;
+use super::runner::{self, AuditContext};
 use super::trailers::{self, Reference};
-
-// ---- git plumbing ------------------------------------------------------------------
-
-/// One captured `git` failure: the process's stderr (or, when `git` could
-/// not even be launched, the OS error's own text standing in for it) --
-/// the raw material `rev`/`git_diff`/the tree/show/log helpers each turn
-/// into their own one-line message.
-struct RawGitError {
-    stderr: String,
-}
-
-/// Runs `git` with `args` inside `root`, forcing `LC_ALL=C` for
-/// locale-independent output.
-fn run_git(root: &Path, args: &[&str]) -> Result<String, RawGitError> {
-    match Command::new("git")
-        .args(args)
-        .env("LC_ALL", "C")
-        .current_dir(root)
-        .output()
-    {
-        Ok(output) if output.status.success() => {
-            Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-        }
-        Ok(output) => Err(RawGitError {
-            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-        }),
-        Err(error) => Err(RawGitError {
-            stderr: error.to_string(),
-        }),
-    }
-}
-
-/// The first non-blank line of `stderr`, trimmed, with a generic message
-/// for the case of a nonzero exit with fully empty stderr.
-fn stderr_headline(error: &RawGitError) -> String {
-    match error.stderr.lines().find(|line| !line.trim().is_empty()) {
-        Some(line) => line.trim().to_string(),
-        None => "git command failed".to_string(),
-    }
-}
-
-/// Resolves `reference` to its short commit sha. Any failure (a bad ref,
-/// or git itself failing to run) is `bad ref "<reference>"`, discarding
-/// git's own message. `pub(super)`: `check_commit`'s own range arm
-/// resolves its `--from`/`--to` refs through this same function, so a bad
-/// ref reads identically from either command.
-pub(super) fn rev(root: &Path, reference: &str) -> Result<String, String> {
-    run_git(
-        root,
-        &[
-            "rev-parse",
-            "--short",
-            "--verify",
-            &format!("{reference}^{{commit}}"),
-        ],
-    )
-    .map(|output| output.trim().to_string())
-    .map_err(|_| format!("bad ref \"{reference}\""))
-}
-
-/// A three-dot `git diff` range from the merge base of `base` and `head`
-/// to `head`.
-pub(super) fn range(base: &str, head: &str) -> String {
-    format!("{base}...{head}")
-}
-
-/// Runs `git diff` with `args` (everything after `diff`). A shared merge
-/// base miss between `base` and `head` reports
-/// the fixed `no merge base between "<base>" and "<head>"` message; any
-/// other failure carries git's own first non-empty stderr line.
-/// `pub(super)`: `durable_sha`'s own `added_lines` reads a files-scoped
-/// diff through this same function, not a second `git diff` invocation
-/// of its own.
-pub(super) fn git_diff(
-    root: &Path,
-    base: &str,
-    head: &str,
-    args: &[&str],
-) -> Result<String, String> {
-    let mut full_args = vec!["diff"];
-    full_args.extend_from_slice(args);
-    run_git(root, &full_args).map_err(|error| {
-        if error.stderr.contains("no merge base") {
-            format!("no merge base between \"{base}\" and \"{head}\"")
-        } else {
-            stderr_headline(&error)
-        }
-    })
-}
-
-/// Every file added, copied, modified, or renamed between `base` and
-/// `head`'s merge base and `head`, as install-root paths
-/// (`InstallPrefix::map`).
-fn changed_files(
-    root: &Path,
-    prefix: &InstallPrefix,
-    base: &str,
-    head: &str,
-) -> Result<Vec<String>, String> {
-    let output = git_diff(
-        root,
-        base,
-        head,
-        &[
-            "--name-only",
-            "-z",
-            "--diff-filter=ACMR",
-            &range(base, head),
-        ],
-    )?;
-    Ok(prefix.map(&output))
-}
-
-/// Every file in `head`'s tree, as install-root paths. `--full-tree` lists
-/// the whole tree, not only the directory `root`: `InstallPrefix::map`
-/// drops the paths outside the install. `pub(super)`: `check_commit`'s own
-/// per-commit `co-change` retroactivity guard reads a commit's PARENT
-/// tree through this same function, not a second `git ls-tree`
-/// invocation of its own.
-pub(super) fn tree_files(
-    root: &Path,
-    prefix: &InstallPrefix,
-    head: &str,
-) -> Result<Vec<String>, String> {
-    let output = run_git(
-        root,
-        &["ls-tree", "-r", "--name-only", "-z", "--full-tree", head],
-    )
-    .map_err(|e| stderr_headline(&e))?;
-    Ok(prefix.map(&output))
-}
-
-/// `path`'s content as it exists in `head`. `path` is an install-root
-/// path: the `./` makes git read it from the directory `root` rather than
-/// from the git top level.
-fn show_file(root: &Path, head: &str, path: &str) -> Result<String, String> {
-    run_git(root, &["show", &format!("{head}:./{path}")]).map_err(|e| stderr_headline(&e))
-}
-
-/// One commit as the `commits` checks read it: its subject, its body, its
-/// author name (`%an`) -- so a check can tell a generated message from a
-/// human one (see [`CommitsCheck::violation`]) -- and its trailers. `sha` is
-/// empty for a commit that has no real one yet (`unattributed`); a
-/// non-empty `sha` is what `check_commit`'s own per-commit `co-change`
-/// evaluation uses to fetch that one commit's changed files
-/// (`changed_files_for`) -- `Commit` itself carries no file list, since a
-/// range-level `CheckType::Commits` check never needs one.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct Commit {
-    pub(super) sha: String,
-    /// The abbreviated sha that a line names the commit by; empty with `sha`.
-    pub(super) short_sha: String,
-    pub(super) subject: String,
-    pub(super) body: String,
-    pub(super) author: String,
-    /// The trailers of the message as `(key, value)`, in message order
-    /// (`trailers::parse`). Empty when the reader did not parse them
-    /// (`commits_in`'s `read_trailers`).
-    pub(super) trailers: Vec<(String, String)>,
-}
-
-impl Commit {
-    /// A message with no author or sha on record: the `check-commit` hook
-    /// arm, which reads a message file before git has committed it --
-    /// there is no commit object yet for a `co-change` check to diff.
-    pub(super) fn unattributed(
-        subject: String,
-        body: String,
-        trailers: Vec<(String, String)>,
-    ) -> Self {
-        Self {
-            sha: String::new(),
-            short_sha: String::new(),
-            subject,
-            body,
-            author: String::new(),
-            trailers,
-        }
-    }
-
-    /// GitHub App and Dependabot commits carry an author name ending in
-    /// `[bot]`; their bodies are generated (release links, metadata) and
-    /// are not wrapped by a human.
-    fn is_bot_authored(&self) -> bool {
-        self.author.ends_with("[bot]")
-    }
-}
-
-/// Every commit strictly between `base` and `head` (two-dot range -- not
-/// `range()`'s three-dot merge-base form), plus the author name and the
-/// abbreviated sha, newest first. With `read_trailers`, each commit also
-/// carries its trailers (`trailers::parse` of its message, one `git` process
-/// for each commit); without it they stay empty, so a reader that never
-/// looks at a trailer pays for none. `pub(super)`: `check_commit`'s own range
-/// arm reads a git range through this same function, not a second `git log`
-/// invocation of its own.
-pub(super) fn commits_in(
-    root: &Path,
-    base: &str,
-    head: &str,
-    read_trailers: bool,
-) -> Result<Vec<Commit>, String> {
-    let output = run_git(
-        root,
-        &[
-            "log",
-            "--format=%H%x00%h%x00%an%x00%s%x00%b%x1e",
-            &format!("{base}..{head}"),
-        ],
-    )
-    .map_err(|e| stderr_headline(&e))?;
-    output
-        .split('\u{1e}')
-        .map(|record| record.strip_prefix('\n').unwrap_or(record))
-        .filter(|record| !record.is_empty())
-        .map(|record| {
-            let mut parts = record.splitn(5, '\u{0}');
-            let sha = parts.next().unwrap_or_default().to_string();
-            let short_sha = parts.next().unwrap_or_default().to_string();
-            let author = parts.next().unwrap_or_default().to_string();
-            let subject = parts.next().unwrap_or_default().to_string();
-            let body = parts.next().unwrap_or_default().to_string();
-            let trailers = if read_trailers {
-                super::trailers::parse(root, &format!("{subject}\n\n{body}"))?
-            } else {
-                Vec::new()
-            };
-            Ok(Commit {
-                sha,
-                short_sha,
-                subject,
-                body,
-                author,
-                trailers,
-            })
-        })
-        .collect()
-}
-
-/// Every path one commit (`sha`) itself changed, against its single first
-/// parent -- `git diff-tree`'s own plumbing for "what did this commit
-/// touch", one process per commit (`check_commit`'s range arm runs over
-/// CI's own PR-sized commit range, never a full-history walk). A MERGE
-/// commit (more than one parent) is read as touching NOTHING: plain `git
-/// diff-tree` needs `-m`, `-c`, or `--first-parent` to diff a merge
-/// against any parent at all, and this call passes none of them (verified
-/// live against a scratch `--no-ff` merge: empty output, exit 0, no
-/// error). That is the accepted contract here, not an oversight: this
-/// repository merges fast-forward only (`process.ff-only-merges`), so no
-/// merge commit ever reaches `check-commit`'s own range in practice, and a
-/// silently-empty file list is exactly what a per-commit `co-change` check
-/// needs on one -- `filter_matching` over an empty slice never matches
-/// `if_changed`, so the check simply does not trigger, never a false
-/// violation. `pub(super)`: `check_commit`'s own per-commit `co-change`
-/// evaluation is the only caller. The paths are install-root paths
-/// (`InstallPrefix::map`). An unresolvable `sha` or a failing `git` is a
-/// named `Err`, never a panic (`houserules.crash-paths-are-named`).
-pub(super) fn changed_files_for(
-    root: &Path,
-    prefix: &InstallPrefix,
-    sha: &str,
-) -> Result<Vec<String>, String> {
-    let output = run_git(
-        root,
-        &[
-            "diff-tree",
-            "--no-commit-id",
-            "--name-only",
-            "-r",
-            "-z",
-            sha,
-        ],
-    )
-    .map_err(|e| stderr_headline(&e))?;
-    Ok(prefix.map(&output))
-}
-
-/// Every top-level path one commit (`sha`) changed against any of its
-/// parents, NUL-separated and not mapped: `git diff-tree -m` prints the
-/// diff against each parent of a merge, and the same paths as plain
-/// `diff-tree` for a commit with one parent. `check_commit`'s skip decision
-/// reads it through `InstallPrefix::changes_only_outside`, so a merge that
-/// brings a path below the install root is not skipped. A failing `git` is
-/// a named `Err` (`houserules.crash-paths-are-named`).
-pub(super) fn paths_changed_against_any_parent(root: &Path, sha: &str) -> Result<String, String> {
-    run_git(
-        root,
-        &[
-            "diff-tree",
-            "--no-commit-id",
-            "--name-only",
-            "-r",
-            "-m",
-            "-z",
-            sha,
-        ],
-    )
-    .map_err(|e| stderr_headline(&e))
-}
-
-/// Every removed (`-`-prefixed, excluding the `---` file header) line in
-/// `files`'s diff between `base` and `head`.
-fn removed_lines(
-    root: &Path,
-    base: &str,
-    head: &str,
-    files: &[String],
-) -> Result<Vec<String>, String> {
-    let mut args = vec![range(base, head), "--".to_string()];
-    args.extend(files.iter().cloned());
-    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
-    let output = git_diff(root, base, head, &arg_refs)?;
-    Ok(output
-        .lines()
-        .filter(|line| line.starts_with('-') && !line.starts_with("---"))
-        .map(str::to_string)
-        .collect())
-}
-
-// ---- check runners --------------------------------------------------------------------
-
-/// Every string a knowledge-schema glob field holds: a `check` field
-/// already narrowed to `Glob` (bare string or array of strings; a
-/// JSON-Schema `["string", "array"]` property, `check_shape::Glob`'s own
-/// doc).
-fn glob_list(glob: &Option<Glob>) -> Vec<&str> {
-    match glob {
-        None => Vec::new(),
-        Some(Glob::One(g)) => vec![g.as_str()],
-        Some(Glob::Many(items)) => items.iter().map(String::as_str).collect(),
-    }
-}
-
-/// `true` when `path` matches any glob in `glob`, on the single globset
-/// engine `glob::glob_match` runs (`houserules.glob-union-matcher`).
-fn match_any(path: &str, glob: &Option<Glob>) -> Result<bool, String> {
-    for candidate in glob_list(glob) {
-        if glob_match(path, candidate).map_err(|error| error.to_string())? {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-/// `paths` filtered to those matching any glob in `glob`, propagating a
-/// malformed glob as an error instead of panicking.
-fn filter_matching(paths: &[String], glob: &Option<Glob>) -> Result<Vec<String>, String> {
-    let mut matched = Vec::new();
-    for path in paths {
-        if match_any(path, glob)? {
-            matched.push(path.clone());
-        }
-    }
-    Ok(matched)
-}
-
-/// Compiles `pattern` under `flags` with `g`/`y` stripped: a check's
-/// regex is built once and reused across every commit or file in a loop,
-/// so a stateful match-position flag has no place here. `regress::Regex`
-/// carries no such state itself, but the flags are still stripped before
-/// compiling for a consistent, documented contract.
-fn compile_check_regex(pattern: &str, flags: &str) -> Result<Regex, String> {
-    let stripped: String = flags.chars().filter(|c| *c != 'g' && *c != 'y').collect();
-    Regex::with_flags(pattern, stripped.as_str()).map_err(|error| error.to_string())
-}
-
-/// One rule that a commit breaks, as the `commits` checks report it.
-#[derive(Debug, PartialEq, Eq)]
-pub(super) struct Violation {
-    evidence: String,
-    /// `true` when `evidence` is a whole finding that names the check itself,
-    /// so `line` prints it as it is.
-    names_the_check: bool,
-}
-
-impl Violation {
-    /// The evidence of an audit row.
-    pub(super) fn evidence(&self) -> &str {
-        &self.evidence
-    }
-
-    /// The finding that `check-commit` prints for the check `id`: the
-    /// evidence behind the id, except for a finding that names the check
-    /// itself.
-    pub(super) fn line(&self, id: &str) -> String {
-        if self.names_the_check {
-            self.evidence.clone()
-        } else {
-            format!("{id}: {}", self.evidence)
-        }
-    }
-}
-
-/// One `commits`-type check, its `subject`, `body_absent`, and
-/// `exempt_subjects` patterns compiled once -- the per-commit evaluation
-/// `run_check`'s `CheckType::Commits` arm
-/// and `check_commit::check_commit` both run, factored here so the two
-/// commands can never drift apart on what
-/// counts as a violation or how it reads (`houserules check-commit` reuses
-/// the audit's `commits` rules; it does not reimplement them). `pub(super)`
-/// rather than `pub(crate)`: `check_commit` is a sibling module under
-/// `rules`, and nothing outside this module needs it.
-pub(super) struct CommitsCheck<'a> {
-    id: &'a str,
-    check: &'a CheckDef,
-    subject_re: Option<Regex>,
-    body_re: Option<Regex>,
-    exempt_subject_res: Vec<Regex>,
-}
-
-impl<'a> CommitsCheck<'a> {
-    /// Compiles the `subject`, `body_absent`, and `exempt_subjects` patterns
-    /// of `check`, the check of the entry `id`, under its own `flags` (`g`/`y`
-    /// stripped, `compile_check_regex`) -- a malformed pattern is a named
-    /// `Err`, never a panic (`houserules.crash-paths-are-named`).
-    pub(super) fn compile(id: &'a str, check: &'a CheckDef) -> Result<Self, String> {
-        let flags = check.flags.as_deref().unwrap_or_default();
-        let subject_re = match &check.subject {
-            Some(s) if !s.is_empty() => Some(compile_check_regex(s, flags)?),
-            _ => None,
-        };
-        let body_re = match &check.body_absent {
-            Some(s) if !s.is_empty() => Some(compile_check_regex(s, flags)?),
-            _ => None,
-        };
-        let exempt_subject_res = check
-            .exempt_subjects
-            .iter()
-            .flatten()
-            .map(|pattern| compile_check_regex(pattern, flags))
-            .collect::<Result<_, _>>()?;
-        Ok(Self {
-            id,
-            check,
-            subject_re,
-            body_re,
-            exempt_subject_res,
-        })
-    }
-
-    /// `true` when `commit` is exempt from the trailer rule: its author is
-    /// one of `exempt_authors` by whole name, or its subject matches one of
-    /// `exempt_subjects`. A commit with no author on record (the message
-    /// file of the commit-msg hook) is exempt by subject alone.
-    fn is_exempt_from_the_trailer(&self, commit: &Commit) -> bool {
-        (!commit.author.is_empty()
-            && self
-                .check
-                .exempt_authors
-                .iter()
-                .flatten()
-                .any(|author| author == &commit.author))
-            || self
-                .exempt_subject_res
-                .iter()
-                .any(|re| re.find(&commit.subject).is_some())
-    }
-
-    /// Evaluates one commit against this check, in the same
-    /// subject/body_absent/body_line_max/require_trailer order `run_check`'s
-    /// own commit loop tests them: `Some(violation)` for the first rule this
-    /// commit breaks, `None` when the commit satisfies every rule this check
-    /// declares. `violation` is the single place that builds this
-    /// evidence text; both `run_check`'s `CheckType::Commits` arm and
-    /// `check_commit` call it, so the two commands' output cannot drift
-    /// apart. A bot-authored commit (`[bot]` author suffix) is exempt
-    /// from `body_line_max` alone: a generated body (Dependabot's compare
-    /// links, say) carries lines no human wraps; its subject and
-    /// `body_absent` rules still apply. `exempt_authors` and
-    /// `exempt_subjects` exempt a commit from `require_trailer` alone. A
-    /// trailer with no value names nothing, so it does not satisfy
-    /// `require_trailer`.
-    pub(super) fn violation(&self, commit: &Commit) -> Option<Violation> {
-        let (subject, body) = (commit.subject.as_str(), commit.body.as_str());
-        let rule = |evidence: String| {
-            Some(Violation {
-                evidence,
-                names_the_check: false,
-            })
-        };
-        if let Some(re) = &self.subject_re
-            && re.find(subject).is_none()
-        {
-            return rule(format!(
-                "commit \"{subject}\" does not match {}",
-                self.check.subject.as_deref().unwrap_or_default()
-            ));
-        }
-        if let Some(re) = &self.body_re
-            && body.split('\n').any(|line| re.find(line).is_some())
-        {
-            return rule(format!(
-                "commit \"{subject}\" body matches {}",
-                self.check.body_absent.as_deref().unwrap_or_default()
-            ));
-        }
-        if let Some(limit) = self.check.body_line_max.filter(|&limit| limit > 0)
-            && !commit.is_bot_authored()
-            && body
-                .split('\n')
-                .any(|line| line.encode_utf16().count() as u64 > limit)
-        {
-            return rule(format!(
-                "commit \"{subject}\" has a body line over {limit} characters"
-            ));
-        }
-        if let Some(key) = &self.check.require_trailer
-            && !self.is_exempt_from_the_trailer(commit)
-            && !commit
-                .trailers
-                .iter()
-                .any(|(name, value)| super::trailers::is_key(name, key) && !value.is_empty())
-        {
-            let sha = if commit.short_sha.is_empty() {
-                String::new()
-            } else {
-                format!("{}: ", commit.short_sha)
-            };
-            return Some(Violation {
-                evidence: format!("{sha}no {key} trailer ({})", self.id),
-                names_the_check: true,
-            });
-        }
-        None
-    }
-
-    /// This check's declared `level`: `check_commit`'s own outcome carries
-    /// this forward onto each finding the same way `run_check`'s
-    /// `violated_result` already reads
-    /// `check.level` to decide a row's `result` (`"warn"` vs `"fail"`), so
-    /// a warn-level `commits` check cannot silently escalate into a hard
-    /// block on either surface.
-    pub(super) fn level(&self) -> super::check_shape::CheckLevel {
-        self.check.level
-    }
-}
-
-/// One `co-change` check, evaluated against one commit's own changed
-/// files. `run_check`'s own `CheckType::CoChange` arm answers a different
-/// question at a different granularity -- whether the whole audited RANGE
-/// ever paired `if_changed` with `then` somewhere across its commits, not
-/// whether any single commit split them -- so `check_commit`'s per-commit
-/// range arm evaluates this struct instead of that arm. `pub(super)`: a
-/// sibling of `CommitsCheck`, read by `check_commit` alone.
-pub(super) struct CoChangeCheck<'a> {
-    check: &'a CheckDef,
-}
-
-impl<'a> CoChangeCheck<'a> {
-    /// Wraps `check` for per-commit evaluation. Unlike `CommitsCheck::
-    /// compile`, there is no regex to precompile: `if_changed`/`then` are
-    /// globs, matched fresh per path by `glob_match` itself.
-    pub(super) fn compile(check: &'a CheckDef) -> Self {
-        Self { check }
-    }
-
-    /// `Ok(Some(evidence))` when `files` (one commit's own changed paths)
-    /// matches `if_changed` but none of them also matches `then`;
-    /// `Ok(None)` when the check did not trigger on this commit, or the
-    /// commit already pairs both sides itself. A malformed glob is a named
-    /// `Err`, never a silently-false match -- the same care `run_check`'s
-    /// own `CoChange` arm takes (see its inline comment).
-    pub(super) fn violation(&self, files: &[String]) -> Result<Option<String>, String> {
-        let trigger = filter_matching(files, &self.check.if_changed)?;
-        if trigger.is_empty() {
-            return Ok(None);
-        }
-        for path in files {
-            if match_any(path, &self.check.then)? {
-                return Ok(None);
-            }
-        }
-        Ok(Some(format!(
-            "{} changed without {}",
-            trigger[0],
-            glob_list(&self.check.then).join(" or ")
-        )))
-    }
-
-    /// This check's declared `level`, the same way `CommitsCheck::level`
-    /// reads it.
-    pub(super) fn level(&self) -> super::check_shape::CheckLevel {
-        self.check.level
-    }
-
-    /// `true` when this check's own `then` target already exists somewhere
-    /// in `parent_tree` -- a commit's own PARENT tree, from one commit
-    /// before the diff (`tree_files`). A per-commit `co-change` check
-    /// exists to enforce that a mechanism the repository ALREADY HAS was
-    /// paired with its trigger in the same commit; a commit written before
-    /// that mechanism existed could not have paired it, so `check_commit`'s
-    /// own per-commit loop treats a `false` return as "not yet applicable
-    /// to this commit," never a violation. A malformed `then` glob is a
-    /// named `Err`, the same care `violation` takes.
-    pub(super) fn mechanism_exists(&self, parent_tree: &[String]) -> Result<bool, String> {
-        Ok(!filter_matching(parent_tree, &self.check.then)?.is_empty())
-    }
-}
-
-/// The value at a dot-separated `field` path in `data`, indexing into
-/// either an object's keys or an array's numeric-string indices.
-fn field_value<'a>(data: &'a Value, field: &str) -> Option<&'a Value> {
-    field.split('.').try_fold(data, |node, key| match node {
-        Value::Object(map) => map.get(key),
-        Value::Array(items) => key.parse::<usize>().ok().and_then(|index| items.get(index)),
-        _ => None,
-    })
-}
-
-/// `true` when `field_value` is present and not `null`.
-fn has_field(data: &Value, field: &str) -> bool {
-    !matches!(field_value(data, field), None | Some(Value::Null))
-}
-
-/// The one report field that holds the audit's own output. An implementer
-/// writes the draft report with `self_audit: null`, runs the audit, and
-/// copies the audit's printed `summary` and deterministic rows into the
-/// field. `houserules validate` guards the field's final state: it rejects a
-/// `DONE` or `DONE_WITH_CONCERNS` report whose `self_audit` is `null`
-/// (`check_task_report_audit` in `validate_deliverable.rs`).
-const SELF_AUDIT_FIELD: &str = "self_audit";
-
-/// `true` when `field` is `self_audit` and `report` holds that key, filled or
-/// as an explicit JSON `null` (the draft state, before the implementer has
-/// copied the audit's rows into it). A report that lacks the key is not a
-/// draft, and no other field has a draft state.
-fn self_audit_is_present(report: &Value, field: &str) -> bool {
-    field == SELF_AUDIT_FIELD && field_value(report, field).is_some()
-}
-
-/// The per-check evaluation context: the range's changed files, the
-/// `--report`/`--workspace` inputs a `report-field` check reads, and the
-/// tree/blob/commit git reads every check type may need, each cached
-/// after its first read. A `RefCell` per cache lets every check share one
-/// immutable `&AuditContext` while still mutating the cache on first use.
-struct AuditContext<'a> {
-    root: &'a Path,
-    prefix: &'a InstallPrefix,
-    base_sha: String,
-    head_sha: String,
-    changed: &'a [String],
-    report: Option<&'a Value>,
-    reports: Option<&'a [(String, Value)]>,
-    show_cache: RefCell<HashMap<String, String>>,
-    tree_cache: RefCell<Option<Vec<String>>>,
-    commits_cache: RefCell<Option<Vec<Commit>>>,
-}
-
-impl AuditContext<'_> {
-    fn show(&self, path: &str) -> Result<String, String> {
-        if let Some(cached) = self.show_cache.borrow().get(path) {
-            return Ok(cached.clone());
-        }
-        let content = show_file(self.root, &self.head_sha, path)?;
-        self.show_cache
-            .borrow_mut()
-            .insert(path.to_string(), content.clone());
-        Ok(content)
-    }
-
-    fn tree(&self) -> Result<Vec<String>, String> {
-        if let Some(cached) = self.tree_cache.borrow().as_ref() {
-            return Ok(cached.clone());
-        }
-        let files = tree_files(self.root, self.prefix, &self.head_sha)?;
-        *self.tree_cache.borrow_mut() = Some(files.clone());
-        Ok(files)
-    }
-
-    fn commits(&self) -> Result<Vec<Commit>, String> {
-        if let Some(cached) = self.commits_cache.borrow().as_ref() {
-            return Ok(cached.clone());
-        }
-        let commits = commits_in(self.root, &self.base_sha, &self.head_sha, true)?;
-        *self.commits_cache.borrow_mut() = Some(commits.clone());
-        Ok(commits)
-    }
-
-    fn removed(&self, files: &[String]) -> Result<Vec<String>, String> {
-        removed_lines(self.root, &self.base_sha, &self.head_sha, files)
-    }
-}
-
-/// Judges one `report-field` check: with `--report`, whether that report
-/// holds a value for `check.field`; with `--workspace`, whether every
-/// report whose `files_changed` triggers the check does; with neither,
-/// the row is `skipped`. A `--report` run also accepts the draft state of
-/// `self_audit` (see `self_audit_is_present`): a `null` and a filled field get
-/// the same row, `report field self_audit is present`. A `--workspace` run
-/// does not accept the draft state. `row` builds an audit row for this
-/// check's entry and `violated_result` is the result a violation carries
-/// (`fail` or `warn`, from the check's level).
-fn run_report_field_check(
-    check: &CheckDef,
-    ctx: &AuditContext,
-    row: &dyn Fn(&str, String) -> Value,
-    violated_result: &str,
-) -> Result<Value, String> {
-    let pass = |evidence: String| row("pass", evidence);
-    let violate = |evidence: String| row(violated_result, evidence);
-    let trigger = filter_matching(ctx.changed, &check.if_changed)?;
-    if trigger.is_empty() {
-        return Ok(pass("not triggered".to_string()));
-    }
-    let field = check.field.as_deref().unwrap_or_default();
-    if let Some(report) = ctx.report {
-        if self_audit_is_present(report, field) {
-            return Ok(pass(format!("report field {field} is present")));
-        }
-        if has_field(report, field) {
-            return Ok(pass(format!("report field {field} is set")));
-        }
-        return Ok(violate(format!(
-            "report lacks a value for {field} (triggered by {})",
-            trigger[0]
-        )));
-    }
-    if let Some(reports) = ctx.reports {
-        // A `files_changed` array holding a non-string element is
-        // just as unusable for glob-matching as one that is not an
-        // array at all, so both shapes are named the same "lacks
-        // files_changed" finding here, not silently filtered
-        // element-by-element.
-        let has_valid_files_changed = |data: &Value| matches!(data.get("files_changed"), Some(Value::Array(items)) if items.iter().all(Value::is_string));
-        let malformed = reports
-            .iter()
-            .find(|(_, data)| !has_valid_files_changed(data));
-        if let Some((name, _)) = malformed {
-            return Ok(violate(format!("{name} lacks files_changed")));
-        }
-        fn report_files_changed(data: &Value) -> Vec<&str> {
-            data.get("files_changed")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str)
-                .collect()
-        }
-        // The first of a report's `files_changed` matching `check.if_changed`,
-        // or `None` when none do -- propagates a malformed glob with `?`
-        // instead of `unwrap_or(false)`, which would hide it behind a
-        // false "did not match".
-        fn matching_file<'a>(
-            data: &'a Value,
-            globs: &Option<Glob>,
-        ) -> Result<Option<&'a str>, String> {
-            for f in report_files_changed(data) {
-                if match_any(f, globs)? {
-                    return Ok(Some(f));
-                }
-            }
-            Ok(None)
-        }
-        let mut hits: Vec<&(String, Value)> = Vec::new();
-        for entry in reports {
-            if matching_file(&entry.1, &check.if_changed)?.is_some() {
-                hits.push(entry);
-            }
-        }
-        if hits.is_empty() {
-            return Ok(pass("not triggered by any report".to_string()));
-        }
-        for (name, data) in &hits {
-            if !has_field(data, field) {
-                let file = matching_file(data, &check.if_changed)?.unwrap_or_default();
-                return Ok(violate(format!(
-                    "{name} lacks a value for {field} (triggered by {file})"
-                )));
-            }
-        }
-        return Ok(pass(format!(
-            "report field {field} is set in {} reports",
-            hits.len()
-        )));
-    }
-    Ok(row("skipped", "no --report given".to_string()))
-}
-
-/// Runs one entry's deterministic `check` and returns its audit row (see
-/// this module's doc for why the row is a raw `Value`, not a typed
-/// model). `check` is passed separately from `entry` (rather than read
-/// back off `entry.check`) so the caller's own `CheckField` match is the
-/// one place that decides "does this entry get its check run at all".
-fn run_check(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result<Value, String> {
-    let level_str = match check.level {
-        super::check_shape::CheckLevel::Fail => "fail",
-        super::check_shape::CheckLevel::Warn => "warn",
-    };
-    let violated_result = if check.level == super::check_shape::CheckLevel::Warn {
-        "warn"
-    } else {
-        "fail"
-    };
-    let row = |result: &str, evidence: String| -> Value {
-        json!({
-            "id": entry.id, "kind": entry.kind, "mode": "deterministic",
-            "level": level_str, "result": result, "evidence": evidence,
-        })
-    };
-    let pass = |evidence: String| row("pass", evidence);
-    let violate = |evidence: String| row(violated_result, evidence);
-
-    match check.kind {
-        CheckType::GrepAbsent => {
-            let pool: Vec<String> = if check.scope == Some(Scope::Tree) {
-                ctx.tree()?
-            } else {
-                ctx.changed.to_vec()
-            };
-            let files = filter_matching(&pool, &check.files)?;
-            let pattern = check.pattern.as_deref().unwrap_or_default();
-            let regex = compile_check_regex(pattern, check.flags.as_deref().unwrap_or_default())?;
-            for path in &files {
-                let text = ctx.show(path)?;
-                if let Some(found) = regex.find(&text) {
-                    let line = text[..found.start()].matches('\n').count() + 1;
-                    return Ok(violate(format!("{path}:{line} matches {pattern}")));
-                }
-            }
-            Ok(pass(format!("{} files checked", files.len())))
-        }
-        CheckType::Commits => {
-            let compiled = CommitsCheck::compile(&entry.id, check)?;
-            let commits = ctx.commits()?;
-            for commit in &commits {
-                if let Some(violation) = compiled.violation(commit) {
-                    return Ok(violate(violation.evidence().to_string()));
-                }
-            }
-            Ok(pass(format!("{} commits checked", commits.len())))
-        }
-        CheckType::CoChange => {
-            let trigger = filter_matching(ctx.changed, &check.if_changed)?;
-            if trigger.is_empty() {
-                return Ok(pass("not triggered".to_string()));
-            }
-            // `check.then` has not been matched yet at this point (`trigger`
-            // above matches `if_changed`, a different field) -- both loops
-            // below propagate a malformed `then` with `?`, the same as
-            // `filter_matching` already does for `files`/`if_changed`: there
-            // is no `unwrap_or(false)` here to hide a `GlobError` behind a
-            // false "did not match".
-            let mut satisfying: Option<&String> = None;
-            for path in ctx.changed {
-                if match_any(path, &check.then)? {
-                    satisfying = Some(path);
-                    break;
-                }
-            }
-            if let Some(satisfying) = satisfying {
-                let mut real_trigger: Option<&String> = None;
-                for path in &trigger {
-                    if !match_any(path, &check.then)? {
-                        real_trigger = Some(path);
-                        break;
-                    }
-                }
-                let evidence = match real_trigger {
-                    Some(t) => format!("{t} changed with {satisfying}"),
-                    None => format!(
-                        "only {} changed; the co-change is satisfied by definition",
-                        trigger.join(", ")
-                    ),
-                };
-                return Ok(pass(evidence));
-            }
-            Ok(violate(format!(
-                "{} changed without {}",
-                trigger[0],
-                glob_list(&check.then).join(" or ")
-            )))
-        }
-        CheckType::DiffAppendOnly => {
-            let files = filter_matching(ctx.changed, &check.files)?;
-            if files.is_empty() {
-                return Ok(pass("not triggered".to_string()));
-            }
-            let removed = ctx.removed(&files)?;
-            if !removed.is_empty() {
-                return Ok(violate(format!(
-                    "{} removed lines in {}",
-                    removed.len(),
-                    files.join(", ")
-                )));
-            }
-            Ok(pass(format!("{}: no removed lines", files.join(", "))))
-        }
-        CheckType::ReportField => run_report_field_check(check, ctx, &row, violated_result),
-        CheckType::DurableSha => {
-            let files = filter_matching(ctx.changed, &check.files)?;
-            if files.is_empty() {
-                return Ok(pass("not triggered".to_string()));
-            }
-            // Resolved fresh per evaluation, independent of `--base`/
-            // `--head`: `durable_sha.rs`'s own module doc, "Why the
-            // default branch is resolved explicitly", has the full
-            // account of why `ctx.base_sha` cannot stand in for it.
-            let default_branch = super::durable_sha::resolve_default_branch(ctx.root)?;
-            match super::durable_sha::find_violation(
-                ctx.root,
-                &ctx.base_sha,
-                &ctx.head_sha,
-                &default_branch,
-                &files,
-            )? {
-                Some(evidence) => Ok(violate(evidence)),
-                None => Ok(pass(format!(
-                    "{} file(s) checked for in-branch sha citations (against the default \
-                     branch, {default_branch})",
-                    files.len()
-                ))),
-            }
-        }
-    }
-}
 
 // ---- the audit engine -----------------------------------------------------------------
 
@@ -1017,12 +101,17 @@ pub(crate) struct AuditOptions {
 /// work-item references, whether any row's `result` is `fail`, and the
 /// work-item references of the range and of the deliverables it read, which
 /// `cmd_audit` judges through the installed tracker and adds to the result
-/// (spec 3.7).
+/// (spec 3.7). A `--report` run also hands `cmd_audit` the parsed report and
+/// the ids of the rows that found a filled `self_audit`. `cmd_audit` compares
+/// the copy with the final result (spec 6) and judges again the bookings of
+/// the rows that the comparison moves.
 #[derive(Debug)]
 pub(crate) struct AuditOutcome {
     pub result: Value,
     pub failed: bool,
     pub(super) references: Vec<Reference>,
+    pub(super) report: Option<Value>,
+    pub(super) self_audit_rows: Vec<String>,
 }
 
 /// `area_file_map` as a JSON object, preserving its own insertion order --
@@ -1167,18 +256,16 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
         reviews_value = read(files.reviews)?;
     }
 
-    let ctx = AuditContext {
+    let ctx = AuditContext::new(
         root,
-        prefix: &prefix,
-        base_sha: base_sha.clone(),
-        head_sha: head_sha.clone(),
-        changed: &changed,
-        report: report_value.as_ref(),
-        reports: reports_value.as_deref(),
-        show_cache: RefCell::new(HashMap::new()),
-        tree_cache: RefCell::new(None),
-        commits_cache: RefCell::new(None),
-    };
+        &prefix,
+        base_sha.clone(),
+        head_sha.clone(),
+        &changed,
+        &opts.ids,
+        report_value.as_ref(),
+        reports_value.as_deref(),
+    );
 
     let mut ids: Vec<&String> = package.keys().collect();
     ids.sort();
@@ -1186,7 +273,7 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
     for id in ids {
         let entry = package[id];
         let row = match &entry.check {
-            super::model::CheckField::Valid(check) => run_check(entry, check, &ctx)?,
+            super::model::CheckField::Valid(check) => runner::run(entry, check, &ctx)?,
             // A malformed check is a named error, never a silently
             // downgraded judged row (`houserules.crash-paths-are-named`).
             super::model::CheckField::Malformed => {
@@ -1200,26 +287,23 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
         rows.push(row);
     }
 
-    // ---- the sanctioned-fail annotation ----
+    // ---- the sanctioned annotation ----
     //
-    // A `--sanctioned <rule>=<ref>` declares a spec-booked interim fail
-    // once per dispatch, instead of narrating it by hand across every
-    // audit and review round the interim fail spans. Semantics, defended
-    // against the row shape above: the sanctioned rule's row keeps its
-    // TRUE `result` -- a fail stays "fail", never silently becomes "pass"
-    // -- and gains the declaration in its `evidence` text alone, so
-    // `auditRow`'s schema shape (id/kind/mode/level/result/evidence,
-    // unchanged) needs no change at all. `parse_sanctioned` already ruled
-    // out an empty reference and a repeated rule id, so every remaining
-    // case is a row or a named error: a rule that is no row of the
-    // package is `sanctioned_outside_package_error` (an id the knowledge
-    // base lacks is the same "unknown id" shape `--ids` already uses one
-    // flag over; a known id outside the package names that cause);
-    // present but not `result: "fail"` is a stale booking, reported in
-    // `stale_sanctions` and folded into `failed`, never a silent no-op --
-    // distinguishing the two matters because reading "did not fail" for a
-    // rule that never ran would send an author to un-book a typo instead
-    // of fixing it.
+    // A `--sanctioned <rule>=<ref>` declares a spec-booked interim fail once
+    // per dispatch, instead of narrating it by hand across every audit and
+    // review round that the interim fail spans. `book_sanction` judges each
+    // booking against the TRUE result of its row: a fail stays "fail", and
+    // never silently becomes "pass". `parse_sanctioned` already ruled out an
+    // empty reference and a repeated rule id, so every remaining case is a row
+    // or a named error. A rule that is no row of the package is
+    // `sanctioned_outside_package_error` (an id the knowledge base lacks is the
+    // same "unknown id" shape that `--ids` uses; a known id outside the
+    // package names that cause). A deterministic row that did not fail is a
+    // stale booking, reported in `stale_sanctions` and folded into `failed`,
+    // never a silent no-op: reading "did not fail" for a rule that never ran
+    // would send an author to un-book a typo instead of fixing it. The
+    // comparison of `self_audit` can still move the row of its own check after
+    // this loop; `cmd_audit` re-judges those bookings (`rejudge_moved_bookings`).
     let mut stale_sanctions: Vec<String> = Vec::new();
     let mut sanctioned_fail = 0usize;
     for (rule, reference) in &opts.sanctioned {
@@ -1229,23 +313,10 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
         else {
             return Err(sanctioned_outside_package_error(base, rule, is_task_audit));
         };
-        let result = row
-            .get("result")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string();
-        if result == "fail" {
-            let evidence = row
-                .get("evidence")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string();
-            row["evidence"] = Value::String(format!("{evidence} (sanctioned: {reference})"));
-            sanctioned_fail += 1;
-        } else {
-            stale_sanctions.push(format!(
-                "--sanctioned {rule}={reference}: row result is \"{result}\", not fail"
-            ));
+        match book_sanction(row, rule, reference) {
+            Booking::Judged => {}
+            Booking::Failed => sanctioned_fail += 1,
+            Booking::Stale(line) => stale_sanctions.push(line),
         }
     }
 
@@ -1319,11 +390,145 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
         result["stale_sanctions"] = json!(stale_sanctions);
     }
 
+    let self_audit_rows = ctx.self_audit_rows();
     Ok(AuditOutcome {
         result,
         failed,
         references,
+        report: report_value,
+        self_audit_rows,
     })
+}
+
+/// What one `--sanctioned` booking made of its row.
+enum Booking {
+    /// The row is judged: it carries `sanctioned`, and the booking is never
+    /// stale.
+    Judged,
+    /// The row is a deterministic `fail`: it carries `sanctioned` and the
+    /// evidence suffix.
+    Failed,
+    /// The row is deterministic and did not fail: the row stays as it is, and
+    /// the text is the booking's line of `stale_sanctions`.
+    Stale(String),
+}
+
+/// The start of the `stale_sanctions` line of the booking `rule=reference`.
+fn stale_line_start(rule: &str, reference: &str) -> String {
+    format!("--sanctioned {rule}={reference}: ")
+}
+
+/// Books `reference` on `row`, the row of `rule`, as the result of the row
+/// allows: a judged row and a deterministic `fail` carry `sanctioned`, and the
+/// `fail` also gains the evidence suffix `(sanctioned: <reference>)`.
+fn book_sanction(row: &mut Value, rule: &str, reference: &str) -> Booking {
+    let result = row
+        .get("result")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+    if !is_deterministic(row) {
+        row["sanctioned"] = Value::String(reference.to_string());
+        Booking::Judged
+    } else if result == "fail" {
+        let evidence = row
+            .get("evidence")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        row["evidence"] = Value::String(format!("{evidence} (sanctioned: {reference})"));
+        row["sanctioned"] = Value::String(reference.to_string());
+        Booking::Failed
+    } else {
+        Booking::Stale(format!(
+            "{}row result is \"{result}\", not fail",
+            stale_line_start(rule, reference)
+        ))
+    }
+}
+
+/// Sets `sanctioned_fail` in the `summary` of an audit result to `count`. The
+/// audit prints the key before `reference_fail`; a key that is not there yet
+/// takes that place.
+fn put_sanctioned_fail(summary: &mut Value, count: usize) {
+    let Some(map) = summary.as_object_mut() else {
+        return;
+    };
+    if let Some(slot) = map.get_mut("sanctioned_fail") {
+        *slot = json!(count);
+    } else if let Some(index) = map.keys().position(|key| key == "reference_fail") {
+        map.shift_insert(index, "sanctioned_fail".to_string(), json!(count));
+    } else {
+        map.insert("sanctioned_fail".to_string(), json!(count));
+    }
+}
+
+/// Re-judges the `--sanctioned` bookings on the rows of `comparing` after
+/// `compare_self_audit` moved them. The audit judged those bookings while each
+/// row still passed, so a booking on a row that is now a `fail` was called
+/// stale. Each such booking is judged again against the row's printed result:
+/// a `fail` carries the booking and counts in `sanctioned_fail`, and any other
+/// result keeps a stale line that names it. A row that still passes keeps the
+/// first judgement.
+fn rejudge_moved_bookings(
+    result: &mut Value,
+    comparing: &[String],
+    sanctioned: &[(String, String)],
+) {
+    let mut stale: Vec<String> = result["stale_sanctions"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|line| line.as_str().map(str::to_string))
+        .collect();
+    let mut sanctioned_fail = result["summary"]["sanctioned_fail"]
+        .as_u64()
+        .and_then(|count| usize::try_from(count).ok())
+        .unwrap_or(0);
+    let mut moved = false;
+    for (rule, reference) in sanctioned
+        .iter()
+        .filter(|(rule, _)| comparing.contains(rule))
+    {
+        let Some(row) = result["rules"]
+            .as_array_mut()
+            .into_iter()
+            .flatten()
+            .find(|row| row.get("id").and_then(Value::as_str) == Some(rule.as_str()))
+        else {
+            continue;
+        };
+        if row["result"] == "pass" {
+            continue;
+        }
+        moved = true;
+        let start = stale_line_start(rule, reference);
+        let slot = stale.iter().position(|line| line.starts_with(&start));
+        match (book_sanction(row, rule, reference), slot) {
+            (Booking::Judged, _) => {}
+            (Booking::Failed, slot) => {
+                sanctioned_fail += 1;
+                if let Some(index) = slot {
+                    stale.remove(index);
+                }
+            }
+            (Booking::Stale(line), Some(index)) => stale[index] = line,
+            (Booking::Stale(line), None) => stale.push(line),
+        }
+    }
+    if !moved {
+        return;
+    }
+    if sanctioned_fail > 0 {
+        put_sanctioned_fail(&mut result["summary"], sanctioned_fail);
+    }
+    if stale.is_empty() {
+        if let Some(map) = result.as_object_mut() {
+            map.remove("stale_sanctions");
+        }
+    } else {
+        result["stale_sanctions"] = json!(stale);
+    }
 }
 
 // ---- CLI --------------------------------------------------------------------------
@@ -1371,23 +576,37 @@ fn parse_sanctioned(raw: Vec<String>) -> Result<Vec<(String, String)>, String> {
 /// `--sanctioned` per `parse_sanctioned`, and prints the JSON result on
 /// stdout. `--json` writes the same result to a file.
 ///
+/// A triggered `runner` check can stop the audit before it has a result: a
+/// tool that `runners` does not define, a malformed `runners` entry, a
+/// program the system does not find, a working tree that is not the tree at
+/// `--head`, and a SARIF document that is unusable each give one stderr line
+/// and exit 2, with no rows (`runner::run` returns the line as its `Err`).
+///
 /// The install's tracker comes into it as spec 3.4 and 3.7 say. The audit
 /// reads the work-item references of its range: the `Work-Item:` and
 /// `Deferred:` trailers of each commit, and the `issues[].backlog` ids of the
 /// deliverables it reads (`trailers::collect`). It judges them
 /// (`trailers::judge`) before it prints the result, and the result holds the
-/// verdict: `references` (`resolved`, `skipped`, and one line in `failures`
-/// for each failure) and the `reference_fail` count of the summary. With a
-/// tracker, it prints each failure line on stderr too, and exits 1 when there
-/// is one, whatever the checks decided; a tracker that cannot be reached is
-/// its own failure line and exit 1, and any other tracker error is a failure
-/// line and exit 2, each with every reference skipped. With no tracker and no
-/// `backlog/` directory, it resolves none, counts them as skipped, and prints
-/// the line that counts the references it did not resolve on stderr,
-/// `skipped 0` included. With no tracker and a `backlog/` directory, line B
-/// is the one failure and the exit is 1. Every such line is on stderr, so
-/// stdout stays the JSON result. A tracker that cannot be built, or a tracker
-/// key that cannot be read, is its own line and exit 2, with no result.
+/// verdict: `references` (`checked`, `passed`, `skipped`, and one line in
+/// `failures` for each failure) and the `reference_fail` count of the summary.
+/// With a tracker, it prints each failure line on stderr too, and exits 1 when
+/// there is one, whatever the checks decided; a tracker that cannot be reached
+/// is its own failure line and exit 1, and any other tracker error is a
+/// failure line and exit 2, each with every reference skipped. With no tracker
+/// and no `backlog/` directory, it resolves none, counts them as skipped, and
+/// prints the line that counts the references it did not resolve on stderr,
+/// `skipped 0` included. With no tracker and a `backlog/` directory, line B is
+/// the one failure and the exit is 1. Every such line is on stderr, so stdout
+/// stays the JSON result. A tracker that cannot be built, or a tracker key that
+/// cannot be read, is its own line and exit 2, with no result.
+///
+/// A `--report` run then compares the `self_audit` of the report with the
+/// result (`compare_self_audit`, spec 6). A difference makes the row of the
+/// check that reads `self_audit` a `fail` (a `warn` for a check of level
+/// `warn`), moves the summary counts with it, and makes the exit 1 for a
+/// `fail`. The audit then judges again the `--sanctioned` booking on that row
+/// (`rejudge_moved_bookings`), so that `sanctioned`, `sanctioned_fail`, and
+/// `stale_sanctions` describe the printed result.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_audit(
     dir: Option<PathBuf>,
@@ -1438,7 +657,7 @@ pub(crate) fn cmd_audit(
             ids,
             report,
             workspace,
-            sanctioned,
+            sanctioned: sanctioned.clone(),
         },
     );
     let mut outcome = match outcome {
@@ -1450,6 +669,15 @@ pub(crate) fn cmd_audit(
     };
     let verdict = trailers::judge(&tracker, &outcome.references);
     add_verdict(&mut outcome.result, &verdict);
+    if let Some(report) = &outcome.report {
+        outcome.failed |= runner::compare_self_audit(
+            &base.root,
+            report,
+            &outcome.self_audit_rows,
+            &mut outcome.result,
+        );
+        rejudge_moved_bookings(&mut outcome.result, &outcome.self_audit_rows, &sanctioned);
+    }
     if let Some(path) = &json
         && let Err(error) = std::fs::write(path, emit(&outcome.result))
     {
@@ -1468,13 +696,14 @@ pub(crate) fn cmd_audit(
 }
 
 /// Adds the verdict on the work-item references to the audit `result`: the
-/// `references` object (`resolved`, `skipped`, and the `failures` lines) and
-/// the `reference_fail` count of the summary. The `fail` count of the summary
-/// stays the count of the rule rows.
+/// `references` object (`checked`, `passed`, `skipped`, and the `failures`
+/// lines) and the `reference_fail` count of the summary. The `fail` count of
+/// the summary stays the count of the rule rows.
 fn add_verdict(result: &mut Value, verdict: &trailers::Verdict) {
     result["summary"]["reference_fail"] = json!(verdict.failures.len());
     result["references"] = json!({
-        "resolved": verdict.resolved,
+        "checked": verdict.checked,
+        "passed": verdict.passed,
         "skipped": verdict.skipped,
         "failures": verdict.failures,
     });
@@ -2943,7 +2172,7 @@ mod tests {
         assert_eq!(row["result"], json!("pass"));
         assert_eq!(
             row["evidence"],
-            json!("report field dependency_vetting is set in 2 reports")
+            json!("report field dependency_vetting is set in 2 of 2 reports")
         );
     }
 
@@ -3129,50 +2358,6 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error, "audit takes --report or --workspace, not both");
-    }
-
-    /// Carries git's own stderr line for a diff failure that is not a
-    /// merge-base miss: calls `git_diff` directly, since `audit()` never
-    /// feeds it a malformed pathspec itself, and this is the only way to
-    /// exercise its generic fallback.
-    #[test]
-    fn git_diff_carries_gits_own_stderr_line_for_a_non_merge_base_failure() {
-        let dir = make_repo(&audit_entries());
-        let error = git_diff(dir.path(), "main", "main", &["--name-only", ":(bad"]).unwrap_err();
-        assert_eq!(error, "fatal: Invalid pathspec magic 'bad' in ':(bad'");
-    }
-
-    /// The discriminator looks for the literal substring "no merge base",
-    /// so a pathspec that echoes back the different words "bad merge
-    /// base" must not be mistaken for an actual merge-base miss.
-    #[test]
-    fn git_diff_does_not_mislabel_a_pathspec_failure_whose_text_contains_merge_base() {
-        let dir = make_repo(&audit_entries());
-        let error = git_diff(
-            dir.path(),
-            "main",
-            "main",
-            &["--name-only", ":(bad merge base"],
-        )
-        .unwrap_err();
-        assert_eq!(
-            error,
-            "fatal: Invalid pathspec magic 'bad merge base' in ':(bad merge base'"
-        );
-    }
-
-    /// A `cwd` that does not exist makes `Command::output` itself fail
-    /// (git never launches), so `run_git`'s `RawGitError::stderr` carries
-    /// the OS error's own text instead of anything git printed. This
-    /// pins only that the fallback still produces a real, non-empty
-    /// one-line message, since the OS error text is platform-specific.
-    #[test]
-    fn git_diff_falls_back_to_the_os_errors_own_message_when_git_never_runs() {
-        let missing_root =
-            std::env::temp_dir().join("houserules-audit-git-diff-missing-root-probe");
-        let error =
-            git_diff(&missing_root, "main", "main", &["--name-only"]).expect_err("git diff");
-        assert!(!error.is_empty());
     }
 
     // ---- the `controller` tag ----
@@ -3451,6 +2636,51 @@ mod tests {
         assert!(outcome.failed, "a sanctioned fail still fails the run");
     }
 
+    /// Spec 6: every sanctioned row carries the structured `sanctioned` field
+    /// with the reference, beside the evidence suffix of a deterministic fail.
+    #[test]
+    fn a_sanctioned_deterministic_fail_carries_the_sanctioned_field() {
+        let (dir, base_sha) = make_repo_with_one_bad_commit_subject();
+        let base = load_base(dir.path()).unwrap();
+        let outcome = audit(
+            &base,
+            AuditOptions {
+                base_ref: Some(base_sha),
+                sanctioned: vec![("process.commits".to_string(), "spec section 6".to_string())],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let rows = outcome.result["rules"].as_array().unwrap();
+        let row = rows.iter().find(|r| r["id"] == "process.commits").unwrap();
+        assert_eq!(row["sanctioned"], json!("spec section 6"));
+    }
+
+    /// Spec 6: a booking on a judged rule is never stale. The judged row stays
+    /// `open`, carries the reference in `sanctioned`, and fails nothing, and
+    /// `sanctioned_fail` counts fails only.
+    #[test]
+    fn sanctioned_judged_rule_is_not_stale() {
+        let outcome =
+            controller_audit(AuditKind::Plain, &[], &["process.plain-standing"]).expect("audit");
+        let rows = outcome.result["rules"].as_array().unwrap();
+        let row = rows
+            .iter()
+            .find(|r| r["id"] == "process.plain-standing")
+            .unwrap();
+        assert_eq!(
+            row,
+            &json!({
+                "id": "process.plain-standing", "kind": "rule", "mode": "judged",
+                "level": null, "result": "open", "evidence": "\u{2014}",
+                "sanctioned": "spec 3.1",
+            })
+        );
+        assert!(outcome.result.get("stale_sanctions").is_none());
+        assert!(outcome.result["summary"].get("sanctioned_fail").is_none());
+        assert!(!outcome.failed, "a booked judged rule fails nothing");
+    }
+
     /// A rule that RAN and passed is a stale booking, distinguished by
     /// wording from a rule the package never carried at all
     /// (`reports_an_unknown_sanctioned_id_as_a_named_error_not_a_stale_
@@ -3584,143 +2814,5 @@ mod tests {
                 "https://x.test/?a=b".to_string()
             )])
         );
-    }
-
-    // ---- the trailer rule of a `commits` check ----
-
-    /// A `commits` check that requires the `Work-Item` trailer, with the
-    /// fields of `extra` added.
-    fn trailer_check(extra: serde_json::Value) -> CheckDef {
-        let mut check = json!({"type": "commits", "level": "fail", "require_trailer": "Work-Item"});
-        if let (Some(map), Some(more)) = (check.as_object_mut(), extra.as_object()) {
-            map.extend(more.clone());
-        }
-        serde_json::from_value(check).expect("a valid commits check")
-    }
-
-    /// A commit by `author` with `subject` and `trailers`, abbreviated sha
-    /// `abc1234`.
-    fn commit_by(author: &str, subject: &str, trailers: &[(&str, &str)]) -> Commit {
-        Commit {
-            sha: "abc1234ffffffffffffffffffffffffffffffff".to_string(),
-            short_sha: "abc1234".to_string(),
-            subject: subject.to_string(),
-            body: String::new(),
-            author: author.to_string(),
-            trailers: trailers
-                .iter()
-                .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
-                .collect(),
-        }
-    }
-
-    /// The finding that `check-commit` prints for `commit` under `check`, or
-    /// none.
-    fn finding(check: &CheckDef, commit: &Commit) -> Option<String> {
-        let compiled = CommitsCheck::compile("team.trailers", check).expect("compiles");
-        compiled
-            .violation(commit)
-            .map(|violation| violation.line("team.trailers"))
-    }
-
-    /// A commit with no trailer of the required key breaks the rule, and the
-    /// finding names the commit and the check itself: it is whole, with no id
-    /// in front of it. The audit row carries the same text.
-    #[test]
-    fn a_commit_without_the_required_trailer_breaks_the_rule() {
-        let check = trailer_check(json!({}));
-        let commit = commit_by(
-            "A Human",
-            "feat: a change",
-            &[("Signed-off-by", "A <a@b.c>")],
-        );
-        assert_eq!(
-            finding(&check, &commit),
-            Some("abc1234: no Work-Item trailer (team.trailers)".to_string())
-        );
-        let compiled = CommitsCheck::compile("team.trailers", &check).expect("compiles");
-        assert_eq!(
-            compiled.violation(&commit).expect("a violation").evidence(),
-            "abc1234: no Work-Item trailer (team.trailers)"
-        );
-    }
-
-    /// A message with no sha on record, the hook's, names no sha.
-    #[test]
-    fn a_message_with_no_sha_names_no_sha() {
-        let check = trailer_check(json!({}));
-        let message = Commit::unattributed("feat: a change".to_string(), String::new(), vec![]);
-        assert_eq!(
-            finding(&check, &message),
-            Some("no Work-Item trailer (team.trailers)".to_string())
-        );
-    }
-
-    /// A trailer of the key with a value satisfies the rule, whatever the case
-    /// of the key; a trailer with no value names nothing and does not.
-    #[test]
-    fn the_key_matches_without_regard_to_case_and_needs_a_value() {
-        let check = trailer_check(json!({}));
-        for key in ["Work-Item", "work-item", "WORK-ITEM"] {
-            let commit = commit_by("A Human", "feat: a change", &[(key, "HR-001")]);
-            assert_eq!(finding(&check, &commit), None, "{key}");
-        }
-        let empty = commit_by("A Human", "feat: a change", &[("Work-Item", "")]);
-        assert!(finding(&check, &empty).is_some());
-    }
-
-    /// `exempt_authors` match the whole author name; a commit with no author
-    /// on record is never exempt by author, even if the list names an empty
-    /// string.
-    #[test]
-    fn exempt_authors_match_whole_names_and_never_an_empty_author() {
-        let check = trailer_check(json!({"exempt_authors": ["dependabot[bot]", ""]}));
-        let by = |author: &str| commit_by(author, "feat: a change", &[]);
-        assert_eq!(finding(&check, &by("dependabot[bot]")), None);
-        assert!(finding(&check, &by("not dependabot[bot]")).is_some());
-        assert!(finding(&check, &by("dependabot")).is_some());
-        let unattributed =
-            Commit::unattributed("feat: a change".to_string(), String::new(), vec![]);
-        assert!(finding(&check, &unattributed).is_some());
-    }
-
-    /// `exempt_subjects` are patterns under the check's flags that may match
-    /// anywhere in the subject unless they anchor themselves.
-    #[test]
-    fn exempt_subjects_match_anywhere_unless_anchored_and_take_the_check_flags() {
-        let anchored = trailer_check(json!({"exempt_subjects": ["^chore\\(.+\\): release "]}));
-        let release = commit_by("A Human", "chore(main): release 2.0.0", &[]);
-        let inside = commit_by("A Human", "feat: prepare chore(main): release 2.0.0", &[]);
-        assert_eq!(finding(&anchored, &release), None);
-        assert!(finding(&anchored, &inside).is_some());
-
-        let loose = trailer_check(json!({"exempt_subjects": ["RELEASE"], "flags": "i"}));
-        assert_eq!(finding(&loose, &inside), None);
-        let strict = trailer_check(json!({"exempt_subjects": ["RELEASE"]}));
-        assert!(finding(&strict, &inside).is_some());
-    }
-
-    /// The exemptions release a commit from the trailer rule alone: an exempt
-    /// author still breaks the subject rule of the same check, and that
-    /// finding reads behind the id as every other rule's does.
-    #[test]
-    fn the_exemptions_leave_the_other_rules_of_the_check_alone() {
-        let check = trailer_check(json!({
-            "subject": "^(feat|fix): ",
-            "exempt_authors": ["dependabot[bot]"],
-        }));
-        let commit = commit_by("dependabot[bot]", "Bump serde", &[]);
-        assert_eq!(
-            finding(&check, &commit),
-            Some("team.trailers: commit \"Bump serde\" does not match ^(feat|fix): ".to_string())
-        );
-    }
-
-    /// A malformed `exempt_subjects` pattern is a named error, never a panic
-    /// (`houserules.crash-paths-are-named`).
-    #[test]
-    fn a_malformed_exempt_subject_pattern_is_a_named_error() {
-        let check = trailer_check(json!({"exempt_subjects": ["(unclosed"]}));
-        assert!(CommitsCheck::compile("team.trailers", &check).is_err());
     }
 }

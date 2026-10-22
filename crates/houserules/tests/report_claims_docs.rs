@@ -12,7 +12,7 @@ use std::process::Output;
 
 use serde_json::json;
 use tracker_support::{
-    LINE_A, LINE_B, assert_output, git, houserules, install_with_backlog_dir,
+    LINE_A, LINE_B, add_submodule, assert_output, git, houserules, install_with_backlog_dir,
     install_without_backlog, mini_install, read_json, run, scratch_git_repo, stderr, write_json,
 };
 
@@ -232,6 +232,80 @@ fn doc_names_each_missing_path_once() {
     );
 }
 
+/// HR-222: `.houserules/step/` holds the output of a tool (`rules.json`,
+/// `audit.json`), which the checkout has not run the step to make. A spec that
+/// names it cites no evidence of the workspace. The skip holds under both
+/// ignore lines (`.houserules/` and the older `.houserules/step/`), and for an
+/// absolute citation too.
+#[test]
+fn doc_skips_a_cited_path_under_the_step_folder() {
+    for ignore_line in [".houserules/", ".houserules/step/"] {
+        let dir = install_with_doc("");
+        ignore(dir.path(), ignore_line);
+        let root = root_of(dir.path());
+        write(
+            dir.path(),
+            DOC,
+            &format!(
+                "The step wrote .houserules/step/rules.json and {root}/.houserules/step/audit.json.\n"
+            ),
+        );
+        assert_output(
+            &check_doc(dir.path()),
+            0,
+            &format!("{DOC}: no claim mismatches found\n"),
+            "",
+        );
+    }
+}
+
+/// HR-222: a cited path under the `workspaces` location is checked: the
+/// default location `.houserules/work` is a workspace once git ignores it. A
+/// missing file there is named, and an existing one is clean.
+#[test]
+fn doc_checks_a_cited_path_under_the_workspaces_location() {
+    let dir = install_with_doc("");
+    ignore(dir.path(), ".houserules/");
+    write(
+        dir.path(),
+        ".houserules/work/2026-10-21-batch-1/probe.txt",
+        "probe\n",
+    );
+    write(
+        dir.path(),
+        DOC,
+        "See .houserules/work/2026-10-21-batch-1/probe.txt and \
+         .houserules/work/2026-10-21-batch-1/missing.txt.\n",
+    );
+    assert_output(
+        &check_doc(dir.path()),
+        1,
+        "",
+        &format!(
+            "{DOC}: cites .houserules/work/2026-10-21-batch-1/missing.txt, which does not exist\n"
+        ),
+    );
+}
+
+/// `git check-ignore` refuses a path inside a submodule and ends the whole
+/// call, so the check never asks it about one. A citation of such a path is no
+/// workspace path, and it takes no other verdict with it: the missing
+/// workspace file is named.
+#[test]
+fn doc_names_a_missing_workspace_file_beside_a_citation_in_a_submodule() {
+    let dir = install_with_doc(&format!(
+        "The file vendor/s.txt shows it. The run {WORKSPACE}/missing.txt is cited too.\n"
+    ));
+    add_submodule(dir.path(), "vendor", "s.txt");
+
+    assert_output(
+        &check_doc(dir.path()),
+        1,
+        "",
+        &format!("{DOC}: cites {WORKSPACE}/missing.txt, which does not exist\n"),
+    );
+}
+
 /// A doc that cannot be read is a named error with the operating system's
 /// text, exit 2.
 #[test]
@@ -321,6 +395,26 @@ fn item_with_only_existing_workspace_paths_is_clean() {
     assert_output(&output, 0, "HR-901: no claim mismatches found\n", "");
 }
 
+/// HR-222: `--item` skips a cited path under `.houserules/step/` as `--doc`
+/// does, and checks a cited path under the default workspaces location.
+#[test]
+fn item_skips_the_step_folder_and_checks_the_workspaces_location() {
+    let dir = mini_with_item_citing("");
+    ignore(dir.path(), ".houserules/");
+    cite_in_item(
+        dir.path(),
+        "The step wrote .houserules/step/audit.json. The run is \
+         .houserules/work/2026-10-21-batch-1/missing.txt.",
+    );
+    let output = run(dir.path(), &["check-report-claims", "--item", "HR-901"]);
+    assert_output(
+        &output,
+        1,
+        "",
+        "HR-901: cites .houserules/work/2026-10-21-batch-1/missing.txt, which does not exist\n",
+    );
+}
+
 /// The tracker's own not-found line is the error for an id it does not hold,
 /// exit 2.
 #[test]
@@ -362,13 +456,14 @@ fn the_source_of_the_claims_is_exactly_one_of_report_doc_and_item() {
 /// reaches it by a short and a long name. A symlink to the install root is the
 /// same cause on Linux. A citation inside the root is inside it in every
 /// spelling (spec 9.1: a cited workspace path must exist, whatever its
-/// spelling).
+/// spelling). A citation through a symlink below the root is judged at the
+/// target of the link (HR-224). A symlink is a platform feature of Unix here
+/// (`houserules.platform-gated-tests`).
 #[cfg(unix)]
 mod symlinked_root {
     use std::os::unix::fs::symlink;
     use std::path::PathBuf;
 
-    use super::tracker_support::stdout;
     use super::*;
 
     /// The source of the claims that a case checks.
@@ -545,44 +640,125 @@ mod symlinked_root {
         );
     }
 
-    /// A symlink below the root that leaves it (a workspace that the worktrees
-    /// share, say) makes git refuse the path, and the run fails with git's
-    /// line. An absolute citation gets the verdict of the relative citation of
-    /// the same names: the check never passes a file silently that it must
-    /// fail. The pathspec that git names is the path below the root.
+    /// The citations of the file `file` below the symlink `link` of the
+    /// install, in the two spellings of the install root: the path below the
+    /// root, and the absolute path.
+    fn through(install: &Path, link: &str, file: &str) -> [String; 2] {
+        let below_the_root = format!("{link}/{file}");
+        [
+            below_the_root.clone(),
+            format!("{}/{below_the_root}", root_of(install)),
+        ]
+    }
+
+    /// Requires `check-report-claims --doc` to name the file cited as `cited`
+    /// as missing (`missing`), or to find the citation clean.
+    fn assert_doc_verdict(install: &Path, cited: &str, missing: bool) {
+        write(install, DOC, &format!("The run {cited} is cited.\n"));
+        let output = check_doc(install);
+        if missing {
+            assert_output(
+                &output,
+                1,
+                "",
+                &format!("{DOC}: cites {cited}, which does not exist\n"),
+            );
+        } else {
+            assert_output(
+                &output,
+                0,
+                &format!("{DOC}: no claim mismatches found\n"),
+                "",
+            );
+        }
+    }
+
+    /// HR-224 (C8): a symlink below the root that leaves it (a workspace that
+    /// the worktrees share, say) makes git refuse the path beyond it. The check
+    /// judges the citation at its target: the link is ignored, so the citation
+    /// names a workspace file, and the target decides whether the file exists.
+    /// The relative and the absolute citation agree.
     #[test]
-    fn doc_gives_an_absolute_citation_through_a_symlink_the_verdict_of_the_relative_one() {
+    fn doc_judges_a_citation_through_a_symlink_that_leaves_the_root_at_its_target() {
         let install = install_with_doc("");
         let outside = tempfile::tempdir().expect("tempdir");
+        write(outside.path(), "present.txt", "present\n");
+        let link = format!("{WORKSPACE}/elsewhere");
+        symlink(outside.path(), install.path().join(&link)).expect("symlink out of the root");
+
+        for cited in through(install.path(), &link, "missing.txt") {
+            assert_doc_verdict(install.path(), &cited, true);
+        }
+        for cited in through(install.path(), &link, "present.txt") {
+            assert_doc_verdict(install.path(), &cited, false);
+        }
+    }
+
+    /// A symlink whose target is gone judges the citation at the missing
+    /// target: the file does not exist.
+    #[test]
+    fn doc_names_a_citation_through_a_dangling_symlink() {
+        let install = install_with_doc("");
+        let gone = tempfile::tempdir().expect("tempdir");
+        let link = format!("{WORKSPACE}/dangling");
+        symlink(gone.path().join("removed"), install.path().join(&link))
+            .expect("symlink to a missing target");
+
+        for cited in through(install.path(), &link, "missing.txt") {
+            assert_doc_verdict(install.path(), &cited, true);
+        }
+    }
+
+    /// A tracked symlink to a folder of the workspace inside the root is judged
+    /// at its target: the target is ignored, so the citation names a workspace
+    /// file.
+    #[test]
+    fn doc_judges_a_citation_through_a_symlink_into_an_ignored_folder_at_its_target() {
+        let install = install_with_doc("");
         symlink(
-            outside.path(),
-            install.path().join(WORKSPACE).join("elsewhere"),
+            install.path().join(WORKSPACE),
+            install.path().join("shared"),
         )
-        .expect("symlink out of the root");
-        let below_the_root = format!("{WORKSPACE}/elsewhere/missing.txt");
-        write(
-            install.path(),
-            DOC,
-            &format!("The run {below_the_root} is cited.\n"),
-        );
-        let relative = check_doc(install.path());
-        let root = root_of(install.path());
-        write(
-            install.path(),
-            DOC,
-            &format!("The run {root}/{below_the_root} is cited.\n"),
-        );
-        let absolute = check_doc(install.path());
-        assert_eq!(relative.status.code(), Some(2));
-        let relative_line = stderr(&relative);
-        assert!(
-            relative_line.starts_with(&format!("{DOC}: git check-ignore failed: ")),
-            "{relative_line}"
-        );
-        assert!(relative_line.contains(&below_the_root), "{relative_line}");
-        assert_eq!(
-            (absolute.status.code(), stdout(&absolute), stderr(&absolute)),
-            (relative.status.code(), stdout(&relative), relative_line),
+        .expect("symlink to the workspace");
+
+        for cited in through(install.path(), "shared", "missing.txt") {
+            assert_doc_verdict(install.path(), &cited, true);
+        }
+        for cited in through(install.path(), "shared", "probe.txt") {
+            assert_doc_verdict(install.path(), &cited, false);
+        }
+    }
+
+    /// A symlink to a folder that is not ignored names no workspace: a
+    /// citation through it is skipped, as a citation of that folder is.
+    #[test]
+    fn doc_skips_a_citation_through_a_symlink_into_an_unignored_folder() {
+        let install = install_with_doc("");
+        symlink(install.path().join("docs"), install.path().join("alias"))
+            .expect("symlink to docs/");
+
+        for cited in through(install.path(), "alias", "missing.json") {
+            assert_doc_verdict(install.path(), &cited, false);
+        }
+    }
+
+    /// `--item` judges a citation through a symlink at its target as `--doc`
+    /// does.
+    #[test]
+    fn item_judges_a_citation_through_a_symlink_that_leaves_the_root_at_its_target() {
+        let install = mini_with_item_citing("");
+        let outside = tempfile::tempdir().expect("tempdir");
+        let link = format!("{WORKSPACE}/elsewhere");
+        symlink(outside.path(), install.path().join(&link)).expect("symlink out of the root");
+        cite_in_item(install.path(), &format!("Held at {link}/missing.json."));
+
+        let output = run(install.path(), &["check-report-claims", "--item", "HR-901"]);
+
+        assert_output(
+            &output,
+            1,
+            "",
+            &format!("HR-901: cites {link}/missing.json, which does not exist\n"),
         );
     }
 }

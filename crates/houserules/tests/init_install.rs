@@ -1,5 +1,5 @@
 //! `init` writes the 2.0 install (batch 33, spec sections 3, 7, and 9; batch 34,
-//! spec 4.6): the marker `houserules/install@2.1.0`, the `knowledge-base` pack
+//! spec 4.6): the marker `houserules/install@2.2.0`, the `knowledge-base` pack
 //! with its pin, no other pack, no topic file, and the Claude Code files only
 //! with `--target claude`.
 //! Each case runs the compiled binary against a scratch git repository.
@@ -196,7 +196,7 @@ fn init_writes_the_2_0_marker() {
             "baselines"
         ]
     );
-    assert_eq!(marker["schema"], json!("houserules/install@2.1.0"));
+    assert_eq!(marker["schema"], json!("houserules/install@2.2.0"));
     assert_eq!(marker["version"], json!(env!("CARGO_PKG_VERSION")));
     assert_eq!(marker["idPrefix"], json!("WI"));
     assert_eq!(marker["renderers"], json!([]));

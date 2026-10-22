@@ -1,0 +1,80 @@
+{
+  "base": "4723faf",
+  "head": "85f272c",
+  "ids": [],
+  "changed_files": [
+    "docs/log.md",
+    "docs/notes.md",
+    "src/a.rs"
+  ],
+  "areas": [
+    "docs",
+    "global"
+  ],
+  "area_files": {
+    "global": [],
+    "docs": [
+      "docs/log.md",
+      "docs/notes.md"
+    ]
+  },
+  "rules": [
+    {
+      "id": "pins.append-only",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "fail",
+      "evidence": "1 removed lines in docs/log.md"
+    },
+    {
+      "id": "pins.cochange",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "fail",
+      "evidence": "src/a.rs changed without docs/changelog.md"
+    },
+    {
+      "id": "pins.commit-format",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "fail",
+      "evidence": "commit \"Rewrite the log\" does not match ^(feat|fix|chore|docs|test): .+"
+    },
+    {
+      "id": "pins.durable-sha",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "fail",
+      "evidence": "docs/notes.md:2: \"see f26f80b for the change\" cites f26f80b, resolving to commit f26f80b7a9853e7077cd3024ac800c6f49d4d0d7, not reachable from the default branch (4723faf02e488d720f2ad105f7fe094f39e36dce)"
+    },
+    {
+      "id": "pins.trailer",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "fail",
+      "evidence": "85f272c: no Work-Item trailer (pins.trailer)"
+    }
+  ],
+  "summary": {
+    "base": "4723faf",
+    "head": "85f272c",
+    "deterministic": 5,
+    "pass": 0,
+    "fail": 5,
+    "warn": 0,
+    "skipped": 0,
+    "judged": 0,
+    "reference_fail": 0
+  },
+  "references": {
+    "checked": 0,
+    "passed": 0,
+    "skipped": 3,
+    "failures": []
+  }
+}
