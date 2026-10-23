@@ -2921,3 +2921,213 @@ Each item records the ruling with its date, or stays marked open.
     `url` and `percent-encoding` crates as direct dependencies) is now the
     owner's choice under `quality.well-maintained-libraries`. Source: owner,
     2026-10-22.
+207. **Batch 35 accepted; the controller decides its close proposals and
+    deferrals - ruled 2026-10-22.** The owner, verbatim: "Accepted. Decide
+    the stats proposals and deferrals for me. Proceed". The controller's
+    decisions, each reviewable by the owner:
+    (1) The four owner-gated `mechanize` proposals of the batch-35
+    `stats.json` (`process.fix-proofs-extend-the-reviewers-run`,
+    `process.gates-cover-generated-commits`,
+    `process.refused-commands-hand-back`, `process.rulings-to-file`): keep
+    each judged and tag it `ruled-keep`. Whether a proof extends a
+    reviewer's run, whether a paper walk covers every author class, whether
+    a refused step was taken another way (a harness event, not in the
+    diff), and whether a ruling reached its home file all need a reader;
+    HR-204 (batch 36) mechanizes the parts of report claims that a check
+    can read. (2) `narrow process.rulings-to-file`: declined with (1).
+    (3) The standing budget (26 of 25): demote
+    `process.every-commit-names-a-work-item` to area `global`. It caught
+    nothing in the window, and `check-commit`, the commit-msg hook, and
+    CI's check-commit job enforce its check whether or not it is standing;
+    area `global` keeps it in every audit package. (4) The two `narrow`
+    proposals with owner_gate false (`houserules.task-gates-mirror-ci`,
+    `quality.absence-is-designed`): no change; each entry already confines
+    itself to its contract surface. (5) The deferrals: HR-226, HR-227,
+    HR-228, HR-229, HR-230, and HR-232 join batch 36; HR-231 (mechanize
+    four judged rules, each needing its own design and corpus run) moves
+    to 2.x. Source: owner, 2026-10-22.
+208. **Batch 36: approval and merge leave as for batch 35 - ruled
+    2026-10-22.** (1) "Yes, as 201 (Recommended)": the batch-36 spec is
+    approved once a fresh whole-meta-spec design review holds no Critical
+    finding; the controller folds that review's findings and proceeds to
+    the plan; owner-only questions still go to the owner. (2) "Yes, as 198
+    (Recommended)": after the full lifecycle, CI green, and the owner's word
+    on any decision the controller took alone, the controller merges
+    ff-only from the CLI; no release, and release PR #83 stays held until
+    batch 38. Source: owner, 2026-10-22.
+209. **Batch 36: the quoting library - ruled 2026-10-22.** "shlex 2.0.1
+    (Recommended)": `shlex` quotes the recorded command of a capture and
+    every path that a printed remedy puts into a command (HR-171, HR-227;
+    spec question Q1). The locked 2.0.1 adds no crate to `Cargo.lock`;
+    the plan vets it and adds it as a direct dependency with `cargo add
+    shlex@=<version>`. Source: owner, 2026-10-22.
+210. **Batch 36: HR-204 item 5 moves to 2.x - ruled 2026-10-22.** "Move
+    to 2.x (Recommended)": the batch-close warning for a ledger line that
+    says "for the owner" with no spec entry leaves batch 36 as HR-233
+    (milestone 2.x). The kit defines no ledger line form and no spec
+    section numbers, so a deterministic check would read one repository's
+    prose habits; `process.rulings-to-file` stays judged, as ruling 179
+    already limits the item (spec question Q2). Source: owner, 2026-10-22.
+211. **Batch 36: the natural-RED predicate of HR-204 item 6 - ruled
+    2026-10-22.** "Exit code only (Recommended)": `check-report-claims`
+    fails a `natural` RED whose capture exited 0. This replaces the words
+    `FAILED` and `panicked` of 177(4): they are cargo's, and they fail a
+    RED that is a compile error, the usual first RED of a function that
+    does not exist yet (13 of the retained natural REDs; spec question
+    Q-C6, `rederive-f3-f5.txt` in the batch-36 workspace). Source: owner,
+    2026-10-22.
+212. **Batch 36: three report-claims checks retire, HR-072 drops - ruled
+    2026-10-22.** "Retire all three, drop HR-072 (Recommended)": the
+    redirected-capture check, the truncation-marker check, and the
+    paste-run lint of `check-report-claims` retire with the inline output
+    they read; the hash check, the byte-exact excerpt check, and the
+    command taken from the capture header replace them. This rules the
+    meta-spec fate "kept; checks grow" of `check-report-claims` (5.100)
+    for these three checks. HR-072 (narrow the paste-run lint, 2.x)
+    is dropped: its subject is gone (spec question Q-C12). Source: owner,
+    2026-10-22.
+213. **Batch 36: the atomic file replace - ruled 2026-10-22.**
+    "tempfile 3.27.0 (Recommended)": `capture` and `report-facts` write
+    through `tempfile::NamedTempFile` in the target's directory and
+    `persist` it (`persist_noclobber` where `capture` must not replace an
+    existing file). `tempfile` moves from the dev dependencies to the
+    dependencies at its pinned version (spec review finding F13;
+    `library-research-tempfile.txt` in the batch-36 workspace). Source:
+    owner, 2026-10-22.
+214. **Batch 36: the report-facts subcommand - ruled 2026-10-22.**
+    "Approve as report-facts (Recommended)": HR-158 ships as the new flat
+    subcommand `houserules report-facts <REPORT> --base <ref> [--fix-base
+    <ref>] [--audit <file>]`, which fills a task report's fact fields from
+    git and from captures and never replaces a recorded hash
+    (`houserules.1-0-surface-is-frozen`; spec question Q-RF1). Source:
+    owner, 2026-10-22.
+215. **Batch 36: the home of the ls-files listings - ruled 2026-10-23.**
+    "All in rules::git_paths (Recommended)": the tracked-file listing
+    (today in `rules/check.rs`, with a copy in `report_claims.rs`), the
+    glob listing (today in `install/location.rs` and
+    `rules/render/agents_md.rs`), and the index listing (today in
+    `rules/ignored.rs`) move into `rules::git_paths`; the lint test of
+    HR-204 item 7 names that module and the three gate binaries. This
+    supersedes the module names of 177(4) for item 7 (spec question
+    Q-C8). Source: owner, 2026-10-23.
+216. **Second night delegation - ruled 2026-10-23.** The owner, verbatim:
+    "Continue autonomously like last night. You can continue autonomously
+    either until the clock strikes 8am when i take over the rulings again
+    or until you reach the spec stage of batch 38, whichever comes first.
+    Just like last night, give me an overview of the rulings you took on
+    my behalf when the time comes for me to take over the decisions again
+    so i can see if anything needs a veto." The limits of 204 apply ("like
+    last night"): no release, no spending, no external action beyond the
+    grants of the past; privileges scoped to the current work in
+    houserules; a spec changes only to fold a review finding; the
+    meta-spec never changes. The delegation ends at 08:00 local time
+    (CEST) on 2026-10-23, or when batch 38 reaches its spec stage. Every
+    decision taken under it goes to a page for the owner's veto. (2) To
+    the question whether batch 36 may merge before the owner's word on the
+    decisions taken alone (208(2)): "Merge, veto later (Recommended)": the
+    controller ff-merges batch 36 from the CLI once its lifecycle and CI
+    are green, with no release; a veto after the merge is fixed in a
+    follow-up commit or in batch 37, which then starts from main. Source:
+    owner, 2026-10-23.
+217. **Batch 36: two check-report-claims lines beyond spec 6 - ruled
+    2026-10-23.** "Reviewer's wording (Recommended)": a report run that
+    lacks `sha256`, `command`, or `exit` gets one line per missing key,
+    `<label>: no <key>; run houserules report-facts`; a natural RED whose
+    capture header `end` does not parse gets `tdd[<i>]: mode "natural",
+    but the RED capture "<path>" has an end that is no RFC 3339 time (<the
+    jiff error>)`. Both go into spec 6 (Task 6 review, question Q1 of the
+    night page). Source: owner, 2026-10-23.
+218. **The second night's decisions approved - ruled 2026-10-23.** The
+    owner, verbatim: "your nightly rulings are approved." Decisions D1 to
+    D15 taken under 216 (`delegated-decisions.md` in the batch-36
+    workspace; the night page) stand with no veto. Source: owner,
+    2026-10-23.
+219. **Batch 36: three check-report-claims readings of Task 7 - ruled
+    2026-10-23.** (1) "Add the line (Recommended)": checks 5 and 6 print
+    `<label>: <path> could not be read (<the OS error>)` for a failed
+    lookup that is not NotFound; only NotFound reads as `does not exist`.
+    (2) "JSON path label (Recommended)": check 10 labels a commit body
+    with the commit's JSON path, its sha as listed, and `body`
+    (`commits[<i>] <sha> body`, `fix_rounds[<r>].commits[<i>] <sha>
+    body`). (3) "Count if a capture (Recommended)": in a commit body a
+    bare file name that names a capture at the install root counts; every
+    other citation is skipped, a bare file name that names no capture at
+    the install root included. All three go into spec 6 (Task 7 review).
+    Source: owner, 2026-10-23.
+220. **The surface freeze ends at the 2.0.0 release - ruled
+    2026-10-23.** The owner, verbatim: "After the 2.0.0 release, the
+    freeze does not apply anymore." To the question what then holds:
+    "Retire at 2.0.0 (Recommended)": `houserules.1-0-surface-is-frozen`
+    is retired when 2.0.0 ships, and the freeze of 82 ends with it.
+    Semver still applies: a breaking CLI or schema change is a `!`
+    commit, release-please bumps the major version, and no owner ruling
+    is needed per change. Until the release the freeze holds as before.
+    The retirement is HR-238 (batch 38). Source: owner, 2026-10-23.
+221. **A breaking change after 2.0.0 still needs an owner ruling - ruled
+    2026-10-23.** The owner, verbatim: "If a change would prompt a major
+    release, i.e. a breaking change, I still need to rule about it." This
+    replaces the clause of 220 that no owner ruling is needed per change.
+    From the 2.0.0 release on, every change that would prompt a major
+    release (a `!` commit, a `BREAKING CHANGE` footer) needs the owner's
+    ruling before it merges, whatever surface it touches. HR-238 retires
+    `houserules.1-0-surface-is-frozen` and adds a standing successor entry
+    that states this rule and names the entry it replaces. Source: owner,
+    2026-10-23.
+222. **Batch 36: the `env` example of the implementer template - ruled
+    2026-10-23.** "Plain houserules (Recommended)": spec 7's example
+    reads `-- env HOUSERULES_SKIP_SELF_UPDATE=1 houserules
+    check-knowledge`, the installed binary any adopter has, in place of
+    this repository's `./target/debug/houserules` (Task 11 review).
+    Source: owner, 2026-10-23.
+223. **Batch 36: the branch review's GitHub finding and three knowledge
+    proposals - ruled 2026-10-23.** (1) "Fix both now (Recommended)": the
+    fix wave gives a kept GitHub-form CI copy one hand step for its
+    permissions and one for its env, each only for a marker it lacks;
+    this fixes the branch review's finding (a copy with `issues: read`
+    and no `contents: read` got no step) and HR-235 (a copy lacking only
+    the env was asked for `issues: read`), which joins batch 36; spec 8.5
+    and case 9 state the lines. (2) "Keep standing (Recommended)":
+    `process.conventional-commits` stays standing and gets the tag
+    `ruled-keep` (stats proposed a demote). (3) "Keep judged":
+    `writing-style.readme-is-an-adopter-funnel` stays judged and gets
+    `ruled-keep` (stats proposed a mechanize). (4) "Apply the edit
+    (Recommended)": the body of `process.reversals-are-recorded` states
+    that each reversal is its own list item starting with `Reversal:`,
+    the form `houserules stats` counts. Source: owner, 2026-10-23.
+224. **The haiku trial - ruled 2026-10-23.** The owner, verbatim: "Do as
+    you recommend. I want you to give haiku increasingly difficult tasks
+    during the next implementations and track how it performs. The
+    intention here is to gauge if - through houserule's setup - models
+    that you normally wouldn't use because they are not mighty enough are
+    enabled to perform better through having clear, targeted rules." From
+    batch 37 on, every batch gives haiku at least one implementer task,
+    starting at a simple task and one level harder after each clean close;
+    a haiku task gets the same brief, knowledge, gates, and opus review as
+    a sonnet task. `process.implementer-model-per-task` holds the levels,
+    the moves, and the record; HR-242 collects one data point per batch.
+    Source: owner, 2026-10-23.
+225. **The gate of the haiku trial - ruled 2026-10-23.** "4 points + early
+    stop (Recommended)": after every fourth haiku data point in HR-242,
+    and at once after any Critical finding on a haiku task, the owner
+    rules on the data table (haiku against the sonnet tasks of the same
+    level: findings by severity, fix rounds, re-reviews, tokens, time):
+    continue, change the levels or the moves, stop, or make haiku the
+    default up to a level. A plan may give haiku two tasks per batch when
+    it holds two at the current level. Source: owner, 2026-10-23.
+226. **Batch 36: two findings of the fix-wave re-review - ruled
+    2026-10-23.** (1) "Fix now (Recommended)", corrected by "A replace step
+    (Recommended)": the job's own `permissions` key decides the form of a
+    permissions hand step of a kept CI copy: no key, a block is added; a
+    mapping block that lacks a scope, the scope is added to it; a scalar
+    `read-all` holds every read scope and gets no step; a scalar
+    `write-all` gets a step that replaces it with the read-only block
+    (my first option counted `write-all` as holding the token, which
+    contradicts spec 8.5's goal; the owner ruled the correction). Spec 8.5
+    states the lines. (2) "Reviewer's wording (Recommended)": the body[0]
+    of `process.reversals-are-recorded` reads "Write each reversal as its
+    own list item of the record that starts with `Reversal:` and names the
+    decision that was overturned; `houserules stats` counts only a line
+    that starts with `Reversal:`, and the branch reviewer of the reference
+    workflow also counts a `Reversal:` inside a longer entry.", true for a
+    minimal install too; the test exclusion of the 5.223 sentence goes.
+    Source: owner, 2026-10-23.
