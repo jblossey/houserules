@@ -9,7 +9,7 @@ use std::path::Path;
 use std::process::{Child, Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, json};
 use tempfile::TempDir;
 
 /// The keys of the header, in the order that `capture --help` lists them.
@@ -227,22 +227,50 @@ fn an_empty_output_is_a_header_alone() {
     );
 }
 
+/// Arguments that a shell would split, unquote, expand, or drop: a blank, a
+/// single quote, a variable, and an empty string.
+const AWKWARD_ARGUMENTS: [&str; 4] = ["a b", "it's", "$HOME", ""];
+
+// The command that gets the arguments is `houserules`: it runs `sh -c "exit 0"`
+// with them and records them in the header of its own capture. It is not `sh`
+// itself. Git for Windows' `sh` is a Cygwin program, and a Cygwin program that
+// a native program starts cuts its command line by Cygwin's rules, where a
+// single quote quotes (`build_argv` in winsup/cygwin/dcrt0.cc), not by the
+// MSVC rules that `Command` writes for. On Windows, that `sh` does not see the
+// arguments that `capture` passed.
 #[test]
 fn arguments_reach_the_command_without_a_shell() {
-    let (_dir, _out, _output, written) = run_plain(&[
-        "sh",
-        "-c",
-        "printf '%s|' \"$@\"",
-        "sh",
-        "a b",
-        "it's",
-        "$HOME",
-        "",
-    ]);
-    assert_eq!(text(&written.output), "a b|it's|$HOME||");
+    let dir = tempfile::tempdir().expect("tempdir");
+    let outer = dir.path().join("outer.txt");
+    let inner = dir.path().join("inner.txt");
+    let mut program = vec!["sh", "-c", "exit 0", "sh"];
+    program.extend(AWKWARD_ARGUMENTS);
+    let mut command = vec![
+        env!("CARGO_BIN_EXE_houserules"),
+        "capture",
+        "--out",
+        inner.to_str().expect("utf8 path"),
+        "--",
+    ];
+    command.extend(&program);
+
+    let output = capture(dir.path(), &outer, &[], &command);
+
     assert_eq!(
-        written.header["argv"][5], "it's",
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        text(&output.stderr)
+    );
+    assert_eq!(
+        read_capture(&outer).header["argv"],
+        json!(command),
         "the header records the arguments as given"
+    );
+    assert_eq!(
+        read_capture(&inner).header["argv"],
+        json!(program),
+        "the command gets the arguments as given"
     );
 }
 

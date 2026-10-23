@@ -867,17 +867,38 @@ fn replace_in_strings(value: &mut Value, replacements: &[(String, String)]) {
     }
 }
 
+/// The length of a short sha in the committed results of the old-form workspace.
+const SHORT_SHA: usize = 7;
+
+/// `run`, with git's abbreviation pinned to `SHORT_SHA`. `audit` prints `base`
+/// and `head` as short shas, and git takes their length from `core.abbrev` or,
+/// without it, from the object count of the repository, so the configuration of
+/// the host would change the text that the committed results hold. The pin is
+/// the config pair that `git-config(1)` documents under `GIT_CONFIG_COUNT`; it
+/// replaces the pairs of the caller for this run.
+fn run_with_pinned_abbrev(dir: &Path, args: &[&str]) -> std::process::Output {
+    tracker_support::houserules()
+        .args(args)
+        .arg("--dir")
+        .arg(dir)
+        .env("GIT_CONFIG_COUNT", "1")
+        .env("GIT_CONFIG_KEY_0", "core.abbrev")
+        .env("GIT_CONFIG_VALUE_0", SHORT_SHA.to_string())
+        .output()
+        .expect("run houserules")
+}
+
 /// The JSON that a successful run printed, with the workspace and the two
-/// commits (whole and as the seven characters that `audit` prints) replaced by
-/// placeholders.
+/// commits (whole and as the `SHORT_SHA` characters that `audit` prints)
+/// replaced by placeholders.
 fn normalized(stdout_text: &str, workspace: &Path, base: &str, head: &str) -> Value {
     let mut value: Value = serde_json::from_str(stdout_text).expect("the command prints JSON");
     let replacements = [
         (workspace.display().to_string(), "<workspace>".to_string()),
         (base.to_string(), "<base>".to_string()),
         (head.to_string(), "<head>".to_string()),
-        (base[..7].to_string(), "<base>".to_string()),
-        (head[..7].to_string(), "<head>".to_string()),
+        (base[..SHORT_SHA].to_string(), "<base>".to_string()),
+        (head[..SHORT_SHA].to_string(), "<head>".to_string()),
     ];
     replace_in_strings(&mut value, &replacements);
     value
@@ -910,7 +931,7 @@ fn stats_and_audit_workspace_read_an_old_form_workspace_as_before() {
         expected_result("stats.json")
     );
 
-    let audit = run(
+    let audit = run_with_pinned_abbrev(
         root.path(),
         &[
             "audit",
