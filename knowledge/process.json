@@ -63,7 +63,8 @@
         "gates",
         "ci",
         "release",
-        "bots"
+        "bots",
+        "ruled-keep"
       ],
       "source": {
         "date": "2026-09-13",
@@ -169,7 +170,8 @@
       ],
       "tags": [
         "permissions",
-        "dispatch"
+        "dispatch",
+        "ruled-keep"
       ],
       "source": {
         "date": "2026-10-21",
@@ -181,11 +183,14 @@
       "id": "process.implementer-model-per-task",
       "kind": "rule",
       "area": "process",
-      "summary": "Watch whether haiku implementers draw extra review rounds; when haiku is not a good fit, pick per task: haiku for a simple task, sonnet otherwise.",
+      "summary": "Haiku trial: from batch 37, give haiku at least one implementer task per batch, a level harder after each clean close; record it beside the sonnet tasks.",
       "body": [
-        "Watch: the ledger row of every implementer dispatch names its model, and its close line states the review's findings by severity, the fix rounds, and the re-reviews. A haiku task that draws a Critical or Important finding, or a fix round that a sonnet task of the same kind would not need, counts against haiku.",
-        "Decide per task, at dispatch time: a simple task (few files, a spec that fixes the exact output, no interface that other tasks consume) may run on haiku; every other task runs on sonnet. Record the choice and its reason in the dispatch's ledger row.",
-        "Report the haiku observations to the owner at batch close.",
+        "Intent (owner, 2026-10-23, verbatim): \"I want you to give haiku increasingly difficult tasks during the next implementations and track how it performs. The intention here is to gauge if - through houserule's setup - models that you normally wouldn't use because they are not mighty enough are enabled to perform better through having clear, targeted rules.\"",
+        "Levels, by the task the plan describes: L1 a spec that fixes the exact output, few files, no interface that another task consumes; L2 new logic with its own tests, no interface that another task consumes; L3 an interface that a later task consumes; L4 a critical task (design.md 173). Batch 37 starts at L1.",
+        "Moves: after a haiku task closes with no Critical or Important finding and no more fix rounds than the median sonnet task of its batch, the next haiku task is one level higher; after one Important finding it stays at its level; after a Critical finding or two Important findings it drops one level (not below L1).",
+        "A haiku task gets the same brief, Knowledge ids, tier, review model, and review caps as a sonnet task of its level: the trial measures what the setup gives a smaller model, so it adds no extra help and lowers no gate.",
+        "Record: the dispatch's ledger row names the model, the level, and the reason; its close line states the review's findings by severity, the fix rounds, the re-reviews, and the token and tool-use counts the harness shows. At batch close, append one data point to HR-242 (batch, task, level, outcome, the same counts of the batch's sonnet tasks) and report it to the owner.",
+        "Gate (owner, 2026-10-23, design.md 5.225): after every fourth haiku data point in HR-242, and at once after any Critical finding on a haiku task, the controller takes the data table to the owner: haiku against the sonnet tasks of the same level, with findings by severity, fix rounds, re-reviews, tokens, and time. The owner rules continue, change the levels or the moves, stop, or make haiku the default up to a level. Until then a plan may give haiku two tasks per batch when it holds two at the current level.",
         "Owner, 2026-10-21: \"I want you to keep an eye on whether haiku brings enough quality as an implementer or if haiku provokes many review rounds. If Haiku is not a good fit, decide case-by-case if the task is simple enough for haiku or is sonnet should be used.\""
       ],
       "tags": [
@@ -197,9 +202,9 @@
         "process.model-policy"
       ],
       "source": {
-        "date": "2026-10-21",
+        "date": "2026-10-23",
         "by": "user",
-        "ref": "owner ruling in chat, batch 34 (haiku implementer)"
+        "ref": "owner rulings in chat, batch 34 (haiku implementer) and batch 36 (the haiku trial, design.md 5.224)"
       }
     },
     {

@@ -510,6 +510,33 @@
         "state": "done",
         "text": "Merged ff-only after the planned lifecycle, with no release (design.md 190); acceptance by the owner follows the rollout."
       }
+    },
+    {
+      "number": 35,
+      "items": [
+        "HR-183",
+        "HR-188",
+        "HR-175",
+        "HR-176",
+        "HR-138",
+        "HR-152",
+        "HR-213",
+        "HR-214",
+        "HR-215",
+        "HR-216",
+        "HR-218",
+        "HR-219",
+        "HR-220",
+        "HR-221",
+        "HR-222",
+        "HR-224"
+      ],
+      "summary": "2.0.0: audit and its checks - the runner contract for external tools, promotion proposals, report-field content checks, the self_audit comparison, and the stats and evidence fixes.",
+      "kickoff": "the owner's rulings of 2026-10-15 (design.md 5.97 to 5.102) and the meta-spec docs/specs/2026-10-15-release-2-0-0-meta-spec.md",
+      "status": {
+        "state": "done",
+        "text": "All nine tasks, the eval run, the live run, and the branch review closed on 2026-10-22; the owner kept the night decisions (design.md 206); ff-only merge per design.md 198, no release."
+      }
     }
   ]
 }

@@ -27,6 +27,6 @@ Generated from knowledge/ by houserules render. Do not edit.
 ## Gotchas
 
 - [knowledge-base.context-proxy-output-is-lossy] A context proxy can shorten or drop houserules output with no visible sign; the source files and the gates are the truth, not the transcript.
-- [process.pointer-sweep-unfiltered] When a file moves or is deleted, sweep for its old path with an unfiltered grep over the whole tree; an extension-limited grep is not a pointer audit.
+- [process.pointer-sweep-unfiltered] When a file moves or is deleted, sweep for its old path with an unfiltered, case-insensitive grep over the whole tree; an extension filter misses pointers.
 
 Detail: houserules get <id>

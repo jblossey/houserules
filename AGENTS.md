@@ -42,7 +42,6 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [process.claims-match-artifacts] Before submitting a report, re-open every artifact a claim cites and confirm the artifact shows what the sentence says.
 - [process.closure-claims-carry-enumeration] A claim that a set is closed ('every', 'all', 'no remaining') names the bounded, rerunnable enumeration that produced it; without the artifact, no claim.
 - [process.conventional-commits] Commits use Conventional Commits (feat, fix, chore, test, ci, docs, refactor). Header at most 100 characters, body lines at most 100.
-- [process.every-commit-names-a-work-item] Every commit names the work item it delivers in a `Work-Item:` trailer.
 - [process.evidence-outlives-the-session] Cite evidence only at paths that outlive the session: the project's deliverables folder or the tracked tree, never a session scratchpad.
 - [process.fix-proofs-extend-the-reviewers-run] A fix round's proof re-runs the review's own reproduction, extended to cover the fix -- never a fresh, narrower proof.
 - [process.gates-cover-generated-commits] Before a new gate or pipeline step ships, walk every commit author class and every generated resource it touches through it on paper; state each accepted red.

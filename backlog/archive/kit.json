@@ -2739,6 +2739,277 @@
         "HR-207",
         "HR-181"
       ]
+    },
+    {
+      "id": "HR-138",
+      "type": "feat",
+      "title": "audit: byte-compare self_audit against a fresh run; sanctions for judged rows",
+      "body": [
+        "Batch-27 branch review template defects, both in houserules audit: (1) teach --report/--workspace mode to byte-compare the report's self_audit deterministic rows and summary against its own fresh run and fail the deliverables row on divergence - the batch-27 T1 failure (one hand-reworded row) is what reviewers now catch by hand every round, and the tool holds both sides in memory. (2) --sanctioned only covers deterministic rows: a booked interim fail on a JUDGED rule (process.wiring-checks-run-the-resolution=HR-137) came back stale_sanctions, forcing hand-narration. Accept a sanction for a judged row and record it on the row so the judging reviewer sees the booking structurally."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 35,
+      "see": [
+        "HR-137"
+      ]
+    },
+    {
+      "id": "HR-152",
+      "type": "fix",
+      "title": "stats counts a sanctioned interim fail as a violation",
+      "body": [
+        "Found in the batch-28 branch review. `houserules stats` lists a fail row that the audit carries as sanctioned (`--sanctioned <rule>=<ref>`) as a violation: crates/houserules/src/rules/stats.rs reads neither the summary's `sanctioned_fail` nor the `(sanctioned: <ref>)` mark of the row. In batch 28 the id with the highest count, process.evals-rerun with 4, is the one interim fail the spec booked, so the retrospective input over-reports.",
+        "Scope for the fix: stats reports sanctioned rows in a list of their own. That changes the output shape of a frozen command, so the item needs an owner ruling under houserules.1-0-surface-is-frozen before it is scheduled."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 35,
+      "see": [
+        "HR-145"
+      ]
+    },
+    {
+      "id": "HR-175",
+      "type": "feat",
+      "title": "report-field checks test content, not presence: non-empty fields and knowledge_used against --ids",
+      "body": [
+        "From the batch-32 branch review retrospective (.superpowers/sdd/2026-10-10-batch-32/branch-review.json). Template defect 1, seen first by the batch-32 seeded-violations eval reviewer.",
+        "process.knowledge-first and security-hygiene.verify-current-docs pass on a field's presence: knowledge_used with one id and docs_verified: [] both pass (the report-field runner, crates/houserules/src/rules/runner/report_field.rs, tests the field's presence only). Change: a report-field option `non_empty: true`, and for knowledge_used a comparison with the audit's --ids (every dispatch id present). Both add to the check schema: batch 33 (2.0.0)."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 35,
+      "see": [
+        "HR-173"
+      ]
+    },
+    {
+      "id": "HR-176",
+      "type": "fix",
+      "title": "report-field evidence names triggered and read report counts",
+      "body": [
+        "From the batch-32 branch review retrospective (.superpowers/sdd/2026-10-10-batch-32/branch-review.json). Template defect 2.",
+        "A report-field row's evidence reads 'report field <f> is set in N reports', where N counts the reports the check's `if` globs triggered, not the reports read. branch-reviewer.md tells the reviewer to compare that count with the workspace's task-*-report.json listing, so a check with a file-typed `if` (verify-current-docs: 'set in 1 reports' with two reports) reads as a mismatch when it is not. Change: the evidence says 'set in <triggered> of <read> reports', and the template sentence compares the second number. No schema change."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 35,
+      "see": []
+    },
+    {
+      "id": "HR-183",
+      "type": "feat",
+      "title": "Delegate deterministic checks to external tools (issue 63)",
+      "body": [
+        "Issue 63 asks to standardize the check field on a runner contract (command, arguments, output parser: exit code, SARIF, or JSON), ship parsers for Semgrep, ast-grep, and SARIF, and re-implement seed checks that duplicate a tool by calling it; a built-in check stays only where no tool exists. A rule entry states how to install each tool, and audit reports a missing tool as a setup error. Acceptance: a rule with a Semgrep check passes or fails in audit with line-level findings; existing built-in checks keep working through the same contract.",
+        "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 63 on the 2.0.0 release.",
+        "Owner ruling 2026-10-15 (design.md 5.107, meta-spec M5): the runner contract is a port; the six built-in check types are runners inside the binary that need no other tool; external tools are runners a project or pack chooses; the kit's packs keep the built-ins; point 3 does not apply and point 4 is replaced (a built-in stays where a tool exists); a missing external tool is a setup error naming the tool and its install step.",
+        "Back in 2.0.0 by the owner's ruling of 2026-10-21 (design.md 193).",
+        "Owner rulings 2026-10-21 and 2026-10-22 (design.md 199, 200): the project's .houserules.json runners entry holds a tool's command, parser (sarif or exit-code), and install line; a pack's check names only the tool key, the files, and the scope. The JSON parser is HR-225 (2.x). At the 2.0.0 release issue 63 gets the comment of design.md 193(3) and stays open, in place of the close above."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 35,
+      "see": [
+        "HR-173"
+      ]
+    },
+    {
+      "id": "HR-188",
+      "type": "feat",
+      "title": "Propose promotion of judged rules to deterministic checks (issue 68)",
+      "body": [
+        "Issue 68 asks that the deliverables record human overrides of judged verdicts, and that stats report per judged rule the verdict count, fail count, override rate, and cost, flagging promotion candidates (low override rate, repeated similar findings, with sample findings) and retirement candidates (high cost, zero fails over a configurable window). Acceptance: stats lists promotion and retirement candidates with the evidence for each.",
+        "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 68 on the 2.0.0 release.",
+        "Back in 2.0.0 by the owner's ruling of 2026-10-21 (design.md 193)."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 35
+    },
+    {
+      "id": "HR-213",
+      "type": "fix",
+      "title": "Let adopters keep the batch workspaces out of git without failing the knowledge CI job",
+      "body": [
+        "Owner, 2026-10-21, verbatim: \"Adopters report that the workspaces directory grows very large and can't be gitignored because otherwise the ci knowledge job fails.\"",
+        "Owner, 2026-10-21, verbatim: \"the ci check that fails is check-knowledge that has files that point into the verify path. 2.0.0, batch 35\". So check-knowledge fails an entry whose `verify` path names a workspace file that git does not hold (crates/houserules/src/rules/check.rs, the `verify path ... does not exist` finding); process.evidence-outlives-the-session tells authors to cite captures in the deliverables folder. Reproduce it first: an install of the reference workflow with a gitignored workspace and an entry whose `verify` names a workspace file, run through the seeded workflow's three gates in a fresh clone.",
+        "Scope: the workspace can be gitignored, or kept small, and the knowledge job stays green; the evidence rule and the stats, audit --workspace, and branch-review reads that use the workspace keep working on the machine that holds it.",
+        "Why the kit repository never failed: it gitignores its workspace `.superpowers/` (since f7f8baf), and all 43 `verify` paths of its knowledge name tracked files, none under `.superpowers/` (measured 2026-10-21 over knowledge/*.json and knowledge/packs/*.json). Where a test needed workspace content, the content was committed as a fixture copy and the entry verifies the copy (houserules.corpus-batch14-fixtures-are-committed). The kit states this practice nowhere for adopters.",
+        "Owner, 2026-10-21 (design.md 195), verbatim: \"workspaces should be gitignored from the start in adopters.\" So the fix gives the workspaces a gitignored home from the first install; batch 35's spec names the location, the ignore line that init and update write, the move of an install that tracks its workspaces today, and what a verify path into a workspace becomes."
+      ],
+      "milestone": null,
+      "status": "done",
+      "batch": 35
+    },
+    {
+      "id": "HR-214",
+      "type": "chore",
+      "milestone": null,
+      "status": "done",
+      "title": "The exact-pins gate flags a bare Cargo version and a mise tool pin that is not a full version",
+      "body": [
+        "Owner ruling 2026-10-21 (batch 34 fix wave): an old gap of the gate, not made by batch 34; batch 35 holds the audit and check work. Reproduction: branch-review issue 4 (a Cargo.toml serde = \"1.0.200\" and a mise.toml bd = \"latest\" pass)."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Owner ruling 2026-10-21 (batch 34 fix wave): an old gap of the gate, not made by batch 34; batch 35 holds the audit and check work. Reproduction: branch-review issue 4 (a Cargo.toml serde = \"1.0.200\" and a mise.toml bd = \"latest\" pass).",
+        "origin": "batch 34 branch review (owner ruling 2026-10-21: defer to batch 35), issue 4",
+        "files": [
+          "template/packs/security-hygiene.json"
+        ]
+      }
+    },
+    {
+      "id": "HR-215",
+      "type": "chore",
+      "milestone": null,
+      "status": "done",
+      "title": "Agent templates record the dispatch's Model: value verbatim, with the eval run the template change needs",
+      "body": [
+        "Owner ruling 2026-10-21 (batch 34 fix wave): the template change forces a re-run of every eval scenario; batch 34 makes stats group an alias with its model id instead. Branch-review issue 2: deliverables record opus and claude-opus-5-5 for one role.",
+        "Same eval run (branch re-review r1, issue 5): implementer.md step 1 says to fix every fail row and every line of references.failures; task-reviewer.md step 5 says that a line in references.failures, or a self_audit.summary.reference_fail that differs from the audit, is a finding."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Owner ruling 2026-10-21 (batch 34 fix wave): the template change forces a re-run of every eval scenario; batch 34 makes stats group an alias with its model id instead. Branch-review issue 2: deliverables record opus and claude-opus-5-5 for one role.",
+        "origin": "batch 34 branch review (owner ruling 2026-10-21: defer to batch 35), issue 2",
+        "files": [
+          "template/workflows/reference/.claude/agents/implementer.md",
+          "template/workflows/reference/.claude/agents/task-reviewer.md"
+        ]
+      }
+    },
+    {
+      "id": "HR-216",
+      "type": "chore",
+      "milestone": null,
+      "status": "done",
+      "title": "update in a git repository with no install stops with a raw OS error and leaves a broken marker",
+      "body": [
+        "Owner ruling 2026-10-21 (batch 34 fix wave): the defect is older than batch 34 (measured at fcc342d); batch 35 holds it. Branch-review issue 5: knowledge/schema.json: No such file or directory (os error 2)."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Owner ruling 2026-10-21 (batch 34 fix wave): the defect is older than batch 34 (measured at fcc342d); batch 35 holds it. Branch-review issue 5: knowledge/schema.json: No such file or directory (os error 2).",
+        "origin": "batch 34 branch review (owner ruling 2026-10-21: defer to batch 35), issue 5",
+        "files": [
+          "crates/houserules/src/install/mod.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-218",
+      "type": "chore",
+      "milestone": null,
+      "status": "done",
+      "title": "The durable-sha check reads docs/plans/** and .claude/evals/record.json too",
+      "body": [
+        "Owner ruling 2026-10-21 (batch 34 fix wave, checks go to batch 35): the check missed interim shas in the plan and the eval record. Batch 34 restates both shas at aggregation. Branch-review issue 7.",
+        "The check's scope is the files list of the knowledge-base.cite-durable-refs check in template/packs/knowledge-base.json (durable_sha.rs holds no glob); the pack's version moves with the change (branch re-review r1, issue 3)."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Owner ruling 2026-10-21 (batch 34 fix wave, checks go to batch 35): the check missed interim shas in the plan and the eval record. Batch 34 restates both shas at aggregation. Branch-review issue 7.",
+        "origin": "batch 34 branch review (owner ruling 2026-10-21: defer to batch 35), issue 7",
+        "files": [
+          "template/packs/knowledge-base.json"
+        ]
+      }
+    },
+    {
+      "id": "HR-219",
+      "type": "chore",
+      "milestone": null,
+      "status": "done",
+      "title": "Apply the check and template proposals of the batch-34 retrospective",
+      "body": [
+        "Batch 34 batch close: each proposal changes a check, an agent template (a full eval run), or a kit pack, the work of batch 35. Items: (1) stats mechanize rows with owner_gate false for houserules.crash-paths-are-named, knowledge-base.state-only-the-source, quality.exclusive-pins-are-mutation-proven, quality.gates-derive-their-scope, quality.user-facing-text-is-contract, writing-style.instructions-cover-the-state-space (the branch review judges that each needs judgment no grep or co-change check holds; decide per row); (2) a co-change check crates/houserules/src/install/classes.rs -> README.md for houserules.readme-mirrors-kit-owned; (3) a grep-absent warn check for history phrases in crates/**/*.rs for writing-style.code-comments; (4) check-report-claims checks commit-body counts against the capture they name, warns on closure words without an enumeration, and flags a cited scratchpad or /tmp path; (5) the implementer template carries the refused-commands rule; (6) the task-reviewer template scopes its rule_adherence flip to judged rows; (7) the docs-edit eval brief names the binary; (8) stats reads Reversal: lines; (9) the orchestrating skill names efficiency.json before the branch review. Source: branch-review.json retrospective and recommendations.",
+        "Owner ruling 2026-10-21 (design.md 197): the stats mechanize row for process.gates-cover-generated-commits folds in here as item (10): the planning skill lists the paper walk as a required plan row for a task that adds or tightens a check."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Batch 34 batch close: each proposal changes a check, an agent template (a full eval run), or a kit pack, the work of batch 35. Items: (1) stats mechanize rows with owner_gate false for houserules.crash-paths-are-named, knowledge-base.state-only-the-source, quality.exclusive-pins-are-mutation-proven, quality.gates-derive-their-scope, quality.user-facing-text-is-contract, writing-style.instructions-cover-the-state-space (the branch review judges that each needs judgment no grep or co-change check holds; decide per row); (2) a co-change check crates/houserules/src/install/classes.rs -> README.md for houserules.readme-mirrors-kit-owned; (3) a grep-absent warn check for history phrases in crates/**/*.rs for writing-style.code-comments; (4) check-report-claims checks commit-body counts against the capture they name, warns on closure words without an enumeration, and flags a cited scratchpad or /tmp path; (5) the implementer template carries the refused-commands rule; (6) the task-reviewer template scopes its rule_adherence flip to judged rows; (7) the docs-edit eval brief names the binary; (8) stats reads Reversal: lines; (9) the orchestrating skill names efficiency.json before the branch review. Source: branch-review.json retrospective and recommendations.",
+        "origin": "batch 34 branch review, retrospective",
+        "files": [
+          "knowledge/houserules.json",
+          "template/workflows/reference/.claude/agents/implementer.md"
+        ]
+      }
+    },
+    {
+      "id": "HR-220",
+      "type": "chore",
+      "milestone": null,
+      "status": "done",
+      "title": "init with no --tracker on an install that has a tracker rewrites a lost deliverables schema with the any-token pattern",
+      "body": [
+        "Batch 34 made this gap: it made the deliverables schema's default pattern the any-token one and the backlogId pattern a tracker's (spec 3.9); at fcc342d the template schema held the prefix pattern. Found by batch 34 Task 12 (concern 7) and the branch re-review (issue 2). A later update restores the right pattern. Owner ruling 2026-10-21 (the re-review's last Minors): deferred to batch 35. Fix direction: for the JSON and GitHub adapters, seed takes the installed tracker's pattern with no backend call, as install_backlog_id_pattern does for a new tracker; Beads keeps the C38 handling of an unreachable bd."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Batch 34 made this gap: it made the deliverables schema's default pattern the any-token one and the backlogId pattern a tracker's (spec 3.9); at fcc342d the template schema held the prefix pattern. Found by batch 34 Task 12 (concern 7) and the branch re-review (issue 2). A later update restores the right pattern. Owner ruling 2026-10-21 (the re-review's last Minors): deferred to batch 35. Fix direction: for the JSON and GitHub adapters, seed takes the installed tracker's pattern with no backend call, as install_backlog_id_pattern does for a new tracker; Beads keeps the C38 handling of an unreachable bd.",
+        "origin": "batch 34 Task 12, concern 7; branch re-review r1, issue 2",
+        "files": [
+          "crates/houserules/src/install/mod.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-221",
+      "type": "chore",
+      "milestone": null,
+      "status": "done",
+      "title": "The audit JSON's references.resolved counts failed references too: rename it or count only passes",
+      "body": [
+        "Owner ruling 2026-10-21 (the re-review's last Minors): deferred to batch 35, the audit and checks batch; the key ships first in 2.0.0 (batch 38). Reproduction: branch-rr1-probe-audit-json-vs-exit.txt (resolved 2 with two failures). Update audit --help, README, the upgrade guide, the Verdict doc comment, and the tests."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Owner ruling 2026-10-21 (the re-review's last Minors): deferred to batch 35, the audit and checks batch; the key ships first in 2.0.0 (batch 38). Reproduction: branch-rr1-probe-audit-json-vs-exit.txt (resolved 2 with two failures). Update audit --help, README, the upgrade guide, the Verdict doc comment, and the tests.",
+        "origin": "batch 34 branch re-review r1 (owner ruling 2026-10-21: defer to batch 35), issue 1; Task 12 review",
+        "files": [
+          "crates/houserules/src/rules/trailers.rs",
+          "crates/houserules/src/main.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-222",
+      "type": "chore",
+      "milestone": null,
+      "status": "done",
+      "title": "check-report-claims --doc and --item treat a tool's output path under .houserules/step/ as a workspace citation",
+      "body": [
+        "Owner ruling 2026-10-21 (the re-review's last Minors; checks go to batch 35). The batch-34 spec names the step script's outputs .houserules/step/rules.json and audit.json (4.4a), and the check fails when the checkout has not run the step (branch-rr1-probe-spec-claims.txt)."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Owner ruling 2026-10-21 (the re-review's last Minors; checks go to batch 35). The batch-34 spec names the step script's outputs .houserules/step/rules.json and audit.json (4.4a), and the check fails when the checkout has not run the step (branch-rr1-probe-spec-claims.txt).",
+        "origin": "batch 34 branch re-review r1 (owner ruling 2026-10-21: defer to batch 35), issue 6",
+        "files": [
+          "crates/houserules/src/report_claims/doc.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-224",
+      "type": "chore",
+      "milestone": null,
+      "status": "done",
+      "title": "check-report-claims fails a citation through an in-root symlink with git's beyond-a-symbolic-link error",
+      "body": [
+        "Found by batch 34 Task 13 (fix round 1): a relative or absolute citation through an in-root symlink, such as a .superpowers workspace symlinked into each worktree, makes git check-ignore abort the run (exit 2) instead of a named verdict. Older than Task 13 for the relative form; batch 35 holds the checks (owner ruling 2026-10-21 on the fix wave)."
+      ],
+      "batch": 35,
+      "deferral": {
+        "reason": "Found by batch 34 Task 13 (fix round 1): a relative or absolute citation through an in-root symlink, such as a .superpowers workspace symlinked into each worktree, makes git check-ignore abort the run (exit 2) instead of a named verdict. Older than Task 13 for the relative form; batch 35 holds the checks (owner ruling 2026-10-21 on the fix wave).",
+        "origin": "batch 34 Task 13, concern 4 and fix round 1",
+        "files": [
+          "crates/houserules/src/report_claims/doc.rs"
+        ]
+      }
     }
   ]
 }

@@ -13,6 +13,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [houserules.comments-name-no-review-history] A comment in crates/ names no review round, task review, or batch event; a warn check flags the history phrases beside the judged code-comments rule.
 - [houserules.crash-paths-are-named] Where the frozen JS crashed or a glob/regex fails to compile, the binary reports one named error or finding — never a reproduced crash, never a silent default.
 - [houserules.kit-lints-read-kit-vocabulary] A check over kit-owned text takes its vocabulary from the embedded payload; a name the adopter chooses never turns kit text into a finding.
+- [houserules.pinned-git-text-runs-hermetic] A test that pins text git prints runs git with LC_ALL=C, no injected configuration, and an explicit core.abbrev; the host locale and config change the text.
 - [houserules.platform-gated-tests] Gate platform-specific code with #[cfg]: a std::os::unix or std::os::windows use compiles only on that platform; CI builds all targets on three OSes.
 - [houserules.pnpm-only] Use cargo for every package operation in this repository (`cargo add <crate>@=<version>`); pnpm, npm, and npx left the toolchain at batch 20 T3.
 - [houserules.task-gates-mirror-ci] A task-end gate run includes every check CI runs on push or pull request; a local gate list that omits a CI check is stale.

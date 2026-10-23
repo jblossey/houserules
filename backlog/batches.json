@@ -37,33 +37,6 @@
       }
     },
     {
-      "number": 35,
-      "items": [
-        "HR-183",
-        "HR-188",
-        "HR-175",
-        "HR-176",
-        "HR-138",
-        "HR-152",
-        "HR-213",
-        "HR-214",
-        "HR-215",
-        "HR-216",
-        "HR-218",
-        "HR-219",
-        "HR-220",
-        "HR-221",
-        "HR-222",
-        "HR-224"
-      ],
-      "summary": "2.0.0: audit and its checks - the runner contract for external tools, promotion proposals, report-field content checks, the self_audit comparison, and the stats and evidence fixes.",
-      "kickoff": "the owner's rulings of 2026-10-15 (design.md 5.97 to 5.102) and the meta-spec docs/specs/2026-10-15-release-2-0-0-meta-spec.md",
-      "status": {
-        "state": "done",
-        "text": "All nine tasks, the eval run, the live run, and the branch review closed on 2026-10-22; the owner kept the night decisions (design.md 206); ff-only merge per design.md 198, no release."
-      }
-    },
-    {
       "number": 36,
       "items": [
         "HR-171",
@@ -72,13 +45,20 @@
         "HR-158",
         "HR-141",
         "HR-148",
-        "HR-204"
+        "HR-204",
+        "HR-226",
+        "HR-227",
+        "HR-228",
+        "HR-229",
+        "HR-230",
+        "HR-232",
+        "HR-235"
       ],
       "summary": "2.0.0: evidence and report claims - capture and evidence by reference with byte-exact excerpts, generated report facts, and the citation checks.",
       "kickoff": "the owner's rulings of 2026-10-15 (design.md 5.97 to 5.102) and the meta-spec docs/specs/2026-10-15-release-2-0-0-meta-spec.md",
       "status": {
-        "state": "planned",
-        "text": "Rows ruled 2026-10-21 (design.md 193). Its spec starts after batch 35 merges."
+        "state": "done",
+        "text": "Done 2026-10-23: captures and report facts in task reports, check-report-claims checks 1 to 11, the batch-35 deferrals, HR-235; design.md 209 to 226. Merged ff-only without a release (design.md 208, 216(2)); the archive sweep waits for the acceptance."
       }
     },
     {
@@ -104,7 +84,8 @@
         "HR-190",
         "HR-212",
         "HR-217",
-        "HR-223"
+        "HR-223",
+        "HR-238"
       ],
       "summary": "2.0.0, the last batch: OpenSpec support (HR-209) with spec and session links in the audit (HR-190), the upgrade-path live proof, and the issue comments of the release (HR-212).",
       "kickoff": "the owner's rulings of 2026-10-15 (design.md 5.97 to 5.102) and the meta-spec docs/specs/2026-10-15-release-2-0-0-meta-spec.md",

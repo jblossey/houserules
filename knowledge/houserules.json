@@ -58,10 +58,10 @@
       "area": "cli",
       "summary": "Live-run every CLI change in a scratch `git init` repo: `init --dir <scratch>`, both checks inside; each gate its own `live_run` entry with `exit`.",
       "body": [
-        "Scratch repositories live under the session scratchpad, never inside this repository and never in tag-pilot. Run `houserules check-knowledge` and `houserules check-backlog` there and record each command's verbatim output as its own report `live_run` entry (batch 3 task 3 recorded only one of a chained pair).",
+        "Scratch repositories live under the session scratchpad, never inside this repository and never in tag-pilot. Run `houserules check-knowledge` and `houserules check-backlog` there, each through `houserules capture --out <workspace>/<name>.txt -- <command>`, and record each capture as its own report `live_run` entry (batch 3 task 3 recorded only one of a chained pair).",
         "This recipe runs the compiled binary of the tree (docs/specs/2026-09-05-batch-18-phase3.md §4), never an installed release, because the change under test is not in a release: `cargo build --release` once, then `target/release/houserules <command>` (or `cargo run --quiet --release --bin houserules -- <command>`) against the scratch repository. The npm-era HR-001 pair (`pnpm dlx`'s published path, the symlinked `node_modules` path) no longer applies, and neither does the frozen file itself: `bin/houserules.mjs` retired outright at batch 20 T3 (HR-047, docs/specs/2026-09-07-batch-20-phase5.md §2) along with the rest of the JS toolchain — it only ever implemented `init`/`update`/`files`, and this recipe's compiled-binary form already covered the same surface.",
         "For a change to `update`, run `init` and then `update` in the same scratch repository and confirm that only kit-owned files changed.",
-        "The report names the scratch path (a `cd` entry or the path in the command) and records the init and both check gates as their own `live_run` entries; a live run without them fails the recipe.",
+        "The report names the scratch path (the capture header's `cwd`, or the path in the command) and records the captures of the init and both check gates as their own `live_run` entries; a live run without them fails the recipe.",
         "A fix round that changes no CLI behavior (test-only, report-only, evidence wording) may stand on the task's original live run when the report discloses the scoping for the re-reviewer to judge (batch 6).",
         "Sandboxing a real cargo-dist shell installer (batch 27 T2, HR-133) inside a scratch `HOME` needs `CARGO_HOME` and `XDG_CONFIG_HOME` unset too, not only `HOME` overridden: the installer's own install-path fallback and axoupdater's receipt-home lookup both prefer `CARGO_HOME`/`XDG_CONFIG_HOME` first when either is inherited from the real environment, silently installing into the real machine's `~/.cargo/bin` even with a scratch `HOME` set (`env -u CARGO_HOME -u XDG_CONFIG_HOME HOME=<scratch> sh`). Caught live when this exact mistake overwrote this repository's own dev-installed `houserules` binary; fixed by reinstalling from the tree (`cargo install --path crates/houserules --bin houserules --force`)."
       ],
@@ -495,7 +495,8 @@
         "The crate's own precedent is the gate: install.rs, commit_msg_hook.rs, and validate_stats_audit_parity.rs all cfg-gate their os::unix uses, with a #[cfg(windows)] arm where the behavior needs a Windows equivalent.",
         "The cheap local proxy runs in mise run lint since batch 21: cargo clippy --target x86_64-pc-windows-gnu --all-targets --locked -- -D warnings (a compile check until batch 34, when a dead-code warning passed it that the windows-latest clippy fails), with the target provisioned by mise.toml's rust targets option. The host's green cargo test proves one OS of three.",
         "Second layer, found on PR #14's real macos-latest run after #[cfg(unix)] shipped (the same three tests then panicked at an fs::write unwrap, Os error 92 Illegal byte sequence, since APFS rejects a non-UTF-8 filename at creation): a cfg gate names one CAPABILITY at a time, so #[cfg(unix)] covering the compiler capability (OsStrExt exists) does not cover a distinct filesystem capability (writing that name succeeds) the same test also needs and Linux alone has both of; the fix (seed via git's byte-oriented index -- git hash-object -w --stdin, git update-index --add --cacheinfo -- never a real file write) is recorded at its call site, `crates/houserules/src/rules/check.rs`'s `seed_undecodable_tracked_path`.",
-        "A test that runs a shell script on Windows starts `sh`, not `bash`: `Command::new` on Windows searches the system directory before PATH, so `bash` is C:\\Windows\\System32\\bash.exe, the WSL launcher, which exits 1 with no distribution; `sh` is only on PATH, from Git for Windows (doc.rust-lang.org std::process::Command, Platform-specific behavior; batch 34 PR #84 CI)."
+        "A test that runs a shell script on Windows starts `sh`, not `bash`: `Command::new` on Windows searches the system directory before PATH, so `bash` is C:\\Windows\\System32\\bash.exe, the WSL launcher, which exits 1 with no distribution; `sh` is only on PATH, from Git for Windows (doc.rust-lang.org std::process::Command, Platform-specific behavior; batch 34 PR #84 CI).",
+        "A test that pins an OS error or a quoted path takes the expected text from the same call the code makes (houserules.path-pins-mirror-the-code): Windows prints its own OS errors, and shlex quotes a backslash path (batch 36 T8 and T6 reviews)."
       ],
       "tags": [
         "tests",
@@ -722,7 +723,8 @@
         "The frozen schema surface: `knowledge/schema.json`, `template/knowledge/schema.json`, `backlog/schema.json`, `template/backlog/schema.json`, `.claude/schemas/deliverables.json`, and `template/.claude/schemas/deliverables.json` -- their constraints, not a prose restatement of them. `git rev-parse HEAD:<path>` pins each copy to its blob id at the freeze; design.md 5.82 carries the six ids.",
         "Adding, removing, or renaming a subcommand or flag, or tightening or loosening a required field, an enum, a textList floor, or an id-shape pattern in any of the six schema files needs an owner ruling and a major-version bump, never a patch or minor release.",
         "Widening a positional argument's arity (one value to one or more) adds, removes, and renames no subcommand or flag and leaves every existing call unchanged: it is not a surface change (design.md 5.91, owner 2026-10-09).",
-        "Neither surface is gated mechanically by this entry; design.md 5.82 is the durable record an owner supersession amends (process.owner-rulings-need-owner-supersession)."
+        "Neither surface is gated mechanically by this entry; design.md 5.82 is the durable record an owner supersession amends (process.owner-rulings-need-owner-supersession).",
+        "The freeze ends at the 2.0.0 release: the entry is retired then (design.md 5.220, HR-238). From 2.0.0 on, a standing successor entry holds the rule that every change which would prompt a major release needs an owner ruling (design.md 5.221)."
       ],
       "tags": [
         "cli",
@@ -1138,6 +1140,27 @@
         ],
         "pattern": "//.*\\b([Ff]ix round [0-9]|[Rr]ound [0-9] (parsed|called|of)|Task [0-9]+ review|review \\(batch [0-9]+|batch [0-9]+ Task [0-9]+:|[Bb]atch[ -][0-9]+,? Task [0-9]+|this batch\\b|plan Task [0-9]+)",
         "scope": "changed"
+      }
+    },
+    {
+      "id": "houserules.pinned-git-text-runs-hermetic",
+      "kind": "rule",
+      "area": "rust",
+      "summary": "A test that pins text git prints runs git with LC_ALL=C, no injected configuration, and an explicit core.abbrev; the host locale and config change the text.",
+      "body": [
+        "git translates its messages by the locale, abbreviates shas by the object count of the repository, and reads configuration from GIT_CONFIG_COUNT pairs, GIT_CONFIG_PARAMETERS, and the system and global files.",
+        "A test that compares a line git printed (an error, an abbreviated sha, a warning) sets LC_ALL=C, removes the injected configuration, points GIT_CONFIG_SYSTEM and GIT_CONFIG_GLOBAL at the null device, and pins core.abbrev; a test that asserts the behavior of houserules keeps the inherited environment, because the autocrlf gate reaches the binary through it.",
+        "Precedents: batch 36 T1 review (a locale-bound pin), the T8 integration fix (core.abbrev in validate_stats_audit_parity.rs), and the T11 integration fix (with_default_git_config in help_36.rs)."
+      ],
+      "tags": [
+        "tests",
+        "git",
+        "platform"
+      ],
+      "source": {
+        "date": "2026-10-23",
+        "by": "review",
+        "ref": "batch 36 branch review, uncovered finding of the T1 review"
       }
     }
   ]

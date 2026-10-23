@@ -222,7 +222,7 @@
         "body": [
           "A report or workspace doc that cites a capture must name a file under the batch workspace (or the repository) that a later reader can open. A session scratchpad path is dead the moment the session ends; a citation into it is a claim nobody can collect on.",
           "Copy small captures into the workspace beside the doc that cites them (batch 16 task 5: 59 files under t5-evidence/). An artifact too large to retain is disclosed as not retained, with its decisive excerpt quoted inline - never cited at a path that no longer exists.",
-          "Truncation markers count as citations: a marker naming a full log must point at a durable file whose content is a byte-prefix match of the retained excerpt.",
+          "A task report cites each capture by its path and its SHA-256 hash, and holds at most one short excerpt of its output. The excerpt is a byte-exact part of the capture, so the retained capture in the workspace is the evidence: `houserules check-report-claims` fails a capture that is missing or changed and an excerpt that is not part of its capture.",
           "A long-lived SOURCE comment states the rerunnable command and its measured counts inline, self-contained; a batch-workspace path may ride along as provenance but never as the only evidence, because a clone carries no workspace (ruled at the batch 20 report, docs/design.md 5.52)."
         ],
         "source": {
@@ -248,7 +248,8 @@
         "tags": [
           "review",
           "proofs",
-          "fix-rounds"
+          "fix-rounds",
+          "ruled-keep"
         ],
         "source": {
           "date": "2026-09-13",
@@ -404,6 +405,11 @@
           "A dispatch deviation from the spec's process line (model, order, gate) is a ruling: amend that spec line in the same turn. The batch report at the tick repeats it; it does not replace it.",
           "An accepted implementer deviation is a ruling. Home it (a spec amendment or a backlog item) in the turn it is accepted, before the next dispatch.",
           "A code comment is not a home file: a sanctioned deviation homes in the spec's deviations section or the design record the turn it is accepted; the comment may cite that home, never substitute for it (batch 16 task 4)."
+        ],
+        "tags": [
+          "rulings",
+          "compaction",
+          "ruled-keep"
         ]
       }
     },
@@ -708,6 +714,32 @@
           "knowledge",
           "authoring",
           "fidelity",
+          "ruled-keep"
+        ]
+      }
+    },
+    {
+      "id": "process.every-commit-names-a-work-item",
+      "fields": {
+        "standing": false,
+        "area": "global"
+      }
+    },
+    {
+      "id": "process.conventional-commits",
+      "fields": {
+        "tags": [
+          "git",
+          "ruled-keep"
+        ]
+      }
+    },
+    {
+      "id": "writing-style.readme-is-an-adopter-funnel",
+      "fields": {
+        "tags": [
+          "docs",
+          "readme",
           "ruled-keep"
         ]
       }
