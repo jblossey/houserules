@@ -1,34 +1,25 @@
 //! `update` CLI-level tests. Follows `install.rs`'s own structural pattern
-//! (a real subprocess against a real scratch git repository, its own small
-//! copy of the shared helpers) for the same reason that file gives
-//! (`check_commit.rs`'s module doc): this file needs none of `install.rs`'s
-//! other test-only helpers, so a `mod` share would only add dead-code
-//! warnings there. The deletion mechanism itself (`RETIRED`) is exercised
-//! at the unit level in `install/mod.rs`'s own tests, which inject their own
-//! list directly at the `delete_retired` call site; these CLI-level tests
-//! cover the two production shapes instead: no deletion when the retired
-//! paths are absent (a fresh `init` never seeds them), and
+//! (a real subprocess against a real scratch git repository) for the same
+//! reason that file gives (`check_commit.rs`'s module doc). The shared
+//! helpers `repo_root`, `scratch_git_repo`, and `sha256_hex` come from
+//! `tracker_support`, whose `dead_code` allowance covers the helpers this
+//! file does not call. `houserules()` stays beside its callers, as the doc
+//! of that helper in `tracker_support` says every `tests/*.rs` file keeps
+//! it. The deletion mechanism itself (`RETIRED`) is
+//! exercised at the unit level in `install/mod.rs`'s own tests, which
+//! inject their own list directly at the `delete_retired` call site; these
+//! CLI-level tests cover the two production shapes instead: no deletion
+//! when the retired paths are absent (a fresh `init` never seeds them), and
 //! `update_deletes_retired_shell_tools_from_an_old_install` below,
 //! `RETIRED`'s production use against an old install that still has them.
+
+mod tracker_support;
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use sha2::{Digest, Sha256};
-
-/// `path` canonical, in the form houserules prints it: on Windows without
-/// the `\\?\` prefix that `canonicalize` adds.
-fn resolved(path: &Path) -> PathBuf {
-    let canonical = path.canonicalize().expect("canonicalize");
-    match canonical
-        .to_str()
-        .and_then(|text| text.strip_prefix(r"\\?\"))
-    {
-        Some(plain) => PathBuf::from(plain),
-        None => canonical,
-    }
-}
+use tracker_support::{quoted, repo_root, resolved, scratch_git_repo, sha256_hex};
 
 /// A `Command` for the compiled `houserules` binary under test --
 /// `install.rs`'s own copy of this helper. Sets
@@ -41,27 +32,6 @@ fn houserules() -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_houserules"));
     command.env("HOUSERULES_SKIP_SELF_UPDATE", "1");
     command
-}
-
-/// This checkout's repository root -- `install.rs`'s own copy.
-fn repo_root() -> PathBuf {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    root.canonicalize()
-        .unwrap_or_else(|error| panic!("canonicalize {}: {error}", root.display()))
-}
-
-/// A fresh scratch directory with `git init` already run -- `install.rs`'s
-/// own copy. `tempfile`'s `TempDir` removes itself on drop
-/// (`houserules.tests-clean-scratch-dirs`'s sanctioned Rust form).
-fn scratch_git_repo() -> tempfile::TempDir {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let status = Command::new("git")
-        .args(["init", "-q"])
-        .current_dir(dir.path())
-        .status()
-        .expect("run git init");
-    assert!(status.success(), "git init failed");
-    dir
 }
 
 /// A scratch repository that a fresh `houserules init --target claude`
@@ -119,7 +89,7 @@ fn update_over_a_never_init_ed_target_is_a_named_error_exit_2() {
         String::from_utf8(output.stderr).expect("utf8 stderr"),
         format!(
             "no houserules install here (no .houserules.json); run houserules init --dir {}\n",
-            dir.path().display()
+            quoted(dir.path())
         )
     );
     assert!(
@@ -160,17 +130,6 @@ const SEED_ONCE: &[&str] = &[
 
 /// The CI workflow, the one D3 file that only a GitHub-hosted target gets.
 const GITHUB_HOSTED_SEED_ONCE: &[&str] = &[".github/workflows/knowledge.yml"];
-
-/// The lowercase hex SHA-256 digest of `content` -- this test file's own
-/// copy of `install::baseline::hash`, computed independently with the same
-/// `sha2` crate so a hand-stamped baseline in these tests matches exactly
-/// what the binary under test would compute for the same bytes.
-fn sha256_hex(content: &[u8]) -> String {
-    Sha256::digest(content)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
-}
 
 /// `env!("CARGO_PKG_VERSION")` at THIS test binary's own compile time --
 /// `install/mod.rs`'s own copy of `kit_version` (that function's own doc has
@@ -1538,7 +1497,7 @@ fn assert_subdirectory_refusal(stderr: &str, target: &Path, top_level: &Path) {
             "{}: this directory is inside the git repository at {} and holds no .houserules.json; run houserules init --dir {} to install there\n",
             root.display(),
             top.display(),
-            root.display()
+            quoted(&root)
         )
     );
 }

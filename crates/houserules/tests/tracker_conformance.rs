@@ -3088,7 +3088,7 @@ fn beads_missing_partial_status_names_the_bd_config_step() {
     check("the custom status partial is missing; run bd config set status.custom partial:active\n");
     scenario.bd(&["config", "set", "status.custom", "review:wip"]);
     check(
-        "the custom status partial is missing; run bd config set status.custom review:wip,partial:active\n",
+        "the custom status partial is missing; run bd config set status.custom 'review:wip,partial:active'\n",
     );
     scenario.bd(&[
         "config",
@@ -3097,7 +3097,7 @@ fn beads_missing_partial_status_names_the_bd_config_step() {
         "partial:frozen,review:wip",
     ]);
     check(
-        "the custom status partial is not in the active category; run bd config set status.custom partial:active,review:wip\n",
+        "the custom status partial is not in the active category; run bd config set status.custom 'partial:active,review:wip'\n",
     );
     scenario.bd(&[
         "config",
@@ -3107,7 +3107,7 @@ fn beads_missing_partial_status_names_the_bd_config_step() {
     ]);
     scenario.bd(&["config", "unset", "types.custom"]);
     check(
-        "the custom types houserules-section, houserules-batch, houserules-amendment, houserules-decision, houserules-parked are missing; run bd config set types.custom houserules-section,houserules-batch,houserules-amendment,houserules-decision,houserules-parked\n",
+        "the custom types houserules-section, houserules-batch, houserules-amendment, houserules-decision, houserules-parked are missing; run bd config set types.custom 'houserules-section,houserules-batch,houserules-amendment,houserules-decision,houserules-parked'\n",
     );
     scenario.bd(&[
         "config",
@@ -3116,7 +3116,7 @@ fn beads_missing_partial_status_names_the_bd_config_step() {
         "houserules-section,spike-ish,houserules-batch,houserules-amendment,houserules-decision",
     ]);
     check(
-        "the custom type houserules-parked is missing; run bd config set types.custom houserules-section,spike-ish,houserules-batch,houserules-amendment,houserules-decision,houserules-parked\n",
+        "the custom type houserules-parked is missing; run bd config set types.custom 'houserules-section,spike-ish,houserules-batch,houserules-amendment,houserules-decision,houserules-parked'\n",
     );
 }
 

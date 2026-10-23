@@ -1,0 +1,4 @@
+{"schema":"houserules/capture@1.0.0","argv":["sh","-c","echo \"running 1 test\"; echo \"test a_run_cites_a_capture ... FAILED\"; echo \"test result: FAILED. 0 passed; 1 failed\" >&2; exit 1"],"cwd":"/home/maintainer/work","start":"2026-10-23T02:59:41.226517995Z","end":"2026-10-23T02:59:41.231716287Z","exit":1,"signal":null,"head":null,"dirty":null,"lossy":0}
+running 1 test
+test a_run_cites_a_capture ... FAILED
+test result: FAILED. 0 passed; 1 failed

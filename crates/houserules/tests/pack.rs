@@ -4,6 +4,7 @@
 //! network. Every refusal pins its whole stderr line and leaves the tree
 //! as it was (`quality.exclusive-pins-are-mutation-proven`).
 
+mod tracker_support;
 mod tree_snapshot;
 
 use std::collections::BTreeMap;
@@ -13,8 +14,8 @@ use std::process::{Command, Output};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use tempfile::TempDir;
+use tracker_support::{repo_root, sha256_hex};
 
 /// A `Command` for the compiled `houserules` binary under test.
 /// `HOUSERULES_SKIP_SELF_UPDATE` keeps `update`'s self-update phase from
@@ -23,13 +24,6 @@ fn houserules() -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_houserules"));
     command.env("HOUSERULES_SKIP_SELF_UPDATE", "1");
     command
-}
-
-/// This checkout's repository root, resolved at compile time.
-fn repo_root() -> PathBuf {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    root.canonicalize()
-        .unwrap_or_else(|error| panic!("canonicalize {}: {error}", root.display()))
 }
 
 /// Runs `git <args>` in `dir` with a fixed identity and no signing, fails
@@ -71,15 +65,7 @@ fn emit_form(value: &Value) -> String {
 fn canonical_sha(value: &Value) -> String {
     let mut canonical = value.clone();
     canonical.sort_all_objects();
-    hex_sha256(&serde_json::to_vec(&canonical).expect("serialize"))
-}
-
-/// The SHA-256 of `bytes` as lowercase hex.
-fn hex_sha256(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    sha256_hex(&serde_json::to_vec(&canonical).expect("serialize"))
 }
 
 /// One schema-valid entry in the `global` area.

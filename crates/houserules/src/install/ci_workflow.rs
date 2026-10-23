@@ -15,14 +15,26 @@
 //! depend on the install root.
 //!
 //! The steps of the file depend on the tracker of the install (spec 4.8). JSON
-//! and no tracker keep the steps of the template. GitHub adds a job-level
-//! `permissions` block and the token to the steps that run `check-backlog` and
-//! `audit`, because `gh` reads the issues of the repository. Beads adds a step
-//! that installs `bd` at the release that `mise.toml` pins and a step that
-//! runs `bd bootstrap`, because a fresh clone has no Beads store. Every form
-//! checks out the head of a pull request: the `actions/checkout` step carries
+//! and no tracker keep the steps of the template. GitHub adds `issues: read` to
+//! the job-level `permissions` block of the template and the token to the steps
+//! that run `check-backlog` and `audit`, because `gh` reads the issues of the
+//! repository. Beads adds a step that installs `bd` at the release that
+//! `mise.toml` pins and a step that runs `bd bootstrap`, because a fresh clone
+//! has no Beads store. Every form checks out the head of a pull request: the
+//! `actions/checkout` step carries
 //! `ref: ${{ github.event.pull_request.head.sha }}` (spec 3.2), so that every
 //! step of the job, the audit included, judges the tree that lands.
+//!
+//! Every form runs with a read-only job token: the template sets
+//! `permissions: {contents: read}` on the job. The template also sets
+//! `persist-credentials: false` on the checkout, because no step of the JSON,
+//! GitHub, or no-tracker form runs `git` against the remote after the checkout.
+//! The Beads form drops that input: `bd bootstrap --yes` fetches the Dolt data
+//! from the remote, so it needs the persisted credential, which is read-only.
+//! That claim about `bd` rests on spec 8.5 (C11) of
+//! `docs/specs/2026-10-22-batch-36-evidence-and-report-claims.md`; the run of
+//! the Beads form on GitHub is the proof.
+//!
 //! [`template_for`] builds the text from the template, and [`write_for`] keeps
 //! the file of an install at the content that its tracker calls for: every
 //! command that sets `tracker` calls it, and so does `update`.
@@ -46,16 +58,37 @@ const CHECK_BACKLOG_LINE: &str = "      - run: houserules check-backlog";
 /// The last line of the step of the template that runs `audit`.
 const AUDIT_LAST_LINE: &str = "          --head ${{ github.event.pull_request.head.sha }}";
 
-/// The job-level permissions of the GitHub form: `gh` reads the issues.
-const GITHUB_PERMISSIONS: &str = "    permissions:\n      contents: read\n      issues: read";
+/// The line of the permissions block of the template that the GitHub form
+/// extends.
+const CONTENTS_READ_LINE: &str = "      contents: read";
+
+/// The permission that the GitHub form adds to the block, after
+/// `CONTENTS_READ_LINE`: `gh` reads the issues.
+const GITHUB_ISSUES_LINE: &str = "      issues: read";
+
+/// The input of the checkout step that drops the persisted credential. The Beads
+/// form removes it.
+const PERSIST_CREDENTIALS_LINE: &str = "          persist-credentials: false";
 
 /// The env of a step of the GitHub form that runs a gate: `gh` takes its token
 /// from `GH_TOKEN`.
 const GITHUB_TOKEN_ENV: &str = "        env:\n          GH_TOKEN: ${{ github.token }}";
 
 /// The text that the project must hold for the GitHub form: the read of the
-/// issues and the token. A kept workflow that holds both needs no hand step.
-const GITHUB_MARKERS: [&str; 2] = ["issues: read", "GH_TOKEN: ${{ github.token }}"];
+/// issues, beside `CONTENTS_READ_MARKER` in the permissions of the gates job.
+const ISSUES_READ_MARKER: &str = "issues: read";
+
+/// The line of the template that opens the gates job, two spaces deep under
+/// `jobs:`. The job ends at the next line that is indented by two spaces or fewer.
+const GATES_JOB_LINE: &str = "  gates:";
+
+/// The start of the line of the permissions of the gates job: the key, four
+/// spaces deep, where the template has it.
+const PERMISSIONS_KEY: &str = "    permissions:";
+
+/// The text that the project must hold for the GitHub form: the token of the
+/// steps that run a gate.
+const GITHUB_TOKEN_MARKER: &str = "GH_TOKEN: ${{ github.token }}";
 
 /// The text that the project must hold for the Beads form.
 const BEADS_MARKER: &str = "bd bootstrap";
@@ -64,6 +97,20 @@ const BEADS_MARKER: &str = "bd bootstrap";
 /// checkout step, which makes every step of the job judge the head of a pull
 /// request (spec 3.2).
 const HEAD_CHECKOUT_INPUT: &str = "ref: ${{ github.event.pull_request.head.sha }}";
+
+/// The text that the project must hold for every form: the read-only token of
+/// the job. A file that lacks it gets the permissions step that
+/// `permissions_hand_step` picks from the `permissions` key of the gates job: for
+/// every tracker but GitHub, `ci_lacks_contents_read` where the job holds no key,
+/// and a step that adds the scope to the mapping or replaces `write-all` where it
+/// holds one. The GitHub tracker reads it with `ISSUES_READ_MARKER`, so that no
+/// file is asked for two `permissions` keys.
+const CONTENTS_READ_MARKER: &str = "contents: read";
+
+/// The text that the project must hold for every form but Beads: the input of
+/// the checkout step that drops the persisted credential. The Beads form must
+/// not hold it: `bd bootstrap --yes` needs the credential (spec 8.5, C11).
+const PERSIST_CREDENTIALS_MARKER: &str = "persist-credentials: false";
 
 /// The steps of the Beads form, which go before the step that runs
 /// `check-backlog`: the release of `bd` that `mise.toml` pins is downloaded
@@ -93,6 +140,27 @@ fn beads_steps() -> String {
     )
 }
 
+/// Names a template that lacks the line `anchor`, or holds it twice, as a defect
+/// of the kit, in one line.
+fn require_one_line(template: &str, anchor: &str, adapter: Adapter) -> Result<(), String> {
+    if template.lines().filter(|line| *line == anchor).count() != 1 {
+        return Err(format!(
+            "{TEMPLATE_PATH}: the line {anchor:?} must occur once for the workflow of the {} tracker",
+            adapter.as_str()
+        ));
+    }
+    Ok(())
+}
+
+/// `lines` joined by `\n`, with a final `\n` when `template` ends with one.
+fn join_like(template: &str, lines: &[&str]) -> String {
+    let mut text = lines.join("\n");
+    if template.ends_with('\n') {
+        text.push('\n');
+    }
+    text
+}
+
 /// `template` with `addition` after (`after`) or before the one line that equals
 /// `anchor`. A template that lacks the line, or holds it twice, is a defect of
 /// the kit, named in one line.
@@ -103,12 +171,7 @@ fn insert_at_line(
     after: bool,
     adapter: Adapter,
 ) -> Result<String, String> {
-    if template.lines().filter(|line| *line == anchor).count() != 1 {
-        return Err(format!(
-            "{TEMPLATE_PATH}: the line {anchor:?} must occur once for the workflow of the {} tracker",
-            adapter.as_str()
-        ));
-    }
+    require_one_line(template, anchor, adapter)?;
     let mut lines = Vec::new();
     for line in template.lines() {
         if line == anchor && !after {
@@ -119,11 +182,15 @@ fn insert_at_line(
             lines.push(addition);
         }
     }
-    let mut text = lines.join("\n");
-    if template.ends_with('\n') {
-        text.push('\n');
-    }
-    Ok(text)
+    Ok(join_like(template, &lines))
+}
+
+/// `template` without the one line that equals `anchor`. A template that lacks
+/// the line, or holds it twice, is a defect of the kit, named in one line.
+fn remove_line(template: &str, anchor: &str, adapter: Adapter) -> Result<String, String> {
+    require_one_line(template, anchor, adapter)?;
+    let lines: Vec<&str> = template.lines().filter(|line| *line != anchor).collect();
+    Ok(join_like(template, &lines))
 }
 
 /// The seeded CI workflow of an install with the tracker `adapter` (or none) and
@@ -137,27 +204,131 @@ pub(super) fn template_for(adapter: Option<Adapter>, prefix: &str) -> Result<Vec
         None | Some(Adapter::Json) => return Ok(template),
         Some(Adapter::Github) => {
             let github = Adapter::Github;
-            let text = insert_at_line(text, RUNS_ON_LINE, GITHUB_PERMISSIONS, true, github)?;
+            let text = insert_at_line(text, CONTENTS_READ_LINE, GITHUB_ISSUES_LINE, true, github)?;
             let text = insert_at_line(&text, CHECK_BACKLOG_LINE, GITHUB_TOKEN_ENV, true, github)?;
             insert_at_line(&text, AUDIT_LAST_LINE, GITHUB_TOKEN_ENV, true, github)?
         }
-        Some(Adapter::Beads) => insert_at_line(
-            text,
-            CHECK_BACKLOG_LINE,
-            &beads_steps(),
-            false,
-            Adapter::Beads,
-        )?,
+        Some(Adapter::Beads) => {
+            let beads = Adapter::Beads;
+            let text = remove_line(text, PERSIST_CREDENTIALS_LINE, beads)?;
+            insert_at_line(&text, CHECK_BACKLOG_LINE, &beads_steps(), false, beads)?
+        }
     };
     Ok(form.into_bytes())
 }
 
+/// What the gates job of a kept copy holds under its `permissions` key.
+enum JobPermissions {
+    /// The job has no `permissions` key.
+    Absent,
+    /// A block of scopes, or a flow mapping such as `{contents: read}`.
+    Mapping,
+    /// The scalar `read-all`, which holds every read scope.
+    ReadAll,
+    /// The scalar `write-all`, which holds every scope.
+    WriteAll,
+}
+
+impl JobPermissions {
+    /// The state of a key whose text after the colon is `value`: a scalar, with
+    /// or without quotes and a trailing comment, is `read-all` or `write-all`;
+    /// anything else, the empty value of a block included, is a mapping.
+    fn of_value(value: &str) -> Self {
+        let scalar = value
+            .split(" #")
+            .next()
+            .unwrap_or_default()
+            .trim()
+            .trim_matches(['\'', '"']);
+        match scalar {
+            "read-all" => Self::ReadAll,
+            "write-all" => Self::WriteAll,
+            _ => Self::Mapping,
+        }
+    }
+}
+
+/// The `permissions` key that the gates job of the kept copy `text` holds. The
+/// reader tests the lines of the job and no more: the job begins at
+/// `GATES_JOB_LINE` and ends at the next line indented by two spaces or fewer,
+/// and a comment or a blank line ends nothing. The key is the line that starts
+/// with `PERMISSIONS_KEY`; a key in a comment, in another job, at the workflow
+/// level, or at another indentation is no key of the job. A copy that lacks
+/// `GATES_JOB_LINE` has no key.
+fn job_permissions(text: &str) -> JobPermissions {
+    let job_indent = GATES_JOB_LINE.len() - GATES_JOB_LINE.trim_start().len();
+    let lines = text
+        .lines()
+        .skip_while(|line| line.trim_end() != GATES_JOB_LINE)
+        .skip(1);
+    for line in lines {
+        let content = line.trim_start();
+        if content.is_empty() || content.starts_with('#') {
+            continue;
+        }
+        if line.len() - content.len() <= job_indent {
+            break;
+        }
+        if let Some(value) = line.strip_prefix(PERMISSIONS_KEY) {
+            return JobPermissions::of_value(value);
+        }
+    }
+    JobPermissions::Absent
+}
+
+/// The hand step for the permissions of a kept copy at `path` that holds the
+/// bytes `text`, or none (spec 8.5, design.md 5.226). The `permissions` key of
+/// the gates job decides its form, so that no copy is asked for a second key:
+///
+/// - `read-all` holds every read scope and gets none.
+/// - `write-all` is replaced by the block of the form.
+/// - A mapping gets the scopes it lacks added to it: `contents: read` for every
+///   tracker but GitHub, which reads `contents: read` and `issues: read`.
+/// - A job with no key gets the block: `permissions: {contents: read}`, and for
+///   the GitHub tracker the whole block when the copy holds neither marker, or
+///   the one missing line when it holds the other.
+fn permissions_hand_step(adapter: Option<Adapter>, path: &str, text: &str) -> Option<String> {
+    let github = adapter == Some(Adapter::Github);
+    let contents = text.contains(CONTENTS_READ_MARKER);
+    let issues = text.contains(ISSUES_READ_MARKER);
+    match (job_permissions(text), github, contents, issues) {
+        (JobPermissions::ReadAll, ..) => None,
+        (JobPermissions::WriteAll, github, ..) => {
+            Some(hand_steps::ci_grants_write_all(path, github))
+        }
+        (_, false, true, _) | (_, true, true, true) => None,
+        (_, true, true, false) => Some(hand_steps::ci_lacks_issues_read(path)),
+        (_, true, false, true) | (JobPermissions::Mapping, false, false, _) => {
+            Some(hand_steps::ci_lacks_contents_read_in_the_permissions(path))
+        }
+        (JobPermissions::Mapping, true, false, false) => Some(
+            hand_steps::ci_lacks_the_github_scopes_in_the_permissions(path),
+        ),
+        (JobPermissions::Absent, true, false, false) => {
+            Some(hand_steps::ci_lacks_the_github_permissions(path))
+        }
+        (JobPermissions::Absent, false, false, _) => Some(hand_steps::ci_lacks_contents_read(path)),
+    }
+}
+
 /// The hand steps for a seeded CI workflow that the project changed and that
-/// `update` kept (spec 4.8 and 3.2). The file at `path` holds the bytes
-/// `current`. The first hand step names the lines that the tracker `adapter`
-/// needs when the text lacks them; JSON, no tracker, and a file that holds the
-/// lines of its adapter get none. The last names the `ref` input of the
-/// checkout (`HEAD_CHECKOUT_INPUT`) for every tracker whose file lacks it.
+/// `update` kept. The file at `path` holds the bytes `current`. Each step is for
+/// a marker that the text lacks, or for the credential input that the Beads
+/// tracker cannot use, in the order of the file:
+///
+/// 1. The steps of the Beads tracker (`BEADS_MARKER`).
+/// 2. The permissions of the gates job: the read-only token
+///    (`CONTENTS_READ_MARKER`) for every tracker, and `issues: read`
+///    (`ISSUES_READ_MARKER`) for the GitHub tracker. `permissions_hand_step` picks
+///    the step from the `permissions` key of the job, and a file that holds the
+///    markers gets none.
+/// 3. The `GH_TOKEN` env of the steps that run a gate, for the GitHub tracker
+///    (`GITHUB_TOKEN_MARKER`).
+/// 4. The `ref` input of the checkout (`HEAD_CHECKOUT_INPUT`).
+/// 5. The `persist-credentials` input of the checkout
+///    (`PERSIST_CREDENTIALS_MARKER`): the step adds it for every tracker but
+///    Beads, and the Beads tracker gets the step that removes it from a file
+///    that holds it.
 pub(super) fn hand_step_for_kept(
     adapter: Option<Adapter>,
     path: &str,
@@ -165,17 +336,23 @@ pub(super) fn hand_step_for_kept(
 ) -> Vec<String> {
     let text = String::from_utf8_lossy(current);
     let mut steps = Vec::new();
-    match adapter {
-        Some(Adapter::Github) if GITHUB_MARKERS.iter().any(|needle| !text.contains(needle)) => {
-            steps.push(hand_steps::ci_lacks_the_github_lines(path));
-        }
-        Some(Adapter::Beads) if !text.contains(BEADS_MARKER) => {
-            steps.push(hand_steps::ci_lacks_the_beads_steps(path, BD_VERSION));
-        }
-        _ => {}
+    if adapter == Some(Adapter::Beads) && !text.contains(BEADS_MARKER) {
+        steps.push(hand_steps::ci_lacks_the_beads_steps(path, BD_VERSION));
+    }
+    steps.extend(permissions_hand_step(adapter, path, &text));
+    if adapter == Some(Adapter::Github) && !text.contains(GITHUB_TOKEN_MARKER) {
+        steps.push(hand_steps::ci_lacks_the_github_env(path));
     }
     if !text.contains(HEAD_CHECKOUT_INPUT) {
         steps.push(hand_steps::ci_lacks_the_head_checkout(path));
+    }
+    let holds_persist_credentials = text.contains(PERSIST_CREDENTIALS_MARKER);
+    if adapter == Some(Adapter::Beads) {
+        if holds_persist_credentials {
+            steps.push(hand_steps::ci_holds_persist_credentials_false(path));
+        }
+    } else if !holds_persist_credentials {
+        steps.push(hand_steps::ci_lacks_persisted_credentials_off(path));
     }
     steps
 }
@@ -611,25 +788,52 @@ mod tests {
         }
     }
 
-    /// The GitHub form adds the permissions once and the token to the two gate
-    /// steps; the Beads form adds the two steps before the `check-backlog`
-    /// step, which stays, and no token.
+    /// The GitHub form adds `issues: read` to the one permissions block and the
+    /// token to the two gate steps; the Beads form drops the input that persists
+    /// the credential and adds the two steps before the `check-backlog` step,
+    /// which stays, and no token.
     #[test]
     fn the_forms_of_github_and_beads_add_only_their_lines() {
         let github = String::from_utf8(template_for(Some(Adapter::Github), "WI").expect("form"))
             .expect("UTF-8");
-        assert_eq!(github.matches(GITHUB_PERMISSIONS).count(), 1);
+        assert_eq!(github.matches("permissions:").count(), 1);
+        assert_eq!(
+            github
+                .matches(&format!("{CONTENTS_READ_LINE}\n{GITHUB_ISSUES_LINE}\n"))
+                .count(),
+            1
+        );
         assert_eq!(github.matches(GITHUB_TOKEN_ENV).count(), 2);
         let without: String = github
-            .replace(&format!("\n{GITHUB_PERMISSIONS}"), "")
+            .replace(&format!("\n{GITHUB_ISSUES_LINE}"), "")
             .replace(&format!("\n{GITHUB_TOKEN_ENV}"), "");
         assert_eq!(without, template());
 
         let beads = String::from_utf8(template_for(Some(Adapter::Beads), "WI").expect("form"))
             .expect("UTF-8");
         let added = format!("{}\n", beads_steps());
-        assert_eq!(beads.replace(&added, ""), template());
+        assert_eq!(
+            beads.replace(&added, ""),
+            template().replace(&format!("{PERSIST_CREDENTIALS_LINE}\n"), "")
+        );
+        assert!(!beads.contains("persist-credentials"));
         assert!(beads.contains(&format!("beads_{BD_VERSION}_linux_amd64.tar.gz")));
+    }
+
+    /// The template sets the read-only token and drops the persisted credential,
+    /// each once, on the lines that the forms build on.
+    #[test]
+    fn the_template_holds_the_read_only_token_and_drops_the_credential_once() {
+        let template = template();
+
+        for line in [CONTENTS_READ_LINE, PERSIST_CREDENTIALS_LINE] {
+            assert_eq!(
+                template.lines().filter(|found| *found == line).count(),
+                1,
+                "{line}"
+            );
+        }
+        assert_eq!(template.matches("permissions:").count(), 1);
     }
 
     /// A template that lacks the line of an anchor, or holds it twice, is a
@@ -654,55 +858,398 @@ mod tests {
         }
     }
 
-    /// A kept workflow gets the hand step of its adapter only while it lacks
-    /// what the adapter needs, and the hand step of the PR-head checkout, after
-    /// the one of its adapter, only while it lacks the `ref` input.
+    /// `remove_line` names a template that lacks the line, or holds it twice, in
+    /// the same line as `insert_at_line`, and removes the one line otherwise.
     #[test]
-    fn a_kept_workflow_gets_the_hand_steps_it_lacks_the_tracker_first() {
-        let path = "w.yml";
-        let head = hand_steps::ci_lacks_the_head_checkout(path);
-        let with_head = format!("{HEAD_CHECKOUT_INPUT}\n");
-        assert_eq!(
-            hand_step_for_kept(Some(Adapter::Github), path, b"name: mine\n"),
-            [hand_steps::ci_lacks_the_github_lines(path), head.clone()]
+    fn a_line_to_remove_that_does_not_occur_once_is_named() {
+        let expected = format!(
+            "{TEMPLATE_PATH}: the line {PERSIST_CREDENTIALS_LINE:?} must occur once for the workflow of the beads tracker"
         );
-        let github_lines = "permissions: issues: read\nGH_TOKEN: ${{ github.token }}\n";
-        assert_eq!(
-            hand_step_for_kept(Some(Adapter::Github), path, github_lines.as_bytes()),
-            std::slice::from_ref(&head)
-        );
-        assert_eq!(
-            hand_step_for_kept(
-                Some(Adapter::Github),
-                path,
-                format!("{github_lines}{with_head}").as_bytes()
-            ),
-            Vec::<String>::new()
-        );
-        assert_eq!(
-            hand_step_for_kept(Some(Adapter::Beads), path, b"name: mine\n"),
-            [
-                hand_steps::ci_lacks_the_beads_steps(path, BD_VERSION),
-                head.clone()
-            ]
-        );
-        assert_eq!(
-            hand_step_for_kept(
-                Some(Adapter::Beads),
-                path,
-                format!("run: bd bootstrap --yes\n{with_head}").as_bytes()
-            ),
-            Vec::<String>::new()
-        );
-        for adapter in [None, Some(Adapter::Json)] {
+        let lost = template().replace(&format!("{PERSIST_CREDENTIALS_LINE}\n"), "");
+        let doubled = format!("{}{PERSIST_CREDENTIALS_LINE}\n", template());
+
+        for text in [lost, doubled] {
             assert_eq!(
-                hand_step_for_kept(adapter, path, b"name: mine\n"),
-                std::slice::from_ref(&head)
-            );
-            assert_eq!(
-                hand_step_for_kept(adapter, path, with_head.as_bytes()),
-                Vec::<String>::new()
+                remove_line(&text, PERSIST_CREDENTIALS_LINE, Adapter::Beads),
+                Err(expected.clone())
             );
         }
+        assert_eq!(
+            remove_line("a\nb\nc\n", "b", Adapter::Beads),
+            Ok("a\nc\n".to_string())
+        );
+        assert_eq!(
+            remove_line("a\nb\nc", "b", Adapter::Beads),
+            Ok("a\nc".to_string())
+        );
+    }
+
+    /// A kept workflow whose gates job holds no `permissions` key gets a hand step
+    /// for each marker it lacks, in the order of the file: the steps of the Beads
+    /// tracker, the permissions (the read-only token for every tracker, and for
+    /// GitHub the markers `contents: read` and `issues: read` that the copy
+    /// holds), the env of the GitHub tracker, the `ref` input of the PR-head
+    /// checkout, and the dropped persisted credential. The Beads tracker gets the
+    /// step that removes the credential input in its place, for a copy that holds
+    /// it. The texts are the lines of spec 8.5.
+    #[test]
+    fn a_kept_workflow_gets_the_hand_steps_it_lacks_in_the_order_of_the_file() {
+        let path = "w.yml";
+        let github = format!(
+            "{path} lacks the permissions that the github tracker needs; add permissions: {{contents: read, issues: read}} to the gates job"
+        );
+        let issues_read = format!(
+            "{path} lacks issues: read, which the github tracker needs; add issues: read to the permissions of the gates job"
+        );
+        let contents_beside_issues = format!(
+            "{path} lacks contents: read; add contents: read to the permissions of the gates job"
+        );
+        let github_env = format!(
+            "{path} lacks the GH_TOKEN env that the github tracker needs; add env: {{GH_TOKEN: ${{{{ github.token }}}}}} to each step that runs houserules check-backlog or houserules audit"
+        );
+        let drop = hand_steps::ci_holds_persist_credentials_false(path);
+        let beads = hand_steps::ci_lacks_the_beads_steps(path, BD_VERSION);
+        let contents = hand_steps::ci_lacks_contents_read(path);
+        let head = hand_steps::ci_lacks_the_head_checkout(path);
+        let persist = hand_steps::ci_lacks_persisted_credentials_off(path);
+        let issues_marker = "issues: read";
+        let token_marker = "GH_TOKEN: ${{ github.token }}";
+        let github_lines = format!("{issues_marker}\n{token_marker}\n");
+        let beads_lines = "run: bd bootstrap --yes\n";
+        let common = format!(
+            "{HEAD_CHECKOUT_INPUT}\n{CONTENTS_READ_MARKER}\n{PERSIST_CREDENTIALS_MARKER}\n"
+        );
+        let cases: Vec<(Option<Adapter>, String, Vec<String>)> = vec![
+            (
+                Some(Adapter::Github),
+                "name: mine\n".to_string(),
+                vec![
+                    github.clone(),
+                    github_env.clone(),
+                    head.clone(),
+                    persist.clone(),
+                ],
+            ),
+            (
+                Some(Adapter::Github),
+                github_lines.to_string(),
+                vec![
+                    contents_beside_issues.clone(),
+                    head.clone(),
+                    persist.clone(),
+                ],
+            ),
+            (
+                Some(Adapter::Github),
+                format!("{github_lines}{HEAD_CHECKOUT_INPUT}\n"),
+                vec![contents_beside_issues.clone(), persist.clone()],
+            ),
+            (
+                Some(Adapter::Github),
+                format!("{github_lines}{HEAD_CHECKOUT_INPUT}\n{PERSIST_CREDENTIALS_MARKER}\n"),
+                vec![contents_beside_issues.clone()],
+            ),
+            (
+                Some(Adapter::Github),
+                format!("{github_lines}{common}"),
+                vec![],
+            ),
+            (
+                Some(Adapter::Github),
+                format!("{CONTENTS_READ_MARKER}\n"),
+                vec![
+                    issues_read.clone(),
+                    github_env.clone(),
+                    head.clone(),
+                    persist.clone(),
+                ],
+            ),
+            (
+                Some(Adapter::Github),
+                common.clone(),
+                vec![issues_read.clone(), github_env.clone()],
+            ),
+            (
+                Some(Adapter::Github),
+                format!("{common}{issues_marker}\n"),
+                vec![github_env.clone()],
+            ),
+            (
+                Some(Adapter::Github),
+                format!("{common}{token_marker}\n"),
+                vec![issues_read.clone()],
+            ),
+            (
+                Some(Adapter::Github),
+                format!("{HEAD_CHECKOUT_INPUT}\n{PERSIST_CREDENTIALS_MARKER}\n{issues_marker}\n"),
+                vec![contents_beside_issues.clone(), github_env.clone()],
+            ),
+            (
+                Some(Adapter::Beads),
+                "name: mine\n".to_string(),
+                vec![beads.clone(), contents.clone(), head.clone()],
+            ),
+            (
+                Some(Adapter::Beads),
+                format!("{beads_lines}{HEAD_CHECKOUT_INPUT}\n"),
+                vec![contents.clone()],
+            ),
+            (
+                Some(Adapter::Beads),
+                format!("{beads_lines}{HEAD_CHECKOUT_INPUT}\n{CONTENTS_READ_MARKER}\n"),
+                vec![],
+            ),
+            (
+                Some(Adapter::Beads),
+                format!("{PERSIST_CREDENTIALS_MARKER}\n"),
+                vec![beads.clone(), contents.clone(), head.clone(), drop.clone()],
+            ),
+            (
+                Some(Adapter::Beads),
+                format!("{beads_lines}{common}"),
+                vec![drop.clone()],
+            ),
+            (
+                Some(Adapter::Beads),
+                format!(
+                    "{beads_lines}{HEAD_CHECKOUT_INPUT}\n{CONTENTS_READ_MARKER}\n# {PERSIST_CREDENTIALS_MARKER}\n"
+                ),
+                vec![drop.clone()],
+            ),
+            (
+                None,
+                "name: mine\n".to_string(),
+                vec![contents.clone(), head.clone(), persist.clone()],
+            ),
+            (None, common.clone(), vec![]),
+            (
+                Some(Adapter::Json),
+                "name: mine\n".to_string(),
+                vec![contents.clone(), head.clone(), persist.clone()],
+            ),
+            (
+                Some(Adapter::Json),
+                format!("{HEAD_CHECKOUT_INPUT}\n{PERSIST_CREDENTIALS_MARKER}\n"),
+                vec![contents.clone()],
+            ),
+            (
+                Some(Adapter::Json),
+                format!("{HEAD_CHECKOUT_INPUT}\n{CONTENTS_READ_MARKER}\n"),
+                vec![persist.clone()],
+            ),
+            (
+                Some(Adapter::Json),
+                format!("{CONTENTS_READ_MARKER}\n{PERSIST_CREDENTIALS_MARKER}\n"),
+                vec![head.clone()],
+            ),
+            (Some(Adapter::Json), common, vec![]),
+        ];
+
+        for (adapter, text, expected) in cases {
+            assert_eq!(
+                hand_step_for_kept(adapter, path, text.as_bytes()),
+                expected,
+                "{adapter:?} {text:?}"
+            );
+        }
+    }
+
+    /// The `permissions` key of the gates job decides the hand step for the
+    /// permissions of a kept copy (spec 8.5, design.md 5.226), for every adapter:
+    /// with no key the step adds the block (the whole block for the GitHub
+    /// tracker, by the markers the copy holds); with a mapping it adds the scopes
+    /// the mapping lacks to it; `read-all` gets none; `write-all` is replaced by
+    /// the block. The key is read from the lines of the gates job: a quoted
+    /// scalar, a scalar with a comment, and a flow mapping are the same key, and a
+    /// key in a comment, in another job, or at the workflow level is no key of the
+    /// gates job. Every row holds the other markers of its adapter, so that only
+    /// the steps for the permissions remain.
+    #[test]
+    fn a_kept_workflow_follows_the_permissions_key_of_the_gates_job() {
+        let path = "w.yml";
+        let block = format!(
+            "{path} lacks contents: read; add permissions: {{contents: read}} to the gates job"
+        );
+        let github_block = format!(
+            "{path} lacks the permissions that the github tracker needs; add permissions: {{contents: read, issues: read}} to the gates job"
+        );
+        let issues = format!(
+            "{path} lacks issues: read, which the github tracker needs; add issues: read to the permissions of the gates job"
+        );
+        let contents_in = format!(
+            "{path} lacks contents: read; add contents: read to the permissions of the gates job"
+        );
+        let github_in = format!(
+            "{path} lacks the permissions that the github tracker needs; add contents: read and issues: read to the permissions of the gates job"
+        );
+        let write_all = format!(
+            "{path} grants write-all; replace permissions: write-all with permissions: {{contents: read}} in the gates job"
+        );
+        let github_write_all = format!(
+            "{path} grants write-all; replace permissions: write-all with permissions: {{contents: read, issues: read}} in the gates job"
+        );
+        let workflow = |permissions: &str| {
+            format!("jobs:\n  gates:\n    runs-on: ubuntu-latest\n{permissions}    steps: []\n")
+        };
+        let other_scope = workflow("    permissions:\n      pull-requests: read\n");
+        let flow_other_scope = workflow("    permissions: {pull-requests: read}\n");
+        let empty_flow = workflow("    permissions: {}\n");
+        let read_all = workflow("    permissions: read-all\n");
+        let quoted_read_all = workflow("    permissions: 'read-all'\n");
+        let read_all_with_comment = workflow("    permissions: read-all # every read scope\n");
+        let write_all_text = workflow("    permissions: write-all\n");
+        let quoted_write_all = workflow("    permissions: \"write-all\"\n");
+        let write_all_with_comment = workflow("    permissions: write-all # for now\n");
+        let contents = workflow("    permissions:\n      contents: read\n");
+        let flow_contents = workflow("    permissions: {contents: read}\n");
+        let issues_only = workflow("    permissions:\n      issues: read\n");
+        let both = workflow("    permissions:\n      contents: read\n      issues: read\n");
+        let write_all_with_markers =
+            workflow("    permissions: write-all\n    # contents: read\n    # issues: read\n");
+        let no_key = workflow("");
+        let comment_key = workflow("    # permissions: write-all\n");
+        let other_job = format!("{no_key}  docs:\n    permissions: write-all\n");
+        let key_before = "jobs:\n  docs:\n    permissions: write-all\n  gates:\n    permissions:\n      contents: read\n      issues: read\n".to_string();
+        let workflow_level = format!("permissions: read-all\n{no_key}");
+        let after_comment =
+            workflow("    permissions: # the token\n      # the reads\n      contents: read\n");
+        let tracker_lines = |adapter: Option<Adapter>| -> String {
+            let mut lines = format!("{HEAD_CHECKOUT_INPUT}\n");
+            match adapter {
+                Some(Adapter::Github) => lines.push_str("GH_TOKEN: ${{ github.token }}\n"),
+                Some(Adapter::Beads) => lines.push_str("run: bd bootstrap --yes\n"),
+                _ => {}
+            }
+            if adapter != Some(Adapter::Beads) {
+                lines.push_str(&format!("{PERSIST_CREDENTIALS_MARKER}\n"));
+            }
+            lines
+        };
+        // (workflow text, steps of an adapter other than GitHub, steps of the GitHub tracker)
+        let rows: Vec<(&str, &String, Vec<&String>, Vec<&String>)> = vec![
+            ("no key", &no_key, vec![&block], vec![&github_block]),
+            (
+                "a key in a comment",
+                &comment_key,
+                vec![&block],
+                vec![&github_block],
+            ),
+            (
+                "a key of another job",
+                &other_job,
+                vec![&block],
+                vec![&github_block],
+            ),
+            (
+                "a key at the workflow level",
+                &workflow_level,
+                vec![&block],
+                vec![&github_block],
+            ),
+            ("read-all", &read_all, vec![], vec![]),
+            ("a quoted read-all", &quoted_read_all, vec![], vec![]),
+            (
+                "read-all with a comment",
+                &read_all_with_comment,
+                vec![],
+                vec![],
+            ),
+            (
+                "write-all",
+                &write_all_text,
+                vec![&write_all],
+                vec![&github_write_all],
+            ),
+            (
+                "a quoted write-all",
+                &quoted_write_all,
+                vec![&write_all],
+                vec![&github_write_all],
+            ),
+            (
+                "write-all with a comment",
+                &write_all_with_comment,
+                vec![&write_all],
+                vec![&github_write_all],
+            ),
+            (
+                "write-all beside the markers in comments",
+                &write_all_with_markers,
+                vec![&write_all],
+                vec![&github_write_all],
+            ),
+            (
+                "a mapping of another scope",
+                &other_scope,
+                vec![&contents_in],
+                vec![&github_in],
+            ),
+            (
+                "a flow mapping of another scope",
+                &flow_other_scope,
+                vec![&contents_in],
+                vec![&github_in],
+            ),
+            (
+                "an empty flow mapping",
+                &empty_flow,
+                vec![&contents_in],
+                vec![&github_in],
+            ),
+            ("contents: read only", &contents, vec![], vec![&issues]),
+            (
+                "a flow mapping of contents: read",
+                &flow_contents,
+                vec![],
+                vec![&issues],
+            ),
+            (
+                "issues: read only",
+                &issues_only,
+                vec![&contents_in],
+                vec![&contents_in],
+            ),
+            ("both scopes", &both, vec![], vec![]),
+            (
+                "the key of another job before the gates job",
+                &key_before,
+                vec![],
+                vec![],
+            ),
+            (
+                "a comment between the key and its scopes",
+                &after_comment,
+                vec![],
+                vec![&issues],
+            ),
+        ];
+
+        for (label, text, others, github) in rows {
+            for (adapter, expected) in [
+                (None, &others),
+                (Some(Adapter::Json), &others),
+                (Some(Adapter::Beads), &others),
+                (Some(Adapter::Github), &github),
+            ] {
+                let copy = format!("{text}{}", tracker_lines(adapter));
+                let expected: Vec<String> = expected.iter().map(|step| (*step).clone()).collect();
+
+                assert_eq!(
+                    hand_step_for_kept(adapter, path, copy.as_bytes()),
+                    expected,
+                    "{label}, {adapter:?}\n{copy}"
+                );
+            }
+        }
+        let github_without_env =
+            format!("{read_all}{HEAD_CHECKOUT_INPUT}\n{PERSIST_CREDENTIALS_MARKER}\n");
+        let github_env = format!(
+            "{path} lacks the GH_TOKEN env that the github tracker needs; add env: {{GH_TOKEN: ${{{{ github.token }}}}}} to each step that runs houserules check-backlog or houserules audit"
+        );
+        assert_eq!(
+            hand_step_for_kept(Some(Adapter::Github), path, github_without_env.as_bytes()),
+            [github_env],
+            "read-all leaves the env step of the GitHub tracker alone"
+        );
     }
 }

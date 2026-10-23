@@ -29,7 +29,16 @@
 //! and `install` both need (`node_path.rs`'s own module doc has the full
 //! account). `check-report-claims`
 //! (`report_claims::cmd_check_report_claims`) is the deliverable-claims
-//! checker (`report_claims.rs`'s own module doc has the full account).
+//! checker (`report_claims.rs`'s own module doc indexes the account of the
+//! checks, which sits in the docs of its submodules).
+//! `capture` (`capture::cmd_capture`) runs a command and writes its output
+//! under a header, and `capture::read` reads such a file back (`capture.rs`'s
+//! own module doc has the full account). `shell` quotes a value, or a whole
+//! command line, for a POSIX shell. `report-facts`
+//! (`report_facts::cmd_report_facts`) fills the fact fields of a task report
+//! from git and from captures, and `report_facts::judge_citation` is the one
+//! judgement of a recorded citation (`report_facts.rs`'s own module doc has the
+//! full account).
 //! `archive` (`archive::cmd_archive`) moves retired backlog items, batch
 //! entries, and knowledge entries into their `archive/` mirrors;
 //! `archive.rs`'s own module doc has the full account, including the
@@ -68,6 +77,7 @@
 mod archive;
 mod backlog;
 mod baseline;
+mod capture;
 mod emit;
 mod get;
 mod install;
@@ -75,15 +85,18 @@ mod node_path;
 mod pack;
 mod packs;
 mod report_claims;
+mod report_facts;
 mod root;
 mod rules;
 #[cfg(test)]
 mod schema_pin;
 mod selfupdate;
+mod shell;
 mod tracker;
 mod update_check;
 mod workflow;
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -159,14 +172,20 @@ enum Command {
     /// exclusion in `knowledge/overrides.json` against the installed packs.
     /// Checks that the `check` of each entry holds the fields that its type
     /// requires: a local entry as written, and an active pack entry with its
-    /// override applied. Checks that every id a kit-owned file cites from a
-    /// topic the kit seeds is an entry of the knowledge base. Checks the
-    /// `runners` key of `.houserules.json`: it must be an object, and each
-    /// tool in it needs a non-empty `command` array of strings, a `parser` of
-    /// `sarif` or `exit-code`, a non-empty `install` string, and no other key;
-    /// one line names the first fault of each tool. Checks that each `runner`
-    /// check names a tool that `runners` defines. Checks that `workspaces`,
-    /// when set, is a relative path inside the install root. While
+    /// override applied. Checks that the `pattern`, `subject`, `body_absent`,
+    /// and each string of `exempt_subjects` of a check compile as regular
+    /// expressions, for the same entries. An expression that does not compile
+    /// gives the line `<file> <id>: check <field> is not a valid regex
+    /// (<message>)`, where `<file>` is the topic file of a local entry, or the
+    /// pack copy of a pack entry and of the entry that an override changes.
+    /// Checks that every id a kit-owned file cites from a topic the kit seeds
+    /// is an entry of the knowledge base. Checks the `runners` key of
+    /// `.houserules.json`: it must be an object, and each tool in it needs a
+    /// non-empty `command` array of strings, a `parser` of `sarif` or
+    /// `exit-code`, a non-empty `install` string, and no other key; one line
+    /// names the first fault of each tool. Checks that each `runner` check
+    /// names a tool that `runners` defines. Checks that `workspaces`, when
+    /// set, is a relative path inside the install root. While
     /// `workspaces` is not set, it names the default location
     /// `.houserules/work` when that folder exists and git does not ignore it.
     /// Names each `verify` path that git ignores, since a fresh clone lacks
@@ -398,7 +417,15 @@ enum Command {
     },
     /// Validates one or more deliverable JSON files against
     /// `.claude/schemas/deliverables.json`, and rejects a compression marker
-    /// that a context proxy left in a file.
+    /// that a context proxy left in a file. For a task report with the status
+    /// `DONE` or `DONE_WITH_CONCERNS`, it also fails a `self_audit` of `null`
+    /// and a `self_audit` whose `summary.skipped` is above 0. For the same
+    /// reports, it reads the capture of each run in `fix_rounds[].tests[]`,
+    /// resolved against the install root, and fails a run whose output holds
+    /// an audit result with a `summary.skipped` above 0:
+    /// `<file>.fix_rounds[<i>].tests[<j>].capture: audit summary skipped is
+    /// <n>; re-run audit with --report`. It leaves a capture that it cannot
+    /// read to `check-report-claims`.
     Validate {
         /// Deliverable files to validate.
         files: Vec<PathBuf>,
@@ -630,77 +657,94 @@ enum Command {
     /// names the release it needs, and an install whose schema is no install
     /// schema id, with a line that names the value. A directory with no
     /// `.houserules.json` and no `knowledge/` directory, at or above it within
-    /// the git top level, is no install: `update` prints `no houserules
-    /// install here (no .houserules.json); run houserules init`, exits 2, and
-    /// writes nothing. When `--dir` names a directory other than the working
+    /// the git top level, is no install: `update` prints `no houserules install
+    /// here (no .houserules.json); run houserules init`, exits 2, and writes
+    /// nothing. When `--dir` names a directory other than the working
     /// directory, the line names it: `run houserules init --dir <dir>`, with
-    /// `<dir>` as written. An install of houserules 1.x is converted to the
-    /// 2.0 layout: the seeded entries become the five kit packs in
-    /// `knowledge/packs/`, the `overrides` of `.houserules.json`
-    /// become `ownedPaths` and `knowledge/overrides.json`, and the `schema` key
-    /// is written last. A 1.x install with a `backlog/` directory gets the JSON
-    /// tracker in the same run, and one without gets none. An opt-in entry of
-    /// a kit pack that the conversion or a pin move brings onto the install
-    /// arrives excluded: it writes the exclusion to `knowledge/overrides.json`
-    /// once, records the id in `optInOffered`, and prints that the entry is
-    /// opt-in. A topic file
-    /// `knowledge/overrides.json` of 1.x stops the conversion before any
-    /// write, and so does a `knowledge/` directory that does not exist or is
-    /// empty: restore the directory from version control and run `update`
-    /// again, or remove `.houserules.json` and run `init --id-prefix <prefix>`
-    /// for a fresh install, with the `idPrefix` of the marker. A
-    /// `knowledge/areas.json` that `ownedPaths` lists and that does not exist
-    /// stops it too. On a 2.0 install it moves the pins of the kit packs to
-    /// the versions of the binary and turns a local entry with a pack id into
-    /// an override. Then it syncs the kit-owned files of an already-`init`ed
-    /// target from the embedded payload: it writes a missing file, or one that
-    /// the project has not changed, and lists it only when its bytes change;
-    /// it keeps and lists a file the project changed (`kept <file> (locally
-    /// modified)`); it never syncs a path that `ownedPaths` in
+    /// `<dir>` quoted for a POSIX shell where it needs quoting. An install of
+    /// houserules 1.x is converted to the 2.0 layout: the seeded entries become
+    /// the five kit packs in `knowledge/packs/`, the `overrides` of
+    /// `.houserules.json` become `ownedPaths` and `knowledge/overrides.json`,
+    /// and the `schema` key is written last. A 1.x install with a `backlog/`
+    /// directory gets the JSON tracker in the same run, and one without gets
+    /// none. An opt-in entry of a kit pack that the conversion or a pin move
+    /// brings onto the install arrives excluded: it writes the exclusion to
+    /// `knowledge/overrides.json` once, records the id in `optInOffered`, and
+    /// prints that the entry is opt-in. A topic file `knowledge/overrides.json`
+    /// of 1.x stops the conversion before any write, and so does a `knowledge/`
+    /// directory that does not exist or is empty: restore the directory from
+    /// version control and run `update` again, or remove `.houserules.json` and
+    /// run `init --id-prefix <prefix>` for a fresh install, with the `idPrefix`
+    /// of the marker. A `knowledge/areas.json` that `ownedPaths` lists and that
+    /// does not exist stops it too. On a 2.0 install it moves the pins of the
+    /// kit packs to the versions of the binary and turns a local entry with a
+    /// pack id into an override. Then it syncs the kit-owned files of an
+    /// already-`init`ed target from the embedded payload: it writes a missing
+    /// file, or one that the project has not changed, and lists it only when
+    /// its bytes change; it keeps and lists a file the project changed (`kept
+    /// <file> (locally modified)`); it never syncs a path that `ownedPaths` in
     /// `.houserules.json` lists. Where the install runs a workflow, it syncs
-    /// the files of the workflow the same way: it writes a file that is
-    /// missing or that the project has not changed, and it keeps and lists a
-    /// changed file on every run (`kept <file> (locally modified; reference
-    /// workflow <version>)`) until the project merges the change by hand. An
-    /// install with files of the reference workflow at their paths and no
-    /// workflow yet adopts the workflow: it pins each file that is the kit's,
-    /// writes each file that is absent, and leaves a file that is not the kit's
-    /// to the project, with a hand step. Where the session-start script of the
-    /// Claude Code files still holds the ritual line of 1.x and the install
-    /// runs the workflow, it adds the hook entry of the session-start script
-    /// of the workflow to `.claude/settings.json`; the script that the kit
-    /// wrote becomes the core script, and a script that the project changed
-    /// stays, with a hand step. It removes the startup hook entry that the kit
-    /// seeded before, where `.claude/settings.json` holds it unchanged. It
-    /// delivers the deliverables
-    /// schema and, with the JSON tracker, the backlog schema, and writes the
-    /// `backlogId` pattern of the tracker of the install into the deliverables
-    /// schema (a pattern that accepts any token, for an install with no
-    /// tracker); a schema that differs from every content of it that the kit
-    /// shipped stays, with a hand step. With the Beads tracker it reads the
-    /// issue prefix again: where `bd` cannot be reached, it keeps the pattern,
-    /// prints one line on stderr, and finishes. It prints a hand step for a
-    /// seeded CI workflow that the project changed and that lacks what the
-    /// tracker needs or the PR-head checkout (`ref: ${{
-    /// github.event.pull_request.head.sha }}` under `with:` of its
-    /// `actions/checkout` step). It writes each seed-once file that is missing
-    /// and, on an install with the JSON tracker, each tracker data file that
-    /// is missing. While `renderers` lacks `claude`, it skips the Claude Code
-    /// files. It brings `.gitignore` to hold the line `.houserules/`: it
-    /// replaces a `.houserules/step/` line in its place (`merged .gitignore
-    /// (.houserules/step/ replaced by .houserules/)`), adds the line at the
-    /// end where neither line is present (`merged .gitignore (.houserules/
-    /// added)`), writes the file when it is absent (`wrote .gitignore`), and
-    /// prints no line for a `.gitignore` that holds `.houserules/` already. A
-    /// `.gitignore` that `ownedPaths` lists stays as found. It restamps the
-    /// install schema `houserules/install@2.1.0` to `houserules/install@2.2.0`
-    /// and prints `wrote .houserules.json (houserules/install@2.2.0)` once; a
-    /// second run prints no such line. The keys `runners` and `workspaces` of
+    /// the files of the workflow the same way: it writes a file that is missing
+    /// or that the project has not changed, and it keeps and lists a changed
+    /// file on every run (`kept <file> (locally modified; reference workflow
+    /// <version>)`) until the project merges the change by hand. An install
+    /// with files of the reference workflow at their paths and no workflow yet
+    /// adopts the workflow: it pins each file that is the kit's, writes each
+    /// file that is absent, and leaves a file that is not the kit's to the
+    /// project, with a hand step. Where the session-start script of the Claude
+    /// Code files still holds the ritual line of 1.x and the install runs the
+    /// workflow, it adds the hook entry of the session-start script of the
+    /// workflow to `.claude/settings.json`; the script that the kit wrote
+    /// becomes the core script, and a script that the project changed stays,
+    /// with a hand step. It removes the startup hook entry that the kit seeded
+    /// before, where `.claude/settings.json` holds it unchanged. It delivers
+    /// the deliverables schema and, with the JSON tracker, the backlog schema,
+    /// and writes the `backlogId` pattern of the tracker of the install into
+    /// the deliverables schema (a pattern that accepts any token, for an
+    /// install with no tracker); a schema that the project changed stays, and
+    /// `update` lists it (`kept <file> (locally modified)`); a schema with no
+    /// baseline that differs from every content of it that the kit shipped, as
+    /// in an install converted from 1.x, stays with a hand step on every run.
+    /// With the Beads tracker it reads the issue prefix again: where `bd`
+    /// cannot be reached, it keeps the pattern, prints one line on stderr, and
+    /// finishes. It prints a hand step for a seeded CI workflow that the
+    /// project changed and that lacks what the tracker needs or the PR-head
+    /// checkout (`ref: ${{ github.event.pull_request.head.sha }}` under `with:`
+    /// of its `actions/checkout` step). It also prints a hand step for each
+    /// marker of the read-only token that a kept seeded CI workflow lacks:
+    /// `contents: read` in the permissions of the gates job, for every install,
+    /// and `persist-credentials: false` under `with:` of the `actions/checkout`
+    /// step, for every install but one with the Beads tracker. A kept seeded CI
+    /// workflow of the GitHub tracker gets one hand step for its permissions and
+    /// one for its env, each only when the workflow lacks a marker of it
+    /// (`contents: read` and `issues: read` for the permissions,
+    /// `GH_TOKEN: ${{ github.token }}` for the env), so that no workflow is
+    /// asked for two `permissions` keys. The hand step for the permissions
+    /// follows the `permissions` key of the gates job: a workflow with no key is
+    /// asked for the block, a workflow with a block that lacks a scope is asked
+    /// for that scope in the block, a workflow with `permissions: read-all` gets
+    /// no step for its permissions, and a workflow with `permissions: write-all`
+    /// is asked to replace the scalar with the block. A workflow of the Beads
+    /// tracker that holds `persist-credentials: false` gets a hand step that
+    /// removes it, because `bd bootstrap --yes` needs the persisted credential.
+    /// It writes each seed-once file that is missing and, on an install with the
+    /// JSON tracker, each tracker data file that is missing. While `renderers`
+    /// lacks `claude`, it skips the Claude Code files. It brings `.gitignore` to hold
+    /// the line `.houserules/`: it replaces a `.houserules/step/` line in its
+    /// place (`merged .gitignore (.houserules/step/ replaced by
+    /// .houserules/)`), adds the line at the end where neither line is present
+    /// (`merged .gitignore (.houserules/ added)`), writes the file when it is
+    /// absent (`wrote .gitignore`), and prints no line for a `.gitignore` that
+    /// holds `.houserules/` already. A `.gitignore` that `ownedPaths` lists
+    /// stays as found. It restamps the install schema
+    /// `houserules/install@2.1.0` to `houserules/install@2.2.0` and prints
+    /// `wrote .houserules.json (houserules/install@2.2.0)` once; a second run
+    /// prints no such line. The keys `runners` and `workspaces` of
     /// `.houserules.json` keep their values. It deletes any retired kit file
     /// still present, prints each hand step that the project has left (`hand
     /// step: ...`), and reports the stamped-to-running version drift. Every
-    /// other command that reads the install refuses an install of 1.x with
-    /// one line that names this command.
+    /// other command that reads the install refuses an install of 1.x with one
+    /// line that names this command.
     Update {
         /// The install root; defaults to the current directory. Resolved the
         /// same way `init`'s own `--dir` is. A directory below the git top
@@ -714,22 +758,77 @@ enum Command {
         #[arg(long)]
         id_prefix: Option<String>,
     },
+    /// Runs a command and writes its output to the file `--out` under a
+    /// header. The command runs with no shell, in the current directory, with
+    /// the environment of `capture`, and with stdin closed. One pipe takes
+    /// stdout and stderr, so the file holds both streams in the order the
+    /// command wrote them. Line 1 of the file is the header, one JSON object
+    /// with these keys in this order: `schema` (`houserules/capture@1.0.0`),
+    /// `argv` (the command and its arguments), `cwd` (the absolute current
+    /// directory), `start` and `end` (RFC 3339 UTC timestamps with nine
+    /// fractional digits), `exit` (the exit code, or `null` when a signal
+    /// ended the command), `signal` (the signal number, or `null`), `head`
+    /// (the full sha of HEAD, or `null` outside a git work tree, before the
+    /// first commit, or when `git status` fails), `dirty` (`true` when
+    /// `git status --porcelain` prints a line, `false` when it prints none,
+    /// `null` when `head` is `null`), and `lossy` (the number of byte
+    /// sequences that were not UTF-8 and that `capture` replaced with U+FFFD).
+    /// The output follows the first LF as
+    /// UTF-8; `capture` adds no newline, and a command with no output leaves
+    /// the header alone. When the file is written, `capture` prints `<file>:
+    /// exit <n>` or `<file>: ended by signal <n>`, and it exits with the exit
+    /// code of the command, or 128 plus the signal number. A setup error
+    /// prints one line on stderr, writes no file at `--out` (a file that
+    /// exists stays as it was), and exits 2: the file exists and `--force` is
+    /// absent, the directory of the file does not exist, an argument, the
+    /// current directory, or the `--out` path is not UTF-8, the current
+    /// directory cannot be read, the command cannot start, or a file cannot be
+    /// written. One error follows the start: the operating system gives no
+    /// exit status for the command; `capture` then prints one line, writes no
+    /// file at `--out`, and exits 2. A command that exits 2 also gives exit 2,
+    /// and its file then exists.
+    Capture {
+        /// The file to write. Its directory must exist, and the file must not
+        /// exist unless `--force` is set.
+        #[arg(long, value_name = "FILE")]
+        out: PathBuf,
+        /// Replaces the file `--out` when it exists.
+        #[arg(long)]
+        force: bool,
+        /// The command and its arguments; they follow `--`, and each is UTF-8.
+        #[arg(last = true, required = true, value_name = "COMMAND")]
+        command: Vec<OsString>,
+    },
     /// Cross-checks one deliverable report's claims against the artifacts
-    /// and git history it cites: redirected captures, truncation markers,
-    /// the natural label of tdd entries (RED capture time against commit
-    /// time), the self-audit head against the newest listed commit, commit
-    /// shas in the narrative, self-audit pass ratios in the narrative, the
-    /// bounded no-execution paste-run lint over every captured command
-    /// field, ephemeral paths in the narrative, line numbers of cited
-    /// files, counts beside a cited capture, and a cited sweep against the
-    /// files the report changed. With `--doc` or `--item` in place of a
-    /// report, it reads a spec or a backlog item and names every cited
-    /// workspace path that does not exist; a workspace path is a cited path
-    /// that git ignores, such as a path below the default `workspaces`
-    /// location `.houserules/work/`. It skips a cited path under
-    /// `.houserules/step/`, which holds tool output. It judges a cited path
-    /// through a symlink inside the install root at the target of the link, so
-    /// a missing target is a missing file.
+    /// and git history it cites: the captures that runs cite, the excerpts
+    /// of runs, the natural label of tdd entries (a RED capture that ended
+    /// after the newest listed commit or exited 0), recorded citations, the
+    /// evidence of self-review claims, re-run probes, ephemeral paths in the
+    /// strings of the report, the self-audit head against the newest listed
+    /// commit, commit shas in the narrative, self-audit pass ratios in the
+    /// narrative, line numbers of cited files, counts beside a cited capture,
+    /// and a cited sweep against the files the report changed. A capture must
+    /// exist, be a capture, and have the sha256, command, and exit that the
+    /// run records. An excerpt must be a byte-exact substring of the output
+    /// of its capture, the file without its header line. A recorded citation
+    /// must name a file that git tracks at HEAD, lines that exist there, an
+    /// anchor that occurs once in the file and inside the cited lines, and the
+    /// sha256 of those lines. A self-review claim that says every, all, or no
+    /// remaining must name a capture in its evidence, and one that says pin,
+    /// pins, or pinned must name an existing path. A re-run probe must exist
+    /// in the folder of the report or below it. The ephemeral-path check reads
+    /// every string of the report except a command, an excerpt, an anchor, a
+    /// hash, and the self_audit. Every element of a comma or semicolon list of
+    /// line numbers is checked. A count in the body of a listed commit is
+    /// checked against a cited capture only, and a cited capture is read
+    /// without its header line. With
+    /// `--doc` or `--item` in place of a report, it reads a spec or a
+    /// backlog item and names every cited workspace path that does not
+    /// exist; a workspace path is a cited path that git ignores, such as a
+    /// path below the default `workspaces` location `.houserules/work/`. It
+    /// skips a cited path under `.houserules/step/`, which holds tool output.
+    /// It judges a cited path through a symlink inside the install root at the
+    /// target of the link, so a missing target is a missing file.
     #[command(group(
         clap::ArgGroup::new("claims_source")
             .required(true)
@@ -751,6 +850,56 @@ enum Command {
         /// holds `.houserules.json`, no higher than the git top level, else
         /// the git top level. Independent of `report_path` and `--doc`, which
         /// always resolve against the real current directory.
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
+    /// Fills the fact fields of a task report from git and from captures, and
+    /// writes the report back. `<REPORT>` resolves against the current
+    /// directory; the captures, the cited files, and git resolve against the
+    /// install root. It fills `commits` (every commit of `<base>..HEAD`,
+    /// oldest first), `files_changed` (the paths that `git diff --name-only
+    /// --no-renames <base>..HEAD` prints inside the install root, sorted), the
+    /// `commits` of the last `fix_rounds` entry with `--fix-base`, and
+    /// `self_audit` with `--audit` (the summary of the file that `audit --json`
+    /// wrote, and its deterministic rows). For each run that holds a `capture`
+    /// it fills `command` and `exit` from the header of the capture, and
+    /// `sha256` when the run holds none. For each entry of `citations` it tests
+    /// the anchor against the cited lines in `git show HEAD:./<path>`, run at
+    /// the install root: the anchor must occur in the cited lines and nowhere
+    /// else in the file. It fills `sha256` when the entry holds none. It never
+    /// replaces a recorded `sha256`: a capture or a citation that differs from
+    /// its recorded hash is a finding. A key that the report lacks goes at the
+    /// end of the report. When it writes the report, it prints `<REPORT>: facts
+    /// filled` and exits 0. A finding prints one line on stderr, writes
+    /// nothing, and exits 1: a capture that does not exist, is no capture, or
+    /// differs from its hash, and a citation whose path is not tracked at HEAD,
+    /// whose lines do not exist, whose `end` is before `line`, or whose anchor
+    /// is not in the cited lines or occurs more than once. A setup error prints
+    /// one line, writes nothing, and exits 2: the report cannot be read or
+    /// parsed or is no task report, `--base` or `--fix-base` is no commit, the
+    /// report has no `fix_rounds` entry for `--fix-base`, `--audit` cannot be
+    /// read or is no audit result, git cannot list the commits or the changed
+    /// files, or the report cannot be written.
+    ReportFacts {
+        /// The task report to fill.
+        report: PathBuf,
+        /// The commit that the task started from: `commits` and
+        /// `files_changed` come from the range `<REF>..HEAD`.
+        #[arg(long, value_name = "REF")]
+        base: String,
+        /// The commit that the last fix round started from: the `commits` of
+        /// the last `fix_rounds` entry come from the range `<REF>..HEAD`.
+        #[arg(long, value_name = "REF")]
+        fix_base: Option<String>,
+        /// A file that `audit --json` wrote: it fills `self_audit`. It
+        /// resolves against the real current directory.
+        #[arg(long, value_name = "FILE")]
+        audit: Option<PathBuf>,
+        /// Install root that the captures, the cited files, and git resolve
+        /// against; defaults to the nearest directory at or above the current
+        /// one that holds `.houserules.json`, no higher than the git top level,
+        /// else the git top level. Independent of `<REPORT>`, which always
+        /// resolves against the real current directory.
         #[arg(long)]
         dir: Option<PathBuf>,
     },
@@ -835,9 +984,9 @@ enum PackCommand {
 }
 
 /// How `main` runs D4 before a command, with the `--dir` that names its install
-/// root, or `None` for the two commands that `main` leaves out: `files` reads
-/// no install and runs on any tree, and `update` runs D4 itself after its
-/// self-update phase (`install::cmd_update`, spec C22). `init` refuses a 1.x
+/// root, or `None` for the three commands that `main` leaves out: `files` and
+/// `capture` read no install and run on any tree, and `update` runs D4 itself
+/// after its self-update phase (`install::cmd_update`, spec C22). `init` refuses a 1.x
 /// install with its own line, so it runs on a tree with no install schema or
 /// an older one (`Guard::ConvertsInstall`); every other command reads the
 /// install (`Guard::ReadsInstall`). The match names every variant, so a new
@@ -845,7 +994,7 @@ enum PackCommand {
 fn d4_guard(command: &Command) -> Option<(install::Guard, &Option<PathBuf>)> {
     use install::Guard::{ConvertsInstall, ReadsInstall};
     match command {
-        Command::Files | Command::Update { .. } => None,
+        Command::Files | Command::Capture { .. } | Command::Update { .. } => None,
         Command::Init { dir, .. } => Some((ConvertsInstall, dir)),
         Command::Render { dir, .. }
         | Command::CheckKnowledge { dir }
@@ -864,6 +1013,7 @@ fn d4_guard(command: &Command) -> Option<(install::Guard, &Option<PathBuf>)> {
         | Command::Standing { dir }
         | Command::CheckCommit { dir, .. }
         | Command::CheckReportClaims { dir, .. }
+        | Command::ReportFacts { dir, .. }
         | Command::Archive { dir } => Some((ReadsInstall, dir)),
         Command::Pack { action } => Some((
             ReadsInstall,
@@ -1020,6 +1170,11 @@ fn main() -> ExitCode {
         ),
         Some(Command::Files) => install::cmd_files(),
         Some(Command::Update { dir, id_prefix }) => install::cmd_update(dir, id_prefix),
+        Some(Command::Capture {
+            out,
+            force,
+            command,
+        }) => capture::cmd_capture(out, force, command),
         Some(Command::CheckReportClaims {
             report_path,
             doc,
@@ -1043,6 +1198,13 @@ fn main() -> ExitCode {
                 ExitCode::from(2)
             }
         },
+        Some(Command::ReportFacts {
+            report,
+            base,
+            fix_base,
+            audit,
+            dir,
+        }) => report_facts::cmd_report_facts(dir, report, base, fix_base, audit),
         Some(Command::Archive { dir }) => archive::cmd_archive(dir),
         Some(Command::Pack { action }) => match action {
             PackCommand::List { dir } => pack::cmd_pack_list(dir),
@@ -1082,7 +1244,7 @@ mod tests {
     /// none carries a `long_about` distinct from its own short `about`
     /// either. Enumerated from `Cli::command().get_subcommands()` -- the
     /// same set clap itself renders, not a hand-typed list -- exactly the
-    /// 22 `Command` variants (clap's own built-in `help` subcommand is
+    /// 24 `Command` variants (clap's own built-in `help` subcommand is
     /// rendered separately and is not itself one of `get_subcommands()`'s
     /// entries).
     #[test]
@@ -1091,8 +1253,8 @@ mod tests {
         let subcommands: Vec<_> = command.get_subcommands().collect();
         assert_eq!(
             subcommands.len(),
-            22,
-            "expected the full subcommand surface (22 Command variants), got: {:?}",
+            24,
+            "expected the full subcommand surface (24 Command variants), got: {:?}",
             subcommands.iter().map(|s| s.get_name()).collect::<Vec<_>>()
         );
         for subcommand in subcommands {
@@ -1112,21 +1274,26 @@ mod tests {
     /// it. A callee is written as the call spells it (`natural_red::` and
     /// all). `the_check_report_claims_about_names_every_check` derives the
     /// callees from the source and compares them with this list.
-    const HELP_CHECKS: [(&str, &str); 11] = [
-        ("check_redirected_captures", "redirected captures"),
-        ("check_truncation_markers", "truncation markers"),
+    const HELP_CHECKS: [(&str, &str); 13] = [
+        ("check_captures", "captures that runs cite"),
+        ("check_excerpts", "excerpts of runs"),
         (
             "natural_red::check_natural_red_labels",
             "natural label of tdd entries",
         ),
+        ("check_recorded_citations", "recorded citations"),
+        (
+            "check_self_review_evidence",
+            "evidence of self-review claims",
+        ),
+        ("check_rerun_probes", "re-run probes"),
+        ("check_ephemeral_paths", "ephemeral paths"),
         ("check_self_audit_head_is_current", "self-audit head"),
         (
             "check_narrative_shas_resolve",
             "commit shas in the narrative",
         ),
         ("check_self_audit_narrative", "pass ratios in the narrative"),
-        ("check_paste_run_lint", "paste-run lint"),
-        ("check_ephemeral_paths", "ephemeral paths"),
         ("check_citation_lines", "line numbers of cited files"),
         (
             "check_narrative_number_claims",
@@ -1273,6 +1440,57 @@ mod tests {
         }
     }
 
+    /// `check-report-claims --help` states what the run checks demand of a
+    /// capture and of an excerpt, and no longer names the three checks that
+    /// the capture replaced (batch-36 spec 6, design.md 212).
+    #[test]
+    fn the_check_report_claims_about_states_the_run_checks() {
+        let about = about_of("check-report-claims");
+        for sentence in [
+            "A capture must exist, be a capture, and have the sha256, command, and exit that the run records.",
+            "An excerpt must be a byte-exact substring of the output of its capture, the file without its header line.",
+            "the natural label of tdd entries (a RED capture that ended after the newest listed commit or exited 0)",
+        ] {
+            assert!(
+                about.contains(sentence),
+                "the about lacks `{sentence}`: {about:?}"
+            );
+        }
+        for retired in [
+            "redirected captures",
+            "truncation markers",
+            "paste-run lint",
+        ] {
+            assert!(
+                !about.contains(retired),
+                "the about still names the retired check `{retired}`: {about:?}"
+            );
+        }
+    }
+
+    /// `check-report-claims --help` states what the claim checks demand of a
+    /// recorded citation, of the evidence of a self-review claim, of a re-run
+    /// probe, of the strings that the ephemeral-path check reads, of a list of
+    /// line numbers, and of a count in a commit body (batch-36 spec 6, checks 4
+    /// to 11).
+    #[test]
+    fn the_check_report_claims_about_states_the_claim_checks() {
+        let about = about_of("check-report-claims");
+        for sentence in [
+            "A recorded citation must name a file that git tracks at HEAD, lines that exist there, an anchor that occurs once in the file and inside the cited lines, and the sha256 of those lines.",
+            "A self-review claim that says every, all, or no remaining must name a capture in its evidence, and one that says pin, pins, or pinned must name an existing path.",
+            "A re-run probe must exist in the folder of the report or below it.",
+            "The ephemeral-path check reads every string of the report except a command, an excerpt, an anchor, a hash, and the self_audit.",
+            "Every element of a comma or semicolon list of line numbers is checked.",
+            "A count in the body of a listed commit is checked against a cited capture only, and a cited capture is read without its header line.",
+        ] {
+            assert!(
+                about.contains(sentence),
+                "the about lacks `{sentence}`: {about:?}"
+            );
+        }
+    }
+
     /// `check-knowledge --help` names the kit-owned citation lint, the
     /// check that is none of schema, cross-entry invariants, or a generated
     /// file's freshness and budget, and the vocabulary the lint reads: the
@@ -1343,12 +1561,12 @@ mod tests {
         );
     }
 
-    /// The CLI surface: exactly these 22 subcommand names, in `--help`'s own
+    /// The CLI surface: exactly these 24 subcommand names, in `--help`'s own
     /// declaration order. The count assertion above cannot see a same-length
     /// rename, because a renamed variant keeps `get_subcommands().len()`;
     /// comparing the names themselves does.
     #[test]
-    fn the_cli_surface_names_exactly_these_22_subcommands() {
+    fn the_cli_surface_names_exactly_these_24_subcommands() {
         let command = Cli::command();
         let names: Vec<&str> = command.get_subcommands().map(|s| s.get_name()).collect();
         assert_eq!(
@@ -1373,7 +1591,9 @@ mod tests {
                 "init",
                 "files",
                 "update",
+                "capture",
                 "check-report-claims",
+                "report-facts",
                 "archive",
                 "pack",
             ],
@@ -1529,6 +1749,12 @@ mod tests {
                 && !update.contains("never writes"),
             "the update about limits ownedPaths to the synced files: {update}"
         );
+        assert!(
+            !update.contains("such a workflow lacks")
+                && !update.contains("names the permissions")
+                && !update.contains("shipped stays, with a hand step"),
+            "the update about scopes the token hand steps to a kind of workflow, or promises a hand step for every kept schema: {update}"
+        );
         let update_sentences = sentences(&update);
         for sentence in [
             "A 1.x install with a `backlog/` directory gets the JSON tracker in the same run, and one without gets none",
@@ -1537,9 +1763,13 @@ mod tests {
             "An install with files of the reference workflow at their paths and no workflow yet adopts the workflow: it pins each file that is the kit's, writes each file that is absent, and leaves a file that is not the kit's to the project, with a hand step",
             "Where the session-start script of the Claude Code files still holds the ritual line of 1.x and the install runs the workflow, it adds the hook entry of the session-start script of the workflow to `.claude/settings.json`; the script that the kit wrote becomes the core script, and a script that the project changed stays, with a hand step",
             "It removes the startup hook entry that the kit seeded before, where `.claude/settings.json` holds it unchanged",
-            "It delivers the deliverables schema and, with the JSON tracker, the backlog schema, and writes the `backlogId` pattern of the tracker of the install into the deliverables schema (a pattern that accepts any token, for an install with no tracker); a schema that differs from every content of it that the kit shipped stays, with a hand step",
+            "It delivers the deliverables schema and, with the JSON tracker, the backlog schema, and writes the `backlogId` pattern of the tracker of the install into the deliverables schema (a pattern that accepts any token, for an install with no tracker); a schema that the project changed stays, and `update` lists it (`kept <file> (locally modified)`); a schema with no baseline that differs from every content of it that the kit shipped, as in an install converted from 1.x, stays with a hand step on every run",
             "With the Beads tracker it reads the issue prefix again: where `bd` cannot be reached, it keeps the pattern, prints one line on stderr, and finishes",
             "It prints a hand step for a seeded CI workflow that the project changed and that lacks what the tracker needs or the PR-head checkout (`ref: ${{ github.event.pull_request.head.sha }}` under `with:` of its `actions/checkout` step)",
+            "It also prints a hand step for each marker of the read-only token that a kept seeded CI workflow lacks: `contents: read` in the permissions of the gates job, for every install, and `persist-credentials: false` under `with:` of the `actions/checkout` step, for every install but one with the Beads tracker",
+            "A kept seeded CI workflow of the GitHub tracker gets one hand step for its permissions and one for its env, each only when the workflow lacks a marker of it (`contents: read` and `issues: read` for the permissions, `GH_TOKEN: ${{ github.token }}` for the env), so that no workflow is asked for two `permissions` keys",
+            "The hand step for the permissions follows the `permissions` key of the gates job: a workflow with no key is asked for the block, a workflow with a block that lacks a scope is asked for that scope in the block, a workflow with `permissions: read-all` gets no step for its permissions, and a workflow with `permissions: write-all` is asked to replace the scalar with the block",
+            "A workflow of the Beads tracker that holds `persist-credentials: false` gets a hand step that removes it, because `bd bootstrap --yes` needs the persisted credential",
             "It writes each seed-once file that is missing and, on an install with the JSON tracker, each tracker data file that is missing",
         ] {
             assert!(

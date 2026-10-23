@@ -1,0 +1,50 @@
+{
+  "kind": "task-review",
+  "model": "opus",
+  "task": 1,
+  "base": "0000000",
+  "head": "0000001",
+  "spec_compliance": { "verdict": "compliant", "items": [] },
+  "rule_adherence": [
+    {
+      "id": "j.one",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "pass",
+      "evidence": "The diff follows the rule."
+    },
+    {
+      "id": "j.two",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "fail",
+      "evidence": "The diff breaks the rule.",
+      "override": {
+        "result": "pass",
+        "by": "owner",
+        "reason": "The rule does not cover this file."
+      }
+    },
+    {
+      "id": "j.three",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "skipped",
+      "evidence": "No file in scope."
+    },
+    {
+      "id": "d.one",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "No match."
+    }
+  ],
+  "strengths": [],
+  "issues": [],
+  "assessment": { "verdict": "approved", "text": "Done." }
+}

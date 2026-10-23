@@ -5,15 +5,16 @@
 //! repository is the unit test `this_repository_at_the_base_of_batch_33_task_7_converts_as_the_corpus_run_says`.
 
 mod locked_file;
+mod tracker_support;
 mod tree_snapshot;
 mod v1_4_0;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Command;
 
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
+use tracker_support::{copy_dir, read_json, run, scratch_git_repo, sha256_hex, write_json};
 
 /// The five topics of a 1.4.0 install, which are the five kit packs of 2.0.
 const TOPICS: [&str; 5] = [
@@ -26,14 +27,6 @@ const TOPICS: [&str; 5] = [
 
 /// The CI workflow of an install at the git top level.
 const WORKFLOW: &str = ".github/workflows/knowledge.yml";
-
-/// A `Command` for the compiled `houserules` binary under test, with the
-/// self-update phase of `update` switched off.
-fn houserules() -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_houserules"));
-    command.env("HOUSERULES_SKIP_SELF_UPDATE", "1");
-    command
-}
 
 /// Runs `git <args>` in `dir`, which must succeed.
 fn git(dir: &Path, args: &[&str]) {
@@ -48,13 +41,6 @@ fn git(dir: &Path, args: &[&str]) {
         "git {args:?} failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-}
-
-/// A fresh scratch directory with `git init` already run.
-fn scratch_git_repo() -> tempfile::TempDir {
-    let dir = tempfile::tempdir().expect("tempdir");
-    git(dir.path(), &["init", "-q"]);
-    dir
 }
 
 /// A scratch repository that a real 1.4.0 `init` seeded. With `github`, the
@@ -80,16 +66,6 @@ fn install_1_4_0_with_prefix(github: bool, prefix: Option<&str>) -> tempfile::Te
     }
     v1_4_0::seed(dir.path(), prefix);
     dir
-}
-
-/// Runs `houserules <args> --dir <dir>`.
-fn run(dir: &Path, args: &[&str]) -> Output {
-    houserules()
-        .args(args)
-        .arg("--dir")
-        .arg(dir)
-        .output()
-        .expect("run houserules")
 }
 
 /// Runs `houserules update --dir <dir>` and requires exit 0. Returns the
@@ -149,60 +125,11 @@ fn porcelain(dir: &Path) -> String {
     String::from_utf8(output.stdout).expect("utf8")
 }
 
-/// Reads the JSON file `relative` below `dir`.
-fn read_json(dir: &Path, relative: &str) -> Value {
-    let path = relative
-        .split('/')
-        .fold(dir.to_path_buf(), |path, part| path.join(part));
-    serde_json::from_str(&fs::read_to_string(&path).unwrap_or_else(|error| {
-        panic!("read {}: {error}", path.display());
-    }))
-    .expect("parse JSON")
-}
-
-/// Writes `value` as the JSON file `relative` below `dir`.
-fn write_json(dir: &Path, relative: &str, value: &Value) {
-    let path = relative
-        .split('/')
-        .fold(dir.to_path_buf(), |path, part| path.join(part));
-    fs::create_dir_all(path.parent().expect("a parent")).expect("create directories");
-    fs::write(
-        &path,
-        format!(
-            "{}\n",
-            serde_json::to_string_pretty(value).expect("serialize")
-        ),
-    )
-    .expect("write JSON");
-}
-
 /// The path `relative` below `dir`, built one component at a time.
 fn path_of(dir: &Path, relative: &str) -> PathBuf {
     relative
         .split('/')
         .fold(dir.to_path_buf(), |path, part| path.join(part))
-}
-
-/// Copies the directory `from` into `to` with every file below it.
-fn copy_dir(from: &Path, to: &Path) {
-    fs::create_dir_all(to).expect("create the destination");
-    for entry in fs::read_dir(from).expect("read the source") {
-        let entry = entry.expect("read an entry");
-        let target = to.join(entry.file_name());
-        if entry.file_type().expect("file type").is_dir() {
-            copy_dir(&entry.path(), &target);
-        } else {
-            fs::copy(entry.path(), &target).expect("copy a file");
-        }
-    }
-}
-
-/// The lowercase hex SHA-256 digest of `content`.
-fn sha256_hex(content: &[u8]) -> String {
-    Sha256::digest(content)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
 }
 
 /// Edits the `entries` of the topic file `relative` below `dir`.

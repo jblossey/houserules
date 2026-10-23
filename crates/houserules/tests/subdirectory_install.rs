@@ -13,23 +13,14 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use serde_json::{Value, json};
 
-/// `path` canonical, in the form houserules prints it: on Windows without
-/// the `\\?\` prefix that `canonicalize` adds.
-fn resolved(path: &Path) -> PathBuf {
-    let canonical = path.canonicalize().expect("canonicalize");
-    match canonical
-        .to_str()
-        .and_then(|text| text.strip_prefix(r"\\?\"))
-    {
-        Some(plain) => PathBuf::from(plain),
-        None => canonical,
-    }
-}
+mod tracker_support;
+
+use tracker_support::resolved;
 
 /// A `Command` for the compiled `houserules` binary under test -- this
 /// file's own copy of `common::houserules`, for the reason

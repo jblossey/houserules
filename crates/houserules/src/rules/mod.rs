@@ -60,10 +60,12 @@
 //! (`trailers.rs`'s own module doc has the account; spec 3.7).
 //!
 //! `git_paths` is the one place git's path lists become install-root
-//! paths: `git`'s `changed_files` and `tree_files`, and `check_commit`'s
-//! per-commit file read, all go through `InstallPrefix::map`, so a
-//! subdirectory install matches the paths it owns and drops the rest
-//! (`git_paths.rs`'s own doc has the account).
+//! paths: `git`'s `changed_files` and `tree_files`, `check_commit`'s
+//! per-commit file read, and the `files_changed` of `report-facts` all go
+//! through `InstallPrefix::map`, so a subdirectory install matches the paths
+//! it owns and drops the rest (`git_paths.rs`'s own doc has the account). It
+//! is also the one module that runs `git ls-files`: the tracked files, the
+//! files of one name, and the submodules of the index.
 //!
 //! `durable_sha` is `CheckType::DurableSha`'s own git-plumbing (a diff
 //! hunk's added lines, a hex-candidate scan, and the two `git`
@@ -115,6 +117,9 @@ pub(crate) use audit::cmd_audit;
 pub(crate) use check::{cmd_check_knowledge, skipped_path_line, tracked_tree_files, validate};
 pub(crate) use check_commit::cmd_check_commit;
 pub(crate) use check_packs::{imports_agents_md, pin_mismatch_line};
+pub(crate) use git_paths::{
+    InstallPrefix, ListingFailure, listed_by_name, submodule_paths, tracked_files,
+};
 pub(crate) use glob::compile;
 pub(crate) use ignored::ignored_among;
 pub(crate) use kit_citations::KitScope;

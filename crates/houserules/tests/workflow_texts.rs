@@ -13,6 +13,11 @@
 //! A phrase is compared on the text with every run of white space collapsed
 //! to one space, because the finishing skill wraps its lines.
 //!
+//! The report form of batch 36 (spec 7 and 8.6) reaches the implementer, the
+//! task reviewer, the branch reviewer, the skills, the `dependency-add`
+//! scenario, and the `process` pack: every run is a capture, a claim cites a
+//! recorded line, and the closing act runs `report-facts`.
+//!
 //! The guard of the plugin (live case 20) walks `template/` only. It leaves
 //! out `crates/houserules/released/`, which the binary embeds as well: the
 //! files there keep the bytes of earlier releases, which the provenance rule
@@ -657,16 +662,27 @@ fn a_brief_that_forbids_tree_changes_names_who_files_deferrals() {
     );
 }
 
-/// HR-150: the closing `check-report-claims` entry has no redirect, or a
-/// capture that no earlier entry names, and a fix to the report sends the
-/// implementer back to the citation step.
+/// Spec 7 and design.md 212: the closing act has no redirect rule, because the
+/// check of the redirected capture retired with the inline output it read. A
+/// fix to the report sends the implementer back to the citation step, and the
+/// pointer to the limits of the checker names its submodules, where the limits
+/// of each check now live.
 #[test]
-fn the_closing_entry_has_no_redirect_and_a_report_fix_repeats_the_citation_step() {
-    assert_holds(
+fn the_closing_act_has_no_redirect_rule_and_points_at_the_limits_of_the_submodules() {
+    assert_lacks(
         IMPLEMENTER,
         &[
             "Record that entry with no redirect, or with a redirect to a capture file that no earlier entry names",
-            "After a fix to the report, repeat the citation step (step 4), then the closing run.",
+            "a re-run of an entry that redirects into a capture another entry names truncates the capture before the checker reads it",
+            "paste its clean run as the final `tests` entry",
+            "(`crates/houserules/src/report_claims.rs`), also name it as a new Limits bullet there",
+        ],
+    );
+    assert_holds(
+        IMPLEMENTER,
+        &[
+            "After a fix to the report, repeat the citation step (step 4), then the closing act.",
+            "Where this repository carries the checker's own source (`crates/houserules/src/report_claims.rs` and the submodules in `crates/houserules/src/report_claims/`), also name it as a new Limits bullet in the module doc of the submodule that holds the check",
         ],
     );
 }
@@ -942,15 +958,15 @@ fn every_role_records_its_model_line_as_written() {
 }
 
 /// HR-215 and spec 6: the implementer fixes every `fail` row and every line of
-/// `references.failures`, runs the audit again after the last edit to the
-/// report, and re-copies `self_audit`.
+/// `references.failures`, and runs the closing act again when a stale
+/// `self_audit` copy fails the report.
 #[test]
-fn the_implementer_fixes_reference_failures_and_recopies_the_self_audit() {
+fn the_implementer_fixes_reference_failures_and_reruns_the_closing_act_on_a_stale_self_audit() {
     assert_holds(
         IMPLEMENTER,
         &[
             "Fix a `fail` row in the code, the commits, or the report, and a line of `references.failures` in the commit trailer or the tracker item that it names; re-run until the audit shows no `fail` row other than a sanctioned one and an empty `references.failures`. Name a line that you cannot fix in `concerns`.",
-            "Run the audit of step 1 again after the last edit to the report, and re-copy `self_audit` from that run. A `self_audit differs at <path>` fail of `process.deliverables-json` means that your copy is stale.",
+            "A `self_audit differs at <path>` fail of `process.deliverables-json` means that your copy is stale: run the closing act again from the second step.",
         ],
     );
 }
@@ -1072,5 +1088,331 @@ fn the_step_skill_names_the_ignore_line_and_the_committed_change_of_a_runner_che
     assert!(
         !skill.contains("`init` adds `.houserules/step/` to `.gitignore`"),
         "{STEP_SKILL} still names the older ignore line"
+    );
+}
+
+// ---- Batch 36: evidence by capture (spec 7 and 8.6) -----------------------------------
+
+/// The eval scenario that expects a report in the form of the implementer.
+const DEPENDENCY_ADD: &str = ".claude/evals/dependency-add.json";
+
+/// The process pack of the kit, parsed.
+fn process_pack() -> Value {
+    let path = repo_root().join("template/packs/process.json");
+    let text = fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+    serde_json::from_str(&text).expect("the process pack is JSON")
+}
+
+/// The entry `id` of `pack`.
+fn pack_entry<'a>(pack: &'a Value, id: &str) -> &'a Value {
+    pack["entries"]
+        .as_array()
+        .expect("a pack holds entries")
+        .iter()
+        .find(|entry| entry["id"] == id)
+        .unwrap_or_else(|| panic!("the pack holds no entry {id}"))
+}
+
+/// The paragraphs of the body of `entry`, joined by one space.
+fn body_text(entry: &Value) -> String {
+    let paragraphs: Vec<&str> = entry["body"]
+        .as_array()
+        .expect("an entry holds a body")
+        .iter()
+        .map(|paragraph| paragraph.as_str().expect("a paragraph is a string"))
+        .collect();
+    flat(&paragraphs.join(" "))
+}
+
+/// Spec 7: the implementer runs every test, gate, live run, RED, and GREEN
+/// through `capture`, and the report holds the run as a capture, not as output.
+/// The example of a variable prefix names `houserules` as every install has it,
+/// not the build output of this repository (design.md 222). A capture that
+/// `--force` replaces needs the `sha256` of its run removed, because
+/// `report-facts` fails on the recorded hash. An excerpt comes from the output
+/// of the capture, not from its header line.
+#[test]
+fn the_implementer_runs_every_evidence_command_through_capture() {
+    assert_holds(
+        IMPLEMENTER,
+        &[
+            "Run every test, gate, live run, RED, and GREEN through `houserules capture --out <workspace>/<name>.txt -- <command>`.",
+            "A command with a variable prefix runs through `env` (`-- env HOUSERULES_SKIP_SELF_UPDATE=1 houserules check-knowledge`); a pipe runs through `sh -c` (`-- sh -c '<pipeline>'`).",
+            "Name captures without the `task-` prefix.",
+            "Write the run as `{ \"capture\": \"<path>\" }`; quote at most one short excerpt that proves the claim, copied from the output of the capture (the file after its header line).",
+            "A report holds no command output.",
+            "`houserules report-facts` fills the `sha256`, the `command`, and the `exit` of each run from its capture, so never type them.",
+            "`capture` stops when its `--out` file exists: name a new capture for a new run, or pass `--force` to replace the old one.",
+            "After `--force` replaces the capture of a run whose `sha256` `report-facts` recorded, `report-facts` fails on that `sha256`: re-read the new capture, remove the `sha256` of that run, and run `report-facts` again.",
+        ],
+    );
+    assert_lacks(
+        IMPLEMENTER,
+        &[
+            "./target/debug/houserules",
+            "Keep the verbatim RED and GREEN output for the report.",
+            "`output` carries the command's stdout and stderr verbatim",
+            "Never append an echo of the exit status",
+            "captured as `<command> > <file> 2>&1`",
+            "with its verbatim `output`",
+            "each with the verbatim `command` and `output`",
+            "Capture each RED with `> <file> 2>&1`",
+            "copied from the capture file",
+        ],
+    );
+}
+
+/// Spec 7 and 6 (check 3): the `tests`, `live_run`, and `tdd` fields name runs,
+/// and the `natural` label rests on the header of the RED capture.
+#[test]
+fn the_implementer_describes_the_run_fields_and_the_natural_label_by_capture() {
+    assert_holds(
+        IMPLEMENTER,
+        &[
+            "Each run of `tests`, `live_run`, `tdd[].red`, `tdd[].green`, and `fix_rounds[].tests[]` is `{ \"capture\": \"<path>\" }`, with an optional `excerpt`.",
+            "`commits` and `files_changed` (`report-facts` writes both from git",
+            "Capture each RED with `houserules capture` into the batch workspace; `houserules check-report-claims` fails a `natural` entry whose RED capture ended after the newest commit the report lists, and one whose RED capture exited 0.",
+            "one command for each capture, so that the recorded `exit` is that command's own, with no `;` or `|` tail",
+        ],
+    );
+}
+
+/// Spec 7: a claim rests on a recorded citation, a self-review item carries
+/// its evidence, and a fix round names the probe it re-ran.
+#[test]
+fn the_implementer_records_citations_self_review_evidence_and_reran_probes() {
+    assert_holds(
+        IMPLEMENTER,
+        &[
+            "For each `file:line` that a claim rests on, add `{ \"path\", \"line\", \"anchor\" }` (and `end` for a range) to `citations`; the anchor is the text on the cited lines that the claim rests on, copied from the file at HEAD.",
+            "Write each `self_review` item as `{ \"claim\", \"evidence\" }`; a claim that says every, all, or no remaining names the capture of its enumeration; a claim that a test pins a behavior names the test file.",
+            "A fix round names the review's probe it re-ran in each finding's `reran`.",
+        ],
+    );
+}
+
+/// Spec 7: the draft rule governs every write of the report, the closing act's
+/// included; `report-facts` and `validate` run on the temp copy.
+#[test]
+fn every_write_of_the_report_goes_through_a_temp_copy_with_report_facts_and_validate() {
+    assert_holds(
+        IMPLEMENTER,
+        &[
+            "Edit a report by writing the new content to a temp copy, running `houserules report-facts <copy> --base <BASE>` and `houserules validate <copy>` on the copy, and moving it into place only when validation passes; never edit REPORT_FILE in place.",
+            "This rule governs every write of `REPORT_FILE`, the closing act's included.",
+            "While `self_audit` is still `null`, the only error `validate` lets pass is `needs a non-null self_audit`.",
+        ],
+    );
+}
+
+/// Spec 7: the closing act has four moves, in order.
+#[test]
+fn the_closing_act_runs_its_four_moves_in_the_order_of_the_spec() {
+    let text = flat(&package_text(IMPLEMENTER));
+    let moves = [
+        "First, run step 4 again.",
+        "Second, run the self-audit of step 1 through `houserules capture` with `--json <workspace>/<name>.json`.",
+        "Third, write the report to a temp copy, run `houserules report-facts <copy> --base <BASE> --audit <that file>` (with `--fix-base <FIX_BASE>` in a fix round) and `houserules validate <copy>` on it, and move it into place.",
+        "Fourth, run `houserules check-report-claims <REPORT_FILE>` through `houserules capture`, add it as the last `tests` entry of a new temp copy, run `report-facts` and `validate` on that copy once more, and move it into place, so that the last run gets its facts.",
+    ];
+    let mut from = 0;
+    for step in moves {
+        let at = text[from..]
+            .find(step)
+            .unwrap_or_else(|| panic!("the closing act lacks, or misorders: {step}"));
+        from += at + step.len();
+    }
+    assert_holds(
+        IMPLEMENTER,
+        &[
+            "Re-open the citations: after the last edit, list every citation in the report, recorded in `citations` and free-prose `file:line` alike, and re-open each cited line at HEAD.",
+            "Never retype a `command` of a run; `report-facts` copies it from the capture.",
+        ],
+    );
+}
+
+/// Spec 7: the task reviewer runs `check-report-claims` against a checkout at
+/// the task head, so that the check of recorded citations reads the task's own
+/// HEAD, and files each finding.
+#[test]
+fn the_task_reviewer_runs_check_report_claims_against_a_checkout_at_the_task_head() {
+    assert_holds(
+        TASK_REVIEWER,
+        &[
+            "Run `houserules check-report-claims --dir <a checkout at the task head> <REPORT_FILE>` into a file: the task's worktree when it still exists, else a detached worktree at `HEAD`, so that the check of recorded citations reads the task's own HEAD. File each finding.",
+        ],
+    );
+}
+
+/// Spec 7: the `dependency-add` scenario expects a capture of the RED and of
+/// the GREEN run in place of the verbatim output.
+#[test]
+fn the_dependency_add_scenario_expects_a_capture_of_the_red_and_the_green_run() {
+    let scenario: Value =
+        serde_json::from_str(&package_text(DEPENDENCY_ADD)).expect("dependency-add.json is JSON");
+    let expected: Vec<&str> = scenario["expected_behavior"]
+        .as_array()
+        .expect("expected_behavior is an array")
+        .iter()
+        .map(|line| line.as_str().expect("a line"))
+        .collect();
+    assert!(
+        expected.contains(
+            &"Writes the failing test first; tdd cites a capture of the RED and of the GREEN run"
+        ),
+        "{expected:?}"
+    );
+    assert!(
+        !expected
+            .iter()
+            .any(|line| line.contains("verbatim RED and GREEN output")),
+        "{expected:?}"
+    );
+}
+
+/// Spec 8.6 (1): a gate command that the harness refuses to an agent is a
+/// controller-run integration gate. The orchestrating skill and the planning
+/// skill say so in the same sentence.
+#[test]
+fn the_orchestrating_and_planning_skills_hand_a_refused_gate_to_the_controller() {
+    for skill in [ORCHESTRATING, PLANNING] {
+        assert_holds(
+            skill,
+            &[
+                "A gate command that the harness refuses to an agent is a controller-run integration gate: the plan lists it, and you run it after each integration and record it in the ledger.",
+            ],
+        );
+    }
+}
+
+/// Spec 8.6 (2): the branch reviewer compares the `reversals` count of each
+/// workspace with the `Reversal:` lines of its ledger.
+#[test]
+fn the_branch_reviewer_compares_the_reversals_count_with_the_ledger() {
+    assert_holds(
+        BRANCH_REVIEWER,
+        &[
+            "Compare the `reversals` count of each workspace in `stats.json` with the `Reversal:` lines of that workspace's ledger, including the lines inside a longer ledger entry.",
+        ],
+    );
+}
+
+/// Spec 8.6 (3): a printed command or line that changes after the live run
+/// runs again before the branch review. The sentence stands in the Verify row.
+#[test]
+fn the_verify_phase_runs_a_changed_printed_line_again_before_the_branch_review() {
+    let text = package_text(ORCHESTRATING);
+    let verify = text
+        .lines()
+        .find(|line| line.starts_with("| Verify |"))
+        .expect("the lifecycle table has a Verify row");
+    assert!(
+        verify.contains(
+            "a printed command or line that changes after the live run runs again before the branch review"
+        ),
+        "{verify}"
+    );
+    assert!(verify.contains("`process.live-run-before-ci`"), "{verify}");
+}
+
+/// Spec 8.6 (5): library research names each sub-problem of the design and
+/// researches a library for each.
+#[test]
+fn the_designing_skill_researches_a_library_for_each_sub_problem() {
+    assert_holds(
+        DESIGNING,
+        &[
+            "The library research: it names each sub-problem of the design (a URI resolver inside a SARIF reader, an atomic file replace inside a writer) and researches a library for each.",
+        ],
+    );
+}
+
+/// Spec 7 and 10: three bodies and one summary of the `process` pack describe
+/// captures in place of inline output, redirects, and truncation markers. The
+/// pointer to the limits of the checker names its submodules.
+#[test]
+fn the_process_pack_teaches_captures_in_place_of_inline_output() {
+    let pack = process_pack();
+
+    let claims = body_text(pack_entry(&pack, "process.claims-match-artifacts"));
+    for phrase in [
+        "The `command` and the `exit` of a run come from the header of its capture, and `houserules report-facts` copies them into the report: never retype either",
+        "A run with no capture, or a `command` or `exit` that differs from its capture, fails `houserules check-report-claims`; a reviewer re-runs the command from the header.",
+        "through `houserules capture` after the last edit, and add that clean run as the last `tests` entry",
+        "its Limits lists (the module docs of `crates/houserules/src/report_claims/`, indexed in `crates/houserules/src/report_claims.rs`, reachable only where this kit's own source lives)",
+    ] {
+        assert!(
+            claims.contains(phrase),
+            "claims-match-artifacts lacks: {phrase}"
+        );
+    }
+    for phrase in [
+        "paste-run",
+        "paste its clean run",
+        "(crates/houserules/src/report_claims.rs, reachable only where this kit's own source lives)",
+    ] {
+        assert!(
+            !claims.contains(phrase),
+            "claims-match-artifacts holds: {phrase}"
+        );
+    }
+
+    let outlives = body_text(pack_entry(&pack, "process.evidence-outlives-the-session"));
+    for phrase in [
+        "Write each capture into the deliverables folder, beside the document that cites it.",
+        "A task report cites each capture by its path and its SHA-256 hash, and holds at most one short excerpt of its output.",
+        "The excerpt is a byte-exact part of the output of the capture, so the retained capture is the evidence",
+        "`houserules check-report-claims` fails a capture that is missing or changed and an excerpt that is not part of the output of its capture.",
+    ] {
+        assert!(
+            outlives.contains(phrase),
+            "evidence-outlives-the-session lacks: {phrase}"
+        );
+    }
+    for phrase in [
+        "Truncation markers count as citations",
+        "byte-prefix match",
+        "Copy small captures into the deliverables folder",
+        "quoted inline",
+        "byte-exact part of the capture",
+        "not part of its capture",
+    ] {
+        assert!(
+            !outlives.contains(phrase),
+            "evidence-outlives-the-session holds: {phrase}"
+        );
+    }
+
+    let verbatim = pack_entry(&pack, "process.report-evidence-verbatim");
+    assert_eq!(
+        verbatim["summary"],
+        "A deliverable cites only real captures of command output; a re-review reproduces at least one RED or audit before accepting a fix round."
+    );
+    let verbatim_body = body_text(verbatim);
+    assert!(
+        verbatim_body.contains(
+            "A changed or missing capture, an edited `command` or `exit`, and an excerpt that is not part of the output of its capture fail `houserules check-report-claims`."
+        ),
+        "{verbatim_body}"
+    );
+    assert!(
+        !verbatim_body.contains("not part of its capture"),
+        "{verbatim_body}"
+    );
+    assert!(
+        !verbatim_body.contains("never by a gate"),
+        "{verbatim_body}"
+    );
+}
+
+/// A pin: `process.tdd` keeps its summary. A capture is verbatim, so "verbatim
+/// RED and GREEN" stays true, and the pack text of the rule does not change.
+#[test]
+fn the_process_pack_keeps_the_summary_of_the_tdd_rule() {
+    let pack = process_pack();
+    assert_eq!(
+        pack_entry(&pack, "process.tdd")["summary"],
+        "Test-driven development for every executable change: the failing test first, or a disclosed-mutation proof for already-correct behavior; verbatim RED and GREEN."
     );
 }

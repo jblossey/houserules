@@ -1,9 +1,11 @@
-//! Helpers that `no_tracker.rs`, `tracker_conformance.rs`, and
-//! `tracker_json.rs` share: the binary under test, scratch repositories, the
-//! install shapes the tracker cases start from, the environment of a hermetic
-//! `bd`, and the exact lines of spec sections 3.3, 3.4, 3.8, and 3.10. Every
-//! test file that needs them includes this module, as `install_shape/mod.rs`
-//! is shared.
+//! Helpers that the test files share: the binary under test, scratch
+//! repositories and copies of directories, command runners and output
+//! assertions, the install shapes the tracker cases start from, the
+//! environment of a hermetic `bd`, the exact lines of spec sections 3.3, 3.4,
+//! 3.8, and 3.10, the lowercase hex SHA-256 digest, and the two forms of a
+//! path that the binary prints: canonical, and quoted for a POSIX shell. A test
+//! file that needs them declares this module, as `install_shape/mod.rs` is
+//! shared.
 
 #![allow(dead_code)]
 
@@ -102,6 +104,31 @@ pub fn sha256_hex(content: &[u8]) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
+}
+
+/// `path` canonical, in the form houserules prints it: on Windows without the
+/// `\\?\` prefix that `canonicalize` adds.
+pub fn resolved(path: &Path) -> PathBuf {
+    let canonical = path.canonicalize().expect("canonicalize");
+    match canonical
+        .to_str()
+        .and_then(|text| text.strip_prefix(r"\\?\"))
+    {
+        Some(plain) => PathBuf::from(plain),
+        None => canonical,
+    }
+}
+
+/// `path` quoted for a POSIX shell, in the form houserules prints a path in
+/// its `run houserules init --dir <dir>` remedies. The quoting is `shlex`'s, as
+/// the binary's: a path with a backslash (every Windows temp path) is
+/// double-quoted, a path with a space is single-quoted, and a plain relative
+/// path stays as it is. A test that pins a printed path builds it with this
+/// function, never from the raw path.
+pub fn quoted(path: &Path) -> String {
+    shlex::try_quote(path.to_str().expect("a UTF-8 path"))
+        .expect("a path holds no NUL byte")
+        .into_owned()
 }
 
 /// A fresh scratch directory with `git init` already run.

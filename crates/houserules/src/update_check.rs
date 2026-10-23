@@ -490,8 +490,7 @@ mod tests {
         ));
     }
 
-    // Fix round 1, review Minor finding on update_check.rs:201-207: a
-    // future-dated checked_at_unix (clock skew, or a hand edit) must not
+    // A future-dated checked_at_unix (clock skew, or a hand edit) must not
     // saturate to "never stale" and permanently suppress the header.
     #[test]
     fn is_stale_is_true_when_checked_at_unix_is_in_the_future() {

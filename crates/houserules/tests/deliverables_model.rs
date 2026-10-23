@@ -356,3 +356,91 @@ fn a_plain_install_accepts_any_token_as_a_backlog_id() {
         assert_eq!(code, 1, "{bad:?}: {errors:?}");
     }
 }
+
+/// Spec 4 (batch 36): the report form. A run cites a capture and holds no
+/// output, a `self_review` item is a claim with optional evidence, a task
+/// report may record citations, and a finding may name the probe that its round
+/// re-ran. The description of `run` states the cap of the excerpt.
+#[test]
+fn the_schema_holds_the_report_form() {
+    let schema = read_json(&repo_root(), "template/.claude/schemas/deliverables.json");
+    let defs = &schema["$defs"];
+    assert_eq!(
+        defs["run"]["required"],
+        json!(["capture", "sha256", "command", "exit"])
+    );
+    assert_eq!(defs["run"]["additionalProperties"], json!(false));
+    assert_eq!(defs["run"]["properties"]["output"], Value::Null);
+    assert_eq!(
+        defs["run"]["properties"]["excerpt"]["maxLength"],
+        json!(1000)
+    );
+    assert!(
+        defs["run"]["description"]
+            .as_str()
+            .is_some_and(|text| text.contains("1000")),
+        "the description of run states the cap"
+    );
+    assert_eq!(defs["selfReviewItem"]["required"], json!(["claim"]));
+    assert_eq!(
+        defs["citation"]["required"],
+        json!(["path", "line", "anchor"])
+    );
+    assert_eq!(
+        defs["citation"]["properties"]["anchor"]["pattern"],
+        json!("\\S{3}")
+    );
+    let task_report = &defs["taskReport"];
+    assert_eq!(
+        task_report["properties"]["self_review"]["items"]["$ref"],
+        json!("#/$defs/selfReviewItem")
+    );
+    assert_eq!(
+        task_report["properties"]["citations"]["items"]["$ref"],
+        json!("#/$defs/citation")
+    );
+    assert!(
+        !task_report["required"]
+            .as_array()
+            .expect("required list")
+            .contains(&json!("citations")),
+        "citations is optional"
+    );
+    assert_eq!(
+        defs["fixRound"]["properties"]["findings"]["items"]["properties"]["reran"]["$ref"],
+        json!("#/$defs/text")
+    );
+}
+
+/// Both copies of the schema define one digest, `sha256Hex`, and `run.sha256`
+/// and `citation.sha256` refer to it. Its name and description describe a
+/// digest and no input: the run hashes a whole capture file, the citation
+/// hashes cited lines.
+#[test]
+fn the_digest_definition_names_no_input_in_both_copies() {
+    for path in [
+        "template/.claude/schemas/deliverables.json",
+        ".claude/schemas/deliverables.json",
+    ] {
+        let schema = read_json(&repo_root(), path);
+        let defs = &schema["$defs"];
+        assert_eq!(
+            defs["sha256Hex"]["description"],
+            json!("A SHA-256 digest: 64 lowercase hexadecimal digits."),
+            "{path}"
+        );
+        assert_eq!(
+            defs["sha256Hex"]["pattern"],
+            json!("^[0-9a-f]{64}$"),
+            "{path}"
+        );
+        assert_eq!(defs["fileSha256"], Value::Null, "{path}");
+        for owner in ["run", "citation"] {
+            assert_eq!(
+                defs[owner]["properties"]["sha256"]["$ref"],
+                json!("#/$defs/sha256Hex"),
+                "{path} {owner}"
+            );
+        }
+    }
+}

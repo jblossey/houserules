@@ -625,5 +625,38 @@
         "notes": "batch 35; template blob 97ff9ad given by path; fixture a detached commit at the batch-35 head (picocolors ^1.3.0, a history comment, a doctored self_audit); exact-pins and dependency-vetting fails filed Important with impact; the doctored self_audit filed Critical; history comment Minor with a grep check; Tier standard checked, no tier finding; review validated, model opus; AUDIT_JSON written. It also filed the fixture's Backlog line as not matching the change"
       }
     ]
+  },
+  {
+    "date": "2026-10-23",
+    "templates": {
+      ".claude/agents/implementer.md": "34dcd6615e6758cb4577c6340d2b56f207062f64",
+      ".claude/agents/task-reviewer.md": "d09210bbe7f7d32087e62f9ac26b7b711fc6fa69"
+    },
+    "runs": [
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 7,
+        "of": 7,
+        "notes": "batch 36; template blob 34dcd66 given by path; the new report form: every run through houserules capture, facts by report-facts, validate and check-report-claims clean with the tree binary; similar =3.2.0 via cargo add --dev into a tests/diff_support helper, dev-only (cargo tree -e normal prints nothing); vetting with releases, repository activity, an issue's response, license, each with a capture; docs_verified via context7 and the crate source; natural RED (E0583) then GREEN, both cited as captures; Work-Item trailer; model sonnet; self_audit 12/12 with exact-pins and dependency-vetting pass"
+      },
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 4,
+        "of": 4,
+        "notes": "batch 36; a runbook section for changing a kit file under template/, seven short steps, each walked live on a throwaway edit and kept as a capture; commands literal (step 7's $(git merge-base main HEAD) ran with a literal sha through capture, which runs no shell); Work-Item trailer; report in the new form validates, model sonnet; self_audit 14/14. Its suite ran without mise, so 71 bd and actionlint tests failed for missing tools; no expected behavior depends on it"
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 8,
+        "of": 8,
+        "notes": "batch 36; template blob d09210b given by path; fixture a detached commit at the batch-36 head (picocolors ^1.3.0, a history comment, a new-form report whose self_audit drops the exact-pins fail row); exact-pins and dependency-vetting fails filed Important with impact; the dropped self_audit row filed Critical as output the audit did not produce; history comment Minor with a grep check; Tier standard checked, no tier finding; review validates, no open row, model opus; AUDIT_JSON written. Fixture noise: it also filed the Node script against houserules.dev-tools-are-rust-native and the brief against its Backlog line"
+      }
+    ]
   }
 ]

@@ -10,23 +10,19 @@
 //! runs with both streams piped, exactly how `cargo test` (and most
 //! automation) invokes this binary: `header_disabled`'s own TTY gate
 //! returns before `eprintln!` ever runs, so this pins the realistic,
-//! header-never-fires case, on every platform. That gate is itself what a
-//! regression could remove, which the mutation this file's own
-//! `task-3-report.json` `tdd` entry discloses (temporarily dropping the
-//! TTY term from `header_disabled`) proved by making this test fail with
-//! the header on stderr.
+//! header-never-fires case, on every platform. Dropping the TTY term
+//! from `header_disabled` makes this test fail with the header on stderr.
 //!
-//! Fix round 1 (review, Important): that first test cannot tell stderr
-//! from stdout on the shipped code, since the gate returns before either
-//! stream is written to -- swapping `eprintln!` for `println!` at the
-//! print site leaves it green. `the_update_header_prints_only_on_a_real_stderr_terminal`
+//! That first test cannot tell stderr from stdout on the shipped code,
+//! since the gate returns before either stream is written to -- swapping
+//! `eprintln!` for `println!` at the print site leaves it green.
+//! `the_update_header_prints_only_on_a_real_stderr_terminal`
 //! (`#[cfg(unix)]`) closes that gap: it gives the child a real POSIX pty
 //! as its stderr and an ordinary pipe as its stdout, so `is_terminal()`
 //! is genuinely true and the header genuinely prints, landing on
-//! whichever of the two streams the print site actually writes to. A
-//! disclosed mutation (swapping that `eprintln!` for `println!`) is this
-//! file's own second `tdd` entry: RED, the header appears on the piped
-//! stdout instead of the pty; reverted, GREEN.
+//! whichever of the two streams the print site actually writes to.
+//! Swapping that `eprintln!` for `println!` makes it fail: the header
+//! appears on the piped stdout instead of the pty.
 
 use std::process::Command;
 
@@ -76,25 +72,19 @@ fn scratch_install() -> tempfile::TempDir {
 /// (so no network call is even attempted) naming a release far newer
 /// than any real `CARGO_PKG_VERSION` this crate will ever reach.
 ///
-/// Fix round 4 (CI red on macOS a second time, T3's own round-2 race
-/// theory was not the cause): `dirs::cache_dir()` (`update_check.rs`'s
-/// own `cache_path` doc) reads `XDG_CACHE_HOME`/`HOME` only on Linux;
-/// with `HOME` set to `dir`, macOS resolves it to `dir/Library/Caches`
-/// instead, never `dir/houserules` -- a layout this fixture never wrote
-/// to. Both `stderr`-gated tests below open their TTY gate (the piped
-/// test's TTY term is the only thing false there; the pty test's is
-/// true), so on macOS `read_cache` found nothing, `is_stale` (correctly)
-/// called it stale, and `the_update_header_prints_only_on_a_real_stderr_terminal`
-/// made a real, live network call to GitHub from CI -- which is itself
-/// the bug this fixture must not cause a test to trigger, quite apart
-/// from the empty pty stderr that call's own real result (1.0.0 is not
-/// newer than 1.0.0) then produced. Writing the doctored cache at both
+/// `dirs::cache_dir()` (`update_check.rs`'s own `cache_path` doc) reads
+/// `XDG_CACHE_HOME`/`HOME` only on Linux; with `HOME` set to `dir`, macOS
+/// resolves it to `dir/Library/Caches`, never `dir/houserules`. A cache
+/// written at the Linux layout alone is invisible there: `read_cache`
+/// finds nothing, `is_stale` calls the missing cache stale, and
+/// `the_update_header_prints_only_on_a_real_stderr_terminal` makes a
+/// real, live network call to GitHub -- a call this fixture exists to
+/// keep every test from making. Writing the doctored cache at both
 /// layouts unconditionally, with no `cfg`, means whichever one
 /// `dirs::cache_dir()` actually resolves to on the platform running this
 /// test is always the one already seeded with a fresh timestamp, so the
-/// network call this fixture exists to prevent is never made on any of
-/// them; the layout the running platform does not use sits unread and
-/// harmless.
+/// network call is never made on any platform; the layout the running
+/// platform does not use sits unread and harmless.
 fn scratch_cache_claiming_a_newer_release() -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let now = std::time::SystemTime::now()
@@ -231,8 +221,7 @@ mod pty {
     }
 }
 
-/// Fix round 1, review Important finding on `tests/update_check.rs:75-102`:
-/// gives the child a real pty as stderr and an ordinary pipe as stdout,
+/// Gives the child a real pty as stderr and an ordinary pipe as stdout,
 /// so `header_disabled`'s TTY gate genuinely opens and the header
 /// genuinely prints -- landing on whichever stream the print call
 /// actually targets, the property the piped test above cannot observe.
@@ -240,21 +229,23 @@ mod pty {
 /// image of the piped test's (the header MUST appear, on stderr, and
 /// MUST NOT appear on stdout).
 ///
-/// Fix round 2 (CI red on macOS, T3 r2 review's own flagged risk): the
-/// pty master must be read by a thread already blocked in `read()`
+/// The pty master must be read by a thread already blocked in `read()`
 /// before the child's write ever happens, not only before `child.wait()`
 /// -- on Darwin, a master read that STARTS after every slave-side fd has
 /// already closed returns `EIO` immediately, discarding whatever the pty
 /// driver was still holding, where Linux instead drains the buffered
-/// bytes first and only then returns `EIO` (confirmed on this box: a
-/// pty hangup reports as `EIO`, never `Ok(0)`, once the buffer is
-/// drained). `get houserules.pnpm-only` is fast enough that the fix
-/// round 1 shape (read the master inline, after spawning a separate
-/// thread for stdout first) left a real window on a loaded CI runner: by
-/// the time that inline read's first `read()` syscall ran, the child
-/// could already have written its header line, exited, and closed its
-/// own slave fd, so the master's first read landed in the post-close
-/// state Darwin discards from. Spawning the pty reader thread as the
+/// bytes first and only then returns `EIO`. A pty hangup reports as
+/// `EIO`, never `Ok(0)`, once the buffer is drained; on Linux, this
+/// command prints `b'hi'` and then fails with `OSError: [Errno 5]
+/// Input/output error`:
+/// `python3 -c 'import os,pty;m,s=pty.openpty();os.write(s,b"hi");os.close(s);print(os.read(m,9));os.read(m,9)'`.
+/// `get houserules.pnpm-only` is fast enough that reading the
+/// master inline, after spawning a separate thread for stdout first,
+/// would leave a real window on a loaded CI runner: by the time that
+/// inline read's first `read()` syscall ran, the child could already
+/// have written its header line, exited, and closed its own slave fd, so
+/// the master's first read would land in the post-close state Darwin
+/// discards from. Spawning the pty reader thread as the
 /// very first thing after `spawn`, reading in a loop that treats an
 /// `EIO` exactly like `Ok(0)` (stop, keep whatever was already read),
 /// closes that window on both platforms: the thread is normally already
@@ -265,9 +256,7 @@ mod pty {
 /// (which `read_to_string` calls) keeps its accumulated buffer on any
 /// error per its own doc ("Any bytes which have already been read will
 /// be appended to buf"), `ErrorKind::Interrupted` included (its own doc:
-/// "should be retried"; confirmed on this box too: a pty fed bytes then
-/// hung up leaves `read_to_string` returning `Err(EIO)` with every byte
-/// already read still in the string). The loop exists only so this
+/// "should be retried"). The loop exists only so this
 /// thread's own `read()` call can start the instant the thread runs, and
 /// so the eventual, expected `EIO` -- or a signal-interrupted read along
 /// the way -- does not end the test.
@@ -308,7 +297,7 @@ fn the_update_header_prints_only_on_a_real_stderr_terminal() {
 
     // Spawned first, before even touching stdout: every instruction
     // between `spawn` above and this thread's own first `read()` widens
-    // the race this module doc describes, so nothing else runs first.
+    // the race this test's doc describes, so nothing else runs first.
     let mut master = File::from(pty.master);
     let stderr_thread = std::thread::spawn(move || {
         let mut collected = Vec::new();
@@ -319,11 +308,11 @@ fn the_update_header_prints_only_on_a_real_stderr_terminal() {
                 Ok(n) => collected.extend_from_slice(&chunk[..n]),
                 // A signal-interrupted read is not a failure -- `Read::read`'s
                 // own contract says it "should be retried"; `read_to_end`
-                // (module doc) does this internally, so a hand-rolled loop
+                // (this test's doc) does this internally, so a hand-rolled loop
                 // must too, or a bare signal turns a passing run red.
                 Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
                 // Darwin's post-close EIO and Linux's own post-hangup EIO
-                // (module doc) both mean "nothing more will ever arrive" --
+                // (this test's doc) both mean "nothing more will ever arrive" --
                 // the ordinary, expected way this pty ends once the child
                 // has exited, not a failure to report.
                 Err(error) if error.raw_os_error() == Some(libc::EIO) => break,

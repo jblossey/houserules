@@ -19,7 +19,7 @@ use serde_json::json;
 use tempfile::TempDir;
 use tracker_support::{
     assert_actionlint_passes, assert_output, commit_all, count_lines, edit_marker, git, houserules,
-    read_json, repo_root, run, run_ok, scratch_git_repo, sha256_hex, stderr, stdout,
+    quoted, read_json, repo_root, run, run_ok, scratch_git_repo, sha256_hex, stderr, stdout,
 };
 use tree_snapshot::{assert_same_tree, snapshot};
 
@@ -71,9 +71,10 @@ fn text(dir: &Path, relative: &str) -> String {
 // ---- HR-216: update with no install ----
 
 /// The refusal of `update` for a target that is not the working directory: the
-/// remedy names the target (spec 8.2, D9).
+/// remedy names the target (spec 8.2, D9), quoted for a POSIX shell where it
+/// needs quoting (spec 8.3): a scratch directory of Windows holds a backslash.
 fn no_install_for(dir: &str) -> String {
-    format!("{NO_INSTALL} --dir {dir}")
+    format!("{NO_INSTALL} --dir {}", quoted(Path::new(dir)))
 }
 
 /// Runs `houserules <args>` with `cwd` as the working directory and no
@@ -474,11 +475,19 @@ fn head_checkout_step() -> String {
     )
 }
 
-/// The hand step of a kept workflow that lacks the lines of the GitHub tracker
-/// (spec 4.8).
-fn github_lines_step() -> String {
+/// The hand step of a kept workflow that holds `contents: read` and lacks
+/// `issues: read` (spec 8.5).
+fn issues_read_step() -> String {
     format!(
-        "hand step: {WORKFLOW} lacks the lines that the github tracker needs; add permissions: {{contents: read, issues: read}} to the gates job, and env: {{GH_TOKEN: ${{{{ github.token }}}}}} to each step that runs houserules check-backlog or houserules audit"
+        "hand step: {WORKFLOW} lacks issues: read, which the github tracker needs; add issues: read to the permissions of the gates job"
+    )
+}
+
+/// The hand step of a kept workflow that lacks the `GH_TOKEN` env of the GitHub
+/// tracker (spec 8.5).
+fn github_env_step() -> String {
+    format!(
+        "hand step: {WORKFLOW} lacks the GH_TOKEN env that the github tracker needs; add env: {{GH_TOKEN: ${{{{ github.token }}}}}} to each step that runs houserules check-backlog or houserules audit"
     )
 }
 
@@ -503,7 +512,7 @@ fn update_keeps_a_modified_seeded_workflow_and_prints_its_hand_step() {
         (Some(json!({"adapter": "json"})), vec![head_checkout_step()]),
         (
             Some(json!({"adapter": "github", "repo": "acme/widgets"})),
-            vec![github_lines_step(), head_checkout_step()],
+            vec![issues_read_step(), github_env_step(), head_checkout_step()],
         ),
     ] {
         let dir = repository();

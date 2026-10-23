@@ -384,9 +384,10 @@ Setup:
    apart from the source branches.
 3. Add the custom status and the custom types that the adapter check
    names: `bd config set status.custom partial:active` and
-   `bd config set types.custom houserules-section,houserules-batch,houserules-amendment,houserules-decision,houserules-parked`.
+   `bd config set types.custom 'houserules-section,houserules-batch,houserules-amendment,houserules-decision,houserules-parked'`.
    `bd config set` replaces the whole list, so keep what the store already
-   lists; `houserules check-backlog` prints the exact step.
+   lists; `houserules check-backlog` prints the exact step, with a list of
+   two or more entries in single quotes for a POSIX shell.
 4. Run `houserules init --tracker beads`. It reads the issue prefix from
    `bd`, and it refuses when `bd` or the store is missing.
 

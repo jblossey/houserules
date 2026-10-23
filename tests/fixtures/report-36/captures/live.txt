@@ -1,0 +1,2 @@
+{"schema":"houserules/capture@1.0.0","argv":["sh","-c","echo \"validated: 1 file\""],"cwd":"/home/maintainer/work","start":"2026-10-23T02:59:41.310057536Z","end":"2026-10-23T02:59:41.313384359Z","exit":0,"signal":null,"head":null,"dirty":null,"lossy":0}
+validated: 1 file

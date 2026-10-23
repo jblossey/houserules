@@ -22,13 +22,13 @@
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use crate::install::marker::RenderInputs;
 use crate::root::INSTALL_MARKER;
 use crate::tracker::{Adapter, session_commands};
 use crate::workflow::reference;
 
+use super::super::listed_by_name;
 use super::super::model::{AreaDef, Base};
 use super::block::{BEGIN, END, locate};
 use super::{
@@ -230,29 +230,11 @@ fn undecodable(raw: &[u8]) -> RenderError {
 /// git is not installed. git lists a submodule as one path and none of its
 /// files.
 fn git_listing(root: &Path) -> Result<Option<Vec<String>>, RenderError> {
-    let output = Command::new("git")
-        .args([
-            "ls-files",
-            "-z",
-            "--cached",
-            "--others",
-            "--exclude-standard",
-            "--",
-            ":(glob)**/AGENTS.md",
-        ])
-        .current_dir(root)
-        .output();
-    let Ok(output) = output else {
+    let Ok(listed) = listed_by_name(root, AGENTS_MD) else {
         return Ok(None);
     };
-    if !output.status.success() {
-        return Ok(None);
-    }
     let mut paths = Vec::new();
-    for raw in output.stdout.split(|&byte| byte == 0) {
-        if raw.is_empty() {
-            continue;
-        }
+    for raw in &listed {
         let path = std::str::from_utf8(raw).map_err(|_| undecodable(raw))?;
         paths.push(path.to_string());
     }

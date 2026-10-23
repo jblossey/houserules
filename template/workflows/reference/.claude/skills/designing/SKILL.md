@@ -25,6 +25,7 @@ Write the spec to `docs/specs/`. It holds:
 - The facts the design rests on. Label each run, read, or assumed, and cite its capture or its source (`process.design-claims-are-labelled`).
 - Each decision. A decision that rejects a library, or departs from the source research or an approved spec, carries a captured probe, the best case of the rejected option, and a reversal condition (`process.design-decisions-carry-probes`).
 - The concepts it takes from its sources, each with the source's status and a check against the goal (`process.specs-list-borrowed-concepts`).
+- The library research: it names each sub-problem of the design (a URI resolver inside a SARIF reader, an atomic file replace inside a writer) and researches a library for each.
 - The technical-debt candidates. Run `houserules list --deferred` into a file. Fold in every open deferral whose files overlap the planned files and that passes the convenience criterion: folding it in does not turn a non-critical task into a critical task. List each folded candidate with its overlapping files, and each overlapping deferral that you leave out with the reason.
 - The acceptance cases. Each names what its capture must show. An upgrade case lists the reds that the change causes by design on an install of the previous version, each with its remedy.
 - The questions that only the human can rule, each with your recommendation.

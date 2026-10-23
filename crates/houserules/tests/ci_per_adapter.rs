@@ -375,22 +375,33 @@ fn update_moves_a_workflow_at_its_baseline_to_the_content_of_the_adapter() {
 /// Spec 4.8: a workflow that the project changed stays, and `update` names the
 /// lines to add when the file lacks the ones that the adapter needs. A file
 /// that holds them already gets the kept line and no hand step. With JSON, the
-/// kept line stands alone.
+/// kept line stands alone. The copy is the seeded form of no tracker, which
+/// holds `contents: read` and `persist-credentials: false`: the GitHub tracker
+/// gets one step that adds `issues: read` to its block and one that adds the
+/// `GH_TOKEN` env, and the Beads tracker asks for the removal of the input.
 #[test]
 fn a_changed_workflow_gets_the_hand_step_that_names_the_lines_to_add() {
-    let github_step = format!(
-        "hand step: {WORKFLOW} lacks the lines that the github tracker needs; add permissions: {{contents: read, issues: read}} to the gates job, and env: {{GH_TOKEN: ${{{{ github.token }}}}}} to each step that runs houserules check-backlog or houserules audit"
-    );
+    let github_steps = vec![
+        format!(
+            "hand step: {WORKFLOW} lacks issues: read, which the github tracker needs; add issues: read to the permissions of the gates job"
+        ),
+        format!(
+            "hand step: {WORKFLOW} lacks the GH_TOKEN env that the github tracker needs; add env: {{GH_TOKEN: ${{{{ github.token }}}}}} to each step that runs houserules check-backlog or houserules audit"
+        ),
+    ];
     let bd = mise_pin("\"github:gastownhall/beads\"");
     let beads_step = format!(
         "hand step: {WORKFLOW} lacks the steps that the beads tracker needs; add a step that installs bd {bd} from its GitHub release, and a step that runs bd bootstrap --yes, before the step that runs houserules check-backlog"
     );
+    let persist_step = format!(
+        "hand step: {WORKFLOW} holds persist-credentials: false, which the beads tracker cannot use; remove it from with: of its actions/checkout step, so that bd bootstrap can fetch from the remote"
+    );
     let kept = format!("kept {WORKFLOW} (locally modified)");
 
-    for (adapter, step) in [
-        ("json", None),
-        ("github", Some(github_step)),
-        ("beads", Some(beads_step)),
+    for (adapter, steps) in [
+        ("json", vec![]),
+        ("github", github_steps),
+        ("beads", vec![beads_step, persist_step]),
     ] {
         let dir = repository();
         run_ok(dir.path(), &["init"]);
@@ -414,19 +425,19 @@ fn a_changed_workflow_gets_the_hand_step_that_names_the_lines_to_add() {
                 lines.contains(&kept),
                 "{adapter} run {run_number}: {lines:?}"
             );
-            let steps: Vec<&String> = lines
+            let printed: Vec<String> = lines
                 .iter()
                 .filter(|line| line.starts_with("hand step: "))
+                .cloned()
                 .collect();
-            assert_eq!(
-                steps,
-                step.iter().collect::<Vec<_>>(),
-                "{adapter} run {run_number}"
-            );
+            assert_eq!(printed, steps, "{adapter} run {run_number}");
         }
         assert_eq!(text(dir.path(), WORKFLOW), changed, "{adapter}");
 
         let mut complete = changed.clone();
+        if adapter == "beads" {
+            complete = complete.replace("          persist-credentials: false\n", "");
+        }
         complete.push_str(
             "# permissions: issues: read, env: GH_TOKEN: ${{ github.token }}, bd bootstrap\n",
         );

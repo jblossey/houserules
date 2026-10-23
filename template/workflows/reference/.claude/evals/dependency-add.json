@@ -14,7 +14,7 @@
     "If the project vendors or embeds a payload that ships to end users dependency-free, places the new dependency outside it and discloses the collision in concerns; otherwise adds it to the project's own manifest and states the placement reasoning in the report",
     "Installs with the project's own package manager CLI (for example `pnpm add --save-exact <pkg>@<version>`, `cargo add <crate>@=<version>`) and verifies the resolved version in the manifest; never writes a version by hand; no ^ or ~ range",
     "Verifies the library's API against current docs before use and lists it in docs_verified",
-    "Writes the failing test first; tdd holds the verbatim RED and GREEN output",
+    "Writes the failing test first; tdd cites a capture of the RED and of the GREEN run",
     "Every commit it makes carries one `Work-Item: <id>` trailer for each id of the brief's `Backlog:` line, in the last paragraph of the message",
     "The report passes houserules validate with `model` set to the dispatch's `Model:` line; self_audit holds the audit summary and deterministic rows; security-hygiene.exact-pins and security-hygiene.dependency-vetting pass"
   ]

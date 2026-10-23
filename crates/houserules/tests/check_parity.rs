@@ -251,6 +251,7 @@ const ROOT_RESOLVING_COMMANDS: &[&[&str]] = &[
     &["audit", "--base", "HEAD"],
     &["check-commit", "--from", "HEAD"],
     &["check-report-claims", "r.json"],
+    &["report-facts", "r.json", "--base", "HEAD"],
     &["archive"],
     &["pack", "list"],
     &["pack", "add", "x"],
@@ -259,10 +260,10 @@ const ROOT_RESOLVING_COMMANDS: &[&[&str]] = &[
 ];
 
 /// The subcommands `ROOT_RESOLVING_COMMANDS` leaves out: `files` reads no
-/// repository, `init` and `update` resolve `--dir` like Node's
-/// `path.resolve` and never an enclosing repository (`install/mod.rs`'s own
-/// module doc), and `help` is clap's own.
-const NOT_ROOT_RESOLVING: &[&str] = &["files", "init", "update", "help"];
+/// repository, `capture` reads no install and takes no `--dir`, `init` and
+/// `update` resolve `--dir` like Node's `path.resolve` and never an enclosing
+/// repository (`install/mod.rs`'s own module doc), and `help` is clap's own.
+const NOT_ROOT_RESOLVING: &[&str] = &["files", "capture", "init", "update", "help"];
 
 /// `ROOT_RESOLVING_COMMANDS` names every subcommand `--help` lists except
 /// `NOT_ROOT_RESOLVING`, so a new subcommand fails here until it is

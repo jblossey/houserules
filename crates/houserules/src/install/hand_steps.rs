@@ -47,11 +47,67 @@ pub(super) fn schema_kept(path: &str) -> String {
     )
 }
 
-/// The seeded CI workflow (spec 4.8): the file at `path` is the project's, and
-/// it lacks the lines that the GitHub tracker needs.
-pub(super) fn ci_lacks_the_github_lines(path: &str) -> String {
+/// The seeded CI workflow (spec 8.5): the file at `path` is the project's, its
+/// gates job holds no `permissions` key, and it lacks both `contents: read` and
+/// `issues: read`, the permissions that the GitHub tracker needs. The step adds
+/// the whole block.
+pub(super) fn ci_lacks_the_github_permissions(path: &str) -> String {
     format!(
-        "{path} lacks the lines that the github tracker needs; add permissions: {{contents: read, issues: read}} to the gates job, and env: {{GH_TOKEN: ${{{{ github.token }}}}}} to each step that runs houserules check-backlog or houserules audit"
+        "{path} lacks the permissions that the github tracker needs; add permissions: {{contents: read, issues: read}} to the gates job"
+    )
+}
+
+/// The seeded CI workflow (spec 8.5): the file at `path` is the project's, it
+/// holds `contents: read`, and it lacks `issues: read`, which the GitHub tracker
+/// needs. The step adds the line to the permissions of the copy, so that the job
+/// never holds two `permissions` keys.
+pub(super) fn ci_lacks_issues_read(path: &str) -> String {
+    format!(
+        "{path} lacks issues: read, which the github tracker needs; add issues: read to the permissions of the gates job"
+    )
+}
+
+/// The seeded CI workflow (spec 8.5, design.md 5.226): the file at `path` is the
+/// project's, its gates job holds a `permissions` mapping, and the mapping lacks
+/// `contents: read`; or the copy uses the GitHub tracker, holds `issues: read`,
+/// and lacks `contents: read`. The step adds the line to the permissions of the
+/// copy, so that the job never holds two `permissions` keys. It is the step of
+/// every form.
+pub(super) fn ci_lacks_contents_read_in_the_permissions(path: &str) -> String {
+    format!("{path} lacks contents: read; add contents: read to the permissions of the gates job")
+}
+
+/// The seeded CI workflow (spec 8.5, design.md 5.226): the file at `path` is the
+/// project's, its gates job holds a `permissions` mapping, and the mapping holds
+/// neither `contents: read` nor `issues: read`, which the GitHub tracker needs.
+/// The step adds both lines to the permissions of the copy.
+pub(super) fn ci_lacks_the_github_scopes_in_the_permissions(path: &str) -> String {
+    format!(
+        "{path} lacks the permissions that the github tracker needs; add contents: read and issues: read to the permissions of the gates job"
+    )
+}
+
+/// The seeded CI workflow (spec 8.5, design.md 5.226): the file at `path` is the
+/// project's, and its gates job holds `permissions: write-all`. The step replaces
+/// the scalar with the block of the form: `{contents: read}`, and
+/// `{contents: read, issues: read}` when `github` is set for the GitHub tracker.
+pub(super) fn ci_grants_write_all(path: &str, github: bool) -> String {
+    let scopes = if github {
+        "contents: read, issues: read"
+    } else {
+        "contents: read"
+    };
+    format!(
+        "{path} grants write-all; replace permissions: write-all with permissions: {{{scopes}}} in the gates job"
+    )
+}
+
+/// The seeded CI workflow (spec 8.5): the file at `path` is the project's, and
+/// it lacks the `GH_TOKEN` env that the steps of the GitHub tracker need, because
+/// `gh` takes its token from it.
+pub(super) fn ci_lacks_the_github_env(path: &str) -> String {
+    format!(
+        "{path} lacks the GH_TOKEN env that the github tracker needs; add env: {{GH_TOKEN: ${{{{ github.token }}}}}} to each step that runs houserules check-backlog or houserules audit"
     )
 }
 
@@ -70,6 +126,33 @@ pub(super) fn ci_lacks_the_beads_steps(path: &str, bd_version: &str) -> String {
 pub(super) fn ci_lacks_the_head_checkout(path: &str) -> String {
     format!(
         "{path} lacks the PR-head checkout; add ref: ${{{{ github.event.pull_request.head.sha }}}} under with: of its actions/checkout step"
+    )
+}
+
+/// The seeded CI workflow (spec 8.5): the file at `path` is the project's, its
+/// gates job holds no `permissions` key, and it lacks `contents: read`, the
+/// read-only token of the gates job. The GitHub tracker gets no such step: its
+/// steps for the permissions add `contents: read`.
+pub(super) fn ci_lacks_contents_read(path: &str) -> String {
+    format!("{path} lacks contents: read; add permissions: {{contents: read}} to the gates job")
+}
+
+/// The seeded CI workflow (spec 8.5): the file at `path` is the project's, and
+/// its checkout step keeps the persisted credential. The Beads tracker gets no
+/// such step: `bd bootstrap --yes` needs the credential (spec 8.5, C11).
+pub(super) fn ci_lacks_persisted_credentials_off(path: &str) -> String {
+    format!(
+        "{path} lacks persist-credentials: false; add it under with: of its actions/checkout step"
+    )
+}
+
+/// The seeded CI workflow (spec 8.5): the file at `path` is the project's, it
+/// uses the Beads tracker, and its checkout step drops the persisted credential
+/// with `persist-credentials: false`. `bd bootstrap --yes` fetches from the
+/// remote after the checkout and needs the credential (spec 8.5, C11).
+pub(super) fn ci_holds_persist_credentials_false(path: &str) -> String {
+    format!(
+        "{path} holds persist-credentials: false, which the beads tracker cannot use; remove it from with: of its actions/checkout step, so that bd bootstrap can fetch from the remote"
     )
 }
 
@@ -210,9 +293,21 @@ mod tests {
             ),
             ("schema_kept", schema_kept("<path>")),
             (
-                "ci_lacks_the_github_lines",
-                ci_lacks_the_github_lines("<path>"),
+                "ci_lacks_the_github_permissions",
+                ci_lacks_the_github_permissions("<path>"),
             ),
+            ("ci_lacks_issues_read", ci_lacks_issues_read("<path>")),
+            (
+                "ci_lacks_contents_read_in_the_permissions",
+                ci_lacks_contents_read_in_the_permissions("<path>"),
+            ),
+            (
+                "ci_lacks_the_github_scopes_in_the_permissions",
+                ci_lacks_the_github_scopes_in_the_permissions("<path>"),
+            ),
+            ("ci_grants_write_all", ci_grants_write_all("<path>", false)),
+            ("ci_grants_write_all", ci_grants_write_all("<path>", true)),
+            ("ci_lacks_the_github_env", ci_lacks_the_github_env("<path>")),
             (
                 "ci_lacks_the_beads_steps",
                 ci_lacks_the_beads_steps("<path>", "<bd-version>"),
@@ -220,6 +315,15 @@ mod tests {
             (
                 "ci_lacks_the_head_checkout",
                 ci_lacks_the_head_checkout("<path>"),
+            ),
+            ("ci_lacks_contents_read", ci_lacks_contents_read("<path>")),
+            (
+                "ci_lacks_persisted_credentials_off",
+                ci_lacks_persisted_credentials_off("<path>"),
+            ),
+            (
+                "ci_holds_persist_credentials_false",
+                ci_holds_persist_credentials_false("<path>"),
             ),
             ("kit_pack_shares_an_id", shared(Some(&git))),
             ("kit_pack_shares_an_id", shared(Some(&file))),

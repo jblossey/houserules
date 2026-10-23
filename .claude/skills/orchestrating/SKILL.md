@@ -25,7 +25,7 @@ The batch workspace is the folder `<YYYY-MM-DD>-batch-<n>` of the `workspaces` l
 | Design | `designing` | spec in `docs/specs/`; design review by the `spec-reviewer` (standard tier); approval from the project's owner or decider |
 | Plan | `planning` | plan in `docs/plans/`; code-health scan of the touched files (`process.code-health-scan`); technical-debt candidates; approval when asked |
 | Build | — | the dispatch protocol below |
-| Verify | — | live run before any PR or deploy spend (`process.live-run-before-ci`) |
+| Verify | — | live run before any PR or deploy spend (`process.live-run-before-ci`); a printed command or line that changes after the live run runs again before the branch review |
 | Finish | `finishing-a-feature` | backlog ticked, one to five clean commits, PR, checks, merged per the project's own discipline |
 | Rollout, acceptance | — | acceptance from the project's owner or decider; the acceptance record and new rulings ride the next branch |
 
@@ -68,6 +68,7 @@ Dispatch agents in parallel only when the plan marks their tasks parallel (`proc
 - Give each parallel implementer its own git worktree, on its own branch from the same `BASE`.
 - Name each parallel agent's scratch root in its dispatch, `<scratchpad>/task-<N>/`, and tell it to write scratch files nowhere else. Every agent of one session gets the same scratchpad path, and two agents that write one file name there overwrite each other without an error.
 - Integrate a finished task onto the batch branch one at a time (cherry-pick). Run the gates after each. Write the old-to-new commit map to the ledger. A conflict or a red gate at integration is a fix round for the later task.
+- A gate command that the harness refuses to an agent is a controller-run integration gate: the plan lists it, and you run it after each integration and record it in the ledger.
 - After you integrate a task, remove its worktree and its branch: `git worktree remove <path>`, then `git branch -D <branch>` (the cherry-pick leaves the branch unmerged, so `-d` refuses). A worktree that stays makes your harness load its copies of the skills and templates as duplicates.
 - Reviews of different tasks may run at the same time: reviewers do not write to the tree. The review of a task starts after its implementer closes.
 - Run at most three agents at once unless the plan sets a lower limit. The ledger records each dispatch's start and close.

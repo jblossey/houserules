@@ -26,9 +26,10 @@
 //! - a `see` link is dangling only when no source holds its id: an excluded,
 //!   inactive, or archived id still resolves (`see_is_held`,
 //!   `pack_see_findings`);
-//! - the fields that the `check` of every active pack entry requires, with
-//!   an override applied: a pack copy and an override get the lines of a
-//!   local check, at the pack copy (`pack_check_findings`);
+//! - the shape of the `check` of every active pack entry, with an override
+//!   applied: the fields that its type requires, and the patterns and flags
+//!   that must compile as regular expressions. A pack copy and an override get
+//!   the lines of a local check, at the pack copy (`pack_check_findings`);
 //! - the `CLAUDE.md` import: a `CLAUDE.md` that does not hold `@AGENTS.md`
 //!   keeps the standing rules from Claude Code (`claude_import_finding`).
 //!
@@ -56,7 +57,7 @@ use crate::install::marker::read_pins_for_gate;
 use crate::packs::{pack_sha256, topic_of};
 use crate::root::INSTALL_MARKER;
 
-use super::check::required_field_findings;
+use super::check::check_shape;
 use super::model::{Base, Entry, Source};
 
 /// The file that holds the overrides and the exclusions.
@@ -358,11 +359,12 @@ pub(crate) fn pack_see_findings(base: &Base) -> Vec<String> {
     findings
 }
 
-/// One finding for each field that the effective `check` of an active pack
-/// entry lacks (`check::required_field_findings`), naming the pack file. The
-/// effective check is the one in `base.raw_entries`, an override applied, so
-/// a pack copy and an override get the lines of a local check. The checks of
-/// a local entry are checked in `check_base`.
+/// The findings of `check::check_shape` for the effective `check` of each
+/// active pack entry: a field that the check lacks, and a pattern or flags
+/// that do not compile as a regular expression. Each finding names the pack
+/// file. The effective check is the one in `base.raw_entries`, an override
+/// applied, so a pack copy and an override get the lines of a local check. The
+/// checks of a local entry are checked in `check_base`.
 pub(crate) fn pack_check_findings(base: &Base) -> Vec<String> {
     let mut findings = Vec::new();
     for entry in active_pack_entries(base) {
@@ -377,7 +379,7 @@ pub(crate) fn pack_check_findings(base: &Base) -> Vec<String> {
             source_file(base, &entry.id, &entry.source),
             entry.id
         );
-        required_field_findings(check, &at, &mut findings);
+        check_shape(check, &at, &mut findings);
     }
     findings
 }

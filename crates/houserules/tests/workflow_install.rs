@@ -15,11 +15,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use serde_json::{Map, Value, json};
-use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 use tracker_support::{
-    assert_output, edit_marker, read_json, repo_root, run, run_ok, scratch_git_repo, stderr,
-    stdout, write_json,
+    assert_output, edit_marker, read_json, repo_root, run, run_ok, scratch_git_repo, sha256_hex,
+    stderr, stdout, write_json,
 };
 use tree_snapshot::{assert_same_tree, snapshot};
 
@@ -81,14 +80,6 @@ fn manifest_files() -> Vec<String> {
         .expect("files is an array")
         .iter()
         .map(|file| file.as_str().expect("a path").to_string())
-        .collect()
-}
-
-/// The SHA-256 of `bytes` in lowercase hex, the form of a pin.
-fn sha256(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
         .collect()
 }
 
@@ -201,7 +192,11 @@ fn init_workflow_reference_writes_the_package_and_pins_each_file() {
     assert_eq!(pinned, files.iter().collect::<BTreeSet<_>>());
     for file in &files {
         let bytes = fs::read(path_of(dir.path(), file)).expect("read an installed file");
-        assert_eq!(pins["files"][file], json!(sha256(&bytes)), "pin of {file}");
+        assert_eq!(
+            pins["files"][file],
+            json!(sha256_hex(&bytes)),
+            "pin of {file}"
+        );
     }
     assert_eq!(
         pins["models"],

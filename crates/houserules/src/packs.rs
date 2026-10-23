@@ -471,8 +471,8 @@ mod tests {
         ),
         (
             "process",
-            "2.0.0",
-            "38fb6a43b1057f9227e4ac1a60afaae2c9c1206599914d686b9f5859f7d80a78",
+            "2.0.1",
+            "bd6805c705d5ae96d44b7975b1a8fea4051319dba1d1467638eda4a6be5ea721",
         ),
         (
             "quality",

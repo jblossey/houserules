@@ -16,6 +16,7 @@ use std::process::ExitCode;
 
 use serde_json::{Value, json};
 
+use crate::capture;
 use crate::emit::emit;
 use crate::node_path::resolve_like_node;
 
@@ -53,15 +54,16 @@ pub(super) struct ValidatedDeliverable {
 /// filled `self_audit`, and that audit's `summary.skipped` must be 0 -- a
 /// nonzero count means the audit ran without `--report` and skipped every
 /// report-field check, so its rows are not trustworthy. BLOCKED and
-/// NEEDS_CONTEXT reports are exempt.
-fn check_task_report_audit(value: &Value, path: &str, errors: &mut Vec<String>) {
+/// NEEDS_CONTEXT reports are exempt. `root` is the install root, which the
+/// captures of the fix rounds resolve against.
+fn check_task_report_audit(root: &Path, value: &Value, path: &str, errors: &mut Vec<String>) {
     let Some(status) = value.get("status").and_then(Value::as_str) else {
         return;
     };
     if !TERMINAL_STATUSES.contains(&status) {
         return;
     }
-    check_fix_round_audits(value, path, errors);
+    check_fix_round_audits(root, value, path, errors);
     let self_audit = value.get("self_audit");
     if matches!(self_audit, Some(Value::Null)) {
         errors.push(format!(
@@ -85,9 +87,10 @@ fn check_task_report_audit(value: &Value, path: &str, errors: &mut Vec<String>) 
 /// returns its `summary.skipped` count when that value is a number
 /// greater than zero -- `None` for output carrying no `{` at all (a
 /// cargo/vitest run's prose), no `summary.skipped`, or one that is zero.
+/// `output` is the output of a capture, without its header line.
 ///
-/// Two tolerances, both required by `output` being a verbatim command
-/// capture (`process.evidence-outlives-the-session`'s invariant), not a
+/// Two tolerances, both required by `output` being the verbatim output of
+/// a command (`process.evidence-outlives-the-session`'s invariant), not a
 /// hand-trimmed excerpt:
 /// - Leading bytes: `output.find('{')` skips past any prose before the
 ///   JSON starts (a shell prompt echo, a blank line).
@@ -97,14 +100,14 @@ fn check_task_report_audit(value: &Value, path: &str, errors: &mut Vec<String>) 
 ///   whitespace -- a trailing newline or a second line of shell noise
 ///   must not turn a real match into a parse failure.
 ///
-/// Limits (honest, not exhaustive): a capture whose PROSE itself contains
+/// Limits (honest, not exhaustive): an output whose PROSE itself contains
 /// a `{` before the real audit JSON starts is not scanned past that
 /// point. `find` returns the first occurrence unconditionally, so the
 /// parse is attempted from the prose's own brace; when that slice is not
 /// valid JSON the whole function returns `None` -- a silent miss, the
 /// same shape a plain leading line would cause, just for a leading line
 /// that happens to contain `{` --
-/// `accepts_a_fix_round_test_whose_prose_contains_a_brace_before_the_json`
+/// `accepts_a_fix_round_capture_whose_prose_contains_a_brace_before_the_json`
 /// pins this residual gap rather than leaving it unmeasured. Retrying at
 /// each subsequent `{` until one parses would close it, but no observed
 /// capture in this project's own history needs it; adding the retry loop
@@ -121,12 +124,17 @@ fn parse_audit_summary_skipped(output: &str) -> Option<serde_json::Number> {
     }
 }
 
-/// Scans every `fix_rounds[].tests[].output` for an embedded audit result
-/// carrying a nonzero `summary.skipped`, the same threshold
+/// Scans the output of every `fix_rounds[].tests[]` capture for an embedded
+/// audit result carrying a nonzero `summary.skipped`, the same threshold
 /// `check_task_report_audit` already applies to the top-level audit: a
 /// fix round whose OWN audit test ran without `--report` must also fail
 /// validation, not only a top-level `self_audit` in that state.
-fn check_fix_round_audits(value: &Value, path: &str, errors: &mut Vec<String>) {
+///
+/// A `capture` path resolves against `root` with [`Path::join`], so an
+/// absolute path stands as it is. A capture that cannot be read -- a missing
+/// file, a read error, a file that is no capture -- is skipped, and
+/// `check-report-claims` names it.
+fn check_fix_round_audits(root: &Path, value: &Value, path: &str, errors: &mut Vec<String>) {
     let Some(fix_rounds) = value.get("fix_rounds").and_then(Value::as_array) else {
         return;
     };
@@ -135,12 +143,16 @@ fn check_fix_round_audits(value: &Value, path: &str, errors: &mut Vec<String>) {
             continue;
         };
         for (test_index, test) in tests.iter().enumerate() {
-            let Some(output) = test.get("output").and_then(Value::as_str) else {
+            let Some(capture_path) = test.get("capture").and_then(Value::as_str) else {
                 continue;
             };
-            if let Some(skipped) = parse_audit_summary_skipped(output) {
+            let Ok(capture) = capture::read(&root.join(capture_path)) else {
+                continue;
+            };
+            let output = String::from_utf8_lossy(capture.output());
+            if let Some(skipped) = parse_audit_summary_skipped(&output) {
                 errors.push(format!(
-                    "{path}.fix_rounds[{round_index}].tests[{test_index}].output: audit summary skipped is {skipped}; re-run audit with --report"
+                    "{path}.fix_rounds[{round_index}].tests[{test_index}].capture: audit summary skipped is {skipped}; re-run audit with --report"
                 ));
             }
         }
@@ -182,7 +194,7 @@ fn validate_deliverable(root: &Path, path: &Path) -> Result<ValidatedDeliverable
     let reference = json!({"$ref": format!("#/$defs/{def}")});
     super::validate(&value, &reference, &path_display, &mut errors, &schema);
     if def == "taskReport" {
-        check_task_report_audit(&value, &path_display, &mut errors);
+        check_task_report_audit(root, &value, &path_display, &mut errors);
     }
     errors.extend(marker_findings(&value, &path_display));
     Ok(ValidatedDeliverable {
@@ -281,6 +293,58 @@ mod tests {
         dir
     }
 
+    /// The SHA-256 field of a run in a sample: 64 digits, since `validate` checks
+    /// the form of the hash and not the file.
+    const HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+
+    /// A run of the report form, citing `capture`.
+    fn sample_run(capture: &str, command: &str) -> Value {
+        json!({"capture": capture, "sha256": HASH, "command": command, "exit": 0})
+    }
+
+    /// Writes the capture `name` below `root`: the header of a run of
+    /// `houserules audit`, then `output`. Returns `name`, the path that a run
+    /// cites.
+    fn write_capture(root: &Path, name: &str, output: &str) -> String {
+        let header = crate::capture::Header {
+            schema: crate::capture::SCHEMA.to_string(),
+            argv: vec!["houserules".to_string(), "audit".to_string()],
+            cwd: "/work".to_string(),
+            start: "2026-10-23T00:00:00.000000000Z".to_string(),
+            end: "2026-10-23T00:00:01.000000000Z".to_string(),
+            exit: Some(0),
+            signal: None,
+            head: None,
+            dirty: None,
+            lossy: 0,
+        };
+        let text = format!("{}\n{output}", serde_json::to_string(&header).unwrap());
+        fs::write(root.join(name), text).unwrap();
+        name.to_string()
+    }
+
+    /// The `fix_rounds` of a report whose one test cites the capture `name`.
+    fn fix_round_citing(name: &str) -> Value {
+        json!([{
+            "round": 1,
+            "findings": [{"finding": "f", "fix": "x"}],
+            "commits": [{"sha": "abc1236", "subject": "fix: x"}],
+            "tests": [sample_run(name, "houserules audit --base abc1234 --head abc1235")],
+        }])
+    }
+
+    /// The JSON of an audit result whose `summary.skipped` is `skipped`.
+    fn audit_json(skipped: u32) -> String {
+        serde_json::to_string(&json!({
+            "base": "abc1234", "head": "abc1235", "rules": [],
+            "summary": {
+                "base": "abc1234", "head": "abc1235", "deterministic": 1,
+                "pass": 0, "fail": 0, "warn": 0, "skipped": skipped, "judged": 0,
+            },
+        }))
+        .unwrap()
+    }
+
     fn report_sample() -> Value {
         json!({
             "kind": "task-report", "model": "claude-opus-5-5",
@@ -289,12 +353,12 @@ mod tests {
             "status": "DONE",
             "implemented": "x",
             "commits": [{"sha": "abc1234", "subject": "feat: x"}],
-            "tests": [{"command": "vitest", "output": "ok"}],
-            "live_run": [{"command": "houserules init --dir scratch", "output": "ok", "exit": 0}],
+            "tests": [sample_run("captures/tests.txt", "vitest")],
+            "live_run": [sample_run("captures/live.txt", "houserules init --dir scratch")],
             "tdd": [{
                 "test": "t", "mode": "natural",
-                "red": {"command": "c", "output": "FAIL"},
-                "green": {"command": "c", "output": "PASS"},
+                "red": sample_run("captures/red.txt", "c"),
+                "green": sample_run("captures/green.txt", "c"),
             }],
             "files_changed": ["a.mjs"],
             "docs_verified": [],
@@ -351,13 +415,13 @@ mod tests {
     fn rejects_a_compression_marker_in_a_deliverable_field() {
         let root = schema_root();
         let mut report = report_sample();
-        report["tests"][0]["output"] = json!(marker_text());
+        report["tests"][0]["excerpt"] = json!(marker_text());
         let file = write_report(root.path(), &report);
         let result = validate_deliverable(root.path(), &file).unwrap();
         assert_eq!(
             result.errors,
             vec![marker_finding(&format!(
-                "{}.tests[0].output",
+                "{}.tests[0].excerpt",
                 file.display()
             ))]
         );
@@ -434,9 +498,9 @@ mod tests {
         );
     }
 
-    /// A `+=` of a string onto a textList field appends one list item per
-    /// character. 25 single-character `self_review` items must fail,
-    /// naming the first shredded item's own minLength floor.
+    /// A `+=` of a string onto a list field appends one list item per
+    /// character. 25 single-character `self_review` items must fail, naming
+    /// the first shredded item as no object.
     #[test]
     fn rejects_a_self_review_shredded_into_one_character_per_item() {
         let root = schema_root();
@@ -457,7 +521,7 @@ mod tests {
             result
                 .errors
                 .iter()
-                .any(|e| e.ends_with(".self_review[0]: shorter than 3")),
+                .any(|e| e.ends_with(".self_review[0]: must be object")),
             "{:?}",
             result.errors
         );
@@ -540,7 +604,7 @@ mod tests {
     fn rejects_a_live_run_entry_without_a_command() {
         let root = schema_root();
         let mut report = report_sample();
-        report["live_run"] = json!([{"output": "ok"}]);
+        report["live_run"] = json!([{"capture": "captures/live.txt", "sha256": HASH, "exit": 0}]);
         let file = write_report(root.path(), &report);
         let result = validate_deliverable(root.path(), &file).unwrap();
         assert_eq!(
@@ -630,70 +694,46 @@ mod tests {
         );
     }
 
-    /// A fix round's own audit output can carry a skipped report-field
+    /// A fix round's own audit capture can carry a skipped report-field
     /// check the same way the top-level `self_audit` can -- rejects it
-    /// there too.
+    /// there too, naming the `capture` field of the run.
     #[test]
-    fn rejects_a_fix_round_audit_output_with_a_nonzero_skipped_summary() {
+    fn rejects_a_fix_round_audit_capture_with_a_nonzero_skipped_summary() {
         let root = schema_root();
         let mut report = report_sample();
-        report["fix_rounds"] = json!([{
-            "round": 1,
-            "findings": [{"finding": "f", "fix": "x"}],
-            "commits": [{"sha": "abc1236", "subject": "fix: x"}],
-            "tests": [{
-                "command": "houserules audit --base abc1234 --head abc1235",
-                "output": serde_json::to_string(&json!({
-                    "base": "abc1234", "head": "abc1235", "rules": [],
-                    "summary": {
-                        "base": "abc1234", "head": "abc1235", "deterministic": 1,
-                        "pass": 0, "fail": 0, "warn": 0, "skipped": 3, "judged": 0,
-                    },
-                })).unwrap(),
-            }],
-        }]);
+        let name = write_capture(root.path(), "audit.txt", &audit_json(3));
+        report["fix_rounds"] = fix_round_citing(&name);
         let file = write_report(root.path(), &report);
         let result = validate_deliverable(root.path(), &file).unwrap();
         assert_eq!(
             result.errors,
             vec![format!(
-                "{}.fix_rounds[0].tests[0].output: audit summary skipped is 3; re-run audit with --report",
+                "{}.fix_rounds[0].tests[0].capture: audit summary skipped is 3; re-run audit with --report",
                 file.display()
             )]
         );
     }
 
-    /// A verbatim capture can carry one prose line before the audit JSON
-    /// starts (a shell prompt echo, a leading blank line) --
+    /// A capture can carry one prose line before the audit JSON starts (a
+    /// shell prompt echo, a leading blank line) --
     /// `parse_audit_summary_skipped` must still find the nonzero
     /// `skipped` past it, not only when the JSON is the very first byte.
     #[test]
-    fn rejects_a_fix_round_audit_output_with_one_prose_line_before_the_json() {
+    fn rejects_a_fix_round_audit_capture_with_one_prose_line_before_the_json() {
         let root = schema_root();
         let mut report = report_sample();
-        let audit_json = serde_json::to_string(&json!({
-            "base": "abc1234", "head": "abc1235", "rules": [],
-            "summary": {
-                "base": "abc1234", "head": "abc1235", "deterministic": 1,
-                "pass": 0, "fail": 0, "warn": 0, "skipped": 2, "judged": 0,
-            },
-        }))
-        .unwrap();
-        report["fix_rounds"] = json!([{
-            "round": 1,
-            "findings": [{"finding": "f", "fix": "x"}],
-            "commits": [{"sha": "abc1236", "subject": "fix: x"}],
-            "tests": [{
-                "command": "houserules audit --base abc1234 --head abc1235",
-                "output": format!("Running the audit...\n{audit_json}"),
-            }],
-        }]);
+        let name = write_capture(
+            root.path(),
+            "audit.txt",
+            &format!("Running the audit...\n{}", audit_json(2)),
+        );
+        report["fix_rounds"] = fix_round_citing(&name);
         let file = write_report(root.path(), &report);
         let result = validate_deliverable(root.path(), &file).unwrap();
         assert_eq!(
             result.errors,
             vec![format!(
-                "{}.fix_rounds[0].tests[0].output: audit summary skipped is 2; re-run audit with --report",
+                "{}.fix_rounds[0].tests[0].capture: audit summary skipped is 2; re-run audit with --report",
                 file.display()
             )]
         );
@@ -707,26 +747,15 @@ mod tests {
     /// capture. This is a limit the function's own doc names, measured
     /// here rather than left asserted only in prose.
     #[test]
-    fn accepts_a_fix_round_test_whose_prose_contains_a_brace_before_the_json() {
+    fn accepts_a_fix_round_capture_whose_prose_contains_a_brace_before_the_json() {
         let root = schema_root();
         let mut report = report_sample();
-        let audit_json = serde_json::to_string(&json!({
-            "base": "abc1234", "head": "abc1235", "rules": [],
-            "summary": {
-                "base": "abc1234", "head": "abc1235", "deterministic": 1,
-                "pass": 0, "fail": 0, "warn": 0, "skipped": 5, "judged": 0,
-            },
-        }))
-        .unwrap();
-        report["fix_rounds"] = json!([{
-            "round": 1,
-            "findings": [{"finding": "f", "fix": "x"}],
-            "commits": [{"sha": "abc1236", "subject": "fix: x"}],
-            "tests": [{
-                "command": "houserules audit --base abc1234 --head abc1235",
-                "output": format!("Compiling {{ not json }}\n{audit_json}"),
-            }],
-        }]);
+        let name = write_capture(
+            root.path(),
+            "audit.txt",
+            &format!("Compiling {{ not json }}\n{}", audit_json(5)),
+        );
+        report["fix_rounds"] = fix_round_citing(&name);
         let file = write_report(root.path(), &report);
         assert_eq!(
             validate_deliverable(root.path(), &file).unwrap().errors,
@@ -739,24 +768,11 @@ mod tests {
     /// pins `parse_audit_summary_skipped`'s threshold, not merely its
     /// presence.
     #[test]
-    fn accepts_a_fix_round_audit_output_with_a_zero_skipped_summary() {
+    fn accepts_a_fix_round_audit_capture_with_a_zero_skipped_summary() {
         let root = schema_root();
         let mut report = report_sample();
-        report["fix_rounds"] = json!([{
-            "round": 1,
-            "findings": [{"finding": "f", "fix": "x"}],
-            "commits": [{"sha": "abc1236", "subject": "fix: x"}],
-            "tests": [{
-                "command": "houserules audit --base abc1234 --head abc1235 --report r.json",
-                "output": serde_json::to_string(&json!({
-                    "base": "abc1234", "head": "abc1235", "rules": [],
-                    "summary": {
-                        "base": "abc1234", "head": "abc1235", "deterministic": 1,
-                        "pass": 1, "fail": 0, "warn": 0, "skipped": 0, "judged": 0,
-                    },
-                })).unwrap(),
-            }],
-        }]);
+        let name = write_capture(root.path(), "audit.txt", &audit_json(0));
+        report["fix_rounds"] = fix_round_citing(&name);
         let file = write_report(root.path(), &report);
         assert_eq!(
             validate_deliverable(root.path(), &file).unwrap().errors,
@@ -764,19 +780,15 @@ mod tests {
         );
     }
 
-    /// A fix round test whose output is not JSON at all (cargo/vitest
+    /// A fix round test whose capture holds no JSON at all (cargo/vitest
     /// prose, say) is inspected and quietly skipped, not misread as an
     /// audit summary.
     #[test]
-    fn accepts_a_fix_round_test_whose_output_is_not_json() {
+    fn accepts_a_fix_round_capture_whose_output_is_not_json() {
         let root = schema_root();
         let mut report = report_sample();
-        report["fix_rounds"] = json!([{
-            "round": 1,
-            "findings": [{"finding": "f", "fix": "x"}],
-            "commits": [{"sha": "abc1236", "subject": "fix: x"}],
-            "tests": [{"command": "cargo test", "output": "running 1 test\ntest ok\n"}],
-        }]);
+        let name = write_capture(root.path(), "tests.txt", "running 1 test\ntest ok\n");
+        report["fix_rounds"] = fix_round_citing(&name);
         let file = write_report(root.path(), &report);
         assert_eq!(
             validate_deliverable(root.path(), &file).unwrap().errors,
@@ -832,30 +844,36 @@ mod tests {
         );
     }
 
-    /// Accepts a run whose exit code is an integer.
+    /// Accepts a run whose exit code is an integer, or null for a command that
+    /// a signal ended.
     #[test]
-    fn accepts_a_run_whose_exit_code_is_an_integer() {
+    fn accepts_a_run_whose_exit_code_is_an_integer_or_null() {
         let root = schema_root();
-        let mut report = report_sample();
-        report["tests"] = json!([{"command": "vitest", "output": "ok", "exit": 2}]);
-        let file = write_report(root.path(), &report);
-        assert_eq!(
-            validate_deliverable(root.path(), &file).unwrap().errors,
-            Vec::<String>::new()
-        );
+        for exit in [json!(2), json!(null)] {
+            let mut report = report_sample();
+            report["tests"][0]["exit"] = exit;
+            let file = write_report(root.path(), &report);
+            assert_eq!(
+                validate_deliverable(root.path(), &file).unwrap().errors,
+                Vec::<String>::new()
+            );
+        }
     }
 
-    /// Rejects a run whose exit code is not an integer.
+    /// Rejects a run whose exit code is neither an integer nor null.
     #[test]
     fn rejects_a_run_whose_exit_code_is_not_an_integer() {
         let root = schema_root();
         let mut report = report_sample();
-        report["tests"] = json!([{"command": "vitest", "output": "ok", "exit": "2"}]);
+        report["tests"][0]["exit"] = json!("2");
         let file = write_report(root.path(), &report);
         let result = validate_deliverable(root.path(), &file).unwrap();
         assert_eq!(
             result.errors,
-            vec![format!("{}.tests[0].exit: must be integer", file.display())]
+            vec![format!(
+                "{}.tests[0].exit: must be integer or null",
+                file.display()
+            )]
         );
     }
 

@@ -24,9 +24,7 @@ use std::path::{Component, Path};
 use std::process::{Command, Stdio};
 
 use super::render::{LocateError, git_location_in};
-
-/// The mode that the index records for a submodule.
-const SUBMODULE_MODE: &str = "160000";
+use super::submodule_paths;
 
 /// Why [`ignored_among`] gave no answer. Each variant holds the one line that
 /// names the fault, with the text of git.
@@ -108,30 +106,6 @@ fn ignored_after_a_failure(
         return Ok(BTreeSet::new());
     }
     check_ignore(root, &beyond_submodules).map_err(IgnoreFault::Git)
-}
-
-/// The paths of the submodules in the index of the work tree at `root`, as
-/// `/`-separated paths below `root`; `None` when git cannot list the index.
-fn submodule_paths(root: &Path) -> Option<Vec<String>> {
-    let output = Command::new("git")
-        .args(["ls-files", "--stage", "-z"])
-        .current_dir(root)
-        .env("LC_ALL", "C")
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    Some(
-        output
-            .stdout
-            .split(|&byte| byte == 0)
-            .filter_map(|entry| {
-                let (record, path) = std::str::from_utf8(entry).ok()?.split_once('\t')?;
-                (record.split(' ').next() == Some(SUBMODULE_MODE)).then(|| path.to_string())
-            })
-            .collect(),
-    )
 }
 
 /// `true` when `subject` names a path below one of `submodules`. The submodule

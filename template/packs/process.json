@@ -1,6 +1,6 @@
 {
   "name": "process",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "schema": "houserules/pack@1.2.0",
   "topics": {
     "process": {
@@ -596,8 +596,8 @@
       "summary": "Cite evidence only at paths that outlive the session: the project's deliverables folder or the tracked tree, never a session scratchpad.",
       "body": [
         "A report or work document that cites a capture must name a file under the project's deliverables folder (or the repository) that a later reader can open. A session scratchpad path is dead the moment the session ends; a citation into it is a claim nobody can collect on.",
-        "Copy small captures into the deliverables folder beside the document that cites them. An artifact too large to retain is disclosed as not retained, with its decisive excerpt quoted inline - never cited at a path that no longer exists.",
-        "Truncation markers count as citations: a marker naming a full log must point at a durable file whose content is a byte-prefix match of the retained excerpt.",
+        "Write each capture into the deliverables folder, beside the document that cites it. An artifact too large to retain is disclosed as not retained, with its decisive excerpt quoted - never cited at a path that no longer exists.",
+        "A task report cites each capture by its path and its SHA-256 hash, and holds at most one short excerpt of its output. The excerpt is a byte-exact part of the output of the capture, so the retained capture is the evidence: `houserules check-report-claims` fails a capture that is missing or changed and an excerpt that is not part of the output of its capture.",
         "A long-lived SOURCE comment states the rerunnable command and its measured counts inline, self-contained; a path in the deliverables folder may ride along as provenance but never as the only evidence, because a clone carries no such folder."
       ],
       "tags": [
@@ -622,8 +622,8 @@
         "The check is mechanical: for each named file, open it; for each quoted line, grep it; for each number, recompute it from the artifact. A reviewer does exactly this, so a report that skips it converts Minor findings into review rounds.",
         "A reversed trend is worth recording too: name the pattern in the review when it appears, and name its reversal when a later round demonstrates it.",
         "A SHIPPED doc or comment sentence stating a measurement is a claim like a report sentence: it cites a retained capture at a durable path, and a fix round's sweep re-opens every doc sentence the round touched. The report-claims checker cannot see shipped files — the manual sweep is the only net there.",
-        "A command field is the literal command copied from the terminal — never retyped, never annotated inline; labels and notes go beside the field. A reviewer paste-runs command fields; a field that cannot paste-run is a finding by itself.",
-        "Close every report by running the report-claims checker (`houserules check-report-claims <report file>`) over the report file after the last edit, and paste its clean run as the final tests entry. The checker is a floor, not a substitute for the manual sweep: its Limits section (crates/houserules/src/report_claims.rs, reachable only where this kit's own source lives) names what only the sweep catches; an adopter repo carries no such source, so there a false positive is disclosed per report and reported upstream instead. It ships as a `houserules` subcommand, so the closing act runs in every adopter repo, not only the one that built it. The checker gates gitignored workspace reports, never a tracked artifact a CI job could see, so it carries no CI job of its own -- the closing-act mandate in the task's instructions is the whole mechanism.",
+        "The `command` and the `exit` of a run come from the header of its capture, and `houserules report-facts` copies them into the report: never retype either, and keep labels and notes beside the run, not inside the command. A run with no capture, or a `command` or `exit` that differs from its capture, fails `houserules check-report-claims`; a reviewer re-runs the command from the header.",
+        "Close every report by running the report-claims checker (`houserules check-report-claims <report file>`) through `houserules capture` after the last edit, and add that clean run as the last `tests` entry. The checker is a floor, not a substitute for the manual sweep: its Limits lists (the module docs of `crates/houserules/src/report_claims/`, indexed in `crates/houserules/src/report_claims.rs`, reachable only where this kit's own source lives) name what only the sweep catches; an adopter repo carries no such source, so there a false positive is disclosed per report and reported upstream instead. It ships as a `houserules` subcommand, so the closing act runs in every adopter repo, not only the one that built it. The checker gates gitignored workspace reports, never a tracked artifact a CI job could see, so it carries no CI job of its own -- the closing-act mandate in the task's instructions is the whole mechanism.",
         "A commit message body is a claim like a report sentence: recompute its counts from the artifact before committing; a wrong count found post-commit is recorded in the report for aggregation to carry, never amended and never left silent.",
         "After any world-changing event - a fix round, an interruption, a rebase - re-derive every count and summary-scope field (implemented, self_review, doc comments citing measurements) from the tree at HEAD before re-submitting; a carried-forward sentence is a new claim, never trusted.",
         "A claim about a failure names whether it was OBSERVED or INFERRED - a commit body keeps the same observed-vs-reconstructed split its report keeps.",
@@ -825,7 +825,7 @@
       "kind": "gotcha",
       "area": "docs",
       "standing": false,
-      "summary": "When a file moves or is deleted, sweep for its old path with an unfiltered grep over the whole tree; an extension-limited grep is not a pointer audit.",
+      "summary": "When a file moves or is deleted, sweep for its old path with an unfiltered, case-insensitive grep over the whole tree; an extension filter misses pointers.",
       "body": [
         "An include-pattern or file-extension filter on the sweep misses a stale pointer sitting in an unusual place: a .gitignore entry, a comment in an uncommon file extension, an assertion message string.",
         "Exclude only the directories that never carry source content (a dependency directory, a version-control directory, a build output directory, a scratch workspace) - never a file extension."
@@ -846,9 +846,9 @@
       "kind": "rule",
       "area": "global",
       "standing": false,
-      "summary": "A deliverable pastes only real command output; a re-review reproduces at least one RED or audit before accepting a fix round.",
+      "summary": "A deliverable cites only real captures of command output; a re-review reproduces at least one RED or audit before accepting a fix round.",
       "body": [
-        "A fabricated capture and an overclaimed TDD RED are both caught only by a reviewer actually re-running the thing, never by a gate - the failure is invisible until someone reproduces it.",
+        "A changed or missing capture, an edited `command` or `exit`, and an excerpt that is not part of the output of its capture fail `houserules check-report-claims`. A capture that never ran and a TDD RED that overclaims are caught only by a reviewer actually re-running the thing - the failure is invisible until someone reproduces it.",
         "The author of a report who cannot reproduce a piece of evidence says so and labels what they reconstruct instead; asserting an unrecorded chronology as observed is a violation even when the underlying work was done correctly."
       ],
       "tags": [
@@ -1080,7 +1080,7 @@
       "standing": false,
       "summary": "Record every decision that the owner or a reviewer overturns as a `Reversal:` line in the record of the work; count the lines at the retrospective.",
       "body": [
-        "The line starts with `Reversal:` and names the decision that was overturned.",
+        "Write each reversal as its own list item of the record that starts with `Reversal:` and names the decision that was overturned; `houserules stats` counts only a line that starts with `Reversal:`, and the branch reviewer of the reference workflow also counts a `Reversal:` inside a longer entry.",
         "The retrospective counts the reversals beside the rule violations."
       ],
       "tags": [

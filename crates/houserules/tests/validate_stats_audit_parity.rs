@@ -390,6 +390,24 @@ fn stats_matches_the_frozen_stats_workspace_slice() {
 
 // ---- audit: field-identical JSON, both frozen audit slices --------------------------
 
+/// The hex digits of a short sha in `tests/goldens/audit/`.
+const GOLDEN_ABBREV: usize = 7;
+
+/// `houserules()` with git's abbreviation pinned to `GOLDEN_ABBREV`. `audit`
+/// prints `base` and `head` as short shas, and git (`core.abbrev`) takes their
+/// length from the object count of the repository unless a setting names it, so
+/// the length of a golden comparison would change when the checkout grows. The
+/// pin is the config pair that `git-config(1)` documents under
+/// `GIT_CONFIG_COUNT`; it replaces the pairs of the caller for this run.
+fn houserules_with_pinned_abbrev() -> std::process::Command {
+    let mut command = houserules();
+    command
+        .env("GIT_CONFIG_COUNT", "1")
+        .env("GIT_CONFIG_KEY_0", "core.abbrev")
+        .env("GIT_CONFIG_VALUE_0", GOLDEN_ABBREV.to_string());
+    command
+}
+
 fn assert_audit_matches_corpus(
     worktree: &Path,
     base: &str,
@@ -398,7 +416,7 @@ fn assert_audit_matches_corpus(
     corpus_slice: &str,
     expected_exit: i32,
 ) {
-    let output = houserules()
+    let output = houserules_with_pinned_abbrev()
         .args(["audit", "--base", base, "--head", head, "--ids", ids])
         .current_dir(worktree)
         .output()
@@ -453,6 +471,77 @@ fn audit_matches_the_frozen_knowledge_retrospective_slice() {
         "houserules.template-is-the-source,process.deliverables-json,writing-style.principles,quality.principles,knowledge-base.state-only-the-source",
         "knowledge-retrospective.json",
         0,
+    );
+}
+
+/// The lengths of `summary.base` and `summary.head` in the output of the
+/// `audit` that `command` runs over the range from `base` to `HEAD` in the
+/// repository at `root`.
+fn short_sha_lengths_of_audit(
+    mut command: std::process::Command,
+    root: &Path,
+    base: &str,
+) -> [usize; 2] {
+    let output = command
+        .args(["audit", "--base", base, "--head", "HEAD"])
+        .current_dir(root)
+        .output()
+        .expect("run audit");
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).expect("parse stdout");
+    ["base", "head"].map(|side| {
+        result["summary"][side]
+            .as_str()
+            .unwrap_or_else(|| panic!("summary.{side} is a string: {result}"))
+            .len()
+    })
+}
+
+/// The pin beats the length that git otherwise takes from the configuration of
+/// the repository or from its object count, so the golden comparisons above do
+/// not change when this checkout grows. The unpinned run is the control: it
+/// shows that the setting of the repository is in effect.
+#[test]
+fn the_pinned_audit_prints_short_shas_of_the_golden_length_whatever_core_abbrev_asks_for() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    common::copy_dir_recursive(&repo_root().join("tests/fixtures/mini"), root);
+    let git = |args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .args(["-c", "user.name=t", "-c", "user.email=t@t.t"])
+            .args(["-c", "commit.gpgsign=false"])
+            .args(args)
+            .current_dir(root)
+            .output()
+            .expect("run git");
+        assert!(output.status.success(), "git {args:?} failed");
+        String::from_utf8(output.stdout)
+            .expect("utf8 git output")
+            .trim()
+            .to_string()
+    };
+    git(&["init", "-q", "-b", "main"]);
+    git(&["config", "core.abbrev", "12"]);
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "--no-verify", "-m", "chore: base"]);
+    let base = git(&["rev-parse", "HEAD"]);
+    fs::write(root.join("note.txt"), "x\n").expect("write note.txt");
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "--no-verify", "-m", "chore: note"]);
+
+    assert_eq!(
+        short_sha_lengths_of_audit(houserules(), root, &base),
+        [12, 12],
+        "the control run: the repository setting is in effect"
+    );
+    assert_eq!(
+        short_sha_lengths_of_audit(houserules_with_pinned_abbrev(), root, &base),
+        [GOLDEN_ABBREV; 2]
     );
 }
 

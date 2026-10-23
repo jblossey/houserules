@@ -566,11 +566,21 @@ fn stats_and_freeze(
     write_golden(goldens_dir, &format!("stats/{slice}.json"), &capture)
 }
 
+/// The hex digits of a short sha in `tests/goldens/audit/`. The parity test
+/// `tests/validate_stats_audit_parity.rs` keeps its own `GOLDEN_ABBREV` with the
+/// same value. `audit` prints `base` and `head` as short shas, and git takes
+/// their length from the object count of the repository unless a setting names
+/// it, so the capture pins it.
+const GOLDEN_ABBREV: usize = 7;
+
 /// Runs `houserules audit --base base --head head --ids ids` with
 /// `worktree` as the working directory and freezes the capture at
 /// `tests/goldens/audit/<slice>.json` -- like `stats`, `audit`'s own
 /// output names only git-relative paths (`changed_files`), never an
-/// absolute one, so no redaction applies here either.
+/// absolute one, so no redaction applies here either. The run pins git's
+/// abbreviation to `GOLDEN_ABBREV` through the config pair that
+/// `git-config(1)` documents under `GIT_CONFIG_COUNT`; the pair replaces the
+/// pairs of the caller for this run.
 fn audit_and_freeze(
     bin: &Path,
     worktree: &Path,
@@ -581,6 +591,9 @@ fn audit_and_freeze(
     slice: &str,
 ) -> String {
     let output = Command::new(bin)
+        .env("GIT_CONFIG_COUNT", "1")
+        .env("GIT_CONFIG_KEY_0", "core.abbrev")
+        .env("GIT_CONFIG_VALUE_0", GOLDEN_ABBREV.to_string())
         .args(["audit", "--base", base, "--head", head, "--ids", ids])
         .current_dir(worktree)
         .output()

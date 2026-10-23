@@ -1,0 +1,3 @@
+{"schema":"houserules/capture@1.0.0","argv":["sh","-c","echo \"running 12 tests\"; echo \"test result: ok. 12 passed; 0 failed\""],"cwd":"/home/maintainer/work","start":"2026-10-23T02:59:41.279791229Z","end":"2026-10-23T02:59:41.288645436Z","exit":0,"signal":null,"head":null,"dirty":null,"lossy":0}
+running 12 tests
+test result: ok. 12 passed; 0 failed

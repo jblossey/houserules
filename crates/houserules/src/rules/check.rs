@@ -28,6 +28,7 @@ use super::kit_citations::{KitScope, kit_citation_findings};
 use super::markers::{base_marker_findings, marker_findings};
 use super::model::{Base, load_base};
 use super::render::{self, RULE_KINDS};
+use super::tracked_files;
 
 /// Maps a `check` entry's `type` to the fields `check_shape` requires it
 /// to carry. An unknown type (already reported by the schema's own
@@ -177,10 +178,8 @@ fn regex_validity_message(pattern: &str, flags: &str) -> Option<String> {
 /// (`check_fields`) and the `commits` type's own "needs one of four" rule
 /// (`subject`, `body_absent`, `body_line_max`, or `require_trailer`). An
 /// unknown `type` gives none: the schema reports it. `at` prefixes every
-/// message. `check_shape` runs this on the checks of the local topic files;
-/// `check_packs::pack_check_findings` runs it on the effective checks of the
-/// active pack entries, an override applied.
-pub(super) fn required_field_findings(check: &Value, at: &str, errors: &mut Vec<String>) {
+/// message. `check_shape` runs this first.
+fn required_field_findings(check: &Value, at: &str, errors: &mut Vec<String>) {
     let check_type = check.get("type").and_then(Value::as_str).unwrap_or("");
     let Some(fields) = check_fields(check_type) else {
         return;
@@ -207,8 +206,11 @@ pub(super) fn required_field_findings(check: &Value, at: &str, errors: &mut Vec<
 /// `body_absent`, and each string of `exempt_subjects` (whichever are
 /// present) compile as regular expressions, the patterns the commit
 /// evaluator compiles. `at` prefixes every message the same way the
-/// caller's other per-entry messages are prefixed.
-fn check_shape(check: &Value, at: &str, errors: &mut Vec<String>) {
+/// caller's other per-entry messages are prefixed. `check_base` runs this on
+/// the checks of the local topic files, and
+/// `check_packs::pack_check_findings` runs it on the effective checks of the
+/// active pack entries, an override applied.
+pub(super) fn check_shape(check: &Value, at: &str, errors: &mut Vec<String>) {
     let check_type = check.get("type").and_then(Value::as_str).unwrap_or("");
     if check_fields(check_type).is_none() {
         return; // the schema already reported an unknown type
@@ -517,9 +519,11 @@ impl TreeSource {
 /// `check_base` itself never calls git otherwise, `model::load_base`'s
 /// own module doc), so a tree with no git history at all must still get
 /// an answer -- or `root` is a git repository whose index is empty (this
-/// function's own inline doc has the second case's own account).
+/// function's own inline doc has the second case's own account). A git
+/// that is not on `PATH` falls back the same way: `tracked_files` gives
+/// `None` there.
 ///
-/// The second element is every tracked path `git_ls_files` could not
+/// The second element is every tracked path `tracked_files` could not
 /// decode as UTF-8, named so `check_base` can report each as its own
 /// finding -- never silently dropped, and never allowed to change the
 /// derivation `label` reports for every OTHER, valid path. `TreeSource`
@@ -534,7 +538,7 @@ impl TreeSource {
 /// Filesystem's own label already covers the FILE LIST honestly there
 /// (git returned nothing USABLE, which is what "no git-tracked files
 /// found" means). The SKIPS still travel with it, though: the branch
-/// below carries whatever `git_ls_files` named as undecodable into its
+/// below carries whatever `tracked_files` named as undecodable into its
 /// own return, rather than discarding them the moment `files` came back
 /// empty -- a repository whose one tracked path is entirely non-UTF-8
 /// still gets that path named, not silently absorbed into a bare
@@ -554,7 +558,7 @@ pub(crate) fn tracked_tree_files(
     // to retire something FROM; an index with nothing in it at all is
     // never that case, so trusting the filesystem there costs nothing the
     // primary derivation is built to catch.
-    let (files, skipped) = git_ls_files(root).unwrap_or_default();
+    let (files, skipped) = tracked_files(root).unwrap_or_default();
     if !files.is_empty() {
         return Ok((files, TreeSource::GitTracked, skipped));
     }
@@ -575,56 +579,6 @@ pub(crate) fn tracked_tree_files(
 /// stands. Both commands print each skipped path with this one spelling.
 pub(crate) fn skipped_path_line(path: &str) -> String {
     format!("a tracked path is not valid UTF-8, skipped from the dead-glob scan: {path}")
-}
-
-/// Runs `git ls-files -z` at `root`, decoding each NUL-separated entry on
-/// its own -- `None` when `root` is not a git working tree or git itself
-/// is not on `PATH`; `tracked_tree_files` walks the filesystem instead in
-/// either case. Never panics: an unavailable git is exactly the "fall
-/// back" case from this function's point of view, not a fatal one
-/// (`bin/residue-gate.rs`'s own `tracked_files` panics on the identical
-/// command, but that dev-only tool always runs inside this checkout's
-/// own git history, where the command cannot fail this way).
-///
-/// `-z` is not optional: without it, git's own `core.quotePath` (on by
-/// default) double-quotes and octal-escapes any path byte outside
-/// printable ASCII, so a tracked `docs/café.md` comes back as the
-/// 12-character-escaped literal `"docs/caf\303\251.md"` -- a string no
-/// glob matches -- and a naive `.lines()` split has the identical failure
-/// mode for an embedded newline. `-z` disables that quoting and
-/// NUL-terminates each entry instead of newline-terminating it.
-///
-/// Decoding happens per entry, not once over the whole buffer: a single
-/// `String::from_utf8` over the joined output would turn ONE tracked path
-/// with non-UTF-8 bytes (a latin-1 filename, say) into a `None` for the
-/// ENTIRE result, silently downgrading every other, perfectly valid path
-/// to the filesystem fallback -- under a label ("no git-tracked files
-/// found") that would be false, since git found some. Splitting on NUL
-/// first and decoding each piece keeps every valid entry in the returned
-/// list (`-z`'s own trailing NUL leaves one empty final piece, filtered)
-/// and collects every undecodable one, as its own raw bytes rendered
-/// lossily for display, into the second list instead of discarding it.
-fn git_ls_files(root: &Path) -> Option<(Vec<String>, Vec<String>)> {
-    let output = std::process::Command::new("git")
-        .args(["ls-files", "-z"])
-        .current_dir(root)
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let mut files = Vec::new();
-    let mut skipped = Vec::new();
-    for entry in output.stdout.split(|&byte| byte == 0) {
-        if entry.is_empty() {
-            continue;
-        }
-        match std::str::from_utf8(entry) {
-            Ok(path) => files.push(path.to_string()),
-            Err(_) => skipped.push(String::from_utf8_lossy(entry).into_owned()),
-        }
-    }
-    Some((files, skipped))
 }
 
 /// The fallback tree: every regular file under `root`, as forward-slash-
@@ -806,8 +760,8 @@ fn ignored_verify_paths(base: &Base) -> Result<BTreeSet<String>, String> {
 ///
 /// The area of an active entry must be a key of `areas.json`: the schema
 /// holds no area enum to compare with. `area_findings`, `pack_see_findings`,
-/// and `pack_check_findings` (the fields that the check of an active pack
-/// entry requires, an override applied), all of the pack layer
+/// and `pack_check_findings` (the shape of the check of an active pack entry,
+/// an override applied), all of the pack layer
 /// (`check_packs`), join the first stage, so a finding of any of them stops
 /// the second stage. The trailing group comes last in both cases, so it never
 /// hides the other stage: the findings of `pack_findings` (the pins,
@@ -2286,7 +2240,7 @@ mod tests {
     /// `tracked_tree_files` must return the skipped list on the
     /// `Filesystem` fallback branch too, not only on `GitTracked`: when
     /// NO tracked path decodes -- `files` above comes back empty,
-    /// falling back to the filesystem walk -- `git_ls_files`'s own
+    /// falling back to the filesystem walk -- `tracked_files`'s own
     /// `skipped` list must still reach the reader, not be discarded with
     /// `files`. Reproduced with a repository whose ONLY tracked path is
     /// undecodable: it is `git add`ed before this fixture writes anything

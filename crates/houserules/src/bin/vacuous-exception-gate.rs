@@ -6,18 +6,15 @@
 //! its own: a hit-count grouping built only from the hits it actually
 //! found never lists a label that found none, so a declared exception
 //! matching zero real occurrences is invisible in both places at once
-//! (batch 24 T3a fix round 1's `runbook_release_please_section_lines`,
-//! orphaned by a heading rename with its own two unit tests still green
-//! throughout, since neither recomputed the exception against a real
-//! live run).
+//! (an exception orphaned by a heading rename keeps its own unit tests
+//! green, since none recomputes the exception against a real live run).
 //!
 //! # Scope: every exception list the tree carries
 //!
 //! Two DIFFERENT shapes today, both enumerated by an in-process scan of
 //! `crates/houserules/src/bin/*.rs` (no subprocess spawned --
-//! `houserules.platform-gated-tests`: an earlier version of this
-//! enumeration spawned `grep`, ungated, on a crate CI builds and tests
-//! on three OSes):
+//! `houserules.platform-gated-tests`: a spawned `grep` would run
+//! ungated on a crate CI builds and tests on three OSes):
 //!
 //! - The exception-list function's own declaration (label, reason, a hit
 //!   predicate, returning a `Vec<Exception>`): `other_bin_source_files`
@@ -29,13 +26,12 @@
 //!   (paths never even walked, a coarser exclusion than a per-hit
 //!   exception): the same in-process scan, searching for the substring
 //!   `PREFIXES` this time, finds exactly one file, `residue-gate.rs`
-//!   (`excluded_prefix_style_lists_are_exactly_residue_gates_own`) --
-//!   brought into this gate's reach after a
-//!   branch review found its `.superpowers/` entry matching zero tracked
-//!   files (`.gitignore` already excludes that whole tree from
-//!   `git ls-files`, so the entry excluded nothing, ever) while this
-//!   gate itself, keyed only to the first shape, reported "0 unexpected
-//!   vacuous".
+//!   (`excluded_prefix_style_lists_are_exactly_residue_gates_own`). The
+//!   second shape needs its own scan because a gate keyed only to the
+//!   first shape reports "0 unexpected vacuous" while a prefix entry
+//!   matches zero tracked files: a `.superpowers/` entry excludes
+//!   nothing, since `.gitignore` already keeps that whole tree out of
+//!   `git ls-files`.
 //!
 //! Neither search is a general Rust-source parse (`quality.principles`'
 //! YAGNI: a structural scan for "every construct shaped like a
@@ -246,8 +242,8 @@ fn parse_declared_counts(stdout: &str, header_suffix: &str) -> Option<Vec<(Strin
 /// own failure condition), every zero-count label that IS sanctioned
 /// (`pending`, informational only), and every sanction that no longer
 /// describes a real, current defect (`stale_sanctions`, this gate's
-/// OTHER failure condition -- this module's own doc, "The sanctioned-
-/// until-T4 exceptions", names the two ways a sanction goes stale).
+/// OTHER failure condition -- this module's own doc, "Sanctioning a
+/// known defect", names the two ways a sanction goes stale).
 struct GateReport {
     unexpected_vacuous: Vec<String>,
     stale_sanctions: Vec<String>,
@@ -411,10 +407,10 @@ mod tests {
 
     /// Every `.rs` file directly under `crates/houserules/src/bin/`, as
     /// (repo-relative path, file text) pairs -- an in-process directory
-    /// listing, the replacement for a `grep -rl` subprocess spawn this
-    /// module used to make (`houserules.platform-gated-tests`: an
-    /// ungated spawn on a crate CI builds and tests on `windows-latest`
-    /// and `macos-latest` too). `src/bin/` is flat (no subdirectories),
+    /// listing, not a `grep -rl` subprocess spawn
+    /// (`houserules.platform-gated-tests`: an ungated spawn would run
+    /// on `windows-latest` and `macos-latest` too, which CI builds and
+    /// tests). `src/bin/` is flat (no subdirectories),
     /// so a plain `read_dir` is exactly `-r`'s own reach here; no
     /// `walkdir` needed for one directory level. Test-only: this
     /// module's own enumeration tests are its only callers.
@@ -625,9 +621,9 @@ mod tests {
     }
 
     /// The excluded-prefix kind is classified identically, and a zero
-    /// count there is unexpected too -- the exact live incident
-    /// (`.superpowers/`, HR-115's own review finding) this classification
-    /// path exists to catch.
+    /// count there is unexpected too -- the case of a `.superpowers/`
+    /// entry that `.gitignore` already keeps out of `git ls-files`, which
+    /// this classification path exists to catch.
     #[test]
     fn classify_flags_an_unsanctioned_zero_count_excluded_prefix_as_unexpected() {
         let counts = vec![(".superpowers/".to_string(), 0)];

@@ -36,6 +36,8 @@ A task that adds or tightens a check in `check-knowledge`, `check-backlog`, or `
 
 Mark tasks parallel only when their declared file sets are disjoint and no task needs another's output (`process.parallel-on-disjoint-files`). Name the files that you regenerate at integration.
 
+A gate command that the harness refuses to an agent is a controller-run integration gate: the plan lists it, and you run it after each integration and record it in the ledger.
+
 A task that changes the implementer template, the task-reviewer template, or an eval scenario needs the eval run of the Template evaluation section of the `orchestrating` skill. Say so in the plan.
 
 ## 5. Approve

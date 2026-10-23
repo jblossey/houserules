@@ -14,22 +14,11 @@ use std::process::{Command, Output};
 use serde_json::Value;
 use tempfile::TempDir;
 
+mod tracker_support;
 mod tree_snapshot;
 
+use tracker_support::{quoted, resolved};
 use tree_snapshot::{assert_same_tree, snapshot};
-
-/// `path` canonical, in the form houserules prints it: on Windows without
-/// the `\\?\` prefix that `canonicalize` adds.
-fn resolved(path: &Path) -> PathBuf {
-    let canonical = path.canonicalize().expect("canonicalize");
-    match canonical
-        .to_str()
-        .and_then(|text| text.strip_prefix(r"\\?\"))
-    {
-        Some(plain) => PathBuf::from(plain),
-        None => canonical,
-    }
-}
 
 /// A `Command` for the compiled `houserules` binary under test.
 fn houserules() -> Command {
@@ -585,7 +574,7 @@ fn update_in_a_subdirectory_without_an_install_refuses() {
         String::from_utf8(output.stderr).unwrap(),
         format!(
             "no houserules install here (no .houserules.json); run houserules init --dir {}\n",
-            top.join("sub").display()
+            quoted(&top.join("sub"))
         )
     );
     assert_same_tree(

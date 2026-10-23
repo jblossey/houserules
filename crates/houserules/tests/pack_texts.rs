@@ -1209,7 +1209,7 @@ impl CoreReading {
 
 /// The readings of the core-text scan. The scan fails when a reading excuses
 /// no hit, so a row cannot outlive the text it excuses.
-const CORE_READINGS: [CoreReading; 8] = [
+const CORE_READINGS: [CoreReading; 9] = [
     CoreReading {
         paths: &["backlog/"],
         section: "",
@@ -1237,6 +1237,13 @@ const CORE_READINGS: [CoreReading; 8] = [
         line: "\"backlog\"",
         classes: &["tracker-subject"],
         reason: "`backlog` is a field of the report format, which is core (design.md 5.124)",
+    },
+    CoreReading {
+        paths: &[".claude/skills/houserules-step/SKILL.md"],
+        section: "",
+        line: "in the workspace (default",
+        classes: &["dispatch-protocol"],
+        reason: "the workspace is the `workspaces` location of the install marker, `.houserules/work/` by default, which every install has",
     },
     CoreReading {
         paths: &[".claude/schemas/deliverables.json"],

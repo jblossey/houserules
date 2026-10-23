@@ -1,0 +1,135 @@
+{
+  "kind": "task-report",
+  "model": "sonnet",
+  "task": "fixture",
+  "backlog": [
+    "HR-171"
+  ],
+  "status": "DONE_WITH_CONCERNS",
+  "implemented": "A fixture of the report form of batch 36: every run cites a capture by path and hash.",
+  "commits": [
+    {
+      "sha": "abc1234",
+      "subject": "feat: cite runs by capture"
+    }
+  ],
+  "tests": [
+    {
+      "capture": "captures/suite.txt",
+      "sha256": "8520f94ec80c20287c82ccef5fdec2440e008bfa63b426287e9c8117a2fc0a46",
+      "command": "sh -c 'echo \"running 12 tests\"; echo \"test result: ok. 12 passed; 0 failed\"'",
+      "exit": 0,
+      "excerpt": "test result: ok. 12 passed; 0 failed"
+    }
+  ],
+  "live_run": [
+    {
+      "capture": "captures/live.txt",
+      "sha256": "34e65d8b151d2432fca3c9b5eebefc0488d0a52871ae30cae1ead1097f3a6feb",
+      "command": "sh -c 'echo \"validated: 1 file\"'",
+      "exit": 0
+    }
+  ],
+  "tdd": [
+    {
+      "test": "a_run_cites_a_capture",
+      "mode": "natural",
+      "red": {
+        "capture": "captures/red.txt",
+        "sha256": "efdc0de82aa536b96c36cd68b39bd0e96a2e917b7460047fdcaf1a60ccdde86b",
+        "command": "sh -c 'echo \"running 1 test\"; echo \"test a_run_cites_a_capture ... FAILED\"; echo \"test result: FAILED. 0 passed; 1 failed\" >&2; exit 1'",
+        "exit": 1,
+        "excerpt": "test a_run_cites_a_capture ... FAILED"
+      },
+      "green": {
+        "capture": "captures/green.txt",
+        "sha256": "bbf35c003fcffdf5b9c715ccdb43c9d36f0e57192889ea1210769c9cc72e871f",
+        "command": "sh -c 'echo \"running 1 test\"; echo \"test a_run_cites_a_capture ... ok\"; echo \"test result: ok. 1 passed; 0 failed\"'",
+        "exit": 0,
+        "excerpt": "test a_run_cites_a_capture ... ok"
+      }
+    }
+  ],
+  "files_changed": [
+    "src/a.rs"
+  ],
+  "docs_verified": [],
+  "dependency_vetting": null,
+  "coverage": null,
+  "citations": [
+    {
+      "path": "src/a.rs",
+      "line": 3,
+      "end": 4,
+      "anchor": "fn main",
+      "sha256": "cf2b738e91797a5cb540cee5a2c6fa279477c6a2a4de525af6cd9c3ecf961df5"
+    }
+  ],
+  "self_audit": {
+    "summary": {
+      "base": "abc1233",
+      "head": "abc1234",
+      "deterministic": 1,
+      "pass": 1,
+      "fail": 0,
+      "warn": 0,
+      "skipped": 0,
+      "judged": 0
+    },
+    "rows": [
+      {
+        "id": "process.tdd",
+        "mode": "deterministic",
+        "result": "pass",
+        "evidence": "1 commits checked"
+      }
+    ]
+  },
+  "self_review": [
+    {
+      "claim": "The one pinned behavior is the exit of the red run.",
+      "evidence": [
+        "captures/red.txt"
+      ]
+    },
+    {
+      "claim": "The diff holds no other change."
+    }
+  ],
+  "concerns": [
+    "The fixture cites a file that it does not hold."
+  ],
+  "knowledge_used": [
+    "process.tdd"
+  ],
+  "fix_rounds": [
+    {
+      "round": 1,
+      "findings": [
+        {
+          "finding": "The first run records no exit.",
+          "fix": "The run records the exit of its capture.",
+          "file": "src/a.rs",
+          "reran": "captures/red.txt"
+        }
+      ],
+      "commits": [
+        {
+          "sha": "abc1235",
+          "subject": "fix: record the exit"
+        }
+      ],
+      "tests": [
+        {
+          "capture": "captures/fix-audit.txt",
+          "sha256": "253496dcf2387411dcc8219e97c56f5db0618646773c109c057ebc0a778091d0",
+          "command": "cat audit.json",
+          "exit": 0
+        }
+      ],
+      "gates_run": [
+        "cargo test"
+      ]
+    }
+  ]
+}

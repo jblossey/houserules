@@ -21,18 +21,18 @@ clap = { version = "=4.6.7", features = ["derive"] }
 dirs = "=7.0.0"
 globset = "=0.4.20"
 indexmap = "=2.14.2"
+jiff = { version = "=0.2.38", default-features = false, features = ["std"] }
 percent-encoding = "=2.3.2"
 regress = "=0.12.0"
 rust-embed = { version = "=8.13.0", features = ["debug-embed"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.151", features = ["preserve_order"] }
 sha2 = "=0.11.1"
+shlex = "=2.0.1"
+tempfile = "=3.27.0"
 tokio = { version = "=1.53.3", default-features = false, features = ["rt", "time"] }
 url = "=2.5.8"
 walkdir = "=2.5.0"
-
-[dev-dependencies]
-tempfile = "=3.27.0"
 
 [target."cfg(unix)".dev-dependencies]
 libc = "=0.2.191"

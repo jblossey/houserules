@@ -9,8 +9,9 @@
 # Paths and refs are relative to the install root, the parent of the directory
 # that holds this script, found through the script's own symlinks.
 #   houserules-step.sh before <path>...      the rules for the files to change
-#   houserules-step.sh after <base> [<report>]  the audit since <base>, and
-#                                               the validation of <report>
+#   houserules-step.sh after <base> [<report>]  the audit since <base>, and the
+#                                               facts and the validation of
+#                                               <report>
 set -u
 
 usage() {
@@ -78,12 +79,23 @@ case "$mode" in
     base=$2
     report=${3:-}
     prepare_output_directory || exit 2
-    houserules audit --base "$base" --json .houserules/step/audit.json > /dev/null
+    # The result of an earlier run must never reach report-facts.
+    rm -f .houserules/step/audit.json
+    set -- audit --base "$base" --json .houserules/step/audit.json
+    [ -z "$report" ] || set -- "$@" --report "$report"
+    houserules "$@" > /dev/null
     audit_status=$?
     echo "$root/.houserules/step/audit.json"
     echo "audit exit status: $audit_status"
     status=$audit_status
     if [ -n "$report" ]; then
+      set -- report-facts "$report" --base "$base"
+      [ ! -f .houserules/step/audit.json ] || set -- "$@" --audit .houserules/step/audit.json
+      houserules "$@" > .houserules/step/report-facts.txt 2>&1
+      facts_status=$?
+      echo "$root/.houserules/step/report-facts.txt"
+      echo "report-facts exit status: $facts_status"
+      [ "$status" -ne 0 ] || status=$facts_status
       houserules validate "$report" > .houserules/step/validate.json
       validate_status=$?
       echo "$root/.houserules/step/validate.json"

@@ -12,10 +12,10 @@
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use crate::node_path::resolve_like_node;
 use crate::root::INSTALL_MARKER;
+use crate::rules::{ListingFailure, listed_by_name};
 
 use super::ci_workflow::workflow_path;
 
@@ -126,37 +126,16 @@ pub(super) fn locate(target: &Path) -> Result<Placement, String> {
 /// submodule as one path and none of its files, so an install inside a
 /// submodule belongs to that repository.
 pub(super) fn other_installs(placement: &Placement) -> Result<Vec<Vec<String>>, String> {
-    let output = Command::new("git")
-        .args([
-            "ls-files",
-            "-z",
-            "--cached",
-            "--others",
-            "--exclude-standard",
-            "--",
-        ])
-        .arg(format!(":(glob)**/{INSTALL_MARKER}"))
-        .current_dir(&placement.top_level)
-        .output()
-        .map_err(|error| format!("cannot run git: {error}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let line = stderr
-            .lines()
-            .map(str::trim)
-            .find(|line| !line.is_empty())
-            .unwrap_or("git ls-files failed");
-        return Err(format!(
-            "cannot list the installs of the repository at {}: {line}",
-            placement.top_level.display()
-        ));
-    }
+    let markers =
+        listed_by_name(&placement.top_level, INSTALL_MARKER).map_err(|failure| match failure {
+            ListingFailure::NotRun(error) => format!("cannot run git: {error}"),
+            ListingFailure::Failed(line) => format!(
+                "cannot list the installs of the repository at {}: {line}",
+                placement.top_level.display()
+            ),
+        })?;
     let mut roots = BTreeSet::new();
-    for listed in output
-        .stdout
-        .split(|byte| *byte == 0)
-        .filter(|path| !path.is_empty())
-    {
+    for listed in &markers {
         let listed = std::str::from_utf8(listed).map_err(|_| {
             format!(
                 "cannot list the installs of the repository at {}: git lists a path that is no UTF-8",

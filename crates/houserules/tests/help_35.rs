@@ -11,69 +11,9 @@
 //! one run shows the whole gap. Clap drops the period that ends the last
 //! sentence of a command's description, so no pin ends on it.
 
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+mod help_support;
 
-/// `text` with every run of white space read as one space.
-fn folded(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-/// The text that `houserules <command> --help` prints, folded.
-fn help_of(command: &str) -> String {
-    let output = Command::new(env!("CARGO_BIN_EXE_houserules"))
-        .env("HOUSERULES_SKIP_SELF_UPDATE", "1")
-        .args([command, "--help"])
-        .output()
-        .expect("run --help");
-    assert_eq!(output.status.code(), Some(0), "{command} --help exits 0");
-    folded(&String::from_utf8(output.stdout).expect("utf8 stdout"))
-}
-
-/// The file `relative` below the repository root, built component by component
-/// (`houserules.path-pins-mirror-the-code`).
-fn repo_file(relative: &str) -> PathBuf {
-    relative.split('/').fold(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(".."),
-        |path, part| path.join(part),
-    )
-}
-
-/// The text of the file `relative` below the repository root.
-fn read(relative: &str) -> String {
-    fs::read_to_string(repo_file(relative)).unwrap_or_else(|error| panic!("{relative}: {error}"))
-}
-
-/// Fails with every statement of `statements` that `text` lacks.
-fn states(surface: &str, text: &str, statements: &[&str]) {
-    let missing: Vec<&str> = statements
-        .iter()
-        .copied()
-        .filter(|statement| !text.contains(statement))
-        .collect();
-    assert!(
-        missing.is_empty(),
-        "{surface} lacks {} statement(s):\n{}",
-        missing.len(),
-        missing.join("\n")
-    );
-}
-
-/// Fails with every statement of `statements` that `text` holds.
-fn omits(surface: &str, text: &str, statements: &[&str]) {
-    let found: Vec<&str> = statements
-        .iter()
-        .copied()
-        .filter(|statement| text.contains(statement))
-        .collect();
-    assert!(
-        found.is_empty(),
-        "{surface} holds {} stale statement(s):\n{}",
-        found.len(),
-        found.join("\n")
-    );
-}
+use help_support::{folded, help_of, omits, read, states};
 
 /// The sentence on the reference counts of the audit JSON (spec 8.5). The help
 /// of `audit`, README, and the upgrade guide say the same.
@@ -263,7 +203,8 @@ fn check_report_claims_help_keeps_the_doc_and_item_modes() {
 
 // ---- update --help --------------------------------------------------------------------
 
-/// `update` in a directory with no install (HR-216, spec 8.2).
+/// `update` in a directory with no install (HR-216, spec 8.2). The line quotes
+/// `<dir>` for a POSIX shell where it needs quoting (HR-227, spec 8.3).
 #[test]
 fn update_help_names_the_refusal_of_a_directory_with_no_install() {
     states(
@@ -271,8 +212,13 @@ fn update_help_names_the_refusal_of_a_directory_with_no_install() {
         &help_of("update"),
         &[
             "A directory with no `.houserules.json` and no `knowledge/` directory, at or above it within the git top level, is no install: `update` prints `no houserules install here (no .houserules.json); run houserules init`, exits 2, and writes nothing",
-            "When `--dir` names a directory other than the working directory, the line names it: `run houserules init --dir <dir>`, with `<dir>` as written",
+            "When `--dir` names a directory other than the working directory, the line names it: `run houserules init --dir <dir>`, with `<dir>` quoted for a POSIX shell where it needs quoting",
         ],
+    );
+    omits(
+        "update --help",
+        &help_of("update"),
+        &["with `<dir>` as written"],
     );
 }
 

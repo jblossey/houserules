@@ -1,0 +1,87 @@
+{
+  "kind": "task-report",
+  "model": "sonnet",
+  "task": 1,
+  "backlog": ["HR-999"],
+  "status": "DONE",
+  "implemented": "A report of the form that batch 35 and earlier write: each run holds its output inline and each self_review item is a string.",
+  "commits": [{ "sha": "abc1234", "subject": "feat: an example change" }],
+  "tests": [
+    {
+      "command": "cargo test --locked",
+      "output": "running 12 tests\ntest result: ok. 12 passed; 0 failed\n",
+      "exit": 0
+    }
+  ],
+  "live_run": [
+    {
+      "command": "houserules validate task-1-report.json",
+      "output": "[]\n",
+      "exit": 0
+    }
+  ],
+  "tdd": [
+    {
+      "test": "an_example_behavior",
+      "mode": "natural",
+      "red": {
+        "command": "cargo test an_example_behavior",
+        "output": "test an_example_behavior ... FAILED\n",
+        "exit": 101
+      },
+      "green": {
+        "command": "cargo test an_example_behavior",
+        "output": "test an_example_behavior ... ok\n",
+        "exit": 0
+      }
+    }
+  ],
+  "files_changed": ["src/example.rs"],
+  "docs_verified": [],
+  "dependency_vetting": null,
+  "coverage": null,
+  "self_audit": {
+    "summary": {
+      "base": "0000000",
+      "head": "0000001",
+      "deterministic": 1,
+      "pass": 1,
+      "fail": 0,
+      "warn": 0,
+      "skipped": 0,
+      "judged": 0
+    },
+    "rows": [
+      {
+        "id": "d.one",
+        "kind": "rule",
+        "mode": "deterministic",
+        "level": "fail",
+        "result": "pass",
+        "evidence": "No match."
+      }
+    ]
+  },
+  "self_review": [
+    "The diff holds the example change and nothing else.",
+    "The example test fails before the change and passes after it."
+  ],
+  "concerns": [],
+  "knowledge_used": ["process.tdd"],
+  "fix_rounds": [
+    {
+      "round": 1,
+      "findings": [
+        { "finding": "The example has no test.", "fix": "The example has a test.", "file": "src/example.rs" }
+      ],
+      "commits": [{ "sha": "abc1235", "subject": "fix: test the example" }],
+      "tests": [
+        {
+          "command": "houserules audit --base abc1233 --head abc1235 --report task-1-report.json",
+          "output": "{\"summary\": {\"pass\": 1, \"fail\": 0, \"skipped\": 0}}\n",
+          "exit": 0
+        }
+      ]
+    }
+  ]
+}

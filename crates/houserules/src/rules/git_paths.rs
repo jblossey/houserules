@@ -8,21 +8,34 @@
 //! one function that turns such a list into install-root paths. An install
 //! at the git top level has an empty prefix, and every path maps to
 //! itself.
+//!
+//! This module is also the one module that runs `git ls-files`. The binary
+//! holds three listings: [`tracked_files`] (the index), [`listed_by_name`]
+//! (the files of one name, tracked or untracked and not ignored), and
+//! [`submodule_paths`] (the submodules of the index). Each caller keeps its
+//! own handling of a failure and of a path that is no UTF-8. A lint test
+//! (`tests/ls_files_home.rs`) fails when another module passes the `ls-files`
+//! argument to git.
 
+use std::io;
 use std::path::Path;
+use std::process::Command;
 
 use super::render::git_location_in;
+
+/// The mode that the index records for a submodule.
+const SUBMODULE_MODE: &str = "160000";
 
 /// The install root's path below the git top level, as git prints it:
 /// `/`-separated with a trailing `/` (`sub/`), empty for an install at the
 /// top level.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct InstallPrefix(String);
+pub(crate) struct InstallPrefix(String);
 
 impl InstallPrefix {
     /// Reads the prefix of `root` from git. A failure is git's own named
     /// line (`houserules.crash-paths-are-named`).
-    pub(super) fn of(root: &Path) -> Result<Self, String> {
+    pub(crate) fn of(root: &Path) -> Result<Self, String> {
         git_location_in(root)
             .map(|location| Self(location.prefix))
             .map_err(|error| error.to_string())
@@ -53,7 +66,7 @@ impl InstallPrefix {
     /// Turns `nul_separated`, the NUL-separated top-level paths git printed,
     /// into install-root paths. A path outside the install root is dropped.
     /// The prefix ends in `/`, so `sub2/x` is outside the install `sub/`.
-    pub(super) fn map(&self, nul_separated: &str) -> Vec<String> {
+    pub(crate) fn map(&self, nul_separated: &str) -> Vec<String> {
         nul_separated
             .split('\0')
             .filter(|path| !path.is_empty())
@@ -61,6 +74,125 @@ impl InstallPrefix {
             .map(str::to_string)
             .collect()
     }
+}
+
+/// Runs `git ls-files -z` at `root`, decoding each NUL-separated entry on
+/// its own. It returns `None` when `root` is not a git working tree or git
+/// itself is not on `PATH`, and it never panics
+/// (`bin/residue-gate.rs`'s own `tracked_files` panics on the identical
+/// command, but that dev-only tool always runs inside this checkout's
+/// own git history, where the command cannot fail this way). Otherwise it
+/// returns the tracked paths that decode as UTF-8 and, as a second list,
+/// every tracked path that does not, rendered lossily for display.
+///
+/// `-z` is not optional: without it, git's own `core.quotePath` (on by
+/// default) double-quotes and octal-escapes any path byte outside
+/// printable ASCII, so a tracked `docs/café.md` comes back as the
+/// 12-character-escaped literal `"docs/caf\303\251.md"` -- a string no
+/// glob matches -- and a naive `.lines()` split has the identical failure
+/// mode for an embedded newline. `-z` disables that quoting and
+/// NUL-terminates each entry instead of newline-terminating it.
+///
+/// Decoding happens per entry, not once over the whole buffer: a single
+/// `String::from_utf8` over the joined output would turn ONE tracked path
+/// with non-UTF-8 bytes (a latin-1 filename, say) into a `None` for the
+/// ENTIRE result, silently losing every other, perfectly valid path.
+/// Splitting on NUL first and decoding each piece keeps every valid entry
+/// in the returned list (`-z`'s own trailing NUL leaves one empty final
+/// piece, filtered) and collects every undecodable one, as its own raw
+/// bytes rendered lossily for display, into the second list instead of
+/// discarding it.
+pub(crate) fn tracked_files(root: &Path) -> Option<(Vec<String>, Vec<String>)> {
+    let output = Command::new("git")
+        .args(["ls-files", "-z"])
+        .current_dir(root)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let mut files = Vec::new();
+    let mut skipped = Vec::new();
+    for entry in output.stdout.split(|&byte| byte == 0) {
+        if entry.is_empty() {
+            continue;
+        }
+        match std::str::from_utf8(entry) {
+            Ok(path) => files.push(path.to_string()),
+            Err(_) => skipped.push(String::from_utf8_lossy(entry).into_owned()),
+        }
+    }
+    Some((files, skipped))
+}
+
+/// Why [`listed_by_name`] gave no listing.
+#[derive(Debug)]
+pub(crate) enum ListingFailure {
+    /// git could not run; holds the error of the operating system.
+    NotRun(io::Error),
+    /// git ran and failed; holds the first non-empty line of its error
+    /// output, trimmed, or `git ls-files failed` when it printed none.
+    Failed(String),
+}
+
+/// The files named `name` at any depth below `dir` that git lists, tracked
+/// or untracked and not ignored, as the raw bytes of each path below `dir`
+/// (`/`-separated, in the order git prints). git lists a submodule as one
+/// path and none of its files. The caller decodes the bytes and decides
+/// what a [`ListingFailure`] means.
+pub(crate) fn listed_by_name(dir: &Path, name: &str) -> Result<Vec<Vec<u8>>, ListingFailure> {
+    let output = Command::new("git")
+        .args([
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+        ])
+        .arg(format!(":(glob)**/{name}"))
+        .current_dir(dir)
+        .output()
+        .map_err(ListingFailure::NotRun)?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let line = stderr
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .unwrap_or("git ls-files failed");
+        return Err(ListingFailure::Failed(line.to_string()));
+    }
+    Ok(output
+        .stdout
+        .split(|&byte| byte == 0)
+        .filter(|entry| !entry.is_empty())
+        .map(<[u8]>::to_vec)
+        .collect())
+}
+
+/// The paths of the submodules in the index of the work tree at `root`, as
+/// `/`-separated paths below `root`; `None` when git cannot list the index.
+pub(crate) fn submodule_paths(root: &Path) -> Option<Vec<String>> {
+    let output = Command::new("git")
+        .args(["ls-files", "--stage", "-z"])
+        .current_dir(root)
+        .env("LC_ALL", "C")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(
+        output
+            .stdout
+            .split(|&byte| byte == 0)
+            .filter_map(|entry| {
+                let (record, path) = std::str::from_utf8(entry).ok()?.split_once('\t')?;
+                (record.split(' ').next() == Some(SUBMODULE_MODE)).then(|| path.to_string())
+            })
+            .collect(),
+    )
 }
 
 #[cfg(test)]
@@ -167,6 +299,69 @@ mod tests {
             prefix("sub dir/sä/")
         );
         assert_eq!(InstallPrefix::of(repo.path()).expect("prefix"), prefix(""));
+    }
+
+    /// The listing by name holds the matches at any depth, tracked or
+    /// untracked, and leaves out an ignored match, a tracked file of another
+    /// name, and a name that only ends like the one asked for.
+    #[test]
+    fn listed_by_name_lists_tracked_and_untracked_matches_and_leaves_out_ignored_ones() {
+        let repo = scratch_repo();
+        let root = repo.path();
+        for (path, text) in [
+            ("AGENTS.md", "top\n"),
+            ("a/AGENTS.md", "tracked\n"),
+            ("b/c/AGENTS.md", "untracked\n"),
+            ("ignored/AGENTS.md", "ignored\n"),
+            ("a/NOT-AGENTS.md", "other name\n"),
+            (".gitignore", "ignored/\n"),
+        ] {
+            let path = root.join(path);
+            std::fs::create_dir_all(path.parent().expect("a parent")).expect("create the folder");
+            std::fs::write(&path, text).expect("write the file");
+        }
+        let status = Command::new("git")
+            .args(["add", "AGENTS.md", "a"])
+            .current_dir(root)
+            .status()
+            .expect("run git add");
+        assert!(status.success(), "git add failed");
+
+        let mut listed: Vec<String> = listed_by_name(root, "AGENTS.md")
+            .expect("a listing")
+            .iter()
+            .map(|raw| String::from_utf8_lossy(raw).into_owned())
+            .collect();
+        listed.sort();
+
+        assert_eq!(listed, ["AGENTS.md", "a/AGENTS.md", "b/c/AGENTS.md"]);
+    }
+
+    /// A directory that is no work tree is a failure that holds the first
+    /// line of git's own message. The message follows the host locale, so
+    /// the test reads the expected line from git in the same directory.
+    #[test]
+    fn listed_by_name_fails_with_the_first_line_of_gits_message_outside_a_work_tree() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let message = Command::new("git")
+            .arg("ls-files")
+            .current_dir(dir.path())
+            .output()
+            .expect("run git ls-files")
+            .stderr;
+        let expected = String::from_utf8_lossy(&message)
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .expect("git names the failure")
+            .to_string();
+
+        let failure = listed_by_name(dir.path(), "AGENTS.md").expect_err("a failure");
+
+        assert!(
+            matches!(&failure, ListingFailure::Failed(line) if *line == expected),
+            "{failure:?}"
+        );
     }
 
     /// Outside any repository the error is one line that names the

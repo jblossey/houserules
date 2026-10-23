@@ -22,8 +22,8 @@ use super::model::{Base, CheckField};
 /// `workspaces` or, while the key is not set, the line for an unignored default
 /// location, then one line for each active entry whose `runner` check names
 /// an undefined tool, by entry id, at the file that holds the entry. A
-/// `runner` check with no `tool` names no tool: `check::required_field_findings`
-/// reports it, for an entry of every source.
+/// `runner` check with no `tool` names no tool: `check::check_shape` reports
+/// it, for an entry of every source.
 pub(super) fn findings(base: &Base) -> Vec<String> {
     let Ok(marker) = Marker::read_or_default_for_gate(&base.root, "WI") else {
         return Vec::new();

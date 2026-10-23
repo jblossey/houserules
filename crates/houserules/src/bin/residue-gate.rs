@@ -157,7 +157,7 @@ fn repo_root() -> PathBuf {
 /// undecodable entry is instead a named, non-fatal skip -- `main` reports
 /// it the same "counted, printed, never fatal" way it already reports a
 /// binary asset (`ReadOutcome::Binary`'s own doc) -- and never changes
-/// how any other tracked path is walked. `check.rs`'s `git_ls_files`
+/// how any other tracked path is walked. `rules::git_paths::tracked_files`
 /// carries the identical fix, for the identical reason.
 fn tracked_files(root: &Path) -> (Vec<String>, Vec<String>) {
     let output = Command::new("git")

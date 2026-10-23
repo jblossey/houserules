@@ -1491,13 +1491,16 @@ const NO_INSTALL_LINE: &str =
 /// The refusal line of `update` for `target`, the directory that `given` names
 /// (the value of `--dir`, `.` when the flag is absent). `init` installs in the
 /// working directory, so a target that is another directory gets the remedy
-/// `run houserules init --dir <given>`, with `given` as the user wrote it
-/// (spec 8.2, D9).
+/// `run houserules init --dir <given>`, with `given` as the user wrote it,
+/// quoted for a POSIX shell where it needs quoting (`shell::quote`).
 fn no_install_line(target: &Path, given: &Path) -> String {
     if std::env::current_dir().is_ok_and(|working| working == target) {
         NO_INSTALL_LINE.to_string()
     } else {
-        format!("{NO_INSTALL_LINE} --dir {}", given.display())
+        format!(
+            "{NO_INSTALL_LINE} --dir {}",
+            crate::shell::quote(&given.to_string_lossy())
+        )
     }
 }
 
@@ -1648,7 +1651,7 @@ fn update(target: &Path, given: &Path, id_prefix: Option<String>) -> Result<(), 
             root.display(),
             placement.top_level.display(),
             crate::root::INSTALL_MARKER,
-            root.display()
+            crate::shell::quote(&root.to_string_lossy())
         ));
     }
     let knowledge = target.join("knowledge");

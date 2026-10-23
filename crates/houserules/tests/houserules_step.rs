@@ -2,7 +2,8 @@
 //! skill and a core hook script that any workflow calls. Every install gets
 //! them, a minimal install included. Each case runs the shipped script with
 //! a POSIX shell against a scratch install, on a `PATH` that holds the
-//! binary under test.
+//! binary under test. With a report, the script also fills the facts of the
+//! report (batch 36, spec 7 and case 11a).
 
 mod tracker_support;
 
@@ -15,7 +16,7 @@ use std::process::{Command, Output};
 use serde_json::{Value, json};
 use tempfile::TempDir;
 use tracker_support::{
-    commit_all, git, read_json, repo_root, run_ok, scratch_git_repo, stderr, stdout,
+    commit_all, git, read_json, repo_root, run_ok, scratch_git_repo, stderr, stdout, write_json,
 };
 
 /// The script, relative to an install root.
@@ -122,26 +123,113 @@ fn after_audits_the_range_and_prints_the_file_and_the_exit_status() {
     assert!(audit.get("summary").is_some(), "got {audit}");
 }
 
-/// Spec 4.4a and live case 25: with a report path as the second argument,
-/// `after` also validates the report and prints the file of the result and
-/// the exit status of `validate`.
+/// Spec 4.4a and live case 25, spec 7 of batch 36: with a report path as the
+/// second argument, `after` also fills the facts of the report and validates it.
+/// It prints the file and the exit status of `report-facts`, then those of
+/// `validate`.
 #[test]
-fn after_with_a_report_validates_it() {
+fn after_with_a_report_fills_its_facts_and_validates_it() {
+    let (dir, base) = installed();
+    fs::write(dir.path().join("docs/note.md"), "A note.\n").expect("write a document");
+    let head = commit_all(dir.path(), "docs: add a note");
+    let capture = Command::new(env!("CARGO_BIN_EXE_houserules"))
+        .args(["capture", "--out", "cap.txt", "--", "sh", "-c", "echo ok"])
+        .current_dir(dir.path())
+        .output()
+        .expect("run capture");
+    assert_eq!(
+        capture.status.code(),
+        Some(0),
+        "stderr: {}",
+        stderr(&capture)
+    );
+    let report = write_report(dir.path(), "report.json", true);
+    let mut draft = read_json(dir.path(), &report);
+    draft["tests"] = json!([{"capture": "cap.txt"}]);
+    draft["commits"] = json!([]);
+    write_json(dir.path(), &report, &draft);
+
+    let output = step(dir.path(), &["after", &base, &report]);
+
+    assert_eq!(output.status.code(), Some(0), "stderr: {}", stderr(&output));
+    let printed = lines(&output);
+    assert_eq!(printed.len(), 6, "{printed:?}");
+    assert!(
+        printed[0].ends_with(".houserules/step/audit.json"),
+        "{printed:?}"
+    );
+    assert_eq!(printed[1], "audit exit status: 0");
+    assert!(
+        printed[2].ends_with(".houserules/step/report-facts.txt"),
+        "{printed:?}"
+    );
+    assert_eq!(printed[3], "report-facts exit status: 0");
+    assert!(
+        printed[4].ends_with(".houserules/step/validate.json"),
+        "{printed:?}"
+    );
+    assert_eq!(printed[5], "validate exit status: 0");
+    assert_eq!(
+        fs::read_to_string(dir.path().join(".houserules/step/report-facts.txt"))
+            .expect("read the output of report-facts"),
+        "report.json: facts filled\n"
+    );
+    let filled = read_json(dir.path(), &report);
+    assert_eq!(
+        filled["commits"],
+        json!([{"sha": head, "subject": "docs: add a note"}])
+    );
+    assert_eq!(filled["files_changed"], json!(["docs/note.md"]));
+    assert_eq!(filled["tests"][0]["command"], json!("sh -c 'echo ok'"));
+    assert_eq!(filled["tests"][0]["exit"], json!(0));
+    assert!(filled["tests"][0]["sha256"].is_string(), "got {filled}");
+    let audit = read_json(dir.path(), ".houserules/step/audit.json");
+    assert_eq!(filled["self_audit"]["summary"], audit["summary"]);
+    let deterministic: Vec<&Value> = audit["rules"]
+        .as_array()
+        .expect("the rules")
+        .iter()
+        .filter(|row| row["mode"] == "deterministic")
+        .collect();
+    assert_eq!(
+        filled["self_audit"]["rows"],
+        json!(deterministic),
+        "self_audit holds the deterministic rows of the audit"
+    );
+    let result: Value = read_json(dir.path(), ".houserules/step/validate.json");
+    assert_eq!(result[0]["errors"], json!([]));
+
+    let first = fs::read(dir.path().join(&report)).expect("read the report");
+    let again = step(dir.path(), &["after", &base, &report]);
+    assert_eq!(again.status.code(), Some(0), "stderr: {}", stderr(&again));
+    assert_eq!(
+        fs::read(dir.path().join(&report)).expect("read the report"),
+        first,
+        "a second run changes no byte"
+    );
+}
+
+/// Spec 7 of batch 36: with a report, `after` runs the audit with `--report`, so
+/// a report that is missing stops the audit with exit status 2. The script
+/// removes the audit result of the last run first, so that `report-facts` never
+/// reads the result of another run.
+#[test]
+fn the_audit_of_a_call_with_a_report_reads_it_and_leaves_no_result_of_an_earlier_run() {
     let (dir, base) = installed();
     fs::write(dir.path().join("docs/note.md"), "A note.\n").expect("write a document");
     commit_all(dir.path(), "docs: add a note");
     let report = write_report(dir.path(), "report.json", true);
-    let output = step(dir.path(), &["after", &base, &report]);
-    assert_eq!(output.status.code(), Some(0), "stderr: {}", stderr(&output));
-    let printed = lines(&output);
-    assert_eq!(printed.len(), 4, "{printed:?}");
+    step(dir.path(), &["after", &base, &report]);
+    assert!(dir.path().join(".houserules/step/audit.json").is_file());
+
+    let output = step(dir.path(), &["after", &base, "missing.json"]);
+
+    assert_eq!(output.status.code(), Some(2), "stderr: {}", stderr(&output));
+    assert_eq!(lines(&output)[1], "audit exit status: 2");
     assert!(
-        printed[2].ends_with(".houserules/step/validate.json"),
-        "{printed:?}"
+        !dir.path().join(".houserules/step/audit.json").exists(),
+        "the audit result of the earlier run is still there"
     );
-    assert_eq!(printed[3], "validate exit status: 0");
-    let result: Value = read_json(dir.path(), ".houserules/step/validate.json");
-    assert_eq!(result[0]["errors"], json!([]));
 }
 
 /// A report that fails `validate` shows in the printed status and in the exit
@@ -233,6 +321,22 @@ fn the_skill_names_the_four_steps_and_the_two_calls_and_no_workflow_or_plugin() 
             assert!(!lower.contains(word), "a step file names {word:?}");
         }
     }
+}
+
+/// Step 4 of the skill, as spec 7 of batch 36 states it: the author runs each
+/// test and live run through `capture`, and the script fills the facts of the
+/// report.
+const SKILL_STEP_4: &str = r#"**Write and validate the report.** Write the report in the report format of `.claude/schemas/deliverables.json`. Run each test and live run through `houserules capture --out <file> -- <command>`, with `<file>` in the workspace (default `.houserules/work/`), never in `.houserules/step/`, which the script overwrites; write each run as `{ "capture": "<path>" }`. Run `tools/houserules-step.sh after <base> <report>`. The script runs the audit with `--report`, then `houserules report-facts`, which fills the report's facts, then `houserules validate`, and writes their output to `.houserules/step/`. Fix every error."#;
+
+/// Spec 7 of batch 36: the skill holds step 4 as the spec words it.
+#[test]
+fn the_skill_states_step_4_as_the_spec_words_it() {
+    let skill =
+        fs::read_to_string(repo_root().join("template").join(SKILL)).expect("read the skill");
+    assert!(
+        skill.contains(&format!("\n4. {SKILL_STEP_4}\n")),
+        "step 4 of the skill differs from the spec:\n{skill}"
+    );
 }
 
 /// Run through a symlink from another directory, the script still finds the

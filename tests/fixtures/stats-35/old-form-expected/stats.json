@@ -1,0 +1,332 @@
+{
+  "violations": [
+    {
+      "id": "j.two",
+      "count": 1,
+      "tasks": [
+        "1"
+      ]
+    }
+  ],
+  "unused_ids": [],
+  "audits": {
+    "files": 0,
+    "tasks": 0
+  },
+  "reviews": {
+    "files": 1
+  },
+  "sanctioned": [],
+  "workspaces": [
+    {
+      "path": "<workspace>",
+      "tasks": 1,
+      "reviews": 1,
+      "re_reviews": 0,
+      "fix_rounds": 1,
+      "report_bytes": 2264,
+      "findings": {
+        "critical": 0,
+        "important": 0,
+        "minor": 0,
+        "other": 0
+      },
+      "targets": {
+        "code": 0,
+        "deliverable": 0,
+        "prose": 0,
+        "other": 0
+      },
+      "reversals": 0
+    }
+  ],
+  "models": [
+    {
+      "model": "opus",
+      "tasks": 0,
+      "reviews": 1,
+      "re_reviews": 0,
+      "fix_rounds": 0,
+      "report_bytes": 0,
+      "findings": {
+        "critical": 0,
+        "important": 0,
+        "minor": 0,
+        "other": 0
+      },
+      "targets": {
+        "code": 0,
+        "deliverable": 0,
+        "prose": 0,
+        "other": 0
+      }
+    },
+    {
+      "model": "sonnet",
+      "tasks": 1,
+      "reviews": 0,
+      "re_reviews": 0,
+      "fix_rounds": 1,
+      "report_bytes": 2264,
+      "findings": {
+        "critical": 0,
+        "important": 0,
+        "minor": 0,
+        "other": 0
+      },
+      "targets": {
+        "code": 0,
+        "deliverable": 0,
+        "prose": 0,
+        "other": 0
+      }
+    }
+  ],
+  "cost": {
+    "totals": {
+      "tasks": 1,
+      "reviews": 1,
+      "re_reviews": 0,
+      "fix_rounds": 1,
+      "report_bytes": 2264,
+      "findings": {
+        "critical": 0,
+        "important": 0,
+        "minor": 0,
+        "other": 0
+      },
+      "targets": {
+        "code": 0,
+        "deliverable": 0,
+        "prose": 0,
+        "other": 0
+      }
+    },
+    "per_task": {
+      "reviews": 1.0,
+      "re_reviews": 0.0,
+      "fix_rounds": 1.0,
+      "report_bytes": 2264.0,
+      "findings": {
+        "critical": 0.0,
+        "important": 0.0,
+        "minor": 0.0,
+        "other": 0.0
+      },
+      "targets": {
+        "code": 0.0,
+        "deliverable": 0.0,
+        "prose": 0.0,
+        "other": 0.0
+      }
+    }
+  },
+  "rules": [
+    {
+      "id": "d.one",
+      "source": "local",
+      "standing": false,
+      "mode": "deterministic",
+      "workspaces": 1,
+      "injected": 0,
+      "rows": 0,
+      "fails": 0,
+      "findings": {
+        "critical": 0,
+        "important": 0,
+        "minor": 0,
+        "other": 0
+      },
+      "targets": {
+        "code": 0,
+        "deliverable": 0,
+        "prose": 0,
+        "other": 0
+      },
+      "cited": 0,
+      "verdicts": 0,
+      "overrides": 0,
+      "override_rate": null,
+      "cost": null,
+      "sanctioned": 0
+    },
+    {
+      "id": "d.three",
+      "source": "local",
+      "standing": false,
+      "mode": "deterministic",
+      "workspaces": 0,
+      "injected": 0,
+      "rows": 0,
+      "fails": 0,
+      "findings": {
+        "critical": 0,
+        "important": 0,
+        "minor": 0,
+        "other": 0
+      },
+      "targets": {
+        "code": 0,
+        "deliverable": 0,
+        "prose": 0,
+        "other": 0
+      },
+      "cited": 0,
+      "verdicts": 0,
+      "overrides": 0,
+      "override_rate": null,
+      "cost": null,
+      "sanctioned": 0
+    },
+    {
+      "id": "d.two",
+      "source": "local",
+      "standing": false,
+      "mode": "deterministic",
+      "workspaces": 0,
+      "injected": 0,
+      "rows": 0,
+      "fails": 0,
+      "findings": {
+        "critical": 0,
+        "important": 0,
+        "minor": 0,
+        "other": 0
+      },
+      "targets": {
+        "code": 0,
+        "deliverable": 0,
+        "prose": 0,
+        "other": 0
+      },
+      "cited": 0,
+      "verdicts": 0,
+      "overrides": 0,
+      "override_rate": null,
+      "cost": null,
+      "sanctioned": 0
+    },
+    {
+      "id": "j.one",
+      "source": "local",
+      "standing": false,
+      "mode": "judged",
+      "workspaces": 1,
+      "injected": 0,
+      "rows": 1,
+      "fails": 0,
+      "findings": {
+        "critical": 0,
+        "important": 0,
+        "minor": 0,
+        "other": 0
+      },
+      "targets": {
+        "code": 0,
+        "deliverable": 0,
+        "prose": 0,
+        "other": 0
+      },
+      "cited": 0,
+      "verdicts": 1,
+      "overrides": 0,
+      "override_rate": 0.0,
+      "cost": 364,
+      "sanctioned": 0
+    },
+    {
+      "id": "j.three",
+      "source": "local",
+      "standing": false,
+      "mode": "judged",
+      "workspaces": 1,
+      "injected": 0,
+      "rows": 1,
+      "fails": 0,
+      "findings": {
+        "critical": 0,
+        "important": 0,
+        "minor": 0,
+        "other": 0
+      },
+      "targets": {
+        "code": 0,
+        "deliverable": 0,
+        "prose": 0,
+        "other": 0
+      },
+      "cited": 0,
+      "verdicts": 0,
+      "overrides": 0,
+      "override_rate": null,
+      "cost": 364,
+      "sanctioned": 0
+    },
+    {
+      "id": "j.two",
+      "source": "local",
+      "standing": false,
+      "mode": "judged",
+      "workspaces": 1,
+      "injected": 0,
+      "rows": 1,
+      "fails": 1,
+      "findings": {
+        "critical": 0,
+        "important": 0,
+        "minor": 0,
+        "other": 0
+      },
+      "targets": {
+        "code": 0,
+        "deliverable": 0,
+        "prose": 0,
+        "other": 0
+      },
+      "cited": 0,
+      "verdicts": 1,
+      "overrides": 1,
+      "override_rate": 1.0,
+      "cost": 364,
+      "sanctioned": 0
+    },
+    {
+      "id": "j.unused",
+      "source": "local",
+      "standing": false,
+      "mode": "judged",
+      "workspaces": 0,
+      "injected": 0,
+      "rows": 0,
+      "fails": 0,
+      "findings": {
+        "critical": 0,
+        "important": 0,
+        "minor": 0,
+        "other": 0
+      },
+      "targets": {
+        "code": 0,
+        "deliverable": 0,
+        "prose": 0,
+        "other": 0
+      },
+      "cited": 0,
+      "verdicts": 0,
+      "overrides": 0,
+      "override_rate": null,
+      "cost": null,
+      "sanctioned": 0
+    }
+  ],
+  "packs": [
+    {
+      "source": "local",
+      "entries": 7,
+      "standing": 0,
+      "judged_rows": 3,
+      "violations": 1
+    }
+  ],
+  "proposals": []
+}

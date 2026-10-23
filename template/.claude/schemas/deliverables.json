@@ -68,22 +68,98 @@
         }
       }
     },
+    "sha256Hex": {
+      "description": "A SHA-256 digest: 64 lowercase hexadecimal digits.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
     "run": {
+      "description": "One run of a command that the report cites. The run names its capture, a file that `houserules capture` wrote: a header line, then the output of the command. `sha256` is the hash of the whole capture file. The report holds no command output inline: the capture is the full evidence, and the report stays small. `command` and `exit` repeat the header of the capture, and `houserules report-facts` fills them and `sha256`. `excerpt` is optional: a short part of the output that a reader needs at once, copied byte for byte. It holds at most 1000 UTF-16 code units (the unit of `maxLength`), because a longer part belongs in the capture.",
       "type": "object",
       "required": [
+        "capture",
+        "sha256",
         "command",
-        "output"
+        "exit"
       ],
       "additionalProperties": false,
       "properties": {
-        "command": {
+        "capture": {
+          "description": "The path of the capture file: absolute, or relative to the install root.",
           "$ref": "#/$defs/text"
         },
-        "output": {
-          "type": "string"
+        "sha256": {
+          "description": "The SHA-256 of the whole capture file.",
+          "$ref": "#/$defs/sha256Hex"
+        },
+        "command": {
+          "description": "The `argv` of the capture header, joined for a POSIX shell.",
+          "$ref": "#/$defs/text"
         },
         "exit": {
-          "type": "integer"
+          "description": "The `exit` of the capture header: the exit code, or `null` when a signal ended the command.",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "excerpt": {
+          "description": "A part of the output of the capture, byte for byte: 1 to 1000 UTF-16 code units.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        }
+      }
+    },
+    "selfReviewItem": {
+      "description": "One claim of the self-review, with the evidence for it. A claim that states a closed set (every, all, no remaining) lists a capture as its evidence, and a claim that states a pinned behavior lists an existing path.",
+      "type": "object",
+      "required": [
+        "claim"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "claim": {
+          "$ref": "#/$defs/prose"
+        },
+        "evidence": {
+          "description": "The paths that show the claim, each absolute or relative to the install root, with no line suffix.",
+          "$ref": "#/$defs/textList"
+        }
+      }
+    },
+    "citation": {
+      "description": "A line, or a range of lines, of a file at HEAD that a claim of the report rests on. `anchor` is text of the cited lines, copied byte for byte, that occurs once in the file and holds three non-whitespace characters in a row. `sha256` is the hash of the cited lines at HEAD, from the first byte of line `line` to the last byte of line `end` (or of `line`), without the line feed that ends the last line. `houserules report-facts` fills it.",
+      "type": "object",
+      "required": [
+        "path",
+        "line",
+        "anchor"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "The path of the cited file, relative to the install root.",
+          "$ref": "#/$defs/text"
+        },
+        "line": {
+          "description": "The first cited line, counted from 1.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "end": {
+          "description": "The last cited line, counted from 1. Leave it out to cite one line.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "anchor": {
+          "description": "Text of the cited lines, byte for byte, with three non-whitespace characters in a row.",
+          "type": "string",
+          "pattern": "\\S{3}"
+        },
+        "sha256": {
+          "description": "The SHA-256 of the cited lines at HEAD.",
+          "$ref": "#/$defs/sha256Hex"
         }
       }
     },
@@ -474,6 +550,10 @@
               },
               "file": {
                 "$ref": "#/$defs/text"
+              },
+              "reran": {
+                "description": "The path of the probe that the review ran to find the finding and that this round ran again, absolute or relative to the install root. Leave it out for a finding whose review gave no reproduction.",
+                "$ref": "#/$defs/text"
               }
             }
           }
@@ -598,11 +678,21 @@
             "$ref": "#/$defs/coverageMeasure"
           }
         },
+        "citations": {
+          "description": "The lines of files at HEAD that the claims of the report rest on, in the recorded form.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/citation"
+          }
+        },
         "self_audit": {
           "$ref": "#/$defs/selfAudit"
         },
         "self_review": {
-          "$ref": "#/$defs/proseList"
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/selfReviewItem"
+          }
         },
         "concerns": {
           "$ref": "#/$defs/proseList"

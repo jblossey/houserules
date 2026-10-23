@@ -451,7 +451,7 @@ The conversion does not reduce an install of 1.x to the minimal default. It adop
 
 These files are new: `.claude/skills/houserules-step/SKILL.md` and `tools/houserules-step.sh` (kit-owned), and `.claude/agents/spec-reviewer.md`, `.claude/skills/designing/SKILL.md`, `.claude/skills/planning/SKILL.md`, and `tools/reference-session-start.sh` (workflow files).
 
-The invariant: an install holds the files of the parts it installed, and `update` restores only those. `update` restores and delivers the tracker files only where `tracker.adapter` is `json`. It delivers the deliverables schema and `backlog/schema.json` where they are the kit's, and keeps a copy that you changed, with a [hand step](#hand-step-a-schema-of-your-own).
+The invariant: an install holds the files of the parts it installed, and `update` restores only those. `update` restores and delivers the tracker files only where `tracker.adapter` is `json`. It delivers the deliverables schema and `backlog/schema.json` where they are the kit's, and keeps a copy that you changed. A copy that has a baseline gets the line `kept <path> (locally modified)`; a copy that has none, and that differs from every content that the kit shipped, gets the [hand step of a schema of your own](#hand-step-a-schema-of-your-own).
 
 ### The model field
 
@@ -655,7 +655,7 @@ The reference workflow prints the session ritual from its own script, `tools/ref
 hand step: <path> differs from every content of it that houserules shipped, so houserules update kept it; compare it with the file that houserules init writes, and merge the rest by hand
 ```
 
-`<path>` is `.claude/schemas/deliverables.json`, or `backlog/schema.json` with the JSON tracker. `update` replaces a schema that equals a content that the kit shipped, and keeps yours. Compare it with the schema of the kit and merge by hand:
+`<path>` is `.claude/schemas/deliverables.json`, or `backlog/schema.json` with the JSON tracker. `update` replaces a schema that equals a content that the kit shipped, and keeps yours. It prints this step for a schema that has no baseline, as in an install converted from 1.x. A schema that has a baseline and differs from it gets `kept <path> (locally modified)` and no hand step. Compare your schema with the schema of the kit, and merge by hand:
 
 ```sh
 diff .claude/schemas/deliverables.json ../kit-reference/.claude/schemas/deliverables.json
@@ -665,15 +665,59 @@ The `backlogId` pattern of the deliverables schema belongs to your tracker, so i
 
 ### Hand step: a CI workflow that lacks the lines of your tracker
 
-The seeded CI workflow depends on the tracker. `update` keeps a workflow that you changed. When the workflow lacks what the tracker needs, `update` prints one of these lines on every run.
+The seeded CI workflow depends on the tracker. `update` keeps a workflow that you changed. When the workflow lacks what the tracker needs, `update` prints the lines below on every run, until the workflow holds each marker.
 
-The GitHub tracker:
+The GitHub tracker needs two things: the permissions `contents: read` and `issues: read` on the gates job, and the `GH_TOKEN` env on the two steps that run `houserules check-backlog` and `houserules audit`. `gh` reads the issues with that token. A workflow gets one line for its permissions and one for its env, each only when it lacks a marker of it, and none for a marker it holds. The line for the permissions follows the `permissions` key of the gates job and the markers that the workflow holds, so that the job never holds two `permissions` keys.
+
+The GitHub tracker, for a gates job that holds no `permissions` key and a workflow that holds neither `contents: read` nor `issues: read`:
 
 ```text
-hand step: <path> lacks the lines that the github tracker needs; add permissions: {contents: read, issues: read} to the gates job, and env: {GH_TOKEN: ${{ github.token }}} to each step that runs houserules check-backlog or houserules audit
+hand step: <path> lacks the permissions that the github tracker needs; add permissions: {contents: read, issues: read} to the gates job
 ```
 
-Add the permissions block to the job and the token to the two steps. `gh` reads the issues with that token.
+Add the block to the gates job:
+
+```yaml
+    permissions:
+      contents: read
+      issues: read
+```
+
+The GitHub tracker, for a workflow that holds `contents: read` and lacks `issues: read`. The seeded workflow of an install with no tracker, with the JSON tracker, or with the Beads tracker holds `contents: read`, so this is the line of a workflow that you kept when you moved to the GitHub tracker:
+
+```text
+hand step: <path> lacks issues: read, which the github tracker needs; add issues: read to the permissions of the gates job
+```
+
+Add `issues: read` to the `permissions` block that the job holds. Do not add a second `permissions` block.
+
+```yaml
+    permissions:
+      contents: read
+      issues: read
+```
+
+The GitHub tracker, for a workflow that holds `issues: read` and lacks `contents: read`:
+
+```text
+hand step: <path> lacks contents: read; add contents: read to the permissions of the gates job
+```
+
+Add `contents: read` to the `permissions` block that the job holds, with the same result as above.
+
+The GitHub tracker, for a workflow that lacks the `GH_TOKEN` env. The line comes with one of the lines above or alone, for a workflow whose permissions are complete:
+
+```text
+hand step: <path> lacks the GH_TOKEN env that the github tracker needs; add env: {GH_TOKEN: ${{ github.token }}} to each step that runs houserules check-backlog or houserules audit
+```
+
+Add the env to the step that runs `houserules check-backlog` and to the step that runs `houserules audit`:
+
+```yaml
+      - run: houserules check-backlog
+        env:
+          GH_TOKEN: ${{ github.token }}
+```
 
 The Beads tracker:
 
@@ -758,7 +802,7 @@ A fresh clone lacks an ignored file, so a `verify` path into it fails the gates 
 
 ### The schemas of your own
 
-`update` rewrites the knowledge schema and the deliverables schema while each equals a content that houserules shipped. It keeps a copy that you changed, and prints the [hand step of a schema of your own](#hand-step-a-schema-of-your-own). A kept copy lacks the fields of 2.2.0, and you merge them by hand. In `knowledge/schema.json`, add `"runner"` to the `type` enum of `$defs.check`, and add the properties `tool` (a string of at least one character), `non_empty` (a boolean), and `covers_ids` (a boolean). In `.claude/schemas/deliverables.json`, `$defs.auditRow` gains the properties `sanctioned`, `findings`, and `override`, and the schema gains the definitions `auditFinding` and `rowOverride`. Compare each file with the reference install (see [Hand steps](#hand-steps)):
+`update` rewrites the knowledge schema and the deliverables schema while each equals a content that houserules shipped. It keeps a copy that you changed, and prints `kept <path> (locally modified)` for it; a deliverables schema with no baseline gets the [hand step of a schema of your own](#hand-step-a-schema-of-your-own) instead. A kept copy lacks the fields of 2.2.0, and you merge them by hand. In `knowledge/schema.json`, add `"runner"` to the `type` enum of `$defs.check`, and add the properties `tool` (a string of at least one character), `non_empty` (a boolean), and `covers_ids` (a boolean). In `.claude/schemas/deliverables.json`, `$defs.auditRow` gains the properties `sanctioned`, `findings`, and `override`, and the schema gains the definitions `auditFinding` and `rowOverride`. Compare each file with the reference install (see [Hand steps](#hand-steps)):
 
 ```sh
 diff knowledge/schema.json ../kit-reference/knowledge/schema.json
@@ -774,3 +818,192 @@ The migration commit, or the first commits after it, can fail these checks. Each
 - **A schema of your own lacks the new fields.** `check-knowledge` fails a `runner` check against a knowledge schema that lacks the type, and `validate` fails an audit row that holds `sanctioned`, `findings`, or `override` against a deliverables schema that lacks them. See [the schemas of your own](#the-schemas-of-your-own).
 - **A stale `self_audit` copy fails the report.** `audit --report` compares the copy with its own run over the same range. It compares nothing when the copy records another range, and a draft with `self_audit` set to `null` passes. When you change the report or the tree after the copy, the `self_audit` of the next task report whose copy is stale fails `process.deliverables-json`: run the audit again and copy `self_audit` again.
 - **A change to a manifest that holds a pin that is not exact fails, whoever wrote the commit.** `security-hygiene.exact-pins` fails a change to a `Cargo.toml` that holds a dependency version that is not pinned with `=`: a bare version, which Cargo reads as a caret range, or a requirement that starts with `^`, `~`, `<`, or `>`, or that is `*`. Release-please and Dependabot commits are no exception. The remedy is to pin every dependency of that file exactly: run `cargo add <crate>@=<version>` for each. `security-hygiene.tool-pins-are-exact` and `security-hygiene.tool-versions-pins-are-exact` fail a change to a mise file or a `.tool-versions` file that holds a pin that is not a full version. Write the full version of each tool.
+
+## A read-only token in the seeded CI workflow
+
+The seeded CI workflow runs its gates job with a read-only token. Every form sets `permissions` with `contents: read` on the job. The GitHub form adds `issues: read` to that same block.
+
+The JSON, GitHub, and no-tracker forms also set `persist-credentials: false` under `with:` of the `actions/checkout` step. No step of these forms runs `git` against the remote after the checkout. The checkout itself fetches the history (`fetch-depth: 0`). The Beads form keeps the persisted credential, which is now read-only: `bd bootstrap --yes` fetches the Dolt data from the remote after the checkout.
+
+`update` rewrites a workflow that you did not change. It keeps a workflow that you changed. For a kept workflow, `update` prints one line for each of these markers that the file lacks, and none for a marker that the file holds. It prints the lines on every run, until the file holds the marker. The lines come in the order of the file: the hand step of your tracker, the read-only token, the PR-head checkout, and the persisted credential. A workflow that you kept when you changed the tracker holds the lines of its first form, so the lines of your new tracker can ask for less (`issues: read` and the env, without a new `permissions` block, for the GitHub tracker) or for the removal of a line (`persist-credentials: false` for the Beads tracker).
+
+### Hand step: a CI workflow without the read-only token
+
+```text
+hand step: <path> lacks contents: read; add permissions: {contents: read} to the gates job
+```
+
+Add the block to the gates job:
+
+```yaml
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+```
+
+`update` prints this line for the JSON tracker, the Beads tracker, and no tracker, when the gates job holds no `permissions` key. [A job that holds the key](#hand-step-a-ci-workflow-whose-gates-job-holds-a-permissions-key) gets another line. `update` prints no such line for the GitHub tracker: the [hand steps of the GitHub tracker](#hand-step-a-ci-workflow-that-lacks-the-lines-of-your-tracker) cover the block. They add the whole block, `issues: read` included, to a workflow that holds neither `contents: read` nor `issues: read`, and add the missing line to the block of a workflow that holds the other, so that the job never holds two `permissions` keys.
+
+### Hand step: a CI workflow whose gates job holds a `permissions` key
+
+The lines above add a `permissions` block to a gates job that holds none. When the gates job holds the key already, the line follows the key, so that the job never holds two `permissions` keys.
+
+A `permissions` mapping that lacks `contents: read` gets this line, for every tracker. The mapping is a block, or a flow mapping such as `{pull-requests: read}`:
+
+```text
+hand step: <path> lacks contents: read; add contents: read to the permissions of the gates job
+```
+
+Add `contents: read` to the mapping that the job holds:
+
+```yaml
+    permissions:
+      pull-requests: read
+      contents: read
+```
+
+For the GitHub tracker, a mapping that holds neither `contents: read` nor `issues: read` gets this line:
+
+```text
+hand step: <path> lacks the permissions that the github tracker needs; add contents: read and issues: read to the permissions of the gates job
+```
+
+Add both lines to the mapping:
+
+```yaml
+    permissions:
+      pull-requests: read
+      contents: read
+      issues: read
+```
+
+A mapping that holds one of the two scopes gets the line for the other scope, as in the lines of the GitHub tracker above.
+
+The scalar `permissions: write-all` grants every scope to the job. It gets this line:
+
+```text
+hand step: <path> grants write-all; replace permissions: write-all with permissions: {contents: read} in the gates job
+```
+
+For the GitHub tracker, the line asks for both scopes:
+
+```text
+hand step: <path> grants write-all; replace permissions: write-all with permissions: {contents: read, issues: read} in the gates job
+```
+
+Replace the scalar with the block, for example for the GitHub tracker:
+
+```yaml
+    permissions:
+      contents: read
+      issues: read
+```
+
+The scalar `permissions: read-all` holds every read scope, so `update` prints no line for the permissions of a workflow that holds it. The other lines of the workflow, such as the `GH_TOKEN` env, still come when the workflow lacks them.
+
+### Hand step: a CI workflow that persists its credential
+
+```text
+hand step: <path> lacks persist-credentials: false; add it under with: of its actions/checkout step
+```
+
+Add the input under `with:` of the `actions/checkout` step:
+
+```yaml
+- uses: actions/checkout@v7
+  with:
+    ref: ${{ github.event.pull_request.head.sha }}
+    fetch-depth: 0
+    persist-credentials: false
+```
+
+`update` prints this line for the JSON tracker, the GitHub tracker, and no tracker. It prints no such line for the Beads tracker: the step that runs `bd bootstrap --yes` needs the persisted credential, and a [Beads workflow that holds the input](#hand-step-a-beads-ci-workflow-that-drops-its-credential) gets the opposite line.
+
+### Hand step: a Beads CI workflow that drops its credential
+
+```text
+hand step: <path> holds persist-credentials: false, which the beads tracker cannot use; remove it from with: of its actions/checkout step, so that bd bootstrap can fetch from the remote
+```
+
+Remove the input from `with:` of the `actions/checkout` step:
+
+```yaml
+- uses: actions/checkout@v7
+  with:
+    ref: ${{ github.event.pull_request.head.sha }}
+    fetch-depth: 0
+```
+
+`update` prints this line for the Beads tracker, on every run, until the file no longer holds the input. A workflow that you kept when you moved to the Beads tracker holds the input from its first form. The step that runs `bd bootstrap --yes` fetches from the remote after the checkout, so it needs the persisted credential.
+
+## The report form
+
+A task report cites its evidence by capture. `houserules capture` runs a
+command and writes its output to a file under a header, and the report names
+the file instead of holding the output. `houserules report-facts` fills the
+facts of the report, and `houserules check-report-claims` checks the report
+against the captures and against git. Your install gets the commands with the
+binary. It gets the new report form with the deliverables schema, and the new
+instructions with the agent templates and skills of the reference workflow.
+`update` also moves the copy of the `process` pack to its next version
+(`moved pack process from <old> to <new>`), because three entries and one
+summary describe captures now.
+
+An author writes a report in this order:
+
+1. Run each test, gate, and live run through `houserules capture --out <file> -- <command>`, with `<file>` in the batch workspace.
+2. Write each run as `{ "capture": "<path>" }`, each `self_review` item as `{ "claim", "evidence" }`, and each line that a claim rests on as an entry of `citations`.
+3. Run `houserules report-facts <report> --base <ref>`, with `--audit <file>` for the result of `audit --json` and `--fix-base <ref>` in a fix round. It fills the commits, the changed files, the `sha256`, `command`, and `exit` of each run, the hash of each citation, and the self-audit.
+4. Run `houserules validate <report>` and `houserules check-report-claims <report>`.
+
+`tools/houserules-step.sh after <base> <report>` runs the audit with `--report`, then `report-facts`, then `validate`.
+
+### What changed in the report
+
+- `run` is `{ capture, sha256, command, exit, excerpt? }` and holds no other key. `output` left the schema: a report holds no command output. `capture` is a path, absolute or relative to the install root, so that a parallel agent in a worktree can cite a capture of the workspace. `excerpt` is optional, holds 1 to 1000 UTF-16 code units, and is a byte-exact part of the output of the capture.
+- Each `self_review` item is an object, `{ "claim", "evidence" }`. A claim that says every, all, or no remaining lists a capture in `evidence`. A claim that says pin, pins, or pinned lists an existing path.
+- `citations` is an optional array of `{ "path", "line", "end", "anchor", "sha256" }`. `anchor` is text of the cited lines that occurs once in the file at `HEAD`. `report-facts` fills `sha256` with the hash of the cited lines.
+- A finding of a fix round may name `reran`: the path of the review probe that the round ran again.
+- `check-report-claims` no longer runs three checks: the redirected-capture check, the truncation-marker check, and the paste-run lint. The hash, the byte-exact excerpt, and the `command` of the capture header cover their subjects.
+
+### Closed workspaces need no conversion
+
+A report of the old form fails `validate` against the new schema, and no gate validates a closed report again. `stats` and `audit --workspace` read the deliverables of a workspace as JSON without the schema, and print the same result before and after the upgrade. Leave the closed workspaces as they are.
+
+### Hand step: a deliverables schema of your own
+
+`update` rewrites the deliverables schema while it equals a content that houserules shipped. It keeps a copy that you changed. For a copy that has a baseline, `update` prints `kept .claude/schemas/deliverables.json (locally modified)` and no hand step; for a copy that has none, it prints the [hand step of a schema of your own](#hand-step-a-schema-of-your-own). A kept copy still requires `output` in a run, so every report in the new form fails `validate`. Merge these changes into the kept copy:
+
+- Add the definition `sha256Hex`: a string that matches `^[0-9a-f]{64}$`.
+- Change `$defs.run`: it requires `capture`, `sha256`, `command`, and `exit`, and it holds no `output`. `capture` and `command` are `text`, `sha256` is `sha256Hex`, `exit` is an integer or `null`, and `excerpt` is a string of 1 to 1000 UTF-16 code units (`minLength` 1, `maxLength` 1000).
+- Add the definitions `selfReviewItem` (a required `claim` of type `prose`, and an optional `evidence` of type `textList`) and `citation` (a required `path`, `line`, and `anchor`, and an optional `end` and `sha256`; `line` and `end` are integers of at least 1, and `anchor` matches `\S{3}`).
+- In `$defs.fixRound`, add the property `reran` (`text`) to the items of `findings`.
+- In `$defs.taskReport`, add the property `citations` (an array of `citation`), and make `self_review` an array of `selfReviewItem`.
+
+Compare the file with the reference install (see [Hand steps](#hand-steps)):
+
+```sh
+diff .claude/schemas/deliverables.json ../kit-reference/.claude/schemas/deliverables.json
+```
+
+### Hand step: an agent template that you changed
+
+`update` keeps a template or a skill of the reference workflow that you changed, and prints `kept <file> (locally modified; reference workflow <version>)` on every run until you merge the change (see [The reference workflow](#the-reference-workflow)). Three files carry the new report form. The implementer template teaches the author to capture every run, to record citations, and to close the report with `report-facts` and `check-report-claims`; the task reviewer template gains the step that runs `check-report-claims` against a checkout at the task head; the `dependency-add` scenario expects a capture of the red and of the green run. The branch reviewer template and the `orchestrating`, `planning`, and `designing` skills gain a few sentences too. Make the reference install with the workflow, and compare each kept file with it:
+
+```sh
+git init -q ../kit-reference
+houserules init --workflow reference --tracker json --add-required-packs --dir ../kit-reference
+diff .claude/agents/implementer.md ../kit-reference/.claude/agents/implementer.md
+diff .claude/agents/task-reviewer.md ../kit-reference/.claude/agents/task-reviewer.md
+```
+
+### The reds of the report form by design
+
+The migration commit, or the first reports after it, can fail these checks. Each red is correct, and each has a remedy:
+
+- **Every report in the new form fails `validate` against a deliverables schema that `update` kept.** The kept schema still requires `output`. Merge the changes of [the hand step for a deliverables schema of your own](#hand-step-a-deliverables-schema-of-your-own).
+- **A report from an implementer template that `update` kept is in the old form,** which the new schema rejects. Merge the changes of [the hand step for an agent template that you changed](#hand-step-an-agent-template-that-you-changed).
+- **A task report in flight across the upgrade fails `validate`,** and `check-report-claims` fails each of its runs with `<label>: no capture; run the command through houserules capture`, also on an install that kept the old schema. Rewrite the report in the new form.
+- **`audit` of the update commit fails `process.evals-rerun`** on an install of the reference workflow, because `update` rewrote its templates. The remedy is the one in [the reds that an upgrade causes by design](#the-reds-that-an-upgrade-causes-by-design): run your scenarios and append the run to `.claude/evals/record.json`.
+- **`check-knowledge` fails a pack copy or an override whose pattern does not compile.** It tests the patterns of a check in a pack copy and in an override as it does in a local entry, and prints `<file> <id>: check <field> is not a valid regex (<message>)`. Correct the pattern.

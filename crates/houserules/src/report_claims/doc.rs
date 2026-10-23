@@ -2,8 +2,53 @@
 //! reads a spec, and `--item <id>` reads a backlog item through the installed
 //! tracker. Both read the text for the workspace paths it cites and name each
 //! one that does not exist, so a spec or an item cannot cite evidence that
-//! the batch workspace no longer holds. The parent module doc's Limits list
-//! names what the check does not see.
+//! the batch workspace no longer holds. The parent module doc states the stance
+//! of every Limits list.
+//!
+//! Limits (every doc comment of this file that says "see the module doc's
+//! limits" means this list):
+//! - `doc::check_doc` and `doc::check_item` (`--doc` and `--item`, HR-165
+//!   (3)) check one thing: a cited workspace path exists. A workspace path is
+//!   a cited path that `git check-ignore` reports as ignored, so a project
+//!   whose workspace git does not ignore gets no finding from either mode, and
+//!   a path that git tracks is never checked, because a spec cites files that
+//!   the batch has yet to write. A checkout that lacks the workspace (a linked
+//!   git worktree keeps its ignored files apart from the main checkout) reads
+//!   every citation of it as missing: run the check where the workspace lives.
+//!   Reading every citation as a path to find would flag nearly all of them:
+//!   in this repository's specs, plans, and backlog item bodies the citations
+//!   that name no existing file outnumber the workspace citations by far.
+//! - The two modes read citations through `find_citations`, so they carry the
+//!   limits of `find_citations` (`citations`'s Limits), and add their own. A
+//!   token with a glob, set, or placeholder character (`*`, `?`, `[`, `]`, `{`,
+//!   `}`, `<`, `>`) or an ellipsis names a set of paths, not one, and is
+//!   skipped; so is a markdown link's target, which reaches the walk glued to
+//!   its link text (`[probe](.superpowers/x.txt)` holds `[`). A path with a
+//!   `..` segment is skipped as well, and so is an absolute path outside the
+//!   install root: git cannot classify either from the root. An absolute path
+//!   inside the root is checked as a relative one is. Inside means that an
+//!   ancestor of the path has the real path of the root (`doc::root_relative`),
+//!   so a symlinked directory, the real path that git prints, and a Windows
+//!   short name all name the same root. The names below that ancestor are the
+//!   names of a relative citation, so the two spellings of one file get one
+//!   verdict. A path through a symlink below the root is judged at the target
+//!   of the link (`rules::ignored_among`): git is asked about the target when
+//!   it lies inside the root, and about the link itself when it does not,
+//!   because git refuses a path beyond a symlink. The disk lookup follows the
+//!   link, so a missing target is a missing file. A path inside a submodule is
+//!   no workspace path of the install, because git refuses it too; it is
+//!   skipped. A path under `.houserules/step/` is the output of the step
+//!   script, not a workspace path, and is skipped. A file cited in two
+//!   spellings is named once, in the first spelling. A token that starts with a
+//!   letter, a colon, and a slash or backslash reads as a Windows drive
+//!   (`citations::drive_prefix_len`), so its colon stays in the path whether or
+//!   not a drive of that letter exists. A bare basename names no workspace path
+//!   and is never resolved against the workspace. Only the existence of the
+//!   path is checked: its line numbers and the sentence that cites it are not
+//!   (`check_citation_lines` reads the line numbers of a report).
+//! - `--item` reads every string of the record that the tracker returns, in
+//!   document order, as one text, so a path cited in any field counts. A
+//!   record that holds no string is a clean run.
 
 use std::path::{Component, Path};
 
@@ -12,7 +57,8 @@ use serde_json::Value;
 use crate::rules::ignored_among;
 use crate::tracker::{self, Lookup};
 
-use super::{find_citations, read_utf8_lossy, resolve_against};
+use super::citations::find_citations;
+use super::{read_utf8_lossy, resolve_against};
 
 /// The folder below the install root that holds the output of the step script
 /// (`rules.json`, `audit.json`, `validate.json`). A tool wrote it, and the

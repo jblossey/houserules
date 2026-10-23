@@ -105,6 +105,7 @@ const COVERED: &[&[&str]] = &[
     &["stats", "workspace"],
     &["archive"],
     &["check-report-claims", "report.json"],
+    &["report-facts", "report.json", "--base", "HEAD"],
     &["pack", "list"],
     &["pack", "add", "process"],
     &["pack", "remove", "process"],

@@ -4,12 +4,14 @@
 //! `tests/fixtures/stats-35/`.
 
 mod install_shape;
+mod stats_support;
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use serde_json::{Value, json};
+use stats_support::{fixture, write_knowledge_base};
 use tempfile::TempDir;
 
 /// A `Command` for the compiled `houserules` binary under test, with the
@@ -20,60 +22,12 @@ fn houserules() -> Command {
     command
 }
 
-/// The committed fixture workspace `name`, built component by component
-/// (`houserules.path-pins-mirror-the-code`).
-fn fixture(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("tests")
-        .join("fixtures")
-        .join("stats-35")
-        .join(name)
-}
-
-/// One entry of the knowledge base: a judged rule has no `check`, a
-/// deterministic rule has one.
-fn entry(id: &str, deterministic: bool) -> Value {
-    let mut entry = json!({
-        "id": id, "kind": "rule", "area": "global", "standing": false,
-        "summary": "A rule.", "source": {"date": "2026-10-09", "by": "review"},
-    });
-    if deterministic {
-        entry["check"] =
-            json!({"type": "report-field", "level": "fail", "if": "**", "field": "live_run"});
-    }
-    entry
-}
-
-/// A repository root that holds a loadable knowledge base with the judged
-/// rules `j.one`, `j.two`, `j.three`, and `j.unused` and the deterministic
-/// rules `d.one`, `d.two`, and `d.three`. `stats` loads the base before it
+/// A repository root that holds a loadable knowledge base (see
+/// [`stats_support::write_knowledge_base`]). `stats` loads the base before it
 /// reads any workspace.
 fn knowledge_root() -> TempDir {
     let root = tempfile::tempdir().expect("tempdir");
-    let knowledge = root.path().join("knowledge");
-    fs::create_dir_all(&knowledge).expect("create knowledge/");
-    fs::write(knowledge.join("schema.json"), "{}").expect("write schema.json");
-    fs::write(knowledge.join("areas.json"), "{}").expect("write areas.json");
-    install_shape::mark_2_0(root.path());
-    let entries: Vec<Value> = [
-        ("j.one", false),
-        ("j.two", false),
-        ("j.three", false),
-        ("j.unused", false),
-        ("d.one", true),
-        ("d.two", true),
-        ("d.three", true),
-    ]
-    .iter()
-    .map(|(id, deterministic)| entry(id, *deterministic))
-    .collect();
-    fs::write(
-        knowledge.join("test.json"),
-        serde_json::to_string(&json!({"entries": entries})).expect("serialize entries"),
-    )
-    .expect("write test.json");
+    write_knowledge_base(root.path());
     root
 }
 

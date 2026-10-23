@@ -7,6 +7,7 @@ use std::collections::BTreeSet;
 use serde_json::{Map, Value};
 
 use super::issue::{Issue, PARTIAL};
+use crate::shell;
 use crate::tracker::hosted;
 
 /// The key of `bd config` that lists the custom statuses.
@@ -78,7 +79,8 @@ fn with_partial_active(listed: &[&str]) -> String {
 /// The line for a custom setting that the store lacks: `what` names it (`status
 /// partial`, `type houserules-batch`, or `types a, b` with `are` for the
 /// plural), and the step is `bd config set <key> <existing,missing>`, because
-/// `bd config set` replaces the list.
+/// `bd config set` replaces the list. The list is quoted for a POSIX shell
+/// where it needs quoting: a list of two or more entries holds a comma.
 fn config_line(what: &str, verb: &str, key: &str, existing: &str, missing: &[&str]) -> String {
     let existing = existing.trim();
     let list = if existing.is_empty() {
@@ -86,7 +88,10 @@ fn config_line(what: &str, verb: &str, key: &str, existing: &str, missing: &[&st
     } else {
         format!("{existing},{}", missing.join(","))
     };
-    format!("the custom {what} {verb} missing; run bd config set {key} {list}")
+    format!(
+        "the custom {what} {verb} missing; run bd config set {key} {}",
+        shell::quote(&list)
+    )
 }
 
 /// The faults of the store's configuration: the custom status `partial`, which
@@ -101,7 +106,7 @@ fn check_config(config: &Config) -> Vec<String> {
         if listed.iter().any(|entry| name_of(entry) == PARTIAL) {
             errors.push(format!(
                 "the custom status partial is not in the active category; run bd config set {STATUS_KEY} {}",
-                with_partial_active(&listed)
+                shell::quote(&with_partial_active(&listed))
             ));
         } else {
             errors.push(config_line(
@@ -179,7 +184,7 @@ mod tests {
             errors,
             [
                 format!(
-                    "the custom types {} are missing; run bd config set types.custom {}",
+                    "the custom types {} are missing; run bd config set types.custom '{}'",
                     RECORD_TYPES.join(", "),
                     RECORD_TYPES.join(",")
                 ),
@@ -217,11 +222,11 @@ mod tests {
             "an entry is its name and its category, and spaces around it count for nothing"
         );
         for (listed, step) in [
-            ("review:wip, partial:frozen", "review:wip,partial:active"),
-            ("partial:frozen,review:wip", "partial:active,review:wip"),
+            ("review:wip, partial:frozen", "'review:wip,partial:active'"),
+            ("partial:frozen,review:wip", "'partial:active,review:wip'"),
             ("partial", "partial:active"),
             ("partial:wip,partial:frozen", "partial:active"),
-            ("partial:active2,review:wip", "partial:active,review:wip"),
+            ("partial:active2,review:wip", "'partial:active,review:wip'"),
         ] {
             assert_eq!(
                 check_config(&config(Some(listed), Some(&all_types))),
@@ -240,13 +245,20 @@ mod tests {
         assert_eq!(
             check_config(&config(Some("review:wip"), Some(&all_types))),
             [
-                "the custom status partial is missing; run bd config set status.custom review:wip,partial:active"
+                "the custom status partial is missing; run bd config set status.custom 'review:wip,partial:active'"
             ]
+        );
+        assert_eq!(
+            check_config(&config(Some("my status:wip"), Some(&all_types))),
+            [
+                "the custom status partial is missing; run bd config set status.custom 'my status:wip,partial:active'"
+            ],
+            "a value of the store that holds a space is quoted in the step"
         );
         assert_eq!(
             check_config(&config(Some("partial:active"), None)),
             [format!(
-                "the custom types {} are missing; run bd config set types.custom {all_types}",
+                "the custom types {} are missing; run bd config set types.custom '{all_types}'",
                 RECORD_TYPES.join(", ")
             )]
         );
@@ -258,8 +270,45 @@ mod tests {
                 )
             )),
             [
-                "the custom type houserules-parked is missing; run bd config set types.custom houserules-section,spike-ish,houserules-batch,houserules-amendment,houserules-decision,houserules-parked"
+                "the custom type houserules-parked is missing; run bd config set types.custom 'houserules-section,spike-ish,houserules-batch,houserules-amendment,houserules-decision,houserules-parked'"
             ]
+        );
+    }
+
+    /// A list of the store holds a NUL byte when a project writes the store
+    /// directly (`bd config set` takes its value from an argument, which holds
+    /// none). The check names the fault and quotes the list with the byte in
+    /// it, as it does for any other value; it never crashes
+    /// (`houserules.crash-paths-are-named`).
+    #[test]
+    fn a_nul_byte_in_a_list_of_the_store_gets_a_named_fault() {
+        let mut config = complete();
+        config.insert(STATUS_KEY.to_string(), json!("review:wip\u{0}x"));
+        assert_eq!(
+            check_config(&config),
+            [
+                "the custom status partial is missing; run bd config set status.custom 'review:wip\0x,partial:active'"
+            ]
+        );
+        config.insert(
+            STATUS_KEY.to_string(),
+            json!("review:wip\u{0}x,partial:frozen"),
+        );
+        assert_eq!(
+            check_config(&config),
+            [
+                "the custom status partial is not in the active category; run bd config set status.custom 'review:wip\0x,partial:active'"
+            ]
+        );
+        config.insert(STATUS_KEY.to_string(), json!("partial:active"));
+        config.insert(TYPES_KEY.to_string(), json!("spike\u{0}ish"));
+        assert_eq!(
+            check_config(&config),
+            [format!(
+                "the custom types {} are missing; run bd config set types.custom 'spike\0ish,{}'",
+                RECORD_TYPES.join(", "),
+                RECORD_TYPES.join(",")
+            )]
         );
     }
 }

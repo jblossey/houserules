@@ -1,0 +1,89 @@
+{
+  "base": "<base>",
+  "head": "<head>",
+  "ids": [],
+  "changed_files": [
+    "src/example.rs"
+  ],
+  "areas": [
+    "global"
+  ],
+  "area_files": {
+    "global": []
+  },
+  "rules": [
+    {
+      "id": "d.one",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "report field live_run is set in 1 of 1 reports"
+    },
+    {
+      "id": "d.three",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "report field live_run is set in 1 of 1 reports"
+    },
+    {
+      "id": "d.two",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "pass",
+      "evidence": "report field live_run is set in 1 of 1 reports"
+    },
+    {
+      "id": "j.one",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "open",
+      "evidence": "—"
+    },
+    {
+      "id": "j.three",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "open",
+      "evidence": "—"
+    },
+    {
+      "id": "j.two",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "open",
+      "evidence": "—"
+    },
+    {
+      "id": "j.unused",
+      "kind": "rule",
+      "mode": "judged",
+      "level": null,
+      "result": "open",
+      "evidence": "—"
+    }
+  ],
+  "summary": {
+    "base": "<base>",
+    "head": "<head>",
+    "deterministic": 3,
+    "pass": 3,
+    "fail": 0,
+    "warn": 0,
+    "skipped": 0,
+    "judged": 4,
+    "reference_fail": 0
+  },
+  "references": {
+    "checked": 0,
+    "passed": 0,
+    "skipped": 0,
+    "failures": []
+  }
+}
