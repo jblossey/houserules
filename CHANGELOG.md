@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.0.0](https://github.com/jblossey/houserules/compare/v1.4.0...v2.0.0) (2026-10-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* the deliverables schema rejects the old form.
+* the process pack moves to 2.0.0, security-hygiene to 5.0.0, and knowledge-base to 3.0.0, each with a stricter check; the install schema is 2.2.0; init and update write the ignore line .houserules/ in place of .houserules/step/; the audit JSON's references read checked, passed, and skipped in place of resolved.
+* a plain `init` installs only the knowledge-base pack; the process pack and the work items need a tracker (`init --tracker json|github|beads`), and the agent templates and lifecycle skills come with `init --workflow reference`. Every deliverable needs `model`.
+* every command but `update` and `files` refuses a houserules 1.x install with one line. Run `houserules update` to convert it to the 2.0 layout.
+
+### Features
+
+* cite runs by capture, fill report facts, and check report claims ([70fd7a7](https://github.com/jblossey/houserules/commit/70fd7a7f0f3ad95c22cb106f7fea3d88c2d96a0b))
+* run external tools through runner checks and give audit and stats their evidence ([f52ce07](https://github.com/jblossey/houserules/commit/f52ce074e405f544c0392bb41dff4dc228f6ba79))
+* ship the 2.0 knowledge layer: packs, render targets, and subdirectory installs ([a899f7e](https://github.com/jblossey/houserules/commit/a899f7ecb7987f829ef430eef1230b7bf4971b02))
+* work items through a tracker, the reference workflow as a package, and a minimal default ([53806df](https://github.com/jblossey/houserules/commit/53806df26db984eb66d5c2d8cc9b912ad059fde8))
+
 ## [1.4.0](https://github.com/jblossey/houserules/compare/v1.3.0...v1.4.0) (2026-10-10)
 
 
