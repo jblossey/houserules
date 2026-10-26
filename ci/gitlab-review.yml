@@ -310,7 +310,7 @@ houserules-$[[ inputs.key ]]-floor:
         git fetch -q origin "+refs/heads/$CI_DEFAULT_BRANCH:refs/remotes/origin/$CI_DEFAULT_BRANCH"
         # cargo reads .cargo/config.toml above the source it builds, and rustup reads
         # rust-toolchain.toml above its working directory: no folder of this source lies in the request.
-        HOUSERULES_DEFAULT_SRC=$(mktemp -d)
+        HOUSERULES_DEFAULT_SRC=$(mktemp -d "${TMPDIR:-/tmp}/houserules-default.XXXXXX")
         export HOUSERULES_DEFAULT_SRC
         hr_project=$(cd "${CI_PROJECT_DIR:-$PWD}" && pwd -P)
         hr_source=$(cd "$HOUSERULES_DEFAULT_SRC" && pwd -P)
