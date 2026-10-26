@@ -3661,3 +3661,236 @@ Each item records the ruling with its date, or stays marked open.
     batch-38 spec section 18, and reports the release ready: the owner
     then only cuts the release (merges release PR #83) and posts the
     HR-212 comments. Source: owner, 2026-10-26.
+278. **Batch 38 runs with no cap on parallel agents - ruled 2026-10-26.**
+    The owner, verbatim: "I lift the cap on the number of parallel agents
+    that you are allowed to run for batch 38". (1) For batch 38 the
+    orchestrating skill's limit of three agents at once does not apply:
+    the controller runs as many agents at once as the plan's waves and
+    their reviews allow. (2) Every other rule of parallel dispatch holds:
+    agents run in parallel only when the plan marks their file sets
+    disjoint and no task needs another's output, each in its own worktree
+    with its own scratch root, and the controller integrates one task at a
+    time with the gates after each (`process.parallel-on-disjoint-files`).
+    (3) The ruling is for batch 38 only; a later batch returns to the limit
+    unless the owner rules again. Source: owner, 2026-10-26.
+279. **Batch 37 accepted by the controller - 2026-10-26, under 264.** (1)
+    Batch 37 merged ff-only from the CLI at b9dd0d0e (PR #90, after green
+    required checks on three operating systems; `review / floor` red on that
+    pull request only, by design, because main lacked `route`). (2) The
+    acceptance rests on the batch's acceptance cases (the live run and the
+    final gates at the head, in the batch-37 ledger) and on the rollout
+    checks: on main at b9dd0d0e the `ci`, `review`, `codeql`, and `schemas`
+    workflows pass; the `review` workflow's record job wrote the first
+    change record (`record show b9dd0d0e` reads it); each of the six
+    published schema documents on Pages equals its file and its `$id` is
+    its URL (`post-merge-pages-ids.txt` in the batch-37 workspace). (3) The
+    rollout check found one defect, filed as HR-259: a count of one prints
+    a plural ("1 changed lines"). It blocks no acceptance case. (4) The
+    owner-gated proposals of the batch-37 batch report stay with the owner.
+    Source: controller, 2026-10-26.
+280. **Faster task loops - ruled 2026-10-26.** The owner, verbatim: "all
+    your suggested changes approved. Apply them from now on.", to the
+    controller's four proposals after the owner's remark that nine hours
+    for a wave is too long, and to its offer of a timing analysis. (1) An
+    implementer's task-end run and a fix round run every check of the CI
+    gate list but two: in place of the full suite they run the tests of
+    the files they change, and they skip the autocrlf suite. The controller
+    runs the full suite and the autocrlf suite once per integration; a red
+    there opens a fix round for the task. A fix round runs each finding's
+    Check line, the targeted tests, and the other gates, and no full suite
+    (`houserules.task-gates-mirror-ci`). (2) A reading that the spec leaves
+    open and that a test would pin goes to the controller as a question
+    before the test is written; the brief rules every such reading the
+    controller finds when it writes the brief (`process.ask-when-missing`,
+    through `knowledge/overrides.json`; the kit pack stays unchanged). (3)
+    The ledger stamps each dispatch and each close with its UTC time, so
+    the controller's idle time shows. (4) The controller runs a timing
+    analysis of batch 37 from its transcripts and ledger (per-dispatch
+    time, gate time, idle time) beside batch 38 and brings its numbers and
+    proposals to the owner. (5) The rules hold from batch 38's next
+    dispatch on; a running dispatch gets them by message. They change this
+    repository's discipline, not the kit's defaults: a kit change is a
+    work item. Source: owner, 2026-10-26.
+281. **Ask without blocking; two main.rs tasks at once; gates during a
+    fix-diff review - ruled 2026-10-26.** The owner, verbatim: "P5
+    approved, also P2 and P7", to the controller's proposals from the
+    batch-37 timing analysis (`timing-analysis.md` in the batch-38
+    workspace). (1) P5: the controller asks the owner in a plain message,
+    never in a question tool that holds its turn, and keeps working: it
+    dispatches every task and fix round that needs no ruling and sends the
+    ruling to the waiting agent when it arrives (`process.ask-when-missing`).
+    (2) P2: two tasks whose only shared file is
+    `crates/houserules/src/main.rs` may run at once; the controller
+    resolves the later cherry-pick's conflict by keeping both sides and runs
+    the gates; any other resolution is a fix round for the later task
+    (`process.parallel-on-disjoint-files`). (3) P7: while a fix-diff review
+    or a re-review runs, the controller may integrate the fix and run the
+    integration gates; a new Critical or Important finding undoes the
+    integration and opens the next round (`process.bounded-review-loop`).
+    (4) The three rules go to this repository through
+    `knowledge/overrides.json`; the kit's skills and packs ship them as
+    defaults only through a work item (HR-260). Source: owner, 2026-10-26.
+282. **Batch 37's owner-gated close proposals - ruled 2026-10-26.** The
+    owner, verbatim: "accepted as proposed.", to the controller's
+    recommendations on the proposals of the batch-37 batch report
+    (`.superpowers/sdd/2026-10-24-batch-37/batch-report.md`). (1)
+    `security-hygiene.dependency-vetting` stays as it is and takes the tag
+    `ruled-keep`; its override already states the lock-only check. (2)
+    `process.closure-claims-carry-enumeration` stays as it is (already
+    `ruled-keep`); its report-field check is HR-255's. (3) A body sentence
+    each for `process.tdd` (a test added after the recorded RED carries its
+    own RED or a mutation row) and `quality.principles` (a struct names the
+    production reader of each field), through `knowledge/overrides.json`;
+    the kit packs stay unchanged. (4) `process.ask-when-missing` took its
+    sentence under 280. (5) `process.claims-match-artifacts`,
+    `process.evidence-outlives-the-session`, and the three writing-style
+    rules keep their text; their checks are HR-255's. Source: owner,
+    2026-10-26.
+283. **The faster loop ships in 2.0.0 as batch-38 Task 11 - ruled
+    2026-10-26, amends meta-spec 2 (the batch list) and HR-260.** The owner,
+    verbatim: "Make sure that our improvements reach our adopters who use
+    the reference workflow", then, to the controller's question whether the
+    improvements ship in 2.0.0 as part of batch 38 or in 2.x: "yes, ship it
+    in 2.0.0 as T11". (1) HR-260 moves to milestone 2.0.0 and batch 38;
+    batch 38 gains Task 11, which carries rulings 280 to 282 into the
+    reference workflow's skills and templates and the process and quality
+    packs (batch-38 spec 19, case 14). (2) The changed templates need the
+    eval run of `process.evals-rerun` before the branch review (a
+    controller step). (3) This repository's overrides that the kit then
+    carries drop their duplicated fields. Source: owner, 2026-10-26.
+284. **An install that houserules 0.3.0 seeded keeps its kit files - ruled
+    2026-10-26, amends meta-spec 7.** The owner, verbatim: "a", to the
+    controller's question on the v0.3.0 rows of the batch-38 upgrade proof
+    (branch review issue 2): (a) document the population as an accepted red,
+    or (b) embed the 0.3.0 contents in the binary's released table. (1) The
+    released table stays as 5.142 rules it: the contents shipped from 1.0.0
+    on. `update` keeps the deliverables schema and the dependency-add
+    scenario of a 0.3.0 install and edits only the area enum of its
+    knowledge schema, each with its hand step. (2) Meta-spec 7 states the
+    population: an unchanged kit has its schemas replaced from 1.0.0 on, and
+    the kit files that 0.3.0 seeded are kept and listed as hand steps. (3)
+    The upgrade guide's reds name the three files, each with its hand step
+    as the remedy. (4) Embedding the 0.3.0 contents is a 2.x backlog item.
+    Source: owner, 2026-10-26.
+285. **The README is rewritten from six first-time readers - directed
+    2026-10-26, amends batch-38 spec 8.** The owner, verbatim: "Give just the
+    readme to an agent who knows nothing about houserules and who is not
+    allowed to research anything. Let the agent work piece by piece through
+    the readme and tell you exactly what it does not understand and why and
+    if it would choose houserules over the existing alternatives there are in
+    the open source world for their specific problem. Then use this feedback
+    to make a better readme. Make sure you adhere to best-practices and golden
+    paths for really good open source readmes.", with five personas (an audit
+    trace of agent changes, spec- or intent-driven development, QA policy
+    adherence, platform-wide rules, a git-native knowledge base), then "Add
+    one more agent persona: a developer who knows about openspec and who asks
+    themselves 'i already have openspec, what do i need houserules for?'".
+    (1) Six personas read the README alone; none chose houserules (one
+    maybe, five maybe leaning no), and all six asked for a README of 300 to
+    500 lines with the reference moved to `docs/`. (2) Batch 38 gains Task 13:
+    the README rewrite of the findings and the design in the batch workspace
+    (`readme-rewrite-design.md`), with the reference moved whole to pages
+    under `docs/`, the crate description equal to the README's short
+    description, and the six personas rerun on the result. (3) Spec 8 states
+    the funnel by the reader's needs: the first screen names the problems
+    houserules solves in plain words, not "central layer" or "AI-native
+    coding"; the CLI reference and the other reference sections may live in
+    `docs/` behind a link. (4) The owner's README review stays the last gate
+    (277). The GitHub repository description is the owner's to change.
+    Source: owner, 2026-10-26.
+286. **The README follows best practices, not the personas - ruled
+    2026-10-26, amends 285 and batch-38 spec 8.3.** The owner, verbatim:
+    "Remember to not target the readme towards personas but simply use their
+    feedback to improve the readme which follows the best-practices.
+    Explicitly writing sections for personas is not correct." (1) The README
+    keeps the structure of open-source README practice (description,
+    install, usage, the product's features, concepts, documentation,
+    contributing, license); it holds no section, box, or heading per persona
+    or per persona need and addresses no reader type. (2) The persona reports
+    are evidence of where a first-time reader gets lost; the rewrite fixes
+    those places inside that structure. (3) The persona review after the
+    rewrite adds further personas that the controller proposes to the owner.
+    Source: owner, 2026-10-26.
+287. **The README is reframed from an independent discovery - directed
+    2026-10-26, amends 285 and batch-38 spec 8.** The owner, verbatim:
+    "Additionally, dispatch one agent who is not allowed to read or know the
+    readme. let that agent understand on its own what houserules does and
+    describe it to you. I want you to completely reframe the readme to what
+    houserules actually is rather then letting the old readme influence you.
+    The rules to a good readme still apply." (1) An agent that may not read
+    the README, or any review of it, learns houserules from its code, files,
+    and binary, and writes what it is. (2) The README's description, usage,
+    feature overview, and glossary are written from that description and the
+    tree, not from the old README; the reference that Task 13 moves to
+    `docs/` stays. (3) The best practices of 285 and 286 hold; the persona
+    reviews of 286 run on the result. Source: owner, 2026-10-26.
+288. **The README rework becomes a procedure for every release - ruled
+    2026-10-26.** The owner, verbatim: "Save this process for later use
+    somehow so whenever we release new versions, the readme can get an
+    appropriate rework. You don't have to run the full set every time
+    (except for major releases), only what is useful for the respective
+    release.", then "Use what fits best: a runbook, an agent, a skill...".
+    (1) The procedure of 285 to 287 is the project skill `readme-rework`
+    (`.claude/skills/readme-rework/`: the steps, the scale table, the
+    discovery brief, the persona brief, and the persona catalog with the
+    capabilities each persona exercises). A skill fits because this
+    repository keeps its procedures as skills and an agent loads one by its
+    description; no agent template fits, because the readers must not carry
+    houserules knowledge. (2) A major release runs every step; a minor
+    release runs the personas of the capabilities it changes, and the
+    discovery only when what houserules is changes; a patch release fixes
+    only the facts it made stale. (3) The release runbook points to the
+    skill, and `houserules.readme-rework-at-release` loads it for
+    `README.md`. The skill is this repository's own, not a kit file.
+    Source: owner, 2026-10-26.
+289. **Batch 38 fixes two first-run defects as Task 14 - ruled 2026-10-26.**
+    The owner, verbatim: "yes", to the controller's question whether batch
+    38 fixes, as Task 14, the two defects that the README discovery found
+    and the controller reproduced: `check-knowledge` fails right after
+    `init` in a repository that already has commits, until the new files
+    are added; and `check-backlog` passes an item whose batch no batch
+    record holds. (1) The dead-glob gate keeps its reading: once the index
+    holds files, git's tracked files decide liveness, as CI sees them.
+    `init` and `update` guide the reader instead: when the index holds files
+    and the command wrote files that git does not track, the `next:` line
+    starts with `git add <their top-level paths, relative to the install
+    root, sorted> && `. (2) `check-backlog` on the JSON tracker reports an
+    item whose `batch` names a number that neither `backlog/batches.json`
+    nor `backlog/archive/batches.json` holds. (3) Task 14 is a critical task
+    (173: CLI output). The other findings of the discovery are HR-275 to
+    HR-279 (2.x). Source: owner, 2026-10-26.
+290. **README visualizations and a linked glossary - ruled 2026-10-26.** The
+    owner, verbatim: "Add to the backlog for 2.x to add proper
+    visualizations to the readme. The current wall of text is hard to
+    understand. The readme must also not use any houserules-coded terms
+    without explanation and must provde a short glossary with explanations
+    it links to for every such term." (1) HR-285 (milestone 2.x) holds the
+    work. (2) The `readme-rework` skill states both as rules for every
+    future rework. Source: owner, 2026-10-26.
+291. **The README is approved, and the upgrade proof is not rerun - ruled
+    2026-10-27.** The owner, verbatim: "Upgrade proof is skipped for this
+    batch. I have read the readme and approve it." (1) The owner's README
+    review (HR-223 (5), design.md 277) is done: the README at the batch head
+    is approved. (2) The plan's rerun of case 9 after a change to `src/`
+    does not run for Task 14: run 2 of the upgrade proof (at the code head
+    after the branch-review fix wave) stands as case 9's evidence, and Task
+    14's change of the `next:` line of `update` is covered by its own tests
+    (tests/first_run_38.rs). Case 12 reruns at the final head. Source:
+    owner, 2026-10-27.
+292. **The repository description and the release note's rule ids - ruled
+    2026-10-27.** The owner, verbatim: "You write the github repo
+    description for me and the two rule IDs are exempt from the release
+    note." (1) The controller set the GitHub repository description to the
+    README's short description, which equals the crate description: "A CLI
+    that keeps a repository's rules for AI coding agents as JSON in git and
+    audits each change against them." (2) The release-note draft names no
+    rule id: the opt-in work-item rule and the exact-pins rule are named by
+    what they do. Source: owner, 2026-10-27.
+293. **The one-line description - ruled 2026-10-27, amends 292 (1).** The
+    owner, verbatim: "A CLI that makes your AI coding agents adhere to your rules, audits each change, and proves your intent is obeyed." (1) That line is the
+    README's short description, the crate description, and the GitHub
+    repository description. (2) The controller noted before the ruling that
+    houserules checks patterns, paths, diffs, and commit messages and links
+    each change to its intent, but reads no meaning of code and signs
+    nothing (README Limits); the owner chose this wording. Source: owner,
+    2026-10-27.
