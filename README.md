@@ -3,104 +3,58 @@
 [![CI](https://github.com/jblossey/houserules/actions/workflows/ci.yml/badge.svg)](https://github.com/jblossey/houserules/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/jblossey/houserules?label=release)](https://github.com/jblossey/houserules/releases)
 
-Knowledge base, backlog, and agent workflow for repositories built with
-AI coding agents.
+A CLI that makes your AI coding agents adhere to your rules, audits each change, and proves your intent is obeyed.
 
-houserules gives a repository developed with AI coding agents a knowledge
-base, a backlog, and an agent workflow that keeps both current. Point
-Claude Code (or any harness that reads plain files) at your project;
-houserules installs the machinery, and your project supplies the rules.
+AI coding agents forget a project's rules between sessions, and nobody can review every line they write. With houserules, you write the rules down once, and an audit checks each change against them. Each rule, gotcha, or decision of your project is an [entry](#concepts) in a JSON file under `knowledge/`. An entry has an id and an [area](#concepts), the paths that it applies to. Before an agent changes a file, `houserules for <path>` gives it the rules of that file. `houserules render` writes the same rules into `AGENTS.md`, the instruction file that many coding agents read. After the change, `houserules audit` runs the [check](#concepts) of each rule against the commits, on your machine or in CI, and fails the change when a check fails, whether a person or an agent wrote it.
 
-Every rule, decision, and gotcha your team has learned lives in
-`knowledge/*.json`, addressable by id. Your work items live in the tracker
-that you choose: JSON files, GitHub Issues, or Beads. A commit names the
-item it delivers. An optional reference workflow adds agent templates that
-carry the rules into every change and audit the result against them, so the
-rules stay enforced instead of drifting into a wiki nobody reads.
+houserules is one binary and plain files in your repository. It needs no server, database, account, or hosted service. The knowledge stays readable JSON without the binary.
+
+That is the core. Everything else is an optional layer that you add when you need it: shared rule sets ([packs](#shared-rule-sets)), a store of work items ([tracker](#work-items)), a [review layer](#reviewing-a-change) that links each change to its intent and keeps a record of each merge, and a [workflow for a team of agents](#a-workflow-for-a-team-of-agents). You can stop after the [quick start](#quick-start).
+
+A hand-written `AGENTS.md` costs nothing to start, but nothing checks it. houserules gives each rule an id and a schema, generates the instruction files from one source, and ties a rule to a check that can fail a change. It works beside other tools:
+
+- A tool that copies one rules file into the formats of several agents shares the text of the rules. houserules writes `AGENTS.md` and the files of Claude Code, and it adds a check to a rule.
+- A linter or a code scanner, such as Semgrep, parses the code. The checks of houserules match patterns, paths, diffs, and commit messages, and a check can run such a tool as a [runner](#checks-that-run-your-tools).
+- A spec tool, such as OpenSpec, plans a change. houserules supplies the rules of each change and [links a commit to its plan](#linking-a-change-to-its-intent).
+- A tool that records the session of an agent keeps what the agent did. houserules keeps what each check found and a record of each merge.
+- The branch protection of your host blocks a merge. houserules gives it a check to require, and it blocks nothing itself.
+
+It fits a repository where agents change code every day and every agent, tool, and session must follow the same rules. For one person, one agent, and a short `AGENTS.md`, houserules is likely more than you need. [Limits](#limits) lists what it does not do.
 
 ## Table of contents
 
-- [Why](#why)
 - [Install](#install)
 - [Quick start](#quick-start)
-- [Adding to an existing project](#adding-to-an-existing-project)
-- [What it installs](#what-it-installs)
-- [Packs](#packs)
-- [Trackers](#trackers)
-- [The houserules step](#the-houserules-step)
-- [Evidence](#evidence)
-- [Runners](#runners)
-- [The review layer](#the-review-layer)
-- [Ownership model](#ownership-model)
-- [The reference workflow](#the-reference-workflow)
-- [Measure process cost](#measure-process-cost)
-- [CLI reference](#cli-reference)
+- [Rules and checks](#rules-and-checks)
+- [Integration](#integration)
+- [Linking a change to its intent](#linking-a-change-to-its-intent)
+- [Reviewing a change](#reviewing-a-change)
+- [A workflow for a team of agents](#a-workflow-for-a-team-of-agents)
+- [Limits](#limits)
+- [Concepts](#concepts)
+- [Documentation](#documentation)
 - [Stability](#stability)
 - [Contributing and support](#contributing-and-support)
 - [License](#license)
 
-## Why
-
-Agent sessions forget; repositories don't. houserules turns what agents
-learn in your codebase — the pitfalls, conventions, and decisions — into
-addressable rules that load into every future session. Each rule is
-targeted and audited, so the set stays small and cheap in tokens: agents
-stop repeating known mistakes without re-reading history, and review
-rounds shrink. Once the recurring pitfalls are captured, you add your own
-rules and the same machinery enforces them — the codebase converges on
-the style you rule, not the style that happens.
-
 ## Install
 
-houserules ships one dependency-free binary: no local clone, no Rust
-toolchain, no Node. Install it through any of these channels, then run
-`houserules init` in your project.
-
-### The shell installer
+houserules is one binary for Linux (x64 and arm64), macOS (x64 and arm64), and Windows (x64). It needs no Rust toolchain and no Node runtime.
 
 ```sh
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jblossey/houserules/releases/latest/download/houserules-installer.sh | sh
 ```
 
-The installer picks your platform's archive, verifies its sha256, and
-installs to `~/.local/bin`, adding that directory to `PATH` itself. The
-URL always resolves to the newest release — it never needs a version
-edit.
+The installer puts the binary in `~/.local/bin` and adds that folder to your `PATH`. On Windows, run the PowerShell installer: `powershell -c "irm https://github.com/jblossey/houserules/releases/latest/download/houserules-installer.ps1 | iex"`.
 
-### mise
+With [mise](https://mise.jdx.dev), run `mise use github:jblossey/houserules`. Each [release](https://github.com/jblossey/houserules/releases) also holds an archive for each platform and its SHA-256 checksum. The macOS binaries carry no signature: when macOS blocks a binary that a browser downloaded, run `xattr -d com.apple.quarantine <path to houserules>`, or run the binary once and then click Open Anyway under Privacy & Security in System Settings. To build from the source, clone the repository and run `cargo install --locked --path crates/houserules`.
 
-```sh
-mise use github:jblossey/houserules
-```
+In CI, install an exact release: replace `latest/download` with `download/v<version>` in the installer URL, or run `mise use github:jblossey/houserules@<version>`.
 
-Resolves the newest release's archive for your platform through
-[mise](https://mise.jdx.dev)'s `github` backend and records the tool in
-your `mise.toml`.
+### Requirements
 
-### Direct download
-
-| Target | Archive |
-|---|---|
-| Apple Silicon macOS | [houserules-aarch64-apple-darwin.tar.xz](https://github.com/jblossey/houserules/releases/latest/download/houserules-aarch64-apple-darwin.tar.xz) |
-| Intel macOS | [houserules-x86_64-apple-darwin.tar.xz](https://github.com/jblossey/houserules/releases/latest/download/houserules-x86_64-apple-darwin.tar.xz) |
-| x64 Windows | [houserules-x86_64-pc-windows-msvc.zip](https://github.com/jblossey/houserules/releases/latest/download/houserules-x86_64-pc-windows-msvc.zip) |
-| ARM64 Linux (musl) | [houserules-aarch64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/latest/download/houserules-aarch64-unknown-linux-musl.tar.xz) |
-| x64 Linux (musl) | [houserules-x86_64-unknown-linux-musl.tar.xz](https://github.com/jblossey/houserules/releases/latest/download/houserules-x86_64-unknown-linux-musl.tar.xz) |
-
-Each archive has a `.sha256` checksum beside it (append `.sha256` to the
-archive URL). Extract the archive and put the `houserules` binary on
-`PATH`. An exact older version stays downloadable from its own release
-page.
-
-macOS binaries are unsigned. Clear the quarantine flag once:
-
-```sh
-xattr -d com.apple.quarantine /path/to/houserules
-```
-
-Or use the GUI path: run the binary once and let macOS block it, then
-open System Settings, click Privacy & Security, scroll to the
-blocked-software notice, and click Open Anyway.
+- **git.** `route`, `evidence`, `bundle check`, and `record write` read the attributes of a commit with `git --attr-source`, so they need git 2.41 or later. `audit` needs it only when an `intent-required` check must find an intent in the changed paths. With an older git, the command stops with `<command>: git <version> is older than 2.41, which --attr-source needs`.
+- **`gh`** for the GitHub tracker, and **`bd`** for the Beads tracker. The JSON tracker needs no tool.
 
 ### Updating
 
@@ -108,1028 +62,414 @@ blocked-software notice, and click Open Anyway.
 houserules update
 ```
 
-Installed through the shell installer and run from where it installed,
-`update` checks GitHub for a newer release, replaces the binary itself,
-and re-runs before touching your repository — nothing else to install
-by hand. Run from anywhere else — mise, a direct download, or a
-shell-installer copy invoked from a different location — it prints one
-line naming what to do instead, and updates your repository on the
-binary you already have.
-
-Either way, the repository sync writes the files houserules owns —
-keeping any you changed — and re-renders the generated files. It moves
-each kit pack to the version of the binary and keeps your overrides and
-exclusions. Where the install runs the reference workflow, it moves the files
-of the workflow with the binary and keeps a file that you changed.
-When a pack ships the id of one of your own entries, it moves that entry
-into an override (one id, one source) and removes a topic file left empty. It prints the version
-drift it just synced, `kit <old> -> <new>`. It also backfills any
-seed-once file a later kit release adds that your install never
-received: an install seeded before this release gets a fresh `AGENTS.md`
-this way (`wrote AGENTS.md`) — generic, and yours to fill in with the
-rules your own `CLAUDE.md` already carries; the `migrating-knowledge`
-skill walks that merge. Review the diff (`git diff`) afterward; the
-drift line confirms the version you moved from and the version you
-landed on. Whenever the binary check completes, it also warns if another
-`houserules` sits elsewhere on your `PATH` — not the copy it just
-checked, updated or not.
-
-An install of houserules 1.x converts to the 2.0 layout in the same run.
-[docs/upgrading-to-2.md](docs/upgrading-to-2.md) lists what changes and
-each hand step that `update` can print.
-
-The knowledge schema (`knowledge/schema.json`) and the deliverables schema
-(`.claude/schemas/deliverables.json`) are a kind of file that `houserules
-files` lists as `d3Files`. So is the CI workflow
-(`.github/workflows/knowledge.yml`) of an install that an earlier release
-seeded. `init` writes each schema once and records a baseline for it, and
-it writes no CI workflow. `update` keeps each file current through that
-baseline: it rewrites a copy that still equals its baseline, keeps and
-lists a copy that you changed, and leaves a copy that you list in
-`ownedPaths` as it is. It never writes a CI workflow that is absent. The
-seeded CI workflow installs the release that `.houserules.json` records.
-`update` replaces a seeded workflow of houserules 1.x that equals the
-workflow of a release. It keeps a seeded workflow with steps of your own and
-prints a hand step. Copy the install step from the kit's
-[`template/.github/workflows/knowledge.yml`](https://github.com/jblossey/houserules/blob/main/template/.github/workflows/knowledge.yml)
-into it, or compare the two files.
-
-Set `HOUSERULES_SKIP_SELF_UPDATE` (to any value) to update only the
-repository and skip the binary check for one run; `update` skips it
-automatically in CI.
-
-On an interactive terminal, every other command also checks, at most
-once a day, whether a newer release exists, and names it in one line.
-Set `CI` or `HOUSERULES_NO_UPDATE_CHECK` (to any value) to turn that off.
-
-### Uninstalling
-
-Remove the binary through the channel you installed with:
-
-- **Shell installer or direct download**: delete the `houserules` binary
-  from where it was installed — `~/.local/bin` for the shell installer,
-  wherever you placed it for a direct download. An older shell-installer
-  install sits in `~/.cargo/bin`.
-- **mise**: run `mise uninstall houserules` and remove the tool's entry
-  from your `mise.toml`.
-
-Everything houserules put into a project is plain files tracked by your
-repository — there is no hidden state. To remove the kit from a project,
-delete the files it manages (`houserules files` lists them) plus the
-seeded `knowledge/` data and the `backlog/` data of a JSON tracker, or keep
-the knowledge files: they are readable JSON and useful without the binary.
+`update` brings the kit files of your repository to the version of the binary and keeps each file that you changed. Installed through the shell installer, it first replaces the binary itself. On an interactive terminal, the other commands look for a newer release at most once a day; set `HOUSERULES_NO_UPDATE_CHECK=1` to turn the check off. That check and the self-update are the only network calls of the binary; the GitHub tracker runs `gh`, the Beads tracker runs `bd`, and a pack from a git repository comes through `git`. [docs/updating.md](docs/updating.md) has the details and the steps to uninstall.
 
 ## Quick start
 
+The quick start runs in a new scratch repository, so it changes no file of yours. Run the blocks one after the other in one terminal. In the output, words in angle brackets stand for a value of your run.
+
 ```sh
-mkdir my-project && cd my-project && git init
+mkdir houserules-demo && cd houserules-demo
+git init -q -b main
+mkdir src && printf 'def greet(name):\n    return "Hello, " + name\n' > src/app.py
+git add -A && git commit -q -m "feat: greet a user"
 houserules init
-houserules check-knowledge && houserules check-backlog
-git add -A && git commit -m 'chore: install houserules knowledge setup'
 ```
 
-`init` installs the minimal default: the `knowledge-base` pack (your
-starting rules), the schemas, `AGENTS.md` and `CLAUDE.md`, the
-`migrating-knowledge` and `houserules-step` skills. It installs no tracker,
-no workflow, and no CI file. It then renders the harness files and stamps
-`.houserules.json` with the binary's version. Both gates pass on this install:
+```text
+wrote .claude/skills/migrating-knowledge/SKILL.md
+wrote .claude/skills/houserules-step/SKILL.md
+wrote tools/houserules-step.sh
+wrote knowledge/schema.json
+wrote knowledge/areas.json
+wrote .claude/schemas/deliverables.json
+wrote docs/README.md
+wrote AGENTS.md
+wrote CLAUDE.md
+wrote knowledge/packs/knowledge-base.json
+wrote .gitignore
+AGENTS.md: written
+houserules: initialized <repository>
+for Claude Code: run houserules init --target claude in the install root
+init: houserules wrote no CI file; to run the gates and the review layer in your pipeline, run houserules ci print --host github or gitlab
+next: <the commands to run next>
+```
+
+`init` writes the [kit](#concepts) files and keeps every file that exists. Its last line names the commands to run next, which depend on the state of your repository. Commit the files before the first check: `check-knowledge` matches the globs of each area against the files that git tracks, and a glob that matches no tracked file is a finding. [Setting up your repository](#setting-up-your-repository) says what each file is for.
+
+```sh
+git add -A && git commit -q -m "chore: install houserules"
+houserules check-knowledge
+```
 
 ```text
 knowledge: ok
-no tracker installed; run houserules init --tracker json|github|beads to add one
 ```
 
-`check-backlog` has no tracker to check, so it prints its line and exits 0.
-Look at what you got:
+Now add an area for `src/` and two entries. The block writes `knowledge/areas.json` again, with the four areas that `init` wrote and a fifth, `app`; in your own repository, add the `app` key to the file that you have. The entries go into a topic file of your own, `knowledge/project.json`: a rule whose `check` fails a change that adds a `TODO` under `src/`, and a decision, which records a choice and has no check:
 
 ```sh
-houserules topics
+cat > knowledge/areas.json <<'EOF'
+{
+  "global": { "paths": [] },
+  "process": { "paths": [] },
+  "docs": { "paths": ["docs/**", "AGENTS.md", "knowledge/**", "backlog/**", ".claude/**"] },
+  "tools": { "paths": ["tools/**"] },
+  "app": { "paths": ["src/**"] }
+}
+EOF
+cat > knowledge/project.json <<'EOF'
+{
+  "topic": "project",
+  "title": "Rules of this project",
+  "entries": [
+    {
+      "id": "project.no-todo-comments",
+      "kind": "rule",
+      "area": "app",
+      "summary": "File open work as a work item; leave no TODO comment in the code.",
+      "body": ["A TODO comment has no owner and no date, and nobody plans it."],
+      "tags": ["code"],
+      "source": { "date": "2026-10-26", "by": "user" },
+      "check": { "type": "grep-absent", "level": "fail", "files": ["src/**"], "pattern": "TODO", "scope": "changed", "covers": true }
+    },
+    {
+      "id": "project.plain-python",
+      "kind": "decision",
+      "area": "app",
+      "summary": "The app is plain Python with no web framework.",
+      "body": ["The app answers in one process and needs no server."],
+      "tags": ["code"],
+      "source": { "date": "2026-10-26", "by": "user" }
+    }
+  ]
+}
+EOF
+houserules render
+houserules check-knowledge
+cat src/AGENTS.md
+```
+
+```text
+AGENTS.md: written
+src/AGENTS.md: written
+knowledge: ok
+<!-- houserules:begin -->
+Generated from knowledge/ by houserules render. Do not edit.
+
+## App rules
+
+### Rules
+
+- [project.no-todo-comments] File open work as a work item; leave no TODO comment in the code.
+
+Detail: houserules get <id>
+<!-- houserules:end -->
+```
+
+An entry needs `id`, `kind`, `area`, `summary`, `body`, `tags`, and `source`; the `check` is optional. `source.by` is `user`, `review`, `controller`, or `docs`, and `pattern` is a regular expression. `"covers": true` counts the files that the check reads as checked, which [Reviewing a change](#reviewing-a-change) uses. `knowledge/schema.json` holds the schema of an entry and of each check. `render` wrote the rule into `src/AGENTS.md`, beside the code that it governs, and left the decision out.
+
+An agent that changes `src/app.py` asks for the [rule package](#concepts) of the file. Any agent can run the command, whatever instruction files its tool reads:
+
+```sh
+houserules for src/app.py
+```
+
+```json
+{
+  "schema": "houserules/rule-package@1.0.0",
+  "paths": [
+    "src/app.py"
+  ],
+  "areas": [
+    "app",
+    "global"
+  ],
+  "entries": [
+    {
+      "id": "project.no-todo-comments",
+      "kind": "rule",
+      "area": "app",
+      "standing": false,
+      "summary": "File open work as a work item; leave no TODO comment in the code."
+    }
+  ],
+  "standing": "houserules standing"
+}
+```
+
+Commit the rule. Then make a change that breaks it, and audit the last commit. The audit result goes to `.houserules/`, the folder for scratch output that `init` added to `.gitignore`:
+
+```sh
+git add -A && git commit -q -m "docs: add the first project rule"
+printf '# TODO: say goodbye too\n' >> src/app.py
+git commit -q -am "feat: plan a farewell"
+mkdir -p .houserules
+houserules audit --base HEAD~1 > .houserules/audit.json
+echo "audit exited $?"
+sed -n '/"rules": \[/,/^  \],/p' .houserules/audit.json
+```
+
+```text
+skipped 0 work-item references: no tracker installed (houserules init --tracker)
+audit exited 1
+  "rules": [
+    {
+      "id": "project.no-todo-comments",
+      "kind": "rule",
+      "mode": "deterministic",
+      "level": "fail",
+      "result": "fail",
+      "evidence": "src/app.py:3 matches TODO"
+    }
+  ],
+```
+
+`audit` prints a JSON document: the changed files and their areas, one [audit row](#concepts) for each rule of the change, a `summary` that counts the results, and the work-item `references`. It exits 1 when a row or a reference fails, so a CI job that runs it fails, and 2 when it cannot run, for example for a ref that is no commit. The first line says that the install has no tracker, so `audit` checks no `Work-Item:` trailer. Fix the change and audit again:
+
+```sh
+git checkout -q HEAD~1 -- src/app.py
+printf 'def farewell(name):\n    return "Goodbye, " + name\n' >> src/app.py
+git commit -q --amend -am "feat: say goodbye"
+houserules audit --base HEAD~1 > .houserules/audit.json && echo "audit passed"
+```
+
+```text
+skipped 0 work-item references: no tracker installed (houserules init --tracker)
+audit passed
+```
+
+People read the same knowledge. `topics` lists the topics, `index` lists the entries of a topic, an area, a tag, or a kind, and `get <id>` prints an entry in full, with its body and its source:
+
+```sh
+houserules index --kind decision
 ```
 
 ```json
 [
   {
-    "topic": "knowledge-base",
-    "entries": 7,
-    "title": "Authoring knowledge entries"
+    "id": "project.plain-python",
+    "kind": "decision",
+    "area": "app",
+    "standing": false,
+    "summary": "The app is plain Python with no web framework."
   }
 ]
 ```
 
-```sh
-houserules get knowledge-base.ids-are-permanent   # one entry, in full
-```
+### Setting up your repository
 
-`init` writes no CI file. To run the gates and the review layer in your
-pipeline, run `houserules ci print --host github` (or `--host gitlab`): it
-prints the lines to add, and writes nothing. See
-[The review layer](#the-review-layer).
+In a repository of your own, run `houserules init` at its top. It writes these files and keeps each one that exists:
 
-Add more of the kit when you need it:
+- `.houserules.json`, the record of the install, with the version of the kit and the pin of each pack (`init` prints no `wrote` line for it), and the line `.houserules/` in `.gitignore`.
+- `knowledge/schema.json`, `knowledge/areas.json`, and `knowledge/packs/knowledge-base.json`: the schema of an entry, your areas, and the copy of the `knowledge-base` pack.
+- `AGENTS.md`, which gets the block of `render` at its end, and `CLAUDE.md`, which holds the line `@AGENTS.md`. A `CLAUDE.md` that exists stays as it is: add the line to it, or `check-knowledge` fails.
+- Two procedures in Markdown that any agent can read: `.claude/skills/migrating-knowledge/SKILL.md` moves the rules of an existing `AGENTS.md`, `CLAUDE.md`, or other docs into entries, and `.claude/skills/houserules-step/SKILL.md` runs `for` before a change and `audit` after it, with `tools/houserules-step.sh`.
+- `.claude/schemas/deliverables.json`, the schema of the JSON reports that `houserules validate` checks, and `docs/README.md`, a note on how to take over a kit file.
 
-```sh
-houserules pack add quality                                  # one more pack of starting rules
-houserules init --tracker json                               # a tracker for your work items
-houserules init --workflow reference --add-required-packs    # agent templates and skills
-```
+It writes no CI file, no git hook, and no git ref, and the files of Claude Code come only with `--target claude`. Running it again writes only what is missing. Review the files with `git status`, commit them, and run `houserules check-knowledge`. [docs/ownership.md](docs/ownership.md) says which files `update` keeps current and which are yours. To remove houserules, delete these files and the houserules block of each `AGENTS.md`; [docs/updating.md](docs/updating.md#uninstalling) lists every step.
 
-The reference workflow installs a commit-msg hook that gates Conventional
-Commits. Set `git config core.hooksPath .githooks` to activate it.
+In a monorepo, `houserules init --dir <folder>` installs in a folder. A repository can hold several installs that do not nest, each with its own `knowledge/` and `.houserules.json`, and `ci print` gives each one its own `dir` and `key` ([docs/subdirectory-install.md](docs/subdirectory-install.md)). One install can also give each team folder an area, with its own rules and its own route.
 
-For Claude Code, add the Claude files:
+## Rules and checks
 
-```sh
-houserules init --target claude
-```
+An entry is one of six kinds: `rule`, `invariant`, `gotcha`, `procedure`, `decision`, or `history`. `for` gives an agent the rules, invariants, gotchas, and procedures of the areas of its paths; you read the decisions and the history with `index` and `get`. A [standing rule](#concepts) (`"standing": true`, of the area `global` or `process`) applies to every change: `houserules standing` lists it, and `render` writes it into the root `AGENTS.md`. Only the `summary` of an entry goes into the instruction files, so keep the rule in that one sentence and the reasons in `body`.
 
-This seeds the session-start script and its hook entry in
-`.claude/settings.json`, and enables the Claude renderer, which writes the
-area rules under `.claude/rules/` and the `project-knowledge` skill.
-Restart Claude Code once afterward (a new hook or a new `.claude/agents/`
-file needs a fresh session). Other harnesses need nothing more: the
-standing rules sit in the `houserules` block of `AGENTS.md`.
+A `check` makes a rule enforceable. Its `level` is `fail` or `warn`, and its `type` is one of nine:
 
-## Adding to an existing project
+| Type | The row fails when | Example `check` |
+|---|---|---|
+| `grep-absent` | a pattern matches a line of the files in scope: the changed files, or the whole tree | `{ "type": "grep-absent", "level": "fail", "files": ["src/**"], "pattern": "TODO", "scope": "changed" }` |
+| `commits` | a commit message breaks a rule on its subject, its body, or a required trailer | `{ "type": "commits", "level": "fail", "subject": "^[a-z]+: ", "require_trailer": "Work-Item" }` |
+| `co-change` | a change to the `if` files comes without a change to the `then` files | `{ "type": "co-change", "level": "fail", "if": ["src/**"], "then": ["CHANGELOG.md"] }` |
+| `diff-append-only` | a change removes a line from the files | `{ "type": "diff-append-only", "level": "fail", "files": ["docs/decisions.md"] }` |
+| `durable-sha` | an added line cites a commit that the default branch does not reach | `{ "type": "durable-sha", "level": "warn", "files": ["docs/**"] }` |
+| `runner` | a tool of your project reports a finding (see below) | `{ "type": "runner", "level": "fail", "tool": "shellcheck", "files": ["**/*.sh"] }` |
+| `report-field` | the JSON report of an agent lacks a value for a field | `{ "type": "report-field", "level": "warn", "if": ["src/**"], "field": "docs_verified", "non_empty": true }` |
+| `intent-required` | a change to the `if` files names no intent | `{ "type": "intent-required", "level": "fail", "if": ["src/**"] }` |
+| `intent-resolves` | an `Intent:` trailer names an intent that does not exist | `{ "type": "intent-resolves", "level": "fail" }` |
 
-```sh
-cd my-project
-houserules init --id-prefix ABC
-```
+A rule without a check is [judged](#concepts): `audit` lists it with the result `open`, for a person or an agent to decide. `get <id>` prints the `check` of an entry, and each audit row has the `mode` `deterministic` or `judged`.
 
-- `--id-prefix ABC` sets the id prefix of the JSON tracker (`ABC-001`); default `WI`.
-- An existing `AGENTS.md` keeps its text: `init` reports `kept
-  AGENTS.md`. `render` then adds the `houserules` block at its end, between
-  `<!-- houserules:begin -->` and `<!-- houserules:end -->`. Move the
-  block where you want it; it stays there. Copy the `## Knowledge base`
-  and `## Workflow` sections from the seeded template into yours by hand;
-  the `migrating-knowledge` skill walks the merge. An existing `CLAUDE.md`
-  is kept the same way — point it at your `AGENTS.md` with a single
-  `@AGENTS.md` line if you use Claude Code. `check-knowledge` fails a
-  `CLAUDE.md` that lacks the line.
-- With `--target claude`, an existing `.claude/settings.json` is merged:
-  `init` adds a hook entry only if the file lacks it. Nothing else in your
-  settings is touched.
-- `init --workflow reference` keeps a file that your project already has at
-  a path of the workflow, such as `.githooks/commit-msg` or an agent
-  template. It prints `hand step: <file> is not the kit's; the reference
-  workflow leaves it to the project`, and the file stays yours.
-- Existing files under `knowledge/` and `backlog/` are kept as they are.
+- A check that flags code it should not read: narrow its `files` or its `pattern`, or set its `level` to `warn`. A warned row does not fail the audit.
+- A failure that a plan accepts for now is a [sanction](#concepts): `audit --sanctioned <rule>=<ref>` books it with a reference, the row keeps its `fail`, and the audit still exits 1.
+- To drop a rule for good, delete its entry, or exclude it when it comes from a pack (see [Shared rule sets](#shared-rule-sets)).
+- `houserules check-commit` runs the `commits` checks on a commit message before the commit exists.
 
-Then move your real rules in: add your entries as topic files
-`knowledge/<topic>.json` (an id starts with its topic name), add the
-areas they use to `knowledge/areas.json` with their globs, choose a
-tracker for your work items (see [Trackers](#trackers)), and run
-`houserules render`. To change a rule of
-the kit, override or exclude it in `knowledge/overrides.json` (see
-[Packs](#packs)). The `migrating-knowledge` skill walks the move step by
-step, from inventory to entries to gates — including eliciting your
-project's own merge, attribution, and parallelism discipline, which
-houserules leaves to your ruling instead of shipping fixed.
+### Checks that run your tools
 
-### A subdirectory install
+A `runner` check runs a tool that your project defines in the `runners` key of `.houserules.json`, such as shellcheck, Semgrep, or ast-grep. It fails the row on what the tool reports: a non-zero exit, or a finding of its SARIF output. The kit ships no tool. [docs/runners.md](docs/runners.md) shows the setup.
 
-A repository can hold the install in a subdirectory, for example a
-service in a monorepo:
+### Shared rule sets
+
+A [pack](#concepts) is one versioned file of entries, with their checks, and of the areas that they need. It holds no tool and no CI file: a `runner` check of a pack needs the tool in the `runners` key of each repository. The kit ships five packs: `knowledge-base` (how to write entries; `init` installs it), `process`, `quality`, `security-hygiene`, and `writing-style`. A team shares its own rules the same way: it tags a pack file in a git repository, and each repository pins the tag.
 
 ```sh
-houserules init --dir services/api
+houserules pack list                            # the installed packs, and the kit packs you lack
+houserules pack add quality                     # a kit pack
+houserules pack add git+<url>@<tag>#<path>      # a pack file of a git repository, at an exact tag
+houserules pack upgrade <name> <tag>            # move that pack to another tag
 ```
 
-- The install root is the directory you give. `.claude/` lives in the
-  install root, so launch Claude Code there. `.githooks/` lives there too,
-  where the install runs the reference workflow.
-- Every other command works from anywhere inside the install. Its default
-  root is the nearest directory at or above the current one that holds
-  `.houserules.json`, no higher than the git top level.
-- Every path a gate matches is relative to the install root, and a
-  changed path outside it is out of scope. `check-commit` checks only the
-  commits that touch the install root.
-- A CI workflow that an earlier release seeded stays at the git top level, as
-  `.github/workflows/knowledge-<folder>.yml`, where `<folder>` is the
-  install root's path with each `/` replaced by `-` (`knowledge-services-api.yml`
-  here). It carries a `working-directory` and a `paths` filter for the
-  subdirectory. A repository can hold several installs; `init` refuses a new
-  root that nests with another install. A root that already holds its
-  `.houserules.json` is no new root: `init` there runs no such check.
-  `houserules ci print` and `ci write` give each install its own key, and
-  they refuse two installs of one repository that share a key.
-- houserules never sets `core.hooksPath`. Where the install runs the
-  reference workflow, activate its commit-msg hook with `git config
-  core.hooksPath services/api/.githooks`, or call it from your hook manager
-  in one line: `sh services/api/.githooks/commit-msg "$1"`.
+Each command acts on one repository; houserules has no command that moves many repositories at once. To move many, run `pack upgrade` in each one, for example from a script that opens a pull or merge request. Nobody edits a pack copy in `knowledge/packs/`. A repository changes or drops a pack entry in `knowledge/overrides.json`, and `check-knowledge` prints one line for each [override and exclusion](#concepts), such as `exclusion <id>: <reason>`, so the log of each CI run shows them. houserules has no lock that stops a repository from excluding an entry. The review layer sends a change to `knowledge/` to `senior-review`, and a branch protection rule of your host can require that review. The files in [template/packs/](template/packs) show the shape of a pack, and [docs/upgrading-to-2.md](docs/upgrading-to-2.md#packs) gives the commands in full.
 
-## What it installs
+## Integration
 
-A plain `init` installs the core. A tracker, the reference workflow, and
-the Claude Code files are opt-in.
+### Coding agents
 
-- **A knowledge base** (`knowledge/`): addressable entries (`id`,
-  `kind`, `area`, `summary`, `body`, `tags`, `source`, `see`, `verify`,
-  optional deterministic `check`). The kit's entries come as five packs
-  in `knowledge/packs/`, and a plain `init` installs the `knowledge-base`
-  pack. Your own entries live in one JSON file per
-  topic, `knowledge/<topic>.json`. Your changes to pack entries live in
-  `knowledge/overrides.json`, and your areas in `knowledge/areas.json`.
-  A schema validates the entries, and `update` keeps it current.
-- **Project instructions** (`AGENTS.md`): the cross-harness instruction
-  file every agent reads, plus a one-line `CLAUDE.md` (`@AGENTS.md`) that
-  bridges Claude Code to the same text.
-- **The `houserules` binary**: read commands print JSON;
-  `check-knowledge`/`check-backlog` gate lint; `render` generates the
-  markdown the harness loads; `audit` checks a git range against its
-  rule package; `validate` checks agent deliverables.
-- **Generated harness files** (`houserules render`): the standing rules
-  and one section for each area in a marked block of `AGENTS.md`; the
-  rules of an area whose globs share one directory in that directory's
-  `AGENTS.md`; and, for Claude Code (`houserules init --target claude`),
-  path-scoped area rules (`.claude/rules/<area>.md`) and a preloaded
-  `project-knowledge` skill.
-- **Skills and a report format**: a `migrating-knowledge` skill, a
-  `houserules-step` skill with the script `tools/houserules-step.sh` (see
-  [The houserules step](#the-houserules-step)), and a JSON deliverables
-  contract, `.claude/schemas/deliverables.json`, that every report and
-  review follows.
-- **A tracker** (`houserules init --tracker`): the store of your work
-  items, in JSON files, GitHub Issues, or Beads. See
-  [Trackers](#trackers).
-- **The reference workflow** (`houserules init --workflow reference`): four
-  agent templates (`implementer`, `task-reviewer`, `branch-reviewer`,
-  `spec-reviewer`) with rule-adherence audits; the `orchestrating`,
-  `finishing-a-feature`, `designing`, and `planning` skills; a commit-msg
-  hook that gates Conventional Commits; eval scenarios; and a session-start
-  script. See [The reference workflow](#the-reference-workflow).
-- **Claude Code files** (`houserules init --target claude`): a
-  session-start script that prints the standing rules again after a
-  compaction, its hook entry in `.claude/settings.json`, and the Claude
-  renderer.
-- **Seed rules**: five packs with a generic standing-rule set (TDD,
-  conventional commits, no tech debt, dependency vetting, exact pins,
-  doc comments, ASD-STE100 writing style, and more). Your project adds
-  its own topics, areas, and rules on top, and overrides or excludes a
-  rule of the kit.
-- **CI wiring** (`houserules ci`, opt-in): `init` writes no CI file.
-  `houserules ci print --host github` or `--host gitlab` prints the lines
-  that run `check-knowledge`, `check-backlog`, an audit of the pull or merge
-  request, and the review layer in your own pipeline, and `houserules ci write`
-  creates a file of its own. See [The review layer](#the-review-layer). An
-  install that an earlier release seeded keeps its
-  `.github/workflows/knowledge.yml`, and `update` keeps it current. That
-  workflow first installs the release that `.houserules.json` records, so it
-  runs the binary your kit files came from. It reads the version from the
-  line that starts with two spaces and `"version": "<text>"`, the layout
-  `houserules` writes. When `.houserules.json` is missing or has no such line
-  (a minified or re-indented stamp, or a null version), the workflow installs
-  the latest release and prints a notice that says so; run `houserules update`
-  to write the stamp, or to name the error in it. The job runs with a
-  read-only token (`contents: read`), and every form but Beads drops the
-  persisted checkout credential. The steps that run the gates follow your
-  tracker: the GitHub form adds the `issues: read` permission and a
-  `GH_TOKEN`, and the Beads form installs `bd` at a pinned release and
-  bootstraps the store.
+`render` writes a block into the root `AGENTS.md`: the standing rules, and one section for each area that names its globs and `houserules for <path>`. When the globs of an area share one folder, it writes the rules of the area into the `AGENTS.md` of that folder. It writes only between its `<!-- houserules:begin -->` and `<!-- houserules:end -->` lines and keeps the rest of each file. Codex, Cursor, and the coding agent of GitHub Copilot read `AGENTS.md`, and [agents.md](https://agents.md) lists more tools; each tool decides how it reads the `AGENTS.md` of a folder. `CLAUDE.md` holds the line `@AGENTS.md`, so Claude Code reads the same text. The one value of `--target` is `claude`: `houserules init --target claude` adds the files of Claude Code: one rule file for each area in `.claude/rules/`, which Claude Code loads when it reads or edits a matching file, a `project-knowledge` skill, and a hook that prints the standing rules after Claude Code compacts its context. houserules writes no file in the rule format of another tool, such as `.cursor/rules/` or `.github/copilot-instructions.md`. A [harness](#concepts) that reads no `AGENTS.md` gets the rules from `houserules for <path>`. `check-knowledge` fails while a generated file is out of date. [docs/upgrading-to-2.md](docs/upgrading-to-2.md#render-targets) describes each generated file.
 
-## Packs
+### CI
 
-The kit's rules ship as five packs: `knowledge-base`, `process`,
-`quality`, `security-hygiene`, and `writing-style`. A pack is a
-versioned set of entries. `knowledge/packs/<pack>.json` holds one copy of
-each installed pack, and `.houserules.json` pins each copy by version,
-source, and checksum. Your own entries stay in your topic files.
+`init` writes no CI file. `houserules ci print --host github` or `--host gitlab` prints the lines that call the review jobs of your release, and writes nothing; on GitHub, the lines call a reusable workflow at the commit of the release tag. `houserules ci write` writes the same lines into a new file of its own, such as `.github/workflows/houserules-review.yml`. [docs/review-layer.md](docs/review-layer.md) shows the output. The jobs run on each pull or merge request and on each push to the default branch:
+
+- `gates` runs `check-knowledge`, `check-backlog`, `audit`, and `bundle check` with a read-only token. It checks out the head of the request, so it audits the request with the rules of the request itself.
+- `floor` computes the route of the request with a binary that the request did not build, and it runs no check: a change to a rule source routes to `senior-review`.
+- Two jobs hold the write scopes, and neither runs houserules or the code of the repository: `report` comments the reviewer summary on the request, sets a commit status, and sets a label with the route; `record-push` pushes the record that `record` writes for each merge to the notes ref `refs/notes/houserules`. On a request from a fork, `report` posts nothing.
+
+`gates` fails on a failed rule, and on a request whose description holds no valid [evidence bundle](#concepts). `houserules bundle write` writes that section from the captures of your test runs, `houserules ci write --template` writes a template for the description, and `review.bundle.exemptAuthors` and `review.bundle.exemptBranches` in `.houserules.json` exempt authors, such as a dependency bot, and branches. Make the gates job a required check in the branch protection of your host, so that a red audit blocks the merge: houserules itself merges nothing and blocks nothing. Both units take the inputs `dir`, `key`, `setup`, `validation`, `install`, `floor-install`, and `tracker`. `setup` runs a command before the audit, such as the install of your runner tools. Another CI system runs `houserules audit --base <ref>` as a step. The [upgrade guide](docs/upgrading-to-2.md#the-three-ways-of-wiring) describes the three ways to wire the jobs.
+
+### Work items
+
+`houserules init --tracker json`, `github`, or `beads` installs a [tracker](#concepts): JSON files in `backlog/`, the issues of a GitHub repository through `gh`, or a Beads store through `bd`. The commands `list`, `get`, `set`, `defer`, and `check-backlog` work the same on each. A commit names its [work item](#concepts) in a `Work-Item: <id>` [trailer](#concepts), and `audit` fails a trailer whose item does not exist. [docs/trackers.md](docs/trackers.md) covers the trackers, deferrals, and trailers.
+
+## Linking a change to its intent
+
+A commit names the reason for its change, its [intent](#concepts), in an `Intent: <source>:<ref>` trailer that its author, a person or an agent, writes. The source is `work-item`, `file` (a plan or spec file in the repository), or `openspec` (a change of [OpenSpec](https://github.com/Fission-AI/OpenSpec)). The next block adds a plan, and a change that names the plan in its trailer:
 
 ```sh
-houserules pack list                         # installed packs, and kit packs you lack
-houserules pack add <name>                   # a kit pack
-houserules pack add git+<url>@<tag>#<path>   # an upstream pack at an exact tag
-houserules pack add <file>                   # a pack file inside your install
-houserules pack upgrade <name> <tag>         # move an upstream pack to a new tag
-houserules pack upgrade <name>               # copy a file pack again
-houserules pack remove <name>                # remove a pack
+mkdir -p plans
+printf '# Say goodbye in German\n\nUsers in Germany asked for a farewell in their language.\n\n- [x] Add the German farewell\n- [ ] Translate the greeting\n' > plans/farewell.md
+printf 'def abschied(name):\n    return "Auf Wiedersehen, " + name\n' >> src/app.py
+git add -A
+git commit -q -m "feat: say goodbye in German" -m "Intent: file:plans/farewell.md"
+houserules evidence --base HEAD~1 > .houserules/packet.md
+sed -n '/^### Intent/,/^Tasks:/p' .houserules/packet.md
 ```
 
-An upstream pack comes through your own `git` command, so any host and
-your git credentials work. The tag must be a tag, never a branch or a
-commit: a pin is exact. `update` moves the kit packs to the version of
-the binary, and `pack upgrade` moves an upstream pack.
+````text
+### Intent (1)
 
-The `process` pack names the work items of your tracker, so `pack add
-process` needs one. Without a tracker it refuses: `pack process needs a
-tracker; run houserules init --tracker json|github|beads`.
-
-Never edit a pack copy: `check-knowledge` fails a copy that differs from
-its pin. Put your changes in `knowledge/overrides.json` instead:
-
-```json
-{
-  "schema": "houserules/overrides@1.0.0",
-  "overrides": [
-    {
-      "id": "quality.principles",
-      "fields": { "standing": null }
-    }
-  ],
-  "exclusions": [
-    {
-      "id": "security-hygiene.no-focused-tests",
-      "reason": "This project has no test runner that supports focused tests."
-    }
-  ]
-}
+`file plans/farewell.md`: `Say goodbye in German`
+Why:
 ```
+Users in Germany asked for a farewell in their language.
+```
+Tasks: 1 of 2 done
+````
 
-An override replaces whole fields of one pack entry, and a field set to
-`null` removes it. An exclusion drops an entry. `check-knowledge` lists
-both, and `get <id>` marks an overridden or excluded entry. `update` and
-`pack upgrade` keep your overrides and exclusions; when a pack ships the
-id of one of your own entries, they move that entry into an override.
-An id has one source: `pack add`
-refuses a pack that ships an id of another installed pack.
+`evidence` writes the reviewer summary of a change, the [evidence packet](#concepts). For each intent it prints the title, the reason, and the task count of the plan; it does not compare the diff with the plan. Nothing requires the trailer until you add an entry with an `intent-required` check: `audit` then fails a change to the `if` files whose commits name no intent. An `intent-resolves` check fails a trailer whose intent does not exist. After a squash merge, the record of the merge reads the squash commit, so keep the trailers in its message.
 
-## Trackers
+OpenSpec plans a change: its proposal, specs, design, and tasks. houserules supplies the rules of the project and the checks of each change. houserules reads the `openspec/` folder and edits no OpenSpec file; an `openspec:` trailer still resolves after `openspec archive` moves the change. A block that OpenSpec or another tool keeps in `AGENTS.md` stays as it is, since `render` writes only between its own markers. When git tracks OpenSpec changes, `render` adds a section to its block that tells agents to run `houserules for` before a change and `houserules audit` before they archive it. The reference workflow plans changes too, so a project that plans with OpenSpec needs no reference workflow, and `check-knowledge` warns about an install that holds both ([Plan with one workflow](docs/openspec.md#plan-with-one-workflow)). [docs/openspec.md](docs/openspec.md) shows the setup, a spec requirement beside a rule, the two checks with an example entry, and the guidance block for `openspec/config.yaml`.
 
-A tracker holds your work items. `init` installs none until you choose one:
+## Reviewing a change
+
+The review layer answers three questions about a change: what changed, what no check read, and who must review it. The CI jobs that `ci print` wires run it, and each of its commands also runs on your machine. The packet of the last section starts with the [uncovered surface](#concepts): the changed lines that no check with `"covers": true` read.
 
 ```sh
-houserules init --tracker json     # the backlog/*.json files of your repository
-houserules init --tracker github   # the issues of a GitHub repository, through gh
-houserules init --tracker beads    # a Beads store, through bd
-```
-
-- **JSON** keeps typed items, batches, amendments, and parked polish in
-  `backlog/`, with a schema. `--id-prefix` sets the item id prefix.
-- **GitHub Issues** runs the `gh` CLI. `--repo <owner>/<name>` names the
-  repository; without it, `init` reads the `origin` remote. houserules never
-  reads or stores a token: `gh` keeps its own login. An item is an issue
-  with a `type:<t>` label. `check-backlog` names each `houserules:` label
-  that your repository lacks.
-- **Beads** runs the `bd` CLI. Run `bd init` first, or `bd bootstrap` in a
-  clone: `init --tracker beads` refuses without a store. houserules sets
-  `BD_DISABLE_METRICS=1` and `DO_NOT_TRACK=1` on every `bd` it starts, so an
-  adopter never sends bd usage events through houserules. A user's own `bd`
-  calls keep bd's own setting. The CI jobs of a Beads install install `bd`
-  and bootstrap the store.
-
-The work-item commands are the same on every tracker: `list`, `batch`,
-`get`, `set`, `defer`, `check-backlog`, and `archive`. An install keeps its
-tracker, so `init --tracker` with another tracker refuses. `github` and
-`beads` also refuse an install that has a `backlog/` directory. The
-`migrating-knowledge` skill describes how to move the data. Every tracker
-writes the `backlogId` pattern of the deliverables schema for its id shapes.
-
-With no tracker, `list`, `batch`, `set`, `defer`, and `get` of a work item
-print one line that says so and exit 2. `check-backlog` prints that line and
-exits 0. Where a `backlog/` directory exists, `list`, `batch`, `set`,
-`defer`, and `get` of a work item print
-`backlog/ exists but no tracker is installed; run houserules init --tracker json`
-and exit 2, and `check-backlog` and `audit` print it and exit 1. A tracker
-that the gates cannot reach is never a pass: `check-backlog` and `audit`
-print `tracker <adapter> cannot be reached: <cause>; <setup step>` and exit 1.
-
-### Deferrals
-
-`defer` files work that waits. `--title` files a new item (a chore, open,
-with the reason as its body). `--item <id>` marks an existing item as a
-deferral.
-
-```sh
-houserules defer --title "Split the parser module" \
-  --reason "The split changes the public API and waits for a major version." \
-  --origin "review of the parser change" \
-  --file src/parser.rs --file src/lexer.rs
+sed -n '/^### Uncovered/,/^Coverage/p' .houserules/packet.md
 ```
 
 ```text
-WI-002
+### Uncovered surface (6 of 8 changed lines)
+
+- `plans/farewell.md`: lines 1-6
+
+Coverage is per file: a file is covered when a check that declares covers: true read it.
 ```
 
-`list --deferred` shows each deferral with its `reason`, `origin`, and
-`files`. A title has at most 120 characters.
+The rule of the quick start covers `src/`, so only the plan is uncovered; no entry of the kit sets `covers`. After the intent, the packet lists the failed, warned, and passed (proven) rules, the judged rules, the size of the diff, and the [route](#concepts). The route is the highest route that any of these reasons gives:
 
-### Trailers
+- A change to a rule source (`knowledge/`, `.houserules.json`, or a CI file of houserules) gets `senior-review`.
+- A failed row gets `owner-review`, and so does a warned row unless `review.route.warn` names another route.
+- `review.route` in `.houserules.json` gives an area, or the paths of a glob, a route of its own, such as `"areas": { "app": { "route": "senior-review" } }`. Every other change gets `review.route.default`, which is `owner-review` unless you set it.
+- `auto-merge-eligible` holds only while the size of the diff and its uncovered share stay within the `maxDiffLines` and `maxUncoveredShare` of its entry.
 
-A commit names the work item it delivers in a `Work-Item:` trailer. A
-commit that files a deferral names it in a `Deferred:` trailer:
+houserules names no reviewer and reads no `CODEOWNERS` file. The route is a label and a commit status, and your host decides who reviews.
 
-```text
-fix(parser): read a quoted key
-
-Work-Item: WI-012
-Deferred: WI-015 the split changes the public API
-```
-
-A commit that delivers several items writes one `Work-Item:` trailer for
-each. `audit` resolves every trailer of its range through the installed
-tracker. A `Work-Item:` id must name an item. A `Deferred:` id must name a
-filed deferral with a reason. Each failure prints one line, and `audit`
-exits 1:
-
-```text
-<short-sha>: Work-Item WI-099 does not resolve in the json tracker
-```
-
-With no tracker, `audit` resolves nothing. It prints `skipped <n> work-item
-references: no tracker installed (houserules init --tracker)`. Where a
-`backlog/` directory exists, it prints the `backlog/ exists` line of the
-section [Trackers](#trackers) and exits 1.
-
-The JSON result of `audit` holds the same verdict. `references.failures` lists
-each failure line, `references.checked` counts the references that the tracker
-judged, `references.passed` counts those among them that passed,
-`references.skipped` counts those that the audit did not judge (no tracker, a
-tracker that cannot be reached, or a tracker that answered with an error), and
-`summary.reference_fail` counts the failures. The `backlog/ exists` line and
-the line of a tracker that cannot be reached are failures too. `summary.fail`
-counts only the rule rows.
-
-The process pack ships `process.every-commit-names-a-work-item`, which fails
-a commit that has no `Work-Item:` trailer. It is an opt-in entry. When
-a command brings the process pack onto an install, houserules excludes the
-entry in `knowledge/overrides.json` with the reason `opt-in`, and prints
-`process.every-commit-names-a-work-item is an opt-in entry;
-knowledge/overrides.json excludes it until you delete its exclusion`. Delete
-the exclusion to opt in. The install then keeps the entry, whatever a later
-command does.
-
-## The houserules step
-
-Every install holds the `houserules-step` skill and the script
-`tools/houserules-step.sh`. Any workflow, or none, calls the script around
-a change. The script runs the `houserules` on your `PATH`:
+Each merge gets a [change record](#concepts): a git note with the commits, the hashes of the rules, the audit rows, the intents, the route, and the approvers. The CI jobs write and push it; on your machine, `record write` writes it to your clone:
 
 ```sh
-tools/houserules-step.sh before src/parser.rs     # the rules for the files you will change
-tools/houserules-step.sh after main report.json   # the audit since main, the report's facts, and the report check
-```
-
-`before` runs `houserules for` and writes the rule package to
-`.houserules/step/rules.json`. `after <base>` runs `houserules audit --base
-<base>` and writes the result to `.houserules/step/audit.json`. With a
-report as the second argument, the audit runs with `--report`, and the script
-then runs `houserules report-facts` and `houserules validate` and writes
-`.houserules/step/report-facts.txt` and `.houserules/step/validate.json`. The
-script prints the path of each output file, and `after` prints each exit
-status, so an agent reads the output with its file-read tool. Paths and refs
-are relative to the install root. `.houserules/` holds the scratch output of
-the step and, by default, the batch workspaces, and `init` adds it to
-`.gitignore`.
-
-## Evidence
-
-A task report cites its evidence instead of holding it. `houserules capture`
-runs a command and writes its output to a file under a header. The report names
-the file and its hash. `houserules report-facts` fills the facts of the report
-from git and from those files, and `houserules check-report-claims` checks the
-report against them.
-
-The commands below continue the [quick start](#quick-start): a repository where
-`houserules init` ran and one commit holds its files. The first block adds a
-file and a commit, then captures a command:
-
-```sh
-mkdir -p src .houserules/work/demo
-echo 'fn parse_header() {}' > src/parser.rs
-git add src && git commit -q -m 'feat: add the parser'
-houserules capture --out .houserules/work/demo/files.txt -- ls src
+houserules record write --base HEAD~1 --head HEAD
+houserules record list
+houserules record show HEAD | sed -n 3p
 ```
 
 ```text
-.houserules/work/demo/files.txt: exit 0
+<sha> owner-review 0 reviewers - unaudited
+Record <sha> · range <sha>..<sha> (merge base <sha>) · rules <hash> · route owner-review
 ```
 
-`capture` runs the command with no shell, in the current directory, with stdin
-closed. It exits with the exit code of the command, so a failing test run still
-fails a gate chain. The directory of `--out` must exist. Line 1 of the file is
-the header, one JSON object: the command, the directory, the start and end
-times, the exit status, the signal, `HEAD`, a dirty flag, and the count of byte
-sequences that were not UTF-8. The output of the command follows. A command with
-a variable prefix runs through `env` (`-- env CI=1 cargo test`), and a pipeline
-runs through `sh -c`.
-
-A report cites each run by the path of its capture, and each line that a claim
-rests on by a citation. The next block writes a fragment of a report (a task
-report holds the other fields of its schema too), fills its facts, and checks
-it:
-
-```sh
-cat > report.json <<'EOF'
-{
-  "kind": "task-report",
-  "tests": [
-    { "capture": ".houserules/work/demo/files.txt", "excerpt": "parser.rs" }
-  ],
-  "citations": [
-    { "path": "src/parser.rs", "line": 1, "anchor": "fn parse_header" }
-  ]
-}
-EOF
-houserules report-facts report.json --base HEAD~1
-houserules check-report-claims report.json
-```
-
-```text
-report.json: facts filled
-report.json: no claim mismatches found
-```
-
-- `report-facts` adds the `sha256`, the `command`, and the `exit` of each run
-  from its capture, the `sha256` of each citation from the file at `HEAD`, the
-  `commits` of `<base>..HEAD`, and the `files_changed`. With `--audit <file>`,
-  where the file is the result of `audit --json`, it fills `self_audit`. It
-  never replaces a recorded hash: a capture or a cited line that differs from
-  its hash is a finding.
-- An `excerpt` is optional, holds at most 1000 UTF-16 code units, and must be a
-  byte-exact part of the output of its capture.
-- A citation names a file that git tracks at `HEAD`, the cited lines, and an
-  anchor: text of those lines that occurs once in the file.
-- `check-report-claims` fails a report when a capture is missing or changed,
-  when a `command` or an `exit` differs from its header, when an `excerpt` is
-  not part of the output of its capture, and when a cited line differs from
-  `HEAD`.
-
-A capture that changes after `report-facts` recorded its hash is a finding. A
-word in angle brackets stands for a value of your run:
-
-```sh
-echo changed >> .houserules/work/demo/files.txt
-houserules check-report-claims report.json
-```
-
-```text
-tests[0]: capture .houserules/work/demo/files.txt has sha256 <hash of the file>, but the report records <hash in the report>; re-read the capture, then remove sha256 and run report-facts
-```
-
-`tools/houserules-step.sh after <base> <report>` runs the audit with `--report`,
-then `report-facts`, then `validate`. The reference workflow teaches the
-implementer to run every test, gate, and live run through `capture`.
-
-## Runners
-
-A runner check runs an external tool over a change and fails the audit on what
-the tool reports. Your project defines the tool; the kit ships none.
-
-Define the tool in the `runners` key of `.houserules.json`:
-
-```json
-{
-  "runners": {
-    "shellcheck": {
-      "command": ["shellcheck"],
-      "parser": "exit-code",
-      "install": "install shellcheck from https://www.shellcheck.net"
-    }
-  }
-}
-```
-
-`command` is the program and its arguments. No shell starts, and a program
-with a path separator resolves against the install root. `parser` is
-`exit-code` or `sarif`. `install` is one line that tells a person how to
-install the tool. `init` and `update` keep the values of the key.
-
-Name the tool in the `check` of a knowledge entry:
-
-```json
-{ "type": "runner", "level": "fail", "tool": "shellcheck", "files": ["**/*.sh"], "scope": "changed" }
-```
-
-- `tool` is a key of `runners`.
-- `files` lists the globs that trigger the check; the default is every file.
-  A check with no matching changed file passes with `not triggered` and starts
-  no process.
-- `scope: "changed"` (the default) appends the matching changed files to the
-  command, one argument each and at most 200 for each call. `scope: "tree"`
-  appends nothing and makes one call; the tool reads the install root.
-- The tool runs with the install root as its working directory and the
-  environment of `audit`. No timeout applies.
-
-The row of the entry shows the result:
-
-- An `exit-code` tool passes when every call exits 0 (`exited 0 in 1 call`).
-  Otherwise the row fails with the evidence of the failing call: the first
-  non-blank line of its stderr, trimmed; `exited <n>` when stderr holds no text;
-  or `ended by a signal` when a signal ended the tool.
-- A `sarif` tool prints a SARIF 2.1.0 document on stdout, and its exit status
-  does not matter then. Each result is a finding at the level that SARIF gives
-  it: `error` and `warning` count, `note` and `none` do not. The row fails with
-  the first finding as `<path>:<line> <rule>: <message>` and `and <n> more`,
-  and it holds a `findings` array. A clean run passes with
-  `no findings in 1 call`. Semgrep (`semgrep scan --sarif`) and ast-grep
-  (`ast-grep scan --format sarif`) print SARIF.
-
-The tool reads the working tree, so a triggered runner check needs the tree at
-`--head` checked out: `--head` is the checked-out commit, and no file that the
-tool reads differs from its content there. The jobs that `houserules ci`
-wires check out the head of the pull or merge request for this reason, and so
-does a workflow that an earlier release seeded. The jobs install no tool: pass
-the install step of your tools to the `setup` input of the unit, or add it to
-your own CI.
-
-`audit` stops with exit 2, one line on stderr, and no rows when a triggered
-check cannot run:
-
-```text
-runner tool "shellcheck" is not defined in .houserules.json runners
-runner tool "shellcheck" (shellcheck) is not installed: install shellcheck from https://www.shellcheck.net
-runner tool "shellcheck" needs the tree at --head checked out: HEAD is 7d1e99b, --head is cfef028
-```
-
-The same exit covers a malformed `runners` entry, a program that cannot start,
-and SARIF output that is missing, invalid, or reports a failed run.
-`check-knowledge` names a `runner` check whose tool `runners` does not define,
-and each malformed entry of `runners`. The `migrating-knowledge` skill covers
-how to run such a tool without network access.
-
-## The review layer
-
-A reviewer needs three facts about a change: what it did, what no check read,
-and who must look at it. The review layer writes them down. Each pull or merge
-request gets one report, and each merge gets one record. houserules computes
-both from git, the rules of the install, and the files that your CI hands it.
-No command talks to the host beyond the tracker that the install names: the GitHub tracker runs gh, as audit does.
-
-The commands below continue the [quick start](#quick-start): a repository where
-`houserules init` ran and one commit holds its files. The block adds a file and
-a commit, then asks for the route of the change:
-
-```sh
-mkdir -p src
-echo 'fn parse_header() {}' > src/parser.rs
-git add src && git commit -q -m 'feat: add the parser'
-houserules route --base HEAD~1
-```
-
-```text
-route: owner-review
-no area: `src/parser.rs` -> owner-review
-```
-
-An install with no `review` setting gets `owner-review` for each change, and
-`senior-review` for a change to a rule source. The `review` key sets the rest.
-
-| Command | What it writes |
-|---|---|
-| `houserules evidence --base <ref>` | The reviewer packet, with the uncovered surface first |
-| `houserules route --base <ref>` | The route of the change |
-| `houserules bundle write` and `bundle check` | The evidence bundle for the description of the request, and the check of it |
-| `houserules record write` and `record show` | The change record of a merge, kept as a git note |
-| `houserules ci print` and `ci write` | The lines or the file that wire all of this into GitHub or GitLab |
-
-`init` writes no CI file. To run the gates and the review layer in your
-pipeline, run `houserules ci print --host github` or `--host gitlab`. The output
-calls the unit that this release publishes: a reusable workflow for GitHub and
-a file for `include: remote` for GitLab. `--mode inline` prints the jobs
-themselves, and `houserules ci write` creates a file of its own. The
-`migrating-knowledge` skill and [docs/upgrading-to-2.md](docs/upgrading-to-2.md)
-give the three ways, the GitLab token, and the limits of the layer.
-
-The keys and ids that the layer adds:
-
-| Name | What it is |
-|---|---|
-| `review` | The key of `.houserules.json` that configures the layer: `diffExclude`, `route`, `bundle`, `intent`, `ci`, and `record`. `check-knowledge` fails a fault in it with one line that names the key |
-| `review.route` | The route of an area or a path, thresholds for an external score, and `sampleRate`. An entry with `auto-merge-eligible` names `maxDiffLines` and `maxUncoveredShare` |
-| `review.bundle` | `budgets` (the diff budget of each risk tier), `exemptAuthors`, and `exemptBranches` |
-| `review.intent` | `sources` (`work-item` or `file`) and `files` (globs of the files that the `file` source reads) |
-| `review.ci.files` | The CI files of your own that call houserules; a change to one routes to `senior-review` |
-| `review.record.maxBytes` | The size budget of a change record, at least 8,192 |
-| `covers` | A field of the `check` of a knowledge entry. `covers: true` makes the check count as coverage of the files it reads. No entry of the kit sets it |
-| `houserules/pack@1.3.0` | The schema id of a pack copy whose check sets `covers` |
-| `houserules/overrides@1.2.0` | The schema id of a `knowledge/overrides.json` whose override sets `covers` |
-
-## Ownership model
-
-Every path houserules writes falls into one of seven classes, and
-`houserules files` prints the exact manifest of each as JSON:
-
-- **Kit-owned** (`kitOwned`) — `update` writes a missing file and
-  rewrites one you did not change on every run. It keeps and reports a
-  file you changed. Never hand-edit it.
-- **Seed-once** (`seedOnce`) — `init` writes it only if it is absent,
-  then leaves it alone. It is yours from the first write on.
-  `.claude/settings.json` is the one exception: with `--target claude`,
-  `init` merges its hook entries into an existing file instead of
-  skipping it.
-- **Kept current through a baseline** (`d3Files`) — the knowledge schema,
-  the deliverables schema, and the CI workflow of an install that an earlier
-  release seeded. `init` writes each schema once and baselines it, and
-  `update` keeps each file at the content of the kit unless you changed it.
-  `init` writes no CI workflow, and `update` never writes one that is absent.
-- **Tracker files** (`trackerFiles`) — the JSON tracker: its five data
-  files are seed-once, and `backlog/schema.json` is kept current through a
-  baseline. `init --tracker json` writes them, and `update` restores or
-  delivers them only where the tracker is `json`.
-- **Workflow files** (`workflowFiles`) — the files of the reference
-  workflow. `init --workflow reference` writes them and pins each one in
-  `.houserules.json` under `workflow`. `update` writes a file whose bytes
-  equal its pin and moves the pin with the binary. It keeps a file that you
-  changed and prints `kept <file> (locally modified; reference workflow
-  <version>)` on every run, until you merge the change by hand. A file at a
-  workflow path that the kit did not write is yours and gets no pin.
-- **Workflow data** (`workflowData`) — `.claude/evals/record.json`, your
-  record of eval runs. `init --workflow reference` writes it empty, and
-  nothing pins or replaces it.
-- **Pack copies** (`packCopies`) — `knowledge/packs/<pack>.json`.
-  `update` moves each kit pack to the version of the binary and rewrites
-  its copy. You change a pack entry through `knowledge/overrides.json`,
-  never in the copy.
-- **Yours** — everything else: your knowledge entries, your work items
-  in a tracker you keep, your project code. houserules never touches it.
-
-To keep a file for good, list its path in `ownedPaths` in
-`.houserules.json`: `update` leaves a listed file as it finds it and
-prints no line for it, `init` never seeds it, and `check-knowledge`
-does not check a listed kit-owned file for citations. The files and
-blocks that `render` generates follow the knowledge base, not
-`ownedPaths`: `render` still writes the houserules block of a listed
-`AGENTS.md`. To change a pack
-entry, use `knowledge/overrides.json` (see [Packs](#packs)).
-
-`.claude/rules/*.md` and `.claude/skills/project-knowledge/SKILL.md` are
-generated by `houserules render` from `knowledge/`, and so is the
-`houserules` block of each `AGENTS.md` that `render` writes. The next
-`render` replaces a hand edit inside a generated file or block.
-
-| Class | Files |
-|---|---|
-| kit-owned (`kitOwned`) | `tools/claude-session-start.sh` (with `--target claude`), `.claude/skills/migrating-knowledge/SKILL.md`, `.claude/skills/houserules-step/SKILL.md`, `tools/houserules-step.sh` |
-| seed-once (`seedOnce`) | `knowledge/areas.json`, `docs/README.md`, `AGENTS.md`, `CLAUDE.md` |
-| kept current through a baseline (`d3Files`) | `knowledge/schema.json`, `.claude/schemas/deliverables.json`, `.github/workflows/knowledge.yml` (an install that an earlier release seeded) |
-| tracker files (`trackerFiles`) | `backlog/batches.json`, `backlog/amendments.json`, `backlog/decisions.json`, `backlog/parked.json`, `backlog/items/general.json`, `backlog/schema.json` |
-| workflow files (`workflowFiles`) | `.claude/agents/implementer.md`, `.claude/agents/task-reviewer.md`, `.claude/agents/branch-reviewer.md`, `.claude/agents/spec-reviewer.md`, `.claude/skills/orchestrating/SKILL.md`, `.claude/skills/finishing-a-feature/SKILL.md`, `.claude/skills/designing/SKILL.md`, `.claude/skills/planning/SKILL.md`, `.claude/evals/dependency-add.json`, `.claude/evals/docs-edit.json`, `.claude/evals/seeded-violations.json`, `.githooks/commit-msg`, `tools/reference-session-start.sh` |
-| workflow data (`workflowData`) | `.claude/evals/record.json` |
-| pack copies (`packCopies`) | `knowledge/packs/knowledge-base.json`, `knowledge/packs/process.json`, `knowledge/packs/quality.json`, `knowledge/packs/security-hygiene.json`, `knowledge/packs/writing-style.json` |
-
-## The reference workflow
-
-The reference workflow is an optional set of lifecycle files for a project
-that hands tasks to agents. It needs a tracker and the rules that its files
-cite:
-
-```sh
-houserules init --workflow reference --tracker json --add-required-packs
-```
-
-Without a tracker, `init` refuses: `the reference workflow needs a tracker;
-run houserules init --workflow reference --tracker json|github|beads`.
-Without `--add-required-packs`, `init` names the packs that hold the rules
-the workflow cites and adds none. `check-knowledge` fails while a rule that
-the workflow requires is missing or excluded.
-
-Four agent templates, each on a configured model, carry the rules into
-every change:
-
-- **implementer** (default model `sonnet`): implements one task from a
-  brief, test-driven, and writes a JSON report.
-- **task-reviewer** (default `opus`): reviews one task's diff for spec
-  compliance, code quality, and rule adherence.
-- **branch-reviewer** (default `opus`): reviews the whole branch before
-  merge and proposes knowledge-base improvements drawn from the batch's
-  reviews.
-- **spec-reviewer** (default `opus`): attacks a spec before a human reads
-  it and files its findings in a `spec-review` deliverable.
-
-The model of each role sits in `workflow.models` in `.houserules.json`.
-The templates carry no `model:` line. The `orchestrating` skill names the
-configured model in every dispatch, and each report and review records it
-in its `model` field.
-
-Four skills drive the lifecycle. `designing` drafts a spec from what the
-project already holds, has it reviewed, and takes it to the project's owner
-or decider. `planning` turns the approved spec into tasks with declared
-file sets. `orchestrating` dispatches the agents, runs the live run, and
-drives the batch to its finish. `finishing-a-feature` merges the branch.
-The risk of the change picks one of two tiers, light or standard. A task is
-critical when it changes the commands, flags, or output of a command-line
-interface, a schema, authentication or security code, or the data that an
-install keeps on disk: its tests come first, and it gets one review. Every
-dispatched agent runs `houserules audit` against its own diff and records
-the result in its JSON report, so rule adherence is checked, not just
-asserted.
-
-The workflow also installs a commit-msg hook that gates Conventional
-Commits, three eval scenarios with their record, and
-`tools/reference-session-start.sh`, which prints the session ritual. The
-block that `render` writes into `AGENTS.md` points every harness at the
-`orchestrating` skill. A harness with no subagents does the work directly,
-in its own session.
-
-The workflow keeps the deliverables of a batch in a workspace, a folder of the
-`workspaces` location. The default location is `.houserules/work/`, and git
-ignores it through the `.houserules/` line of `.gitignore`. Set the key
-`workspaces` in `.houserules.json` to another relative folder inside the
-install root to keep the workspaces elsewhere. A fresh clone lacks an ignored
-file, so `check-knowledge` names a `verify` path into an ignored folder: commit
-a copy under a tracked path and verify that.
-
-## Measure process cost
-
-`houserules stats` reads the deliverables that agents write into a batch
-workspace and prints one JSON document. Give it one or more workspace
-directories:
-
-```sh
-houserules stats .houserules/work/*/
-```
-
-`--window <n>` reads only the `n` most recent workspaces. A workspace is more
-recent by the `YYYY-MM-DD` prefix of its folder name, then by name; a folder
-with no date prefix is the oldest. `n` above the number of workspaces reads all
-of them, and `n` must be 1 or more:
-
-```sh
-houserules stats --window 5 .houserules/work/*/
-```
-
-With several workspaces, a task label reads `<workspace>/<task>`; a window of
-one workspace drops the prefix, as a single named workspace does. The
-output keeps the keys `violations`, `unused_ids`, `audits`, and
-`reviews`. It adds these keys:
-
-- `workspaces`: one row per workspace with its tasks, reviews, fix
-  rounds, report bytes, findings by severity and by target, and `reversals`.
-  `reversals` counts the `Reversal:` lines of the `progress.md` of the
-  workspace: a line counts when it starts with `Reversal:`, after optional
-  spaces and an optional list marker with its space (`- `, `* `, or `+ `).
-- `sanctioned`: one row for each fail that a sanction accepts, with the rule
-  `id`, the `workspace`, the `task`, and the `ref` of the sanction.
-- `models`: one row per model that wrote a deliverable, sorted by row
-  name. A `model` value that names one family (`fable`, `haiku`, `opus`,
-  or `sonnet`) as a whole word counts in the row of that family: the
-  alias `opus` and the id `claude-opus-5-5` share the row `opus`. A value
-  that names no family keeps its own row, as `human` and `unknown` do. A
-  row has `model` in place of `path` and the other fields of a
-  `workspaces` row, except `reversals`. A deliverable with no `model` field
-  counts in the row `pre-2.0`.
-- `cost`: the sums of those rows and the mean per task.
-- `rules`: one row per active knowledge entry. `source` names where the
-  entry comes from: `local`, or the name of the pack that ships it.
-  `workspaces` counts the workspaces whose audit or review rated it, and
-  `injected` the workspaces whose audit injected it. `rows` counts the
-  deterministic audit rows and the judged review rows that rated it, and
-  `fails` those that failed. `findings` and `targets` count the findings
-  that cite it, by severity and by target. `cited` counts the reports
-  that cited it. `verdicts` counts the judged rows with a `pass` or `fail`
-  result, `overrides` those that a person overruled, and `override_rate` is
-  `overrides` over `verdicts` (`null` at zero verdicts). `cost` is the sum,
-  over the reviews that judged the rule, of each review's share of its bytes
-  (`null` for a rule with no judged rows). `sanctioned` counts the fails that a
-  sanction accepts, which `violations` and `fails` leave out.
-- `packs`: one row for `local` and one for each installed pack, with
-  the sums of its source. `entries` counts its active entries and
-  `standing` the standing ones. `judged_rows` counts the review rows that
-  rated its judged entries. `violations` counts the tasks that
-  `violations` lists for its entries.
-- `proposals`: the changes the numbers support. Each row names an
-  `action`, the entry `id`, the `reason`, and the `evidence`. The five
-  actions are `demote`, `retire`, `mechanize`, `narrow`, and `budget`. A
-  row with `"owner_gate": true` is for the project's owner to decide.
-  `narrow` counts a finding as soft only when it is minor or hits a
-  deliverable, so a finding on Markdown, `docs/`, `knowledge/`, or
-  `backlog/` text counts as a contract finding. Tag an entry
-  `ruled-keep` when you decide to keep it, and `stats` stops proposing
-  `demote`, `retire`, `narrow`, or `mechanize` for it; the entry still
-  counts toward the standing budget. `mechanize` also needs an
-  `override_rate` of at most 0.2, or `null`; its `evidence` adds
-  `override_rate` and `samples`, up to three `issues` of task reviews and
-  branch reviews that name the rule. The `evidence` of `retire` adds `cost`.
-
-One `models` row, for a workspace whose only deliverable is a task review
-that `claude-opus-5-5` wrote, with one important finding on code and one
-minor finding on prose. The row is named after the family, `opus`:
-
-```json
-{
-  "model": "opus",
-  "tasks": 0,
-  "reviews": 1,
-  "re_reviews": 0,
-  "fix_rounds": 0,
-  "report_bytes": 0,
-  "findings": {
-    "critical": 0,
-    "important": 1,
-    "minor": 1,
-    "other": 0
-  },
-  "targets": {
-    "code": 1,
-    "deliverable": 0,
-    "prose": 1,
-    "other": 0
-  }
-}
-```
-
-One `proposals` row, for a workspace whose only deliverable is a task review
-with four minor findings on prose that cite `process.claims-match-artifacts`:
-
-```json
-{
-  "action": "narrow",
-  "id": "process.claims-match-artifacts",
-  "owner_gate": true,
-  "reason": "4 of 4 findings are minor or hit a deliverable. Narrow the rule to contract surfaces.",
-  "evidence": {
-    "findings": 4,
-    "soft_findings": 4
-  }
-}
-```
-
-## CLI reference
-
-Working with knowledge:
-
-| Command | What it does |
-|---|---|
-| `topics` | Lists every knowledge topic with its entry count and title |
-| `index` | Lists knowledge-entry index rows, optionally filtered |
-| `get <id>` | Prints items by id: a knowledge entry, or a work item of the installed tracker |
-| `for <path>` | Prints the rule package a set of changed paths pulls in |
-| `standing` | Lists the standing rules |
-| `render` | Rewrites stale generated harness files (`--check` lists them instead) |
-| `pack <list\|add\|upgrade\|remove>` | Lists, adds, upgrades, and removes the knowledge packs of an install |
-
-Working with work items:
-
-| Command | What it does |
-|---|---|
-| `list` | Lists the work items of the installed tracker, optionally filtered; `--deferred` lists the deferrals with their reasons |
-| `batch <n>` | Prints one development batch's summary and item rows |
-| `set <id> k=v` | Applies field assignments (`status`, `batch`, `milestone`) to a work item |
-| `defer` | Files a deferral: `--title` files a new item, and `--item <id>` marks an existing one; both name a reason and an origin |
-| `archive` | Sweeps done/dropped items and done batches of the JSON tracker, and retired or superseded entries of your topic files, into `archive/` mirrors; a pack entry stays in its pack copy |
-
-Gates:
-
-| Command | What it does |
-|---|---|
-| `check-knowledge` | Validates the knowledge base, its packs against their pins, its overrides and exclusions, the fields of each check, the `runners` and `workspaces` keys of `.houserules.json` and the tool of each `runner` check, generated-file freshness, and that kit-owned files cite only entries it holds; it names a `verify` path that git ignores |
-| `check-backlog` | Validates the work items of the installed tracker |
-| `check-commit` | Runs commit-message checks against a message file or git range |
-| `audit` | Builds a git range's rule package and runs every deterministic check, the tool of each `runner` check included, and resolves each `Work-Item:` and `Deferred:` trailer of the range through the installed tracker; a task audit (`--report`) leaves out an entry tagged `controller` unless `--ids` names it, and compares the `self_audit` of the report with its own run |
-| `validate` | Validates deliverable JSON files against the schema, which requires a `model` field; a finished task report fails when its self-audit, or the audit capture of a fix round, skipped checks |
-| `check-report-claims` | Cross-checks a report's claims against the captures, files, and commits it cites; with `--doc <path>` or `--item <id>` it checks a spec or a backlog item for cited workspace paths that do not exist, and skips a cited path under `.houserules/step/` |
-| `stats <workspace>...` | Aggregates rule violations, sanctioned fails, process cost, and knowledge-base proposals across one or more workspaces; `--window <n>` reads the `n` most recent |
-
-Working with evidence:
-
-| Command | What it does |
-|---|---|
-| `capture --out <file> -- <command>...` | Runs a command and writes its output to the file under a header (the command, the directory, the times, the exit status, `HEAD`, and a dirty flag); it exits with the exit code of the command |
-| `report-facts <report> --base <ref>` | Fills the fact fields of a task report from git and from captures: the commits, the changed files, the `sha256`, `command`, and `exit` of each run, the `sha256` of each recorded citation, and, with `--audit <file>`, the self-audit |
-
-Reviewing a change:
-
-| Command | What it does |
-|---|---|
-| `evidence` | Writes the reviewer packet of a range as Markdown, and with `--json` as a document: the uncovered surface first, then the intent, the failed, warned, proven, and judged rules, the diff size, and the route |
-| `route` | Decides the route of a range, `auto-merge-eligible`, `owner-review`, or `senior-review`; `--no-audit` computes the floor, which runs no check |
-| `bundle <write\|check>` | `write` writes the evidence bundle section for the description of a pull or merge request from captures; `check` fails a description with a missing part, a stale run, or a diff over its budget |
-| `record <write\|show\|list\|audit>` | Keeps a change record for each merge as a git note: `write` computes it, `show` prints it and checks its rule hashes against git, `list` lists the records, and `audit` adds a post-merge verdict; `stats --records <range>` reports the review coverage of the records in a range |
-| `ci <print\|write>` | Prints the lines that wire the review layer into GitHub or GitLab, or creates a file of its own for them; neither edits a CI file that it did not create |
-
-Installing:
-
-| Command | What it does |
-|---|---|
-| `init` | Seeds the minimal default into a git repository from the embedded payload; `--tracker json\|github\|beads` (with `--repo` for GitHub) installs a tracker, `--workflow reference` installs the reference workflow (`--add-required-packs` adds the packs it needs), `--target claude` adds the Claude Code files, and `--dir <subdir>` installs in a subdirectory; it adds `.houserules/` to `.gitignore`; it writes no CI file |
-| `update` | Syncs kit-owned files, moves the kit packs and the workflow files, converts an install of houserules 1.x, removes retired files, brings `.gitignore` to hold `.houserules/`, reports version drift; it refuses a directory that holds no install |
-| `files` | Prints the file classes of the kit as JSON: kit-owned, seed-once, pack copies, kept current through a baseline, tracker files, workflow files, and workflow data |
-
-Run any command with `--help` for its flags.
+`record list` prints one line for each record: its commit, its route, the number of approvers that the CI job read from the merged request, `sampled` or `-` for the post-merge sample, and the verdict of `record audit`, `unaudited` while there is none. `record show` prints the record as Markdown, with the packet, the sample, the reviewers, and the post-merge audit, and checks its rule hashes against git. A clone fetches the records with `git fetch origin refs/notes/houserules:refs/notes/houserules`. `houserules stats --records <range>` counts the records of a range and those with a reviewer, for each route and each area. [docs/review-layer.md](docs/review-layer.md) lists the commands and the `review` settings, and [docs/evidence.md](docs/evidence.md) covers `houserules capture`, which saves the output of a test run under a header with its exit status and its commit.
+
+## A workflow for a team of agents
+
+`houserules init --workflow reference --tracker json --add-required-packs` installs an optional process for a project that hands tasks to agents: four agent templates for Claude Code (an implementer and three reviewers), four skills that take a change from its spec to its merge, a commit-msg hook, and the packs whose rules the process cites. Turn the hook on with `git config core.hooksPath .githooks`, or call `sh .githooks/commit-msg "$1"` from your hook manager. Each agent audits its own change and writes a JSON report that `houserules validate` and `houserules check-report-claims` check. Without the workflow, houserules works with the process that you have. [docs/reference-workflow.md](docs/reference-workflow.md) describes the workflow.
+
+`houserules stats` reads the reports, reviews, and audits of the agents and counts, for each entry, the workspaces that loaded it, its failed rows, and the findings that cite it. It proposes changes from the numbers, such as `retire` for an entry that is not standing, that at least three workspaces loaded, and that never failed, drew no finding, and no report cited. [docs/process-cost.md](docs/process-cost.md) describes each number.
+
+## Limits
+
+- houserules enforces only what a check tests. `audit` lists a rule without a check as `open`, and no command lists the rules that carry a check.
+- Its own checks match patterns, paths, diffs, and commit messages, and they read no meaning of code. A `runner` check brings a tool that does.
+- It blocks nothing by itself. A red audit stops a merge only when your host requires the job, and a sanction keeps the audit red.
+- In CI, a request is audited with its own rules, so a request that changes `knowledge/` changes the rules that judge it. Its route, `senior-review`, shows the change, and a review that your host requires holds it.
+- A repository can override or exclude any entry of a pack, and no lock stops it. `check-knowledge` prints each override and exclusion.
+- It signs nothing. A capture records a command, its exit status, and its commit, and the hash that a report records shows a later edit of the file, but not whether the run took place as the capture says. The notes ref of the change records is an ordinary git ref: the push rules of your host decide who can rewrite it.
+- A change record names its commits by sha, and their author is what git records. houserules does not tell an agent's commit from a person's, and it keeps no prompt and no session, only a trailer that points at one.
+
+## Concepts
+
+- **area**: a name and a list of path globs in `knowledge/areas.json`. An entry belongs to one area and applies to the files that its globs match. The entries of the area `global` apply to every file.
+- **audit row**: the result of one rule for a change: `pass`, `fail`, `warn`, `skipped`, or `open` for a judged rule.
+- **capture**: the output of a command in a file under a one-line JSON header with the command, its exit status, and its commit. `houserules capture` writes it.
+- **change record**: the git note that `record write` keeps for each merge, under `refs/notes/houserules`.
+- **check**: the machine test of an entry, one of the nine types of [Rules and checks](#rules-and-checks).
+- **entry**: one rule, invariant, gotcha, procedure, decision, or history item, with a permanent id `<topic>.<name>`.
+- **evidence bundle**: a section of the description of a pull or merge request: its purpose, its work items, and the captures of its verification runs. `bundle write` writes it, and `bundle check` checks it.
+- **evidence packet**: the reviewer summary that `evidence` writes as Markdown.
+- **harness**: the tool that runs a coding agent, such as Claude Code.
+- **install root**: the folder that holds `.houserules.json`: the top of the repository, or the folder that `init --dir` names.
+- **intent**: the reason for a change: a work item, a file, or an OpenSpec change, named in an `Intent:` trailer.
+- **judged**: a rule with no check. A person or an agent decides it.
+- **kit**: the files that the binary carries and that `init` and `update` write. `update` keeps a kit file that you changed.
+- **override, exclusion**: a change to a pack entry, or its removal, in `knowledge/overrides.json`.
+- **pack**: a versioned file of entries, copied to `knowledge/packs/` and pinned in `.houserules.json` by version, source, and checksum.
+- **render**: the writing of the generated files from `knowledge/`: the `AGENTS.md` blocks, and with `--target claude` the files in `.claude/`.
+- **route**: who must review a change: `auto-merge-eligible`, `owner-review`, or `senior-review`. It is a label and a commit status, and your host decides who reviews.
+- **rule package**: the entries that a set of paths pulls in, which `for` prints and `audit` checks.
+- **runner**: a tool of your project that a `runner` check starts.
+- **sanction**: a failure that `audit --sanctioned <rule>=<ref>` books with a reference. The row stays `fail`.
+- **standing rule**: an entry with `"standing": true`. It applies to every change and loads in every session.
+- **topic**: a group of entries: one file `knowledge/<topic>.json`, and the first part of each id.
+- **tracker**: the store of work items: JSON files, GitHub issues, or Beads.
+- **trailer**: a `Key: value` line at the end of a commit message, such as `Work-Item: WI-001` or `Intent: file:plans/login.md`.
+- **uncovered surface**: the changed lines that no check with `"covers": true` read.
+- **work item**: a task in the tracker, with an id such as `WI-001`.
+
+## Documentation
+
+- [Updating and uninstalling](docs/updating.md)
+- [A subdirectory install](docs/subdirectory-install.md): an install in a folder of a monorepo
+- [Trackers](docs/trackers.md): work items, deferrals, and trailers
+- [The houserules step and evidence](docs/evidence.md): the helper script, captures, and the checks of a report
+- [Runners](docs/runners.md): checks that run your own tools
+- [The review layer](docs/review-layer.md): the reviewer summary, routes, records, and CI
+- [Ownership model](docs/ownership.md): the files that `update` writes, and the files that are yours
+- [The reference workflow](docs/reference-workflow.md): the optional process for a team of agents
+- [Measure process cost](docs/process-cost.md): `houserules stats` over the reports of agents
+- [CLI reference](docs/cli.md): every command; `houserules <command> --help` prints its flags
+- [houserules with OpenSpec](docs/openspec.md)
+- [Upgrading to houserules 2.0](docs/upgrading-to-2.md): packs, overrides, and each hand step of `update`
 
 ## Stability
 
-The CLI surface (the subcommands above and their flags) and the
-schema constraint surface are frozen: a change to either is a breaking
-change and ships only with a major version bump.
-Within a major version, `update` never rewrites your project's own data
-files, except that it moves an entry whose id a pack ships into an
-override (one id, one source). The full contract lives in [docs/design.md](docs/design.md).
+houserules follows semantic versioning. A change that breaks a command, a flag, or a schema comes in a new major version, and the [changelog](CHANGELOG.md) names it. The JSON documents of `for`, `audit`, `capture`, `evidence`, `route`, and `record` name their schema and its version, such as `houserules/audit-result@1.0.0`. The schemas live in [schemas/](schemas), and a published version of a schema never changes.
 
 ## Contributing and support
 
-Questions and bug reports go to
-[GitHub issues](https://github.com/jblossey/houserules/issues).
-Contributions are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) covers the
-development workflow, the batch process, and the gates a change must
-pass.
-
-This repository runs its own kit (id prefix `HR`): `template/` is the
-source of everything the binary installs, and the root `.claude/`,
-`tools/`, and `.githooks/` are the installed copy. Edit `template/`,
-then run `houserules update --dir .`; tests pin the copies to their
-sources.
-
-```sh
-mise run setup    # hooks + the binary on PATH
-mise run lint     # the full lint chain
-cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
-```
+Ask how to use houserules in the [Q&A discussions](https://github.com/jblossey/houserules/discussions/new?category=q-a), and report a bug or ask for a change in an [issue](https://github.com/jblossey/houserules/issues/new/choose). Report a security problem in private, as [SECURITY.md](SECURITY.md) describes. You can contribute a change: [CONTRIBUTING.md](CONTRIBUTING.md) explains the setup, the commit rules, and the gates that each change must pass. This repository runs houserules on itself, and its own rules are in [knowledge/](knowledge).
 
 ## License
 
-MIT — see [LICENSE](LICENSE). The files that `init` and `update` write
-into your project are yours under the same terms; the kit-owned scripts
-carry an SPDX header, so vendored copies keep the notice. Distribution
-is binary-only: GitHub Releases, mise's `github:` backend, and the shell
-installer.
+[MIT](LICENSE). The scripts that the kit writes into `tools/` carry an SPDX header, so a copy keeps the notice.

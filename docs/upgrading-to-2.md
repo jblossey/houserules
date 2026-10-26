@@ -180,7 +180,7 @@ A 2.0 binary refuses an install of houserules 1.x. On a tree whose `.houserules.
 
 The fix is one command: `houserules update`.
 
-The CI workflow of an install seeded by houserules 0.3.0, 1.0.0, or 1.1.0 installs the newest release. From the release of 2.0, its gates exit 2 with this line until you run `update` and commit the result. A workflow seeded by 1.2.0 or later installs the version that `.houserules.json` records, so it keeps the 1.x binary until `update` restamps the file.
+The CI workflow of an install seeded by houserules 0.3.0, 1.0.0, or 1.1.0 installs the newest release. From the release of 2.0, its gates exit 2 with this line until you run `update` and commit the result. A workflow seeded by 1.2.0 or later installs the version that `.houserules.json` records, so it keeps the 1.x binary until `update` restamps the file. When `.houserules.json` records no readable `version`, a workflow of 1.2.0 or later installs the newest release too, and its gates exit 2 with this line.
 
 A tree with a `knowledge/` directory and no `.houserules.json` gets a different line:
 
@@ -1135,3 +1135,141 @@ Each red is correct, and each has a remedy:
 - **A project with runner checks whose tools the job `record` does not get:** the record holds `audit.error` and no red. The remedy is the `setup` input of the unit.
 - **A GitLab project without `HOUSERULES_TOKEN`, or with an expired one:** no comment, status, label, or record push, and one notice for each run. The remedy is to create or rotate the token. No red.
 - **A check that you meant as coverage:** it is not coverage until its entry declares `covers: true`. No red.
+
+## OpenSpec, links, and install schema 2.4.0
+
+houserules 2.0 reads an OpenSpec change as the intent of a change. A commit links to a spec and to an agent session with a trailer. Two optional check types judge the links. [The OpenSpec page](openspec.md) shows the hookup. This section shows what an upgrade changes. No pack of the kit uses either check type, so neither becomes a gate until your project adds an entry of its own.
+
+`evidence`, `record write`, and `audit` read the `Intent: <source>:<ref>` trailer and the session trailers of each commit of the range. A trailer never stops a command (see [Name a change in a commit](openspec.md#name-a-change-in-a-commit)).
+
+### Changes of install schema 2.4.0
+
+`update` stamps `houserules/install@2.4.0` on a marker of `houserules/install@2.2.0` or `houserules/install@2.3.0` and prints this line once:
+
+```text
+wrote .houserules.json (houserules/install@2.4.0)
+```
+
+It leaves a marker of any other schema as it is, `2.1.0` included. A new `init` and the conversion of an install of 1.x write `2.4.0` directly. The restamp changes the stamp and no other key. These names are new:
+
+| Name | What it is |
+|---|---|
+| `houserules/install@2.4.0` | The install schema that holds the key and the source below. Its readers refuse an empty `defaultBranch`. |
+| `review.sessions.trailers` | The key of `.houserules.json` that lists the trailer keys whose value refers to a session of an agent tool: an array of keys of letters, digits, and `-`. It defaults to `["Entire-Checkpoint"]`. A fault in it is one line from `check-knowledge`, exit 1: `.houserules.json: review.sessions.trailers must be an array of trailer keys (letters, digits, and -)`. |
+| `openspec` | A value of `review.intent.sources`, for the adapter that reads an OpenSpec change. |
+| `intent-required`, `intent-resolves` | Two check types of the knowledge schema. `intent-required` also takes the field `sources`. `update` brings `knowledge/schema.json` to the version that names them (see the hand step below). |
+| `houserules/pack@1.4.0` | The schema id of a pack copy whose check has one of the two types or sets `sources`. |
+| `houserules/overrides@1.3.0` | The schema id of a `knowledge/overrides.json` whose override sets one of them. The overrides schema reads any minor of its major, so an older id does not fail. |
+| `houserules/evidence@1.1.0` | The document that `evidence --json` writes. It adds `sessions`. |
+| `houserules/change-record@1.1.0` | The document that `record write` writes and `record show --json` prints. It adds `links.sessions` and `links.sessions_more`, and its `evidence` part leaves `sessions` out. |
+
+The published files `evidence/1.0.0.json` and `change-record/1.0.0.json` stay at their URLs, byte for byte.
+
+### The `validation` input of the CI units
+
+Both units of the review layer, the GitHub workflow and the GitLab file, take a new input, the `validation` input. Its default is empty, so a pipeline that does not set it runs as before. Set it to the path, relative to the install, of a capture of `openspec validate --json` that your `setup` command writes (see [the validation capture](openspec.md#the-validation-capture)). When the input is set and the file exists, the units pass `--validation <path>` to `evidence` and to `record write`. When the input is set and the file does not exist, a unit prints this notice and passes no flag:
+
+```text
+houserules: the validation input names <path>, which does not exist, so this run passes no validation capture
+```
+
+### Hand step: a knowledge schema that you changed or own
+
+A knowledge schema that lacks the two check types and the field `sources` fails an entry that uses them. `update` replaces `knowledge/schema.json` while it equals a content that houserules shipped, and prints `wrote knowledge/schema.json`. For any other schema, what it prints depends on your install.
+
+**An install of 2.x, a schema that you changed.** `update` keeps the file and prints this line:
+
+```text
+kept knowledge/schema.json (locally modified)
+```
+
+**An install of 2.x, a schema that `ownedPaths` lists.** `update` leaves the file as it found it, and prints no line for it.
+
+**An install of 1.x, a schema that you changed.** The conversion removes `$defs.area` and the `$ref` of its area property, and nothing else. It prints this line:
+
+```text
+hand step: knowledge/schema.json holds changes beyond the area enum, so houserules update removed $defs.area and the $ref of its area property and nothing else; compare the file with the schema that houserules init writes, and merge the rest by hand
+```
+
+**An install of 1.x, a schema that you own.** The `overrides` key of your marker lists `knowledge/schema.json`. The conversion moves the path to `ownedPaths` and does not rewrite the file. It prints this line:
+
+```text
+hand step: remove $defs.area from knowledge/schema.json; your areas live in knowledge/areas.json. Then replace the $ref of its area property with {"type":"string","minLength":1}
+```
+
+Each of these schemas lacks the two types and the field `sources`, and `check-knowledge` exits 1 for an entry that uses them. An entry that uses one of the types draws the first line below. An entry that sets `sources` draws the second line too:
+
+```text
+knowledge/<topic>.json.entries[<n>].check.type: must be one of "grep-absent", "commits", "co-change", "diff-append-only", "report-field", "durable-sha", "runner"
+knowledge/<topic>.json.entries[<n>].check: unknown field "sources"
+```
+
+Each line names the topic file and the index of your entry. A schema of 1.x is older: it lacks the type `runner` and more fields of a check than `sources`. An entry that sets such a field draws one more line for it. The `intent-required` entry of [the OpenSpec page](openspec.md#two-checks-of-intent) sets `exempt_subjects` too, so it draws these lines on an install of 1.x:
+
+```text
+knowledge/<topic>.json.entries[<n>].check.type: must be one of "grep-absent", "commits", "co-change", "diff-append-only", "report-field", "durable-sha"
+knowledge/<topic>.json.entries[<n>].check: unknown field "sources"
+knowledge/<topic>.json.entries[<n>].check: unknown field "exempt_subjects"
+```
+
+**The remedy on an install of 2.x.** Make two edits to `knowledge/schema.json`:
+
+1. In `$defs.check.properties.type.enum`, add `"intent-required"` and `"intent-resolves"`.
+2. In `$defs.check.properties`, add this property:
+
+```json
+"sources": {
+  "type": "array",
+  "items": { "type": "string", "minLength": 1 },
+  "uniqueItems": true
+}
+```
+
+Then run `houserules check-knowledge`. To find other differences, compare the file with the schema of the kit (see [Hand steps](#hand-steps)):
+
+```sh
+diff knowledge/schema.json ../kit-reference/knowledge/schema.json
+```
+
+**The remedy on an install of 1.x.** The two edits are not enough: an entry that sets `exempt_subjects`, or another field that the schema of 1.x lacks, still draws a line for it. Compare the file with the schema of the kit, as in the command above. Merge the check types and the fields of a check that the kit adds, and keep your own changes. For a schema that you own, make the area edits of its line first (see [Hand step: a schema that you own, with the area enum](#hand-step-a-schema-that-you-own-with-the-area-enum)). For a schema that you changed, the merge is the one that its line asks for (see [Hand step: a schema with other changes](#hand-step-a-schema-with-other-changes)). Then run `houserules check-knowledge`.
+
+### The faster task loop in the reference workflow
+
+An install of the reference workflow gets the faster task loop of this release in four files and six pack entries. `update` writes each of these files while it equals its pin, and prints `kept <file> (locally modified; reference workflow <version>)` for a file that you changed (see [The reference workflow](#the-reference-workflow)):
+
+- `.claude/agents/implementer.md`
+- `.claude/agents/task-reviewer.md`
+- `.claude/skills/orchestrating/SKILL.md`
+- `.claude/skills/planning/SKILL.md`
+
+An install that holds the earlier pack versions prints `moved pack process from 2.1.0 to 2.1.1` and `moved pack quality from 1.0.2 to 1.0.3`. The entries `process.ask-when-missing`, `process.tdd`, `process.risk-tiers`, `process.bounded-review-loop`, `process.parallel-on-disjoint-files`, and `quality.principles` gain or change body paragraphs. An override replaces a whole field, so a project that overrides the `body` of one of them keeps its own body. Delete the `body` field from the override to take the paragraphs of the kit, or merge them by hand.
+
+The files and entries carry these rules:
+
+- The implementer runs the focused test while it iterates, and the tests of its files before it commits. It runs no full suite and no suite that the plan marks as integration-only. The person who runs the work runs those suites once for each integration.
+- A reading that the spec or the brief leaves open, and that a test would pin, is a question: the implementer stops, names the reading and its choices, and returns NEEDS_CONTEXT.
+- The ledger stamps each dispatch and each close with its UTC time.
+- The person who runs the work asks the owner in a plain message, never in a question tool that holds its turn, and keeps dispatching each task that needs no ruling.
+- A wave orders the tasks and is no barrier: a task starts as soon as every task it needs is integrated.
+- A plan may name one file that two tasks share. The person who runs the work resolves the later cherry-pick by keeping both sides.
+- While a fix-diff review or a re-review runs, the person who runs the work may integrate the fix and run the integration gates.
+- A test added after the recorded RED carries its own RED or a mutation row in the same report entry. A struct whose fields a reader fills names the production reader of each field in its doc comment.
+
+### The reds of this section by design
+
+Each red is correct, and each has a remedy:
+
+- **Every gate exits 2, on an install of 1.x whose CI installs the newest release.** The workflow that houserules 0.3.0, 1.0.0, or 1.1.0 seeded installs the newest release, and so does a workflow of 1.2.0 or later on a `.houserules.json` with no readable `version`. From the release of 2.0, each gate of such a workflow exits 2 with the line of D4 until you run `update` and commit the result. The line is `<path>/.houserules.json: this is an install of houserules 1.x; run houserules update to convert it`. The remedy is one command, `houserules update` (see [Gates stop on an install of 1.x](#gates-stop-on-an-install-of-1x)).
+- **`update` keeps a knowledge schema that you changed, on an install of 2.x.** It prints `kept knowledge/schema.json (locally modified)`. An entry that uses an intent check draws the lines of the [hand step](#hand-step-a-knowledge-schema-that-you-changed-or-own). The remedy is the two edits of that step.
+- **`update` leaves a knowledge schema that `ownedPaths` lists, on an install of 2.x.** It prints no line for the file. An entry that uses an intent check draws the lines of the [hand step](#hand-step-a-knowledge-schema-that-you-changed-or-own). The remedy is the two edits of that step.
+- **The conversion of an install of 1.x lists a knowledge schema that you changed as a hand step.** It prints a `hand step:` line. An entry that uses an intent check draws the lines of the [hand step](#hand-step-a-knowledge-schema-that-you-changed-or-own). The remedy is the merge of the schema of the kit that the line asks for. The two edits of that step are not enough.
+- **The conversion of an install of 1.x lists a knowledge schema that you own as a hand step.** It prints a `hand step:` line with other words. An entry that uses an intent check draws the lines of the [hand step](#hand-step-a-knowledge-schema-that-you-changed-or-own). The remedy is the area edits that the line asks for, then the merge of the schema of the kit. The two edits of that step are not enough.
+- **`update` keeps the kit files of an install that houserules 0.3.0 seeded.** The binary knows the kit files that houserules shipped from 1.0.0 on, so it reads an unchanged kit of 0.3.0 as files of your own. `update` keeps `.claude/schemas/deliverables.json` and prints the [hand step of a schema of your own](#hand-step-a-schema-of-your-own); until you merge it, every report in the new form fails `validate`. It keeps `.claude/evals/dependency-add.json` and prints the [hand step of a file that is not the kit's](#hand-step-a-file-at-a-workflow-path-that-is-not-the-kits). It removes only the area enum from `knowledge/schema.json` and prints the [hand step of a schema with other changes](#hand-step-a-schema-with-other-changes). The remedy is the three hand steps. For a kit that you did not change, copy `.claude/schemas/deliverables.json` and `knowledge/schema.json` of the reference install over yours, delete `.claude/evals/dependency-add.json`, and run `houserules update` again.
+- **`update` keeps the seeded CI workflow of an install that has no `.houserules.json`.** Such an install has a `knowledge/` directory and no marker, and you convert it with `houserules update --id-prefix <prefix>` (see [Gates stop on an install of 1.x](#gates-stop-on-an-install-of-1x)). The conversion has no baseline for `.github/workflows/knowledge.yml`, so `update` leaves the file as it found it and prints no line and no hand step for it, even when it equals a workflow that houserules 1.x released. An install that has a `.houserules.json` gets `wrote .github/workflows/knowledge.yml` instead. The workflow of 1.x stays, and it lacks `permissions` with `contents: read`, the `ref: ${{ github.event.pull_request.head.sha }}` input of its checkout, and `persist-credentials: false`. No gate is red because of it. The remedy is to write the workflow of your release over the file: run the `curl` command of [the hand step for a CI workflow of your own](#hand-step-a-ci-workflow-of-your-own) with `-o <path>` in place of `| diff <path> -`. `update` leaves the new file as found on every later run, so compare it with the workflow of each release that you adopt.
+- **`update` writes the install schema 2.4.0.** On an install of 2.2.0 or 2.3.0 it restamps the marker and prints `wrote .houserules.json (houserules/install@2.4.0)` once. The conversion of an install of 1.x prints `converted .houserules.json to the install schema houserules/install@2.4.0` instead. No remedy is needed.
+- **A marker with an empty `defaultBranch` fails the commands that read it.** The restamp changes the stamp and no other key, and the readers of 2.4.0 refuse a value that an earlier build accepted. Every command that reads the marker prints `<path>/.houserules.json: defaultBranch must be a non-empty string` and exits 2. `check-knowledge` prints `.houserules.json: defaultBranch must be a non-empty string; kit-owned citations not checked` and exits 1. The remedy is to write the name of your default branch into the key, or to delete the key.
+- **`audit` of the update commit fails `process.evals-rerun`** on an install of the reference workflow, because `update` rewrote the implementer template and more. The remedy is the one in [the reds that an upgrade causes by design](#the-reds-that-an-upgrade-causes-by-design): run your scenarios and append the run to `.claude/evals/record.json`.
+- **An install that tracks an OpenSpec root fails `check-knowledge` until `render`.** After the first tracked file of the root, `check-knowledge` reports `AGENTS.md: generated file is out of date (run houserules render)` and `render --check` reports `AGENTS.md: would change`. The remedy is `houserules render` (see [The split in AGENTS.md](openspec.md#the-split-in-agentsmd)).
+- **An install that runs the reference workflow and holds an OpenSpec root draws a warning** on stderr from `init --workflow reference` and from `check-knowledge`, with the exit code unchanged. The remedy is to plan with one workflow (see [Plan with one workflow](openspec.md#plan-with-one-workflow)).
+- **A project that adds `intent-required`:** a bot or a release commit that changes a path that the entry's `if` matches fails it. The remedy is `exempt_subjects` or an `if` that leaves the lock files out. The `record` job after a squash merge sees one commit, so a squash message that drops the `Intent:` trailers fails the recorded check where the request passed. The remedy is to keep the trailers in the squash message.
+- **`check-backlog` fails for an item whose batch no batch record holds.** On the JSON tracker, `check-backlog` reports each item of `backlog/items/` whose `batch` is a number that neither `backlog/batches.json` nor `backlog/archive/batches.json` holds. It prints one line for each such item on stderr and exits 1: `<item file> <id>: batch <n> is not in backlog/batches.json or backlog/archive/batches.json`. A backlog that ticked an item with `houserules set <id> batch=<n>` before the batch had a record draws the line. A new tracker draws it too, when its first item is ticked with `batch=1`. The remedy is to add a record for the batch to `backlog/batches.json`, or to set the item's `batch` to a batch that a record holds.

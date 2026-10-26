@@ -65,6 +65,8 @@ no bot-commit carve-out.
 
 ## Cutting a release
 
+Before the release PR merges, run the README rework that the release calls for: the `readme-rework` skill ([`.claude/skills/readme-rework/SKILL.md`](../.claude/skills/readme-rework/SKILL.md)) scales it by major, minor, and patch (`houserules.readme-rework-at-release`).
+
 The pipeline (docs/specs/2026-09-12-batch-24-repo-and-setup.md §2a, T1):
 release-please proposes the version from conventional commits, merging
 its PR pushes a plain `v<version>` tag, and that tag drives cargo-dist's
@@ -126,7 +128,7 @@ One release runs:
    upload instead of a second creation.
 
    The macOS x64/arm64 archives ship unsigned: `dist-workspace.toml`
-   carries no `macos-sign` configuration. README's Direct download
+   carries no `macos-sign` configuration. README's Install
    section names the adopter-facing Gatekeeper bypass; HR-121 books
    signing and notarization, triggered by real adopter friction, not a
    date (docs/design.md §5.79(4)).
