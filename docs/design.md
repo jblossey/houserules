@@ -3131,3 +3131,533 @@ Each item records the ruling with its date, or stays marked open.
     workflow also counts a `Reversal:` inside a longer entry.", true for a
     minimal install too; the test exclusion of the 5.223 sentence goes.
     Source: owner, 2026-10-23.
+227. **Batch 36 accepted; its owner-gated close proposals accepted - ruled
+    2026-10-24.** The owner, verbatim: "all accepted." (answering the four
+    points of `.superpowers/sdd/2026-10-22-batch-36/batch-report.md`).
+    (1) Batch 36 is accepted; the archive sweep moves its items and its
+    batch record. (2) The six proposals for standing entries or entries
+    with `source.by: user`: a body line each for
+    `writing-style.doc-comments`, `quality.principles`,
+    `process.rulings-to-file`, and `security-hygiene.dependency-vetting`
+    (the pack entries through `knowledge/overrides.json`; the kit packs
+    stay unchanged), and a body line for
+    `process.refused-commands-hand-back` naming a shell glob or a variable
+    as another way. The warn check for history phrases of
+    `writing-style.code-comments` goes on
+    `houserules.comments-name-no-review-history`, not on the judged rule:
+    an entry with a check gets a deterministic row in place of a judged one
+    (batch-35 spec 9 (3)). Its phrases, ruled the same day by "Unambiguous
+    only (Recommended)": `now (read-only|quoted|shared|gone)` and
+    `confirmed on this box`; `no longer` and `used to` stay judged, because
+    most of their matches on main state a current contract (30 and 5
+    comment lines of crates/; 2 of the 5 `used to` lines are current).
+    (3) The three `narrow` proposals stay "no
+    change". (4) No veto of O3: reading the knowledge JSON when
+    `houserules get` was refused stands as a read, not as the refused
+    command run another way. Source: owner, 2026-10-24.
+228. **The duplicate line of `quality.principles`; batch 37 starts -
+    ruled 2026-10-24.** The owner, verbatim: "yes, delete the duplicate
+    and start batch 37". This repository's override of
+    `quality.principles` drops the short "Tests assert behavior ..." line;
+    the longer line that holds the same sentence and the auto-restore
+    clause stays. Batch 37 (the per-change review layer, meta-spec
+    section 4) starts with its spec. Source: owner, 2026-10-24.
+229. **Batch 37: what counts as coverage - ruled 2026-10-24.** To the
+    question of the first design review (F1, Q-A) what counts as covered
+    for the evidence packet's uncovered surface and the route: "Checks
+    opt in (Recommended)". A check counts as coverage only when it
+    declares it with a new optional field of the knowledge schema
+    (`covers: true`, default false, a minor addition); a file is covered
+    when a check that declares it passed or warned on that file. Until a
+    project marks a check, every changed hunk is uncovered. Source: owner,
+    2026-10-24.
+230. **Batch 37: the name of the per-change requirement - ruled
+    2026-10-24.** "route (Recommended)": the command `houserules route`,
+    the config key `review.route`, and issue 66's values
+    `auto-merge-eligible`, `owner-review`, and `senior-review`; "tier"
+    stays with the pipeline tiers of `process.risk-tiers` (meta-spec
+    5.20). Source: owner, 2026-10-24.
+231. **Batch 37: where the evidence bundle lives - ruled 2026-10-24.**
+    "PR description (Recommended)": a section of the PR body that
+    `houserules bundle write` writes from captures and `houserules bundle
+    check` checks in CI; no file in the tree and no deliverables-schema
+    change (issue 58's first option). Source: owner, 2026-10-24.
+232. **Batch 37: the stable URL of the published schemas - ruled
+    2026-10-24.** "GitHub Pages": the schemas are served by GitHub Pages of
+    this repository, not as raw files on `main`. The spec states the
+    publishing workflow and the hand step that enables Pages. Source:
+    owner, 2026-10-24.
+233. **Batch 37: pull requests from forks - ruled 2026-10-24.** "Summary
+    only (Recommended)": a fork PR runs every check; its evidence packet
+    goes to the job's step summary, and nothing is posted to the PR; the
+    seeded workflow never uses `pull_request_target`. Source: owner,
+    2026-10-24.
+234. **Batch 37: this repository's own CI - ruled 2026-10-24.** "Yes, from
+    batch 37 (Recommended)": `.github/workflows/ci.yml` gains the bundle
+    check, the evidence comment, the route label and status, and the
+    change record on `main`, so batch 37's own PR is the first live proof
+    on GitHub; Dependabot and release-please are exempt from the bundle;
+    the record job holds `contents: write` for the notes ref. Source:
+    owner, 2026-10-24.
+235. **Batch 37: the new surface under the freeze - ruled 2026-10-24.**
+    "Yes, one ruling (Recommended)": batch 37 adds every subcommand and
+    flag that its spec lists (`bundle write`, `bundle check`, `route`,
+    `record write`, `record show`, `record list`, `record audit`,
+    `stats --records`, and the flags of `evidence`, `route`, `bundle`, and
+    `record`) as additions to the 2.0.0 major. Source: owner, 2026-10-24.
+236. **Batch 37: the home of the published-document semver rules -
+    ruled 2026-10-24.** "Non-standing entry (Recommended)": the rules of
+    5.117 and 5.146 for the published documents go to a new non-standing
+    entry of the `cli` area; the rewrite of the frozen entry that 5.117
+    and 5.146(3) put at this review does not happen, because 220 and 221
+    retire that entry (HR-238). Source: owner, 2026-10-24.
+237. **Batch 37: how the published schemas are made - ruled 2026-10-24.**
+    "Generated with schemars": the schemas are derived with `schemars`
+    from Rust types, so the output code of `audit`, `for`, and the new
+    documents moves to typed structs (a refactor that folds into the spec,
+    `quality.well-maintained-libraries`), not hand-written files with a
+    `jsonschema` conformance test. Source: owner, 2026-10-24.
+238. **Batch 37: the YAML reader of the CI workflow copies - ruled
+    2026-10-24.** "saphyr": `install/ci_workflow.rs` reads a kept workflow
+    with the `saphyr` parser instead of its text tests (HR-243); houserules
+    still writes no YAML. Source: owner, 2026-10-24.
+239. **Batch 37: the rollout of the bundle check - ruled 2026-10-24.**
+    "Fail from the start (Recommended)": the seeded workflow's bundle
+    check fails a PR without a bundle from the first `update`; the upgrade
+    guide and `update`'s output state the red and its remedy (`bundle
+    write`, or the bot in `exemptAuthors`). Source: owner, 2026-10-24.
+240. **Batch 37: the spec approval - ruled 2026-10-24.** "I approve the
+    spec": after the design-review loop, the owner reads the final spec
+    and approves it before the plan starts (not the rule of 208). The
+    merge mode is not ruled yet; the controller asks before the merge.
+    Source: owner, 2026-10-24.
+241. **Batch 37: the post-merge sample under a fast-forward merge - ruled
+    2026-10-24.** To the second design review's QO-1: "State the limit
+    (Recommended)". Under a fast-forward merge the record's key is the
+    author's own head commit, so the draw is known before the merge; the
+    spec, the packet's documentation, and the migrating-knowledge skill
+    state that the sample is unsteerable only under a host merge that
+    writes a new commit (squash, merge commit, or rebase on the host). No
+    salt in 2.0.0. Source: owner, 2026-10-24.
+242. **Batch 37: the route's trust boundary - ruled 2026-10-24.** To the
+    second design review's QO-2: "Separate tool-free job". The seeded
+    workflow computes the route's tool-free floors (rule sources, the
+    configured area and path routes, paths in no area, and the diff size)
+    in a job that runs no project tool, and the route that the report job
+    applies is at least that floor; the report job accepts only the three
+    route values. Source: owner, 2026-10-24.
+243. **Batch 37: one report for a change, whatever the spec workflow -
+    ruled 2026-10-24.** The owner asked before approving the batch-37
+    spec: "if we would start using openspec, does the review workflow
+    properly integrate with it? ... That should not yield two different
+    reports at the end. Houserules should enable every kind of workflow
+    to integrate and produce one coherent report at the end." To the
+    question when the packet and the record get the section a spec
+    adapter fills: "Contract now, OpenSpec in 38, and the contract must
+    also allow to use github spec-kit". Batch 37 adds an `intent` section
+    to the evidence packet, the change record, and the bundle, and a
+    spec-adapter contract that a plan file or a work item fills; batch 38's
+    OpenSpec adapter (HR-209, with HR-190) fills it from the change folder;
+    the contract must fit GitHub Spec Kit's feature folders too, so that
+    HR-210 adds an adapter and no schema change. Source: owner, 2026-10-24.
+244. **Batch 37: GitLab is seeded too - ruled 2026-10-24, reverses D11
+    of 5.96.** The owner asked before approving the batch-37 spec: "what
+    we do should work independent of whether someone is on github or
+    gitlab (managed or self-hosted). Have we made sure, that gitlab users
+    are properly supported and that we have no hard-wiring to github for
+    our adopters?" To the question how far batch 37 supports GitLab:
+    "Seed GitLab CI too (Recommended)". The kit seeds a GitLab form beside
+    the GitHub one: a `.gitlab-ci.yml` include with the same jobs, a
+    merge-request template, and the host taken from the origin URL or
+    from `init --host`, so a self-managed GitHub or GitLab instance is
+    covered too; the posting jobs use a project access token that the
+    adopter creates; a live proof runs in a private scratch GitLab project
+    that the owner grants at the live run. The texts become host-neutral
+    (pull or merge request), and no seeded file or command hard-codes
+    `github.com`. Source: owner, 2026-10-24.
+245. **Batch 37: CI wiring is opt-in and minimally invasive - ruled
+    2026-10-24, revises 239, 244, and D3's default seeding.** The owner:
+    "I am thinking about the case when projects have their own github
+    actions or gitlab ci setup pre-existing. Most projects won't want a
+    tool to write in their CI config. We need to be as minimally invasive
+    as possible. What do you propose?" To the proposal: "Yes, as proposed
+    (Recommended)". (1) houserules never edits a CI file it did not
+    create, and writes none unless asked. (2) This repository publishes
+    two versioned units with each release: a GitHub reusable workflow and
+    a GitLab file for `include: remote`, each holding the gates, floor,
+    report, record, and record-push jobs; an adopter references one with
+    a pinned version. (3) `houserules ci print --host github|gitlab`
+    prints the snippet or the jobs for an existing pipeline and writes
+    nothing; `houserules ci write` creates a new file of its own on
+    request and never touches an existing one. (4) `init` writes no CI
+    file by default and prints one line on how to wire CI. (5) An
+    existing install keeps its seeded `knowledge.yml`, which `update`
+    keeps maintaining for the gates; `update` does not add the review
+    layer to it and prints once how to opt in. 239's bundle check fails
+    from the start for a project that opted in. 244's GitLab support is
+    the published include, `ci print`, and `ci write`, not a seeded
+    `.gitlab-ci.yml`. Nothing is lost (5.100): each function stays, only
+    the defaults change. Source: owner, 2026-10-24.
+246. **Batch 37: three answers to the third design review - ruled
+    2026-10-24.** (1) QR-1, "Personal token fallback (Recommended)": on
+    gitlab.com, where project access tokens need Premium or Ultimate, a
+    project may give `HOUSERULES_TOKEN` a personal access token of a
+    dedicated member with the Developer role; a project access token
+    stays the preferred form, and the skill and the upgrade guide state
+    that a personal token reaches every project its user can reach.
+    (2) QR-2, "Only on request (Recommended)": the pull or merge request
+    template is written only by `houserules ci write --template`; `init`
+    and `update` never write one (this narrows HR-179's seed-once template
+    and 244's seeded merge-request template under 245). (3) QR-3, "Accept
+    (Recommended)": no release before 2.0.0 has `route --no-audit`, so
+    batch 37's own pull request shows the floor's mechanics only, and this
+    repository proves 242's floor from the 2.0.0 release (batch 38); from
+    then on the floor job installs a released binary or builds the default
+    branch's commit, never the request's, and a missing floor means at
+    least `owner-review`. Source: owner, 2026-10-24.
+247. **Batch 37: two answers to the fourth design review - ruled
+    2026-10-24.** (1) QS-1, "Allow, with condition (Recommended)": the
+    floor job may also take a binary that the runner image provides
+    (`floor-install: runner:<path>`), an extension of 246(3), only where
+    the runner is fresh per job (a GitHub-hosted runner, a GitLab docker
+    executor) or the runner user cannot write the path; the spec, the
+    migrating-knowledge skill, and the upgrade guide state the condition.
+    (2) QS-2, "Required --sha flag (Recommended)": `houserules ci write
+    --host github --mode reference` requires `--sha <release commit sha>`,
+    which the `git ls-remote` line that `ci print` prints resolves; every
+    command stays host-free. Source: owner, 2026-10-24.
+248. **Batch 37: spec revision 6 approved - ruled 2026-10-24.** The owner was
+    asked to approve spec revision 6, including the correction of the
+    freeze entry's command count from 20 to 29, and answered "I approve
+    the spec (Recommended)". Under 240 the plan starts
+    from `docs/specs/2026-10-24-batch-37-per-change-review-layer.md` at
+    revision 6. The approval covers the fact correction of
+    `houserules.1-0-surface-is-frozen`: its body and its test both name
+    29 commands. Source: owner, 2026-10-24.
+249. **Batch 37: a JSON Schema validator for the tests - ruled 2026-10-24.**
+    At plan time: cases 1, 2, 5, and 6 validate each published document
+    against its generated schema, the in-crate validator of
+    `rules/check.rs` lacks `anyOf`, `oneOf`, and `const`, which schemars
+    emits, and spec 12 named no validator. The owner, to "Which validator
+    should the tests use?": "jsonschema dev-dep (Recommended)". The
+    `jsonschema` crate is a dev-dependency only (it does not ship in the
+    binary), added with `cargo add --dev jsonschema@=<version>`, vetted
+    and pinned exactly in the task that first needs it. Source: owner,
+    2026-10-24.
+250. **Batch 37: a base64 encoder for `ci print` - ruled 2026-10-24.** At
+    plan time: `ci print` prints the GitLab include's `integrity` as
+    `sha256-<base64>` (spec 10.2), and spec 12 named no encoder. The
+    owner, to "Which should T12 use?": "base64 crate, locked
+    (Recommended)". `base64` becomes a direct dependency at the version
+    that `Cargo.lock` already holds through other crates (0.23.1 at plan
+    time), so no crate enters the lockfile; T12 vets it. Source: owner,
+    2026-10-24.
+251. **Batch 37: the CI units live outside the kit payload - ruled
+    2026-10-24.** The plan review (QP-1, `plan-review.json` P1) found that
+    release-please's bump of the units' version lines under `template/ci/`
+    changes `template/**` without regenerating `payload.stamp`, so the
+    payload-stamp gate would fail every release PR
+    (`plan-review-probe-stamp.txt`). The owner, to "Where should the units
+    live?": "Root ci/ dir (Recommended)". The unit sources are
+    `ci/github-review.yml` and `ci/gitlab-review.yml` at the repository
+    root, embedded with `include_bytes!`; the GitLab include URL is
+    `https://raw.githubusercontent.com/jblossey/houserules/v<version>/ci/gitlab-review.yml`.
+    Spec 10.2 and every path of the units are amended. Source: owner,
+    2026-10-24.
+252. **Batch 37: the Zlib license is allowed - ruled 2026-10-24.** The plan
+    review (QP-2, `plan-review.json` P3) found that `jsonschema` and
+    `saphyr` both bring `foldhash` 0.2.0, licensed Zlib, which `deny.toml`
+    does not allow (`plan-review-probe-deny.txt`,
+    `plan-review-probe-deny-saphyr.txt`). The owner, to "Allow Zlib?":
+    "Allow Zlib (Recommended)". T1 adds "Zlib" to `deny.toml`'s allow list
+    with a comment that states why, in the form of the MPL-2.0 comment.
+    Source: owner, 2026-10-24.
+253. **Batch 37: the GitHub unit takes its version as an input - ruled
+    2026-10-25.** The second plan review (`plan-review-r1.json` P27, P32,
+    QP-3, QP-4) found that release-please's token cannot change a workflow
+    file (the default token has no Workflows permission, and
+    `RELEASE_PLEASE_TOKEN` is scoped to Contents, Pull requests, and
+    Issues), and that Dependabot's action-pin updates of
+    `.github/workflows/houserules-review.yml` would break its byte-identical
+    copy under `ci/` every week. The owner, to "Which form should the
+    GitHub unit take?": "Version as input (Recommended)".
+    `.github/workflows/houserules-review.yml` is the GitHub unit's only
+    source: no copy under `ci/` and no release version line. The caller
+    passes `version:` beside its `@<sha> # v<version>` line, and `ci print`
+    and `ci write` fill both. The unit holds a minimum version, raised by
+    hand, and refuses an older binary with one line. The GitLab unit keeps
+    `ci/gitlab-review.yml` and its release-bumped version line. This
+    narrows 251 for GitHub. Source: owner, 2026-10-25.
+254. **Batch 37: two inactive lock-only crates accepted - ruled
+    2026-10-25.** The T1 task review (`task-1-review.json` issue 4) found
+    two crates that the test-only `jsonschema` (249) brings with no recent
+    activity: `num-cmp` 0.1.0 (one release, 2017; last push 2020) and
+    `version_check` 0.9.5 (last release and push July 2024). Neither
+    reaches the shipped binary (`cargo tree -e normal --target all`). The
+    owner, to "Accept them?": "Accept as finished (Recommended)". Both
+    enter as finished, test-only crates under 249; T1's vetting rows cite
+    this ruling; the check is repeated if `jsonschema` drops or replaces
+    them. Source: owner, 2026-10-25.
+255. **Batch 37: a local `.git/info/attributes` is a named input - ruled
+    2026-10-25.** The T4 task review (`task-4-review.json` issue 4) found
+    that no git option turns off `$GIT_DIR/info/attributes`: neither
+    `--attr-source` nor an empty `core.attributesFile` stops it, so a local
+    `*.rs -diff` line there turns a text path binary in the diff of spec
+    4.2 (`review4-git-config-probe-output.txt`). The owner, to "How should
+    the review commands treat it?": "Named input (Recommended)". Spec 4.2
+    names the repository's own `.git/info/attributes` as an input of a
+    local run; a CI clone holds none, so CI stays the authority. No command
+    refuses it. Source: owner, 2026-10-25.
+256. **Batch 37: arraydeque accepted under saphyr - ruled 2026-10-25.**
+    The T13 task review (`task-13-review.json` issue 4) found that
+    `saphyr-parser` 0.2.2, which `saphyr` (238) needs, requires
+    `arraydeque` 0.5.1 as a normal dependency, so it ships in the binary;
+    its last release is from 2023-02-05 (`review13-probe-deps.txt`). The
+    owner, to "Accept it?": "Accept as finished (Recommended)".
+    `arraydeque` enters as a finished, single-purpose crate under 238;
+    T13's vetting row cites this ruling; the check is repeated if `saphyr`
+    drops or replaces it. Source: owner, 2026-10-25.
+257. **Batch 37: no default route of auto-merge-eligible - ruled
+    2026-10-25.** The T6 task review (`task-6-review.json`, spec item 4)
+    found that a `review.route.default` of `auto-merge-eligible` makes a
+    change in an area with no route of its own, or in no area,
+    auto-merge-eligible with no limit: a 3,000-line change with no covering
+    check routed `auto-merge-eligible` (`t6-review-probes-out.txt` P2). The
+    owner, to "How should the default work?": "Refuse it (Recommended)".
+    `check-knowledge` fails a `review.route.default` or `review.route.warn`
+    of `auto-merge-eligible`, so a change is auto-merge-eligible only
+    through an area or a path entry that names both limits (spec 6.1).
+    Source: owner, 2026-10-25.
+258. **Batch 37: the install key maps every other character to `-` -
+    ruled 2026-10-25.** The T11 task review (`task-11-review.json` issue 5)
+    found that spec 10.1's key (the install path with each `/` replaced by
+    `-`) can hold a dot, which a GitLab environment name refuses, so the
+    GitLab unit's key input refuses the spec's key of an install such as
+    `packages/app.v2`. The owner, to "How should the key be formed?": "Map
+    to - and refuse clashes (Recommended)". The key is `root` for a
+    top-level install, else the install path with each character outside
+    `A-Za-z0-9_-` replaced by `-`. `ci print` and `ci write` refuse an
+    install whose key equals the key of another install of the repository,
+    with one line that names both paths. Spec 10.1 and the T12 interface
+    are amended. Source: owner, 2026-10-25.
+259. **Batch 37: a force push to the default branch writes no record -
+    ruled 2026-10-25.** The T11 task review (`task-11-review.json` issue 8)
+    found that both record jobs fall back to git's empty tree when the
+    push's `before` commit is not in the clone (a force push), so they
+    write a record over the whole history; spec 10.1 names the empty tree
+    only for a `before` of all zeros. The owner, to "What should a force
+    push record?": "No record, a notice (Recommended)". The record job
+    prints one notice that names the missing `before` commit and writes no
+    record for that push. Spec 10.1 is amended. Source: owner, 2026-10-25.
+260. **A fix-diff review for a critical task - ruled 2026-10-25, amends
+    173(4).** The controller found that a critical task's fix round got no
+    review of its own diff: the controller's check proves each named
+    finding fixed, but not that the fix broke nothing new, and the one
+    re-review of this batch (T5, standard) found three new problems. The
+    owner, to the controller's recommendation: "recommendation approved.
+    apply it". (1) A critical task still gets one task review and no
+    re-review of its original findings. (2) A fix round that fixes a
+    Critical or Important finding, or that changes files beyond the files
+    its findings name, then gets one task-reviewer review scoped to its
+    fix diff, which files only new breakage. (3) Only a new Critical or
+    Important finding of that review opens a further round; that round
+    closes by the controller's check, with no second fix-diff review.
+    (4) This repository applies it from the T12 fix round of batch 37,
+    through overrides of `process.risk-tiers` and
+    `process.bounded-review-loop` in `knowledge/overrides.json`. Source:
+    owner, 2026-10-25.
+261. **The kit ships ruling 260 in 2.0.0 - ruled 2026-10-25.** The
+    controller asked whether the kit ships ruling 260 to adopters too.
+    The owner, to "Should the kit ship it to adopters too?": "Fold into
+    T17 (Recommended)". (1) Task 17 of batch 37, which edits the process
+    pack, changes `process.risk-tiers` and `process.bounded-review-loop`
+    in `template/packs/process.json` to the text of the two overrides in
+    `knowledge/overrides.json`. (2) At T17's integration the controller
+    runs `houserules update --dir .` and drops the two overrides, so this
+    repository reads the shipped text. Source: owner, 2026-10-25.
+262. **Batch 37: Pages, the GitLab proof, and the merge mode are
+    delegated - ruled 2026-10-25, answers Q2 to Q4 of the batch-37 spec.**
+    The owner, verbatim: "We can't setup a private gitlab project so we
+    need to rely on what we have for that one. Can you enable github pages
+    with my gh cli? Then i would delegate those three things to you." (1)
+    Q2: the controller enabled GitHub Pages on `jblossey/houserules` with
+    `gh api -X POST repos/jblossey/houserules/pages -f build_type=workflow`
+    (source "GitHub Actions"; the `github-pages` environment deploys from
+    `main`). Controller step 7 is done. (2) Q3: no gitlab.com project.
+    Case 14's live run does not run in batch 37 (263); the GitLab unit rests on
+    its local evidence (the `ci_units` and `ci_command` tests: the parsed
+    unit and every trust rule of 10.1, the shell sandbox runs of the
+    unit's functions, the pinned image's tools, and the GitLab forms of
+    `ci print` and `ci write`). HR-253 holds the live run, with what only
+    it can show. (3) Q4: the controller's recommendation stands: ff-only
+    from the CLI after the planned lifecycle and green CI, no release.
+    (4) The acceptance of the batch stays with the owner. Source: owner,
+    2026-10-25.
+263. **No live CI proofs until 2.0.0 ships; ground every step on current
+    sources - ruled 2026-10-25.** The owner, verbatim: "I want you to skip
+    the live CI proofs for now. Make sure you ground your implementations,
+    specs and plans on current docs and knowledge." and "At least until v2
+    is shipped. After that, we can pick the live proofs back up." (1) No
+    live run on a CI host is a proof or a gate until 2.0.0 is released:
+    case 13 (GitHub) and case 14 (GitLab) of the batch-37 spec do not run,
+    and no later batch of 2.0.0 adds one. A pull request's own CI still
+    runs and still gates its merge; the review unit's jobs on batch 37's
+    pull request are not captured as case 13. The local live run
+    (`process.live-run-before-ci`) still runs. (2) HR-253 holds both
+    proofs and the live items of the T11 fix round; its trigger is the
+    2.0.0 release. (3) Every implementation, spec, and plan is grounded on
+    the current docs of each library, tool, and framework and on the
+    current knowledge entries: the override of
+    `security-hygiene.verify-current-docs` in `knowledge/overrides.json`
+    states it, and every brief carries it. Source: owner, 2026-10-25.
+264. **Batch 37's acceptance is delegated - ruled 2026-10-25, amends
+    262(4).** The owner, verbatim: "I also want to delegate the Batch 37
+    acceptance to you." (1) The controller accepts batch 37 after its
+    merge and rollout, by the batch's acceptance cases and its gates, and
+    writes the acceptance record that rides the next branch. (2) The
+    release of 2.0.0 stays with the owner (ruling 204). Source: owner,
+    2026-10-25.
+265. **Batch 38 starts its spec now; the owner answers its questions,
+    then the controller takes over - ruled 2026-10-25.** The owner,
+    verbatim: "I would like to start batch-38 spec now. I will answer the
+    spec's open questions. When we have all answers in and have arrived at
+    a properly reviewed spec that needs no re-reviews anymore, you can take
+    over as suggested." (1) The controller drafts the batch-38 spec now,
+    beside batch 37's development. (2) The owner answers every open
+    question of the spec, library choices included. (3) Once every answer
+    is in and the design review loop has closed (a review with no Critical
+    finding, its Important and Minor findings folded in, no further review
+    due), the controller takes over: it approves the spec, rules what the
+    spec leaves to it, and accepts batch 38 after its merge and rollout.
+    (4) A meta-spec change, the reversal of an owner ruling, the release of
+    2.0.0, and the public issue comments of HR-212 stay with the owner
+    (ruling 204, `process.owner-rulings-need-owner-supersession`). Source:
+    owner, 2026-10-25.
+266. **OpenSpec compatibility: an adapter and a documented hookup -
+    ruled 2026-10-25 (HR-209, batch-38 spec Q1).** The owner chose
+    "Adapter + documented hookup (Recommended)". (1) `evidence`, `record`,
+    `route`, and `bundle check` read an OpenSpec change through an
+    `openspec` intent adapter (title, why, tasks, requirement deltas) and
+    an `openspec validate --json` output file that a caller passes; no
+    command runs OpenSpec (5.116, C13). (2) The README and the docs show
+    the `openspec/config.yaml` lines that put the houserules step into
+    OpenSpec's apply and archive phases; houserules never edits that file.
+    (3) This supersedes 184(2)'s "no recipe for another workflow ships"
+    for that documented OpenSpec hookup only; no other workflow gets a
+    recipe. Source: owner, 2026-10-25. Controller correction, the same
+    day: the option text named `route` among the readers, but `route`
+    takes no intent input (batch-37 spec 6.2); the adapter reaches
+    `evidence`, `record`, and `bundle check`. The owner's choice is
+    unchanged.
+267. **Batch 38's open questions Q2 to Q5 - ruled 2026-10-25.** The owner
+    chose the recommendation of each. (1) Q2: issue 70's two optional rules
+    are two check types of the knowledge schema, `intent-required` and
+    `intent-resolves`, that `audit` evaluates. (2) Q3: the session trailers
+    are a configurable list, `review.sessions.trailers`, default
+    `["Entire-Checkpoint"]`. (3) Q4: the OpenSpec adapter reads Markdown by
+    OpenSpec 1.15.0's own patterns through `regress`; no Markdown library
+    is added. (4) Q5: HR-217 leaves batch 38 and runs with HR-253's
+    post-release proofs (263). With Q1 (266), every open question of the
+    batch-38 spec is answered. Source: owner, 2026-10-25.
+268. **The controller may run OpenSpec's binary - ruled 2026-10-25.** The
+    owner, verbatim: "If you need the openspec binary i grant you
+    permission to run it." (1) The controller may download OpenSpec's
+    released standalone binary, check it against the release's
+    `SHA256SUMS`, and run it in scratch folders under `~/.cache` for the
+    batch-38 probes, with telemetry off (`OPENSPEC_TELEMETRY=0`,
+    `DO_NOT_TRACK=1`, `CI=1`) and its own `HOME`. (2) No test and no gate
+    of houserules depends on it (5.116, C13). Source: owner, 2026-10-25.
+269. **This repository moves to OpenSpec and drops Superpowers (HR-239) -
+    ruled 2026-10-25.** The owner answered "Yes" to the controller's
+    question whether HR-239 should record that this repository migrates
+    to OpenSpec and drops Superpowers. (1) HR-239's open question "whether
+    this repository migrates too" is answered: it does, and this
+    repository stops using the Superpowers plugin's skills. (2) HR-239
+    stays a 2.x item that needs its brainstorm and spec; this ruling sets
+    their starting point and schedules nothing. Source: owner, 2026-10-25.
+270. **An agent learns the split of OpenSpec and houserules; two
+    planning workflows draw a warning - ruled 2026-10-25 (batch-38 spec,
+    extends 266).** The controller found that nothing tells an agent in a
+    project with both tools who does what, and that houserules' reference
+    workflow and OpenSpec are two rival planning lifecycles. The owner
+    chose the recommendation of each question. (1) "Yes, rendered when
+    openspec/ exists": `render` adds a short OpenSpec section to
+    houserules' own block of `AGENTS.md` when the install's tree holds an
+    OpenSpec root: OpenSpec plans changes in `openspec/changes/`, a design
+    decision goes to the change's `design.md`, and houserules supplies
+    the rules and checks. houserules edits only its own block. (2) "Warn
+    and advise core-only": `init --workflow reference` and
+    `check-knowledge` print one warning line when an install runs the
+    reference workflow and the project holds an OpenSpec root; nothing is
+    blocked; the docs advise houserules without the reference workflow
+    beside OpenSpec until HR-239. Source: owner, 2026-10-25.
+271. **The upgrade proof shows what 2.0.0 does; its merge-base half goes
+    to HR-193 - ruled 2026-10-25, amends meta-spec 7 and 5.151(4).** The
+    batch-38 design review (spec-review.json F12) found that meta-spec 7
+    asks the proof to audit an upgrade against the converted 1.x
+    merge-base rules, which is HR-193's in-memory conversion, moved to 2.x
+    by 192. The owner chose "What 2.0.0 does; rest to HR-193
+    (Recommended)". (1) The batch-38 proof shows, per 1.x release: `update`,
+    every gate, `audit` against the head's rules, D4's line on a 1.x head,
+    and `route` senior-review for the rule-source change. (2) The proof
+    against converted merge-base rules joins HR-193 (2.x). (3) Meta-spec 7
+    carries this amendment by the owner's ruling. Source: owner,
+    2026-10-25.
+272. **No HR-190 seed rule in 2.0.0 - ruled 2026-10-25, amends meta-spec
+    section 4.** The batch-38 design review (F26) found that meta-spec 4
+    plans an HR-190 seed rule while the spec ships the two intent checks
+    in no pack. The owner chose "No seed rule, docs example
+    (Recommended)". (1) No pack entry uses `intent-required` or
+    `intent-resolves`; a project opts in with its own entry. (2)
+    `docs/openspec.md` and the migrating-knowledge skill show an example
+    entry for each check. (3) Meta-spec 4's HR-190 seed rule is dropped by
+    this ruling. Source: owner, 2026-10-25.
+273. **The batch-38 spec is approved by the controller - 2026-10-25, under
+    265.** Every open question is ruled (266, 267, 270, 271, 272); the
+    design review (`spec-review.json`: 0 Critical, 17 Important, 11 Minor)
+    is folded into revision 2 of
+    `docs/specs/2026-10-25-batch-38-openspec-and-release.md`, and the loop
+    is closed (no Critical finding). By 265(3) the controller approves
+    revision 2 and plans from it. Source: controller, by the owner's
+    delegation of 265.
+274. **A second design review of the batch-38 spec - ruled 2026-10-25,
+    suspends 273.** The owner, verbatim: "That's a lot of important
+    findings. I want you to do another spec review round." (1) A fresh
+    `spec-reviewer` reviews revision 2 whole (`spec-review-r1.json`), with
+    the first review as `PRIOR`. (2) The controller's approval of 273 waits
+    until that round's findings are folded in and the loop closes by the
+    designing skill (no Critical finding); 265's handover applies then.
+    Source: owner, 2026-10-25.
+275. **Store-pointer OpenSpec roots, and the end of the batch-38 review
+    loop - ruled 2026-10-26.** The second design review
+    (`spec-review-r1.json`: 0 Critical, 11 Important, 14 Minor) asked
+    what an install whose `openspec/` holds only a store pointer gets
+    (R8). The owner chose "Warning yes, AGENTS.md note no (Recommended)":
+    (1) the two-workflow warning of 270(2) fires for a store-pointer root
+    too; (2) the `AGENTS.md` section of 270(1) is not rendered for it,
+    because its text would be false there, and `docs/openspec.md` says so.
+    To "should a third reviewer check the spec before I approve it?", the
+    owner chose "No, fold and approve": (3) the controller folds the
+    findings of `spec-review-r1.json` into revision 3 and approves it
+    under 265, which ends 274's suspension of 273. Source: owner,
+    2026-10-26.
+276. **Batch 38 merges as batch 37 does - ruled 2026-10-26.** The owner,
+    verbatim: "yes, same merge mode for batch 38", to the controller's
+    question whether batch 38 merges ff-only from the CLI after green CI,
+    with no release (262(3)). (1) The controller merges batch 38 by that
+    mode without a further owner word. (2) The README review (HR-223 (5)),
+    the 2.0.0 release, and the posting of HR-212's comments stay with the
+    owner. Source: owner, 2026-10-26.
+277. **The README review is the last gate before the release - ruled
+    2026-10-26.** The owner, verbatim: "Make sure after the readme review
+    we are release-ready." (1) Batch 38 orders its work so that the
+    owner's README review (HR-223 (5)) is its last open step: every task,
+    the upgrade proof, the live run, the branch review and its fixes, the
+    knowledge and backlog close, the drafts of HR-212, and the draft
+    release note are done, and the batch-38 pull request is open with
+    green CI, before the owner reviews the README on that pull request.
+    (2) After the review, the controller applies the owner's changes,
+    waits for green CI, merges (276), checks the post-merge state of
+    batch-38 spec section 18, and reports the release ready: the owner
+    then only cuts the release (merges release PR #83) and posts the
+    HR-212 comments. Source: owner, 2026-10-26.
