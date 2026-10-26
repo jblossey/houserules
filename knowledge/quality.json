@@ -38,7 +38,8 @@
         "Batch-27 retrospective: the surface list for a CLI change includes --help for every touched subcommand and every printed receipt line; run the command and read its own output as a user before closing the task. Both batch-27 instances were surfaces the implementer never re-read after the behavior moved (update's about text; a receipt line update never prints).",
         "When a configuration key gains a second consumer, sweep the texts that define the key, not only the texts of the command that changed (batch 28: `overrides` also decides which kit-owned files check-knowledge reads, and the seeded docs/README.md that defines the key was outside the sweep).",
         "When a change alters which inputs reach an existing error path, re-read every message on that path with the new inputs and name each case. A message that misstates the cause for a newly reachable input is a contract defect, even when the refusal is right (batch 32 task 1: `unknown id` for a known controller entry).",
-        "Every printed line of a command has a test that pins it whole, and every help sentence that names a condition is tested against each state of that condition."
+        "Every printed line of a command has a test that pins it whole, and every help sentence that names a condition is tested against each state of that condition.",
+        "A command task pins each printed line from the spec file with a test that reads the spec, as `the_spec_lines_of_these_tests_are_in_the_spec` (`tests/ci_command.rs`) does, and the spec is amended before that test commit (batch 37: twelve tasks failed this rule)."
       ],
       "tags": [
         "cli",

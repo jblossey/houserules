@@ -56,7 +56,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [security-hygiene.dependency-vetting] Verify every new dependency is well-maintained before adding it. Record the check in the task report's `dependency_vetting` field.
 - [security-hygiene.exact-pins] Pin exact versions. Install only with a CLI (`cargo add <crate>@=<version>`, `pnpm add --save-exact`). Never write a version number by hand.
 - [security-hygiene.no-coauthor] Never add a co-author, session, or tool-attribution line to any commit or pull request description.
-- [security-hygiene.verify-current-docs] Verify every library, tool, and framework API against current docs before use. Internal knowledge is stale.
+- [security-hygiene.verify-current-docs] Ground code, specs, and plans on the current docs of each library, tool, and framework and on the current knowledge entries. Internal knowledge is stale.
 - [writing-style.code-comments] Write a code comment only for a current constraint the code cannot show. Never narrate history in code; git, the specs, and the knowledge base hold it.
 - [writing-style.doc-comments] Document every exported symbol with the language's doc-comment convention: the current contract. Name things so the code reads without comments.
 - [writing-style.principles] Write docs, comments, commit messages, and reports in ASD-STE100 style: short sentences, active voice, one instruction per sentence, concise.

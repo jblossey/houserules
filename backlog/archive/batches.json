@@ -537,6 +537,49 @@
         "state": "done",
         "text": "All nine tasks, the eval run, the live run, and the branch review closed on 2026-10-22; the owner kept the night decisions (design.md 206); ff-only merge per design.md 198, no release."
       }
+    },
+    {
+      "number": 36,
+      "items": [
+        "HR-171",
+        "HR-197",
+        "HR-057",
+        "HR-158",
+        "HR-141",
+        "HR-148",
+        "HR-204",
+        "HR-226",
+        "HR-227",
+        "HR-228",
+        "HR-229",
+        "HR-230",
+        "HR-232",
+        "HR-235"
+      ],
+      "summary": "2.0.0: evidence and report claims - capture and evidence by reference with byte-exact excerpts, generated report facts, and the citation checks.",
+      "kickoff": "the owner's rulings of 2026-10-15 (design.md 5.97 to 5.102) and the meta-spec docs/specs/2026-10-15-release-2-0-0-meta-spec.md",
+      "status": {
+        "state": "done",
+        "text": "Done 2026-10-23: captures and report facts in task reports, check-report-claims checks 1 to 11, the batch-35 deferrals, HR-235; design.md 209 to 226. Merged ff-only without a release (design.md 208, 216(2)); the archive sweep waits for the acceptance."
+      }
+    },
+    {
+      "number": 37,
+      "items": [
+        "HR-179",
+        "HR-185",
+        "HR-186",
+        "HR-192",
+        "HR-187",
+        "HR-245",
+        "HR-246"
+      ],
+      "summary": "2.0.0: the per-change review layer - the PR evidence bundle and packet, review tiers, the change record, and versioned schemas for the documents 2.0 emits.",
+      "kickoff": "the owner's rulings of 2026-10-15 (design.md 5.97 to 5.102) and the meta-spec docs/specs/2026-10-15-release-2-0-0-meta-spec.md",
+      "status": {
+        "state": "done",
+        "text": "Batch 37 closed 2026-10-26: 20 tasks, the eval run, the local live run, the branch review and its fix wave. It merges ff-only after green CI (design.md 262), and the controller accepts it after the merge (design.md 264)."
+      }
     }
   ]
 }

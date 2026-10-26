@@ -165,6 +165,7 @@
       "summary": "A command the harness refuses is never run another way: no script, no wrapper. The agent stops that step, names it in its report, and hands it back.",
       "body": [
         "The person who runs the work then runs the step in their own session, or asks the owner. A live run that needs a refused command, such as git in a scratch repository, goes back the same way.",
+        "Another way includes a shell glob or a variable that spells the refused command or its path differently, a script, and a wrapper.",
         "Every brief carries this rule. A report that discloses a wrapped refused command is a review finding, and its captures count as unverified until the step is re-run by the person who runs the work.",
         "One handed-back step the controller takes over: a `git commit` that the harness refused an agent in the agent's own worktree. The controller commits the agent's staged change with the message the agent wrote, then lets the agent finish its step (owner, 2026-10-21: \"you should take over the committing because you are allowed to\")."
       ],

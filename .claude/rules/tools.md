@@ -13,6 +13,8 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [houserules.actions-pinned-by-sha] Pin every workflow `uses:` to a full commit SHA, version tag as a comment; the Actions policy rejects a tag ref; release.yml pins live in dist-workspace.toml.
 - [houserules.dev-tools-are-rust-native] Dev tooling is a cargo bin under crates/houserules/src/bin/; never a new Node script.
 - [houserules.release-workflow-is-generated] release.yml is generated from dist-workspace.toml; never hand-edit it — edit the config and run `dist generate` (`dist generate --check` is the gate).
+- [houserules.shell-readers-share-the-locale-of-the-rust-reader] A shell text reader that must agree with a Rust reader runs under LC_ALL=C, and one test feeds both readers the same input.
+- [houserules.tool-free-jobs-build-outside-the-request-tree] A job that must run no request code builds from a folder with no request file above it: cargo and rustup read config files from every folder above the source.
 - [process.wiring-checks-run-the-resolution] A trigger, pin, or wiring check runs the resolution end to end - feed the produced value to its consumer; a string, glob, or schema match proves nothing.
 - [quality.selecting-steps-walk-the-states-of-what-they-select] Walk a step that selects a resource and acts on it through each state the resource can have when read: gone, merged, failing, edited, stale in the listing.
 

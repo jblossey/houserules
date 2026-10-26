@@ -404,7 +404,8 @@
           "A ledger note may accompany a ruling; it never substitutes for the tracked write.",
           "A dispatch deviation from the spec's process line (model, order, gate) is a ruling: amend that spec line in the same turn. The batch report at the tick repeats it; it does not replace it.",
           "An accepted implementer deviation is a ruling. Home it (a spec amendment or a backlog item) in the turn it is accepted, before the next dispatch.",
-          "A code comment is not a home file: a sanctioned deviation homes in the spec's deviations section or the design record the turn it is accepted; the comment may cite that home, never substitute for it (batch 16 task 4)."
+          "A code comment is not a home file: a sanctioned deviation homes in the spec's deviations section or the design record the turn it is accepted; the comment may cite that home, never substitute for it (batch 16 task 4).",
+          "A ruling that amends one sentence of the spec re-reads every other sentence of the spec on the same behavior and amends each one that the ruling contradicts (batch 36: spec 8.5 against case 9)."
         ],
         "tags": [
           "rulings",
@@ -496,7 +497,8 @@
           "An input the gate cannot read is a named, fatal error, never a continue: the silent-skip version under-counted and passed a seeded violation hiding behind a rename. A readable-but-binary input may be a counted, printed skip.",
           "A gate's file list comes from the authoritative set (git-tracked files, never the working directory); every finding names which derivation decided it; every skip is counted and printed on every branch, including the one where the primary derivation returns nothing; and an enumeration feeding a closure claim fails loudly on input it cannot read (batch 21 T1/T2 arcs).",
           "A gate that needs a toolchain component derives that need from declared configuration (mise.toml tools, lockfiles), never from what the authoring machine happens to have installed; prove a new gate on a runner shaped like CI's fresh declared install (batch 21 branch-fix: a lint step green only on a hand-added rustup target no tracked file declared).",
-          "Every hand-kept enumeration inside a gate ships with a derivation test that recomputes it from the subject (batch 25: the keyword set derived from the engine's own source, the lint-array pin from mise.toml, the exclusion lists reached by the vacuousness gate)."
+          "Every hand-kept enumeration inside a gate ships with a derivation test that recomputes it from the subject (batch 25: the keyword set derived from the engine's own source, the lint-array pin from mise.toml, the exclusion lists reached by the vacuousness gate).",
+          "A test that lists files of the tree derives the list from `git ls-files` and states each exclusion (batch 37: T1, T3, T14, T17)."
         ],
         "tags": [
           "gates",
@@ -560,10 +562,10 @@
           "DRY once logic has two real call sites: never leave a copy that can drift (shared constants, option factories, one write path). One call site is not yet duplication.",
           "Prefer a well-maintained library (vetted, exact-pinned) to a custom implementation of a solved problem: parsing, validation, globbing, dates, retries. A standing project decision may rule an exception; record it as an entry.",
           "One responsibility per file and per function. Each unit boundary is one a reader can understand without its internals.",
-          "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test.",
           "A dedicated compliance pass over the existing codebase is its own backlog item; new code complies immediately.",
           "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test; an auto-restore setting covers only spies, so a mock created in a module-mock factory gets its own explicit afterEach reset.",
-          "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided (batch 16: the glob translator missed nested braces and panicked; the regex scan flipped four verdicts against V8)."
+          "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided (batch 16: the glob translator missed nested braces and panicked; the regex scan flipped four verdicts against V8).",
+          "Shared integration-test helpers live in the support modules of `crates/houserules/tests/` (`ls -d crates/houserules/tests/*support* crates/houserules/tests/common` lists them). A test uses the helper that a module holds and never copies it; a new shared helper goes into a module."
         ],
         "tags": [
           "quality",
@@ -632,7 +634,8 @@
           "Instructions that branch on host or environment enumerate every branch as shipped text, and the reviewer walks each arm live (batch 25: the non-GitHub origin and the hook-vs-attribution arms).",
           "Batch-27 retrospective: a seed-once file's instruction set is keyed to an enumerated field with three values - absent, present-generic, present-with-own-content; an instruction written for one names what holds for the other two. The batch-27 instance was the untested third state (own CLAUDE.md content, no AGENTS.md, reached by update's backfill).",
           "A printed remedy is an instruction: list the states that reach the finding and follow the line as printed in each; a state the line cannot clear gets its own arm or a named limit (batch 28: the task review found one such state of the citation lint's remedy, an unseeded id in a kept file; the branch review found two more, an archived entry the adopter wants retired and an adopter topic name).",
-          "A ruling with a named set of outcomes states the count in every text that lists them ('one of three ways'), so a grep for the count finds a text that lists fewer (batch 32 task 2: a contested finding had three outcomes, and two texts named two)."
+          "A ruling with a named set of outcomes states the count in every text that lists them ('one of three ways'), so a grep for the count finds a text that lists fewer (batch 32 task 2: a contested finding had three outcomes, and two texts named two).",
+          "A counting or selection rule that the template, the pack, and the spec state has one wording in all three, and one test reads all three (batch 37, T10 and T17)."
         ],
         "tags": [
           "templates",
@@ -665,7 +668,18 @@
           "docs",
           "dependencies",
           "ruled-keep"
-        ]
+        ],
+        "summary": "Ground code, specs, and plans on the current docs of each library, tool, and framework and on the current knowledge entries. Internal knowledge is stale.",
+        "body": [
+          "Use a docs source that is current (a docs MCP such as context7 when available, or the official documentation site). Record what you verified in the report's `docs_verified`.",
+          "A spec or a plan labels each fact about a tool or a library with the doc it read and the date (`process.design-claims-are-labelled`). A brief names the verification that the author of the change runs, never a remembered API.",
+          "Read the knowledge entries, skills, and rulings that a step needs from the tree in the same turn. A copy read earlier in a session, or a summary of one, is not current."
+        ],
+        "source": {
+          "date": "2026-10-25",
+          "by": "user",
+          "ref": "design.md 263"
+        }
       }
     },
     {
@@ -704,6 +718,16 @@
           "comments",
           "naming",
           "ruled-keep"
+        ],
+        "body": [
+          "A doc comment states what the item is for, its invariants, and what it returns or raises when the signature does not say so. It never restates the signature.",
+          "Conventions: TSDoc in TypeScript, JSDoc in JavaScript, rustdoc in Rust, docstrings in Python — the language's standard form.",
+          "Self-documenting code first: full words, verbs for functions, `is`/`has` for booleans, no abbreviation a newcomer must decode, one meaning per name. A comment that explains a name means the name is wrong.",
+          "Comments inside a body still follow writing-style.code-comments: only for a constraint the code cannot show.",
+          "A doc comment stating a behavior ('returns tracked files', 'exits 0 on clean') is a claim under process.claims-match-artifacts - re-read it against the symbol at HEAD in the same pass that edits the symbol.",
+          "A rewrite re-resolves, in the same commit, every cross-reference to a section, file, or symbol it deletes or renames; the dangling-cross-reference class recurs whenever a rewrite skips this step.",
+          "A new caller re-opens the callee's doc comment and confirms that it still states the contract the caller relies on.",
+          "A doc comment that counts or enumerates its callers or items ('the three items', 'the one module') names the command that lists them, so that a reviewer can re-run it."
         ]
       }
     },
@@ -715,6 +739,23 @@
           "authoring",
           "fidelity",
           "ruled-keep"
+        ],
+        "body": [
+          "Invented claims read plausibly; that is what makes them dangerous.",
+          "When two sources disagree, read the code and record which one the entry follows.",
+          "A shipped template or seed names no root-only id, path, or command; verify every reference resolves in a fresh install before syncing the root copy.",
+          "Run every command block you ship exactly as printed, top to bottom, in the environment the reader will have (a fresh directory for a quick start). A block that needs unstated context, or that resolves differently than printed (an unpinned git spec), fails this rule.",
+          "The walk includes a control: when a line looks optional, re-run the block without it and confirm the block then fails - that proves the line load-bearing instead of decorative.",
+          "A sweep keyed on one name for a subject misses a claim keyed on a different, surviving spelling of the same subject; sweep for the claim's SUBJECT, not just the name a prior sweep happened to use.",
+          "A corrected measurement sweeps its dependents: when a sentence is corrected, re-open every sentence that cites, paraphrases, or leans on it - not only the lines the round edited; antecedents drift when their referent is repaired.",
+          "An amendment re-derives the entry's summary from the amended body before filing - the summary is the half that renders into the loaded rules files, so a stale summary ships wider than the body it contradicts.",
+          "Before shipping a uniqueness or attribution sentence ('the only', 'caused by'), run the enumeration that would falsify it against the tree at HEAD.",
+          "A rewritten doc comment is teaching prose under this rule: re-derive caller counts, uniqueness claims, and cross-references from the tree at the revision under edit, never from the pre-rewrite text or another agent's summary.",
+          "Prose stating an invariant about commit history ('always', 'never', 'by the time it reaches main') enumerates every author class that writes such commits - bot-authored release and dependency commits included.",
+          "When a commit closes a tracked item, grep the tracked docs for that item's id in the same commit: the closing commit owns every sentence that scheduled the work.",
+          "A premise about a third-party platform is a claim: quote the page's own sentence before a brief, a spec, or an entry restates it.",
+          "The sweep for a corrected fact is a grep for the fact's key nouns over the tracked tree and the project's work documents, in the commit that corrects the fact.",
+          "A sentence that denies a behavior ('no command talks to the host') names each exception that the code holds (batch 37 branch review: the GitHub tracker runs gh)."
         ]
       }
     },
@@ -741,6 +782,16 @@
           "docs",
           "readme",
           "ruled-keep"
+        ]
+      }
+    },
+    {
+      "id": "security-hygiene.dependency-vetting",
+      "fields": {
+        "body": [
+          "Check recent releases, commit activity, and issue responsiveness.",
+          "Outdated, stale, or abandoned dependencies are a no-go.",
+          "A crate that enters only the lockfile gets the same check: its repository's recent releases, commit activity, and issue responsiveness, not the registry data alone."
         ]
       }
     }

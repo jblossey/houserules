@@ -5,7 +5,9 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 ### Rules
 
+- [houserules.commit-bound-documents-read-the-commit] A document that names a commit reads every input from that commit through git, never from the working tree.
 - [houserules.controller-gates-use-the-tree-binary] While the branch changes generated output, run controller gates and update/render through the tree binary, never the installed houserules.
+- [houserules.published-documents-carry-their-schema] Each published document carries its schema id and version, and a schema change takes the version step that its effect on documents names.
 - [quality.absence-is-designed] Render an absent value in user-facing output as a designed token; never let a raw undefined, null, or empty slot reach the user.
 
 ### Invariants

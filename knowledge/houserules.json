@@ -358,7 +358,8 @@
         "Absence stays tolerated exactly as the JS tolerates it; the named-error contract covers present-but-malformed data and compile failures. One stderr line naming the data, exit 2 for load/usage arms; a named finding row where the surface reports findings.",
         "In a parity port, name an error arm only where the reference engine itself errors — measure the reference first (batch 18 T3: merge_settings named two arms the frozen JS seeds cleanly, because the JS's ??= replaces null; the fix re-measured both engines and mirrored).",
         "Two recurring shapes count as reproduced crashes (batch 22 T1/T2, each filed twice before landing): a synthesized io::Error replacing the operating system's own error text, and a silent skip of an unreadable directory entry. Report the OS's error verbatim; only NotFound is tolerable absence.",
-        "A fallible call added in front of an existing named failure arm is a new arm. List every `?` and `map_err` of the touched function and show the line each arm prints, in the same commit (batch 28 task 2: `current_dir()?` placed ahead of the git call printed a bare OS error from a removed working directory)."
+        "A fallible call added in front of an existing named failure arm is a new arm. List every `?` and `map_err` of the touched function and show the line each arm prints, in the same commit (batch 28 task 2: `current_dir()?` placed ahead of the git call printed a bare OS error from a removed working directory).",
+        "A command that wraps a git failure prints git's own `fatal:` or `error:` line, never a notice that git prints before it (`review/record/notes.rs`), and a reader that cannot tell a count from a missing history says so (`review/record/range.rs`; batch 37, T9 and T10)."
       ],
       "tags": [
         "rust",
@@ -516,7 +517,7 @@
       "standing": false,
       "summary": "A task-end gate run includes every check CI runs on push or pull request; a local gate list that omits a CI check is stale.",
       "body": [
-        "The contract surface is the gate list that CI runs: the jobs in `.github/workflows/ci.yml` and the `lint` and `test` tasks in `mise.toml`. A task-end gate run covers every check on it: a mingw-w64 C compiler installed first (`gcc-mingw-w64-x86-64`, needed once a `-sys` crate landed, houserules.c-toolchain-crates-need-ci-mingw), cargo fmt --check, the full suite, clippy, the windows-gnu cross-target clippy with `-D warnings`, the lint chain (shellcheck, cargo deny, both knowledge gates, render --check, the residue gate, the vacuous-exception gate, the payload-stamp gate, the dist-generate-check gate), and -- pull-request only -- a check-commit range pass (`houserules check-commit --from $(git merge-base main HEAD) --to HEAD`, ci.yml's own check-commit job) and a knowledge-base audit of the diff (`mise run audit -- --base <PR base> --head <PR head>`).",
+        "The contract surface is the gate list that CI runs: the jobs in `.github/workflows/ci.yml` and the `lint` and `test` tasks in `mise.toml`. A task-end gate run covers every check on it: a mingw-w64 C compiler installed first (`gcc-mingw-w64-x86-64`, needed once a `-sys` crate landed, houserules.c-toolchain-crates-need-ci-mingw), cargo fmt --check, the full suite, clippy, the windows-gnu cross-target clippy with `-D warnings`, the lint chain (shellcheck, cargo deny, both knowledge gates, render --check, the residue gate, the vacuous-exception gate, the payload-stamp gate, the dist-generate-check gate), the published-schemas gate (`gen-schemas --check`, which ci.yml's `checks` job runs as `cargo run --quiet --bin gen-schemas -- --check`), and -- pull-request only -- a check-commit range pass (`houserules check-commit --from $(git merge-base main HEAD) --to HEAD`, ci.yml's own check-commit job) and a knowledge-base audit of the diff (`mise run audit -- --base <PR base> --head <PR head>`).",
         "Derive the list from .github/workflows and mise.toml, not from memory and not from an earlier report's account of the gates; when CI gains a check, the task-end list gains it in the same change. How a report narrates the gates it ran is a deliverable matter outside this rule: judge it under process.claims-match-artifacts.",
         "The check-commit range pass matters most for a per-commit knowledge check: it judges every commit back to the real merge base with main, never only a fix round's own diff, so an omission here is exactly how a per-commit check ships unrun against the range CI actually judges (batch 24 T1 fix round 6: a per-commit co-change check went unrun at CI's own --from until this entry named the job).",
         "Origin: batch 22 T1 - three review rounds closed with cargo fmt --check red at HEAD because no round's gate list named it; CI would have failed the first push."
@@ -650,11 +651,12 @@
       "kind": "procedure",
       "area": "tools",
       "standing": false,
-      "summary": "Prove adopter-facing changes with a throwaway seeded repo: init from the released kit, open a PR, and require the seeded knowledge workflow green end to end.",
+      "summary": "Prove adopter-facing changes with a throwaway repo: init from the released kit, wire the CI with ci write, open a PR, and require the gates green end to end.",
       "body": [
-        "One green PR run proves the installer URL, the binary, and the gates together. Steps (batch 24 close, HR-063): create a private throwaway repository; run houserules init from the RELEASED kit (a downloaded archive, not the dev build); push and open a PR; the seeded knowledge workflow must read the version that init stamped into .houserules.json, curl the installer of that release inside the runner, and pass check-knowledge, check-backlog, and audit. Capture the run JSON and full log into the batch workspace.",
+        "One green pull request run proves the installer URL, the binary, and the gates together. Steps (HR-063): create a private throwaway repository with an `origin` remote; run `houserules init` from the RELEASED kit (a downloaded archive, not the dev build). `init` writes no CI file, so wire the gates next: resolve the commit of the release tag with `git ls-remote https://github.com/jblossey/houserules refs/tags/v<version>`, run `houserules ci write --host github --mode reference --sha <release commit sha>`, and commit the file it creates. Push and open a pull request; the review unit must install the release that its `version` input names and pass `check-knowledge`, `check-backlog`, and `audit`. Capture the run JSON and full log into the batch workspace.",
+        "The procedure runs after the 2.0.0 release (HR-253), because no release before it holds the published units, and design.md 263 skips every live CI proof before that release.",
         "The CLI token usually lacks delete_repo: book the owner's deletion of the throwaway repo in the same turn the proof lands. Never use the tag-pilot checkout for this (houserules.tag-pilot-is-read-only).",
-        "Two facts from the 1.2.0 run (HR-154, 2026-10-02). `init` writes `.github/workflows/knowledge.yml` only when the `origin` remote is GitHub-hosted: create the repository and add the remote before `init`. A run whose stamp names the latest release cannot show which release the install step reads: open a second pull request that edits the stamp to an older release, and require the log line `downloading houserules <that version>`."
+        "Two facts from the 1.2.0 run (HR-154, 2026-10-02) hold for an install that a 1.x release seeded, not for the fresh install of the steps above, because no workflow of a fresh install reads the stamp: the seeded workflow reads the version that `init` stamped into `.houserules.json`, and a run whose stamp names the latest release cannot show which release the install step reads. For such an install, open a second pull request that edits the stamp to an older release, and require the log line `downloading houserules <that version>`. The same check on the unit of 2.0 is a second pull request that sets its `version` input to an older release that the unit accepts (its minimum is 2.0.0). It runs from the first release after 2.0.0; at the 2.0.0 release no older release is accepted, so skip it then."
       ],
       "tags": [
         "release",
@@ -719,7 +721,7 @@
       "standing": true,
       "summary": "Past 1.0, a CLI command/flag change or a schema constraint change is a breaking change: get an owner ruling and bump the major version.",
       "body": [
-        "The frozen CLI surface: the 20 `Command` variants `crates/houserules/src/main.rs` defines, enumerated by the `no_subcommand_carries_a_long_about_beyond_its_short_one` test (`cargo test --bin houserules no_subcommand_carries_a_long_about_beyond_its_short_one`, asserts the count) and captured verbatim by `cargo run --release --quiet --bin houserules -- --help`.",
+        "The frozen CLI surface: the 29 `Command` variants `crates/houserules/src/main.rs` defines, enumerated by the `no_subcommand_carries_a_long_about_beyond_its_short_one` test (`cargo test --bin houserules no_subcommand_carries_a_long_about_beyond_its_short_one`, asserts the count) and captured verbatim by `cargo run --release --quiet --bin houserules -- --help`.",
         "The frozen schema surface: `knowledge/schema.json`, `template/knowledge/schema.json`, `backlog/schema.json`, `template/backlog/schema.json`, `.claude/schemas/deliverables.json`, and `template/.claude/schemas/deliverables.json` -- their constraints, not a prose restatement of them. `git rev-parse HEAD:<path>` pins each copy to its blob id at the freeze; design.md 5.82 carries the six ids.",
         "Adding, removing, or renaming a subcommand or flag, or tightening or loosening a required field, an enum, a textList floor, or an id-shape pattern in any of the six schema files needs an owner ruling and a major-version bump, never a patch or minor release.",
         "Widening a positional argument's arity (one value to one or more) adds, removes, and renames no subcommand or flag and leaves every existing call unchanged: it is not a surface change (design.md 5.91, owner 2026-10-09).",
@@ -1117,7 +1119,8 @@
       "summary": "A comment in crates/ names no review round, task review, or batch event; a warn check flags the history phrases beside the judged code-comments rule.",
       "body": [
         "`writing-style.code-comments` stays a judged rule as a whole (design.md 177(4)); this entry carries the deterministic part only, as a warn check on changed Rust files. An entry with a check gets a deterministic row in place of a judged one, so the check lives here, not on the judged rule (batch-35 spec 9 (3)).",
-        "The pattern matches `//` comments that name a fix round, a numbered round of review, a task review, or a batch and task (`Batch 35, Task 2`, `this batch`, `plan Task 9`). Git, the specs, and the knowledge base hold that history."
+        "The pattern matches `//` comments that name a fix round, a numbered round of review, a task review, or a batch and task (`Batch 35, Task 2`, `this batch`, `plan Task 9`), and two phrases that narrate a change (`now read-only`, `confirmed on this box`). Git, the specs, and the knowledge base hold that history.",
+        "`no longer` and `used to` stay with the judged review: most of their matches in crates/ state a current contract (design.md 227)."
       ],
       "tags": [
         "comments",
@@ -1127,7 +1130,7 @@
       "source": {
         "date": "2026-10-22",
         "by": "review",
-        "ref": "batch-34 branch re-review retrospective; batch-35 spec 9 (3), HR-219 (3), HR-204 item 8"
+        "ref": "batch-34 branch re-review retrospective; batch-35 spec 9 (3), HR-219 (3), HR-204 item 8; batch-36 branch review retrospective, design.md 227"
       },
       "see": [
         "writing-style.code-comments"
@@ -1138,7 +1141,7 @@
         "files": [
           "crates/**/*.rs"
         ],
-        "pattern": "//.*\\b([Ff]ix round [0-9]|[Rr]ound [0-9] (parsed|called|of)|Task [0-9]+ review|review \\(batch [0-9]+|batch [0-9]+ Task [0-9]+:|[Bb]atch[ -][0-9]+,? Task [0-9]+|this batch\\b|plan Task [0-9]+)",
+        "pattern": "//.*\\b([Ff]ix round [0-9]|[Rr]ound [0-9] (parsed|called|of)|Task [0-9]+ review|review \\(batch [0-9]+|batch [0-9]+ Task [0-9]+:|[Bb]atch[ -][0-9]+,? Task [0-9]+|this batch\\b|plan Task [0-9]+|now (read-only|quoted|shared|gone)\\b|confirmed on this box)",
         "scope": "changed"
       }
     },
@@ -1161,6 +1164,111 @@
         "date": "2026-10-23",
         "by": "review",
         "ref": "batch 36 branch review, uncovered finding of the T1 review"
+      }
+    },
+    {
+      "id": "houserules.published-documents-carry-their-schema",
+      "kind": "rule",
+      "area": "cli",
+      "summary": "Each published document carries its schema id and version, and a schema change takes the version step that its effect on documents names.",
+      "body": [
+        "An added optional field is a minor version. A removed or renamed field, a new required field, or a narrower type is a major version. A change of the schema text that changes no document, such as a generator update, is a patch version.",
+        "The CLI's major version rises only when a schema that it emits by default takes a major version (design.md 5.117, 5.146(1)). The read schemas, the commands, and the flags follow D2 (design.md 5.146(2)).",
+        "`schemas/published.json` lists each published file with its SHA-256, and a test fails a listed file whose bytes differ: a published version never changes (spec 9.4 of batch 37)."
+      ],
+      "tags": [
+        "schema",
+        "versioning",
+        "published"
+      ],
+      "source": {
+        "date": "2026-10-25",
+        "by": "docs",
+        "ref": "design.md 236; batch 37 spec 9.5"
+      }
+    },
+    {
+      "id": "houserules.tool-free-jobs-build-outside-the-request-tree",
+      "kind": "rule",
+      "area": "tools",
+      "standing": false,
+      "summary": "A job that must run no request code builds from a folder with no request file above it: cargo and rustup read config files from every folder above the source.",
+      "body": [
+        "Check out the request into a folder of its own and the trusted source beside it or in a temporary folder outside the checkout, and start the build with `cd` into the trusted source; a `--path` alone does not move the lookup of `.cargo/config.toml` and `rust-toolchain.toml`.",
+        "A test runs the build with a fake cargo and a fake toolchain file in the request tree and asserts that neither runs (batch 37, T11: r11-probe-floor-build.txt)."
+      ],
+      "tags": [
+        "ci",
+        "floor",
+        "supply-chain"
+      ],
+      "source": {
+        "date": "2026-10-26",
+        "by": "review",
+        "ref": "batch 37 branch review; task-11-review.json issue 0; design.md 242"
+      }
+    },
+    {
+      "id": "houserules.parsed-git-text-pins-every-setting",
+      "kind": "rule",
+      "area": "rust",
+      "standing": false,
+      "summary": "A reader of git's text pins every setting, attribute source, and variable that changes the parsed text, each with a test; the one input left is named.",
+      "body": [
+        "Enumerate the settings from `git config --list --show-origin` and the `git diff` manual, pin each (`-c <key>=<value>`, `--attr-source`, `GIT_ATTR_NOSYSTEM`, the cleared `GIT_DIFF_OPTS` and pathspec variables), and keep the enumeration in the workspace (batch 37, T4: t4-fix2-git-calls.txt).",
+        "A setting that no option can turn off (`$GIT_DIR/info/attributes`) is a named input of the command's doc comment."
+      ],
+      "tags": [
+        "git",
+        "determinism",
+        "review"
+      ],
+      "source": {
+        "date": "2026-10-26",
+        "by": "review",
+        "ref": "batch 37 branch review; task-4-review.json issues 3 and 4; design.md 255"
+      }
+    },
+    {
+      "id": "houserules.commit-bound-documents-read-the-commit",
+      "kind": "rule",
+      "area": "cli",
+      "standing": false,
+      "summary": "A document that names a commit reads every input from that commit through git, never from the working tree.",
+      "body": [
+        "The packet, the route document, and the change record name `head`; the rules hash, the packs, the marker's `review.ci.files`, and the intent files are read with `git ls-tree`, `cat-file`, and `grep` at that commit (`review/rules_hash.rs`, `review/intent.rs`).",
+        "A test runs the command at a head that is not checked out and asserts the document shows the commit's values (batch 37, T7: review7-repro.sh R2)."
+      ],
+      "tags": [
+        "git",
+        "determinism",
+        "published"
+      ],
+      "source": {
+        "date": "2026-10-26",
+        "by": "review",
+        "ref": "batch 37 branch review; task-7-review.json issue 3"
+      }
+    },
+    {
+      "id": "houserules.shell-readers-share-the-locale-of-the-rust-reader",
+      "kind": "rule",
+      "area": "tools",
+      "standing": false,
+      "summary": "A shell text reader that must agree with a Rust reader runs under LC_ALL=C, and one test feeds both readers the same input.",
+      "body": [
+        "`[[:space:]]`, `[[:alpha:]]`, and `.` widen under a UTF-8 locale in gawk and mawk; `LC_ALL=C` before the call keeps the byte classes that the Rust code matches (batch 37, T8: the `hr_intent` reader of both CI units).",
+        "The parity test (`tests/ci_units_shell/gates.rs`) runs the shell reader and the command over one set of descriptions under C and C.UTF-8."
+      ],
+      "tags": [
+        "shell",
+        "locale",
+        "ci"
+      ],
+      "source": {
+        "date": "2026-10-26",
+        "by": "review",
+        "ref": "batch 37 branch review; task-8-review.json issue 1"
       }
     }
   ]
