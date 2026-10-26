@@ -29,8 +29,9 @@ pub(crate) const PACK_SCHEMA_MAJOR: u64 = 1;
 /// aside before validation. Minor 1 names the `optIn` list and the
 /// `require_trailer`, `exempt_authors`, and `exempt_subjects` fields of a
 /// `commits` check. Minor 2 names the `runner` check type and the `tool`,
-/// `non_empty`, and `covers_ids` fields of a check.
-const PACK_SCHEMA_MINOR: u64 = 2;
+/// `non_empty`, and `covers_ids` fields of a check. Minor 3 names the
+/// `covers` field of a check.
+const PACK_SCHEMA_MINOR: u64 = 3;
 
 /// The text that a pack's `schema` id starts with.
 const PACK_SCHEMA_PREFIX: &str = "houserules/pack@";
@@ -379,12 +380,12 @@ mod tests {
 
     /// The id of every entry that the kit's packs carry, sorted: the 58
     /// seeded entries of release 1.4.0, the two entries that release
-    /// 2.0.0 adds to `knowledge-base`, the opt-in entry and the four
-    /// design-phase entries that it adds to `process`, and the two pin
-    /// entries that it adds to `security-hygiene`. A change to this list
-    /// is a change to a pack's content and needs a version change in
-    /// `KIT_PACK_VERSIONS`.
-    const KIT_IDS: [&str; 67] = [
+    /// 2.0.0 adds to `knowledge-base`, the opt-in entry, the four
+    /// design-phase entries, and the seed rule of the evidence bundle that
+    /// it adds to `process`, and the two pin entries that it adds to
+    /// `security-hygiene`. A change to this list is a change to a pack's
+    /// content and needs a version change in `KIT_PACK_VERSIONS`.
+    const KIT_IDS: [&str; 68] = [
         "knowledge-base.cite-durable-refs",
         "knowledge-base.context-proxy-output-is-lossy",
         "knowledge-base.controller-rules-are-tagged",
@@ -408,6 +409,7 @@ mod tests {
         "process.eval-fixture-procedure",
         "process.evals-rerun",
         "process.every-commit-names-a-work-item",
+        "process.evidence-before-review",
         "process.evidence-outlives-the-session",
         "process.fix-proofs-extend-the-reviewers-run",
         "process.fix-round-verification-record",
@@ -471,8 +473,8 @@ mod tests {
         ),
         (
             "process",
-            "2.0.1",
-            "bd6805c705d5ae96d44b7975b1a8fea4051319dba1d1467638eda4a6be5ea721",
+            "2.1.0",
+            "0484ed819ac249ea82a727021c7cce540d0beccde5f9b2eb82c90918db0a1735",
         ),
         (
             "quality",
@@ -486,8 +488,8 @@ mod tests {
         ),
         (
             "writing-style",
-            "1.0.1",
-            "37288facc38829050413653f66881b64f43167110ed8e9eeb878d4a054d5841a",
+            "1.0.2",
+            "96797a15b1cbf71f274ab45e3f66185c1d2de98247594e43bafa3e3f296e4e55",
         ),
     ];
 
@@ -701,7 +703,7 @@ mod tests {
     }
 
     #[test]
-    fn kit_pack_ids_are_the_1_4_0_ids_plus_the_nine_new_ids_each_once() {
+    fn kit_pack_ids_are_the_1_4_0_ids_plus_the_ten_new_ids_each_once() {
         let mut ids: Vec<String> = kit_packs()
             .iter()
             .flat_map(|pack| pack.entries.iter())
@@ -1052,8 +1054,8 @@ mod tests {
     }
 
     #[test]
-    fn the_embedded_pack_schema_names_minor_2_and_holds_the_check_of_the_knowledge_schema() {
-        assert_eq!(PACK_SCHEMA_MINOR, 2);
+    fn the_embedded_pack_schema_names_minor_3_and_holds_the_check_of_the_knowledge_schema() {
+        assert_eq!(PACK_SCHEMA_MINOR, 3);
         let pack: Value = serde_json::from_str(PACK_SCHEMA).expect("the embedded schema is JSON");
         let knowledge: Value =
             serde_json::from_str(include_str!("../../../template/knowledge/schema.json"))

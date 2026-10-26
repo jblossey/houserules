@@ -54,6 +54,16 @@
 //! never the reachability comparison. Unresolvable is a named error,
 //! never a silent substitution of `base_sha` or any other ref.
 //!
+//! # One lookup, two readers
+//!
+//! The order above is [`CANDIDATES`], and [`found_candidates`] walks it.
+//! [`resolve_default_branch`] takes the tip of the first place that
+//! resolves. `houserules ci` needs a name, for the push trigger of its
+//! GitHub forms, and takes it from the same walk ([`default_branch_name`]):
+//! the name of the first place that resolves and stands for a branch. An
+//! `origin/HEAD` that is no symbolic ref has a tip and no name, so the walk
+//! of `ci` passes it over.
+//!
 //! # False positives this design already excludes
 //!
 //! A content hash, digest, or id that merely looks hex is excluded by
@@ -229,6 +239,104 @@ fn resolve_ref(root: &Path, refname: &str) -> Result<Option<String>, String> {
     Ok(if sha.is_empty() { None } else { Some(sha) })
 }
 
+/// The symbolic ref that a clone sets to the default branch of `origin`.
+const ORIGIN_HEAD: &str = "refs/remotes/origin/HEAD";
+
+/// The places where the default branch is looked for when the marker names
+/// none, in order (this module's own doc has the account of each).
+const CANDIDATES: [&str; 5] = [
+    ORIGIN_HEAD,
+    "refs/remotes/origin/main",
+    "refs/remotes/origin/master",
+    "refs/heads/main",
+    "refs/heads/master",
+];
+
+/// The prefixes of the refs that stand for a branch by name, the target of
+/// `origin/HEAD` included: the part of the ref below one of them is the name.
+const BRANCH_PREFIXES: [&str; 2] = ["refs/remotes/origin/", "refs/heads/"];
+
+/// A place of [`CANDIDATES`] that resolves.
+struct FoundBranch {
+    /// The place: one of [`CANDIDATES`].
+    refname: &'static str,
+    /// The commit at the tip of the branch.
+    sha: String,
+}
+
+impl FoundBranch {
+    /// The name of the branch that the place stands for: the part of its ref
+    /// below `refs/remotes/origin/` or `refs/heads/`. `origin/HEAD` stands for
+    /// the branch it points to, and for none when it is no symbolic ref or
+    /// points elsewhere. The name costs a call of git for `origin/HEAD`, so a
+    /// reader that needs the tip alone does not ask for it.
+    fn name(&self, root: &Path) -> Result<Option<String>, String> {
+        let standing_for = if self.refname == ORIGIN_HEAD {
+            symbolic_target(root, self.refname)?
+        } else {
+            Some(self.refname.to_string())
+        };
+        Ok(standing_for.and_then(|full| {
+            BRANCH_PREFIXES
+                .iter()
+                .find_map(|prefix| full.strip_prefix(prefix))
+                .map(str::to_string)
+        }))
+    }
+}
+
+/// The ref that the symbolic ref `refname` points to; `None` when `refname`
+/// is no symbolic ref. A failure to run git is the operating system's own
+/// text, and any other failure of git is its own line.
+fn symbolic_target(root: &Path, refname: &str) -> Result<Option<String>, String> {
+    let output = super::git::command(root)
+        .args(["symbolic-ref", "--quiet", refname])
+        .output()
+        .map_err(|error| error.to_string())?;
+    match output.status.code() {
+        Some(0) => Ok(Some(
+            String::from_utf8_lossy(&output.stdout).trim().to_string(),
+        )),
+        Some(1) => Ok(None),
+        _ => Err(format!(
+            "git symbolic-ref --quiet {refname}: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )),
+    }
+}
+
+/// The places of [`CANDIDATES`] that resolve, in order. The walk is lazy: a
+/// reader that stops at the first place runs git for that place alone.
+fn found_candidates(root: &Path) -> impl Iterator<Item = Result<FoundBranch, String>> + '_ {
+    CANDIDATES
+        .into_iter()
+        .filter_map(move |refname| match resolve_ref(root, refname) {
+            Ok(Some(sha)) => Some(Ok(FoundBranch { refname, sha })),
+            Ok(None) => None,
+            Err(error) => Some(Err(error)),
+        })
+}
+
+/// The name of the default branch, for a reader that triggers on it by name:
+/// `configured`, the `defaultBranch` of the install marker, when given, else
+/// the name of the first place of [`CANDIDATES`] that resolves and stands for
+/// a branch. A configured name is taken as it is, because a project may
+/// name a branch that the clone does not hold. `None` when nothing names one.
+pub(crate) fn default_branch_name(
+    root: &Path,
+    configured: Option<&str>,
+) -> Result<Option<String>, String> {
+    if let Some(name) = configured {
+        return Ok(Some(name.to_string()));
+    }
+    for found in found_candidates(root) {
+        if let Some(name) = found?.name(root)? {
+            return Ok(Some(name));
+        }
+    }
+    Ok(None)
+}
+
 /// The `defaultBranch` string of the install marker `.houserules.json` in
 /// `root`, which `install::marker` reads; `None` when the marker or the key
 /// is absent. Present but malformed data is one named line, never a silent
@@ -271,17 +379,8 @@ pub(super) fn resolve_default_branch(root: &Path) -> Result<String, String> {
     if let Some(name) = configured_default_branch(root)? {
         return resolve_configured_branch(root, &name);
     }
-    const CANDIDATES: [&str; 5] = [
-        "refs/remotes/origin/HEAD",
-        "refs/remotes/origin/main",
-        "refs/remotes/origin/master",
-        "refs/heads/main",
-        "refs/heads/master",
-    ];
-    for candidate in CANDIDATES {
-        if let Some(sha) = resolve_ref(root, candidate)? {
-            return Ok(sha);
-        }
+    if let Some(found) = found_candidates(root).next() {
+        return Ok(found?.sha);
     }
     Err(
         "durable-sha: cannot resolve the default branch. No origin/HEAD, origin/main, \

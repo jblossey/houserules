@@ -3,7 +3,8 @@
   "bootstrap-sha": "8931962b7b8ec67096cbc614973a9f773a76f096",
   "include-component-in-tag": false,
   "extra-files": [
-    { "type": "json", "path": "/.houserules.json", "jsonpath": "$.version" }
+    { "type": "json", "path": "/.houserules.json", "jsonpath": "$.version" },
+    { "type": "generic", "path": "/ci/gitlab-review.yml" }
   ],
   "plugins": [
     { "type": "cargo-workspace" }

@@ -469,8 +469,8 @@ pub(crate) fn install_backlog_id_pattern(
 
 /// The tail of `init --tracker` that every adapter shares (spec 3.3): writes
 /// the `backlogId` pattern of `tracker` (a deliverables schema in `ownedPaths`
-/// is left alone, spec 3.9) and brings the seeded CI workflow to the content
-/// for `adapter` (spec 4.8). It holds no code of one adapter, so an adapter
+/// is left alone, spec 3.9) and, where the install holds the seeded CI
+/// workflow, brings it to the content for `adapter` (spec 4.8). It holds no code of one adapter, so an adapter
 /// gets both by being built in [`register`]. A tracker that cannot name its
 /// pattern fails the tail before the schema and the workflow are written (C37).
 /// Returns the lines `init` prints.
@@ -595,7 +595,7 @@ mod tests {
     }
 
     /// The tail of `init --tracker` that every adapter shares (spec 3.3)
-    /// writes the `backlogId` pattern of the tracker it gets, and brings the
+    /// writes the `backlogId` pattern of the tracker it gets, and brings a held
     /// seeded CI workflow to the content for the adapter, with no code of the
     /// adapter in it: here the GitHub adapter, and a tracker whose pattern is
     /// no JSON pattern.

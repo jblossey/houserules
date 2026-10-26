@@ -15,8 +15,10 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use percent_encoding::percent_decode_str;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use url::{ParseError, Url};
+
+use crate::published::audit_result::Finding;
 
 /// What a SARIF document must not be: the reasons `parse` refuses it.
 #[derive(Debug, PartialEq, Eq)]
@@ -186,22 +188,6 @@ struct ArtifactLocation {
 struct Region {
     #[serde(default, rename = "startLine")]
     start_line: Option<u64>,
-}
-
-/// One result that counts, as the row of the audit lists it.
-#[derive(Debug, PartialEq, Eq, Serialize)]
-pub(super) struct Finding {
-    /// The file, relative to the install root with `/` separators. A
-    /// location outside the root keeps the fully resolved URI of its base
-    /// when it has one, else the URI as the tool wrote it. `None` for a
-    /// result with no location.
-    pub(super) path: Option<String>,
-    /// The line in `path`; `None` with no path or no region.
-    pub(super) line: Option<u64>,
-    /// The id of the rule, or [`NO_RULE_ID`].
-    pub(super) rule: String,
-    /// The text of the message, or [`NO_MESSAGE`].
-    pub(super) message: String,
 }
 
 /// The rule of a result that names no rule.

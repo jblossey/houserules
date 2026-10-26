@@ -27,6 +27,7 @@ jobs:
       # for.
       - run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
       - run: mise run lint
+      - run: cargo run --quiet --bin gen-schemas -- --check
       # `mise run test` runs the Beads cases and the seeded-workflow cases too:
       # the action installs bd and actionlint from mise.toml with the other tools.
       - run: mise run test

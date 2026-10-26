@@ -44,7 +44,8 @@ fn git(dir: &Path, args: &[&str]) {
 }
 
 /// A scratch repository that a real 1.4.0 `init` seeded. With `github`, the
-/// repository has a GitHub `origin` first, so `init` seeds the CI workflow.
+/// repository has a GitHub `origin` first, so the `init` of 1.4.0 seeds the CI
+/// workflow.
 fn install_1_4_0(github: bool) -> tempfile::TempDir {
     install_1_4_0_with_prefix(github, None)
 }
@@ -242,7 +243,7 @@ fn an_unmodified_1_4_0_install_converts_with_no_override_and_only_the_opt_in_exc
         assert!(path_of(dir.path(), &format!("knowledge/packs/{topic}.json")).is_file());
     }
     let marker = read_json(dir.path(), ".houserules.json");
-    assert_eq!(marker["schema"], json!("houserules/install@2.2.0"));
+    assert_eq!(marker["schema"], json!("houserules/install@2.3.0"));
     assert_eq!(marker["renderers"], json!(["claude"]));
     assert!(marker.get("overrides").is_none());
     assert!(marker.get("ownedPaths").is_none());
@@ -284,7 +285,7 @@ fn an_unmodified_1_4_0_install_converts_with_no_override_and_only_the_opt_in_exc
     );
     assert!(
         lines.contains(
-            &"converted .houserules.json to the install schema houserules/install@2.2.0"
+            &"converted .houserules.json to the install schema houserules/install@2.3.0"
                 .to_string()
         ),
         "{lines:?}"
@@ -335,7 +336,7 @@ fn a_1_x_workflow_the_project_changed_is_kept_and_listed_as_a_hand_step() {
     assert_eq!(fs::read(path_of(dir.path(), WORKFLOW)).unwrap(), changed);
     assert!(
         lines.contains(&format!(
-            "hand step: {WORKFLOW} differs from every workflow that houserules 1.x released, so houserules update kept it; compare it with the workflow that houserules init writes, and merge the rest by hand"
+            "hand step: {WORKFLOW} differs from every workflow that houserules 1.x released, so houserules update kept it; compare it with the seeded workflow of this release, template/.github/workflows/knowledge.yml in the houserules repository, and merge the rest by hand"
         )),
         "{lines:?}"
     );
@@ -700,7 +701,7 @@ fn a_tree_with_knowledge_and_no_marker_needs_the_id_prefix_flag() {
     assert_eq!(output.status.code(), Some(0), "{output:?}");
     let marker = read_json(dir.path(), ".houserules.json");
     assert_eq!(marker["idPrefix"], json!("HR"));
-    assert_eq!(marker["schema"], json!("houserules/install@2.2.0"));
+    assert_eq!(marker["schema"], json!("houserules/install@2.3.0"));
 }
 
 /// This repository's own marker and knowledge files at the base of batch 33
@@ -1083,7 +1084,7 @@ fn init_as_the_line_prints_it_gives_a_fresh_install_with_the_old_prefix() {
         passes(dir.path(), &words);
 
         let marker = read_json(dir.path(), ".houserules.json");
-        assert_eq!(marker["schema"], json!("houserules/install@2.2.0"));
+        assert_eq!(marker["schema"], json!("houserules/install@2.3.0"));
         assert_eq!(marker["idPrefix"], json!(prefix));
         assert!(marker.get("overrides").is_none());
         let skill = ".claude/skills/migrating-knowledge/SKILL.md";

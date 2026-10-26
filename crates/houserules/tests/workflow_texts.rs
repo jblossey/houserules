@@ -23,15 +23,31 @@
 //! files there keep the bytes of earlier releases, which the provenance rule
 //! of spec 4.7 compares and never writes (C42). Five copies of the
 //! orchestrating skill and `entries.json` there name the plugin.
+//!
+//! The template defects of HR-241 (spec 11.1 to 11.5) each have a case: the
+//! description of `issue.backlog` in both copies of the deliverables schema,
+//! the sentence of the two reviewer templates, and the sentences of the
+//! orchestrating and planning skills.
+//!
+//! The per-change review layer of batch 37 reaches the kit texts at the end of
+//! the file: the seed rule of the evidence bundle and the fix-diff review of
+//! a critical task in the process pack, the bundle step of the finishing and
+//! orchestrating skills, the parts of the review layer in the
+//! migrating-knowledge skill and the upgrade guide, and what the README, the
+//! guide, and the knowledge base say about the CI files that `init` writes.
 
 mod guard_lists;
+mod help_support;
+mod tracker_support;
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use guard_lists::{FULL_TIER, PLUGIN_SKILLS, VENDOR_MODELS};
+use help_support::{omits, states};
 use regress::Regex;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 const IMPLEMENTER: &str = ".claude/agents/implementer.md";
 const TASK_REVIEWER: &str = ".claude/agents/task-reviewer.md";
@@ -502,10 +518,10 @@ fn the_orchestrating_skill_has_two_tiers_and_the_critical_task_rule() {
             "A critical task is a task whose change alters the CLI's commands, flags, or output, a schema, authentication or security code, or the data on disk of an install.",
             "The implementer commits those tests first, with one recorded run that shows them failing at `BASE`, then makes them pass.",
             "The evidence is that run and the whole suite passing at `HEAD`.",
-            "one task review on the task reviewer's configured model (default opus), and never a re-review",
+            "one task review on the task reviewer's configured model (default opus). It gets no re-review of its original findings.",
             "you record the check in the ledger (`process.fix-round-verification-record`)",
             "A Critical or Important finding goes to a fresh implementer. You fix a Minor finding yourself.",
-            "The cap on re-reviews per task is the tier's: light 0, standard 1. A critical task gets none.",
+            "The cap on re-reviews per task is the tier's: light 0, standard 1. A critical task gets no re-review of its original findings",
         ],
     );
     let text = package_text(ORCHESTRATING);
@@ -536,10 +552,61 @@ fn the_critical_task_rules_reach_the_implementer_and_the_task_reviewer() {
         &[
             "The tiers are light and standard.",
             "is a critical task, and its `Tier:` line says so",
-            "A critical task gets this one review and no re-review.",
-            "the spec's cases committed first as tests, one recorded run that shows them failing at `BASE`, and the whole suite passing at `HEAD`",
+            "A critical task gets one task review and no re-review of its original findings.",
+            "In the task review, check its evidence: the spec's cases committed first as tests, one recorded run that shows them failing at `BASE`, and the whole suite passing at `HEAD`",
             "Give each of its findings a reproduction, a command and its expected result, that the controller re-runs to verify the fix.",
         ],
+    );
+}
+
+/// Ruling 260 reaches the task reviewer: after a fix round of the kind that
+/// `process.risk-tiers` names, the dispatch asks for one review of the fix
+/// diff, written in the re-review form; a critical task still gets no
+/// re-review of its original findings.
+#[test]
+fn the_task_reviewer_writes_the_fix_diff_review_of_a_critical_task() {
+    assert_holds(
+        TASK_REVIEWER,
+        &[
+            "After a fix round that fixes a Critical or Important finding, or that changes files beyond the files its findings name, the dispatch asks for one review of the fix diff.",
+            "Write it in the re-review form, as `task-<N>-review-r<R>.json` of kind `re-review`: `finding_verdicts` for the findings under verification, and every new problem of the fix diff under `new_breakage`.",
+            "Only a new Critical or Important finding opens a further round, which closes by the controller's check, with no second fix-diff review.",
+        ],
+    );
+    assert_lacks(
+        TASK_REVIEWER,
+        &[
+            "this one review and no re-review",
+            "A critical task gets this one review",
+        ],
+    );
+}
+
+/// Step 9 of the task reviewer says that the `mutation` row that step 7 asks for
+/// does not apply to a critical task: the evidence of a critical task is its one
+/// recorded run at `BASE` and the whole suite at `HEAD`, and the fix-diff review
+/// files no missing mutation row against it.
+#[test]
+fn step_9_of_the_task_reviewer_lifts_the_mutation_row_of_step_7_for_a_critical_task() {
+    let text = package_text(TASK_REVIEWER);
+    let step = |number: u32| {
+        let lead = format!("{number}. ");
+        let lines: Vec<String> = text
+            .lines()
+            .filter(|line| line.starts_with(&lead))
+            .map(flat)
+            .collect();
+        assert_eq!(lines.len(), 1, "one step {number}: {lines:?}");
+        lines[0].clone()
+    };
+    assert!(
+        step(7).contains("has a `mutation` row in the round's `tdd`"),
+        "step 7 asks for the row"
+    );
+    states(
+        TASK_REVIEWER,
+        &step(9),
+        &["The `mutation` row that step 7 asks for does not apply to a critical task."],
     );
 }
 
@@ -778,7 +845,9 @@ fn the_riders_of_hr_153_reach_the_skills_and_the_branch_reviewer() {
 fn finishing_steps_after_the_fetch() -> String {
     let text = flat(&package_text(FINISHING));
     let start = text.find("4. **Aggregate commits.**").expect("step 4");
-    let end = text.find("5. **Push and open a PR.**").expect("step 5");
+    let end = text
+        .find("5. **Write the evidence bundle, push, and open the pull or merge request.**")
+        .expect("step 5");
     text[start..end].to_string()
 }
 
@@ -1415,4 +1484,972 @@ fn the_process_pack_keeps_the_summary_of_the_tdd_rule() {
         pack_entry(&pack, "process.tdd")["summary"],
         "Test-driven development for every executable change: the failing test first, or a disclosed-mutation proof for already-correct behavior; verbatim RED and GREEN."
     );
+}
+
+/// The deliverables schema, below `template/` and below the install root.
+const DELIVERABLES_SCHEMA: &str = ".claude/schemas/deliverables.json";
+
+/// The description of `issue.backlog` in both copies of the deliverables
+/// schema (HR-241 (1), spec 11.1).
+const ISSUE_BACKLOG_DESCRIPTION: &str = "The id of the filed deferral that holds this finding; set it only for a finding that the fix round defers (process.no-tech-debt).";
+
+/// The sentence that `task-reviewer.md` and `branch-reviewer.md` carry for the
+/// `backlog` field of an issue (HR-241 (1), spec 11.1).
+const ISSUE_BACKLOG_SENTENCE: &str = "An issue's `backlog` holds the id of the filed deferral that holds the finding. Leave it out of every issue you file; the controller sets it when the fix round defers the finding.";
+
+/// The first act of a dispatch into a worktree (HR-241 (2), spec 11.2).
+const WORKTREE_FIRST_ACT: &str = "Open the brief of a dispatch into a worktree with a first act. The implementer runs `git merge-base --is-ancestor <BASE> HEAD` in its worktree. When the command exits 0, the worktree holds `<BASE>`, and the implementer goes on. When the command exits 1, the implementer runs `git reset --hard <BASE>` and records the reset in `concerns`. When the command exits with any other status, the implementer stops and reports BLOCKED with the output. In a fix round, `<BASE>` is `FIX_BASE`. Leave the first act out of a dispatch into a shared checkout, where a reset discards work.";
+
+/// The capture rule of a controller-run integration gate (HR-241 (3), spec
+/// 11.3).
+const INTEGRATION_GATE_CAPTURE: &str = "Run each controller-run integration gate through `houserules capture`, and put any injected configuration in the argv, so that the capture shows it: `houserules capture --out <workspace>/<name>.txt -- env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.autocrlf GIT_CONFIG_VALUE_0=true <gate command>`.";
+
+/// The test command of an eval scenario brief (HR-241 (4), spec 11.4).
+const EVAL_BRIEF_TEST_COMMAND: &str = "Each scenario brief names the command that runs the suite with the project's pinned tools: the test task of the project's task runner. When the project has no such task, the brief names the test command of the plan's gate list, or, in a batch with no plan, the test command that the project documents.";
+
+/// The revision note of a plan that a decision makes false (HR-241 (5), spec
+/// 11.5).
+const PLAN_REVISION_NOTE: &str = "A decision that makes a sentence of the plan false adds a revision note to the plan in the same turn. At batch close, re-read the declared file set of each task (its Files line) and the plan's Global constraints, when it has them, against the tree. Add a revision note for each sentence that no longer holds.";
+
+/// The plan re-read in the Batch close section of the orchestrating skill
+/// (HR-241 (5), spec 11.5).
+const BATCH_CLOSE_PLAN_REREAD: &str = "Before the branch review dispatches, or before Finish in a batch without one, re-read the declared file set of each task (its Files line) and the plan's Global constraints, when it has them, against the tree. Add a revision note to the plan for each sentence that no longer holds (the `planning` skill, \"Keep the plan true\"). A batch with no plan has nothing to re-read.";
+
+/// The same-turn revision note in the Rulings section of the orchestrating
+/// skill (HR-241 (5), spec 11.5).
+const RULINGS_PLAN_REVISION_NOTE: &str = "A decision that makes a sentence of the plan false adds a revision note to the plan in the same turn (the `planning` skill, \"Keep the plan true\").";
+
+/// The text of the section of the package file `file` that opens with the
+/// heading line `heading`, up to the next `## ` heading, with every run of
+/// white space collapsed.
+fn section_text(file: &str, heading: &str) -> String {
+    let text = package_text(file);
+    let mut lines = text.lines().skip_while(|line| *line != heading);
+    assert!(lines.next().is_some(), "{file} has no heading {heading}");
+    let body: Vec<&str> = lines.take_while(|line| !line.starts_with("## ")).collect();
+    flat(&body.join("\n"))
+}
+
+/// A `Command` for the compiled `houserules` binary under test, with the
+/// self-update phase of `update` switched off.
+fn houserules() -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_houserules"));
+    command.env("HOUSERULES_SKIP_SELF_UPDATE", "1");
+    command
+}
+
+/// Both copies of the deliverables schema, parsed, as `(copy, schema)` pairs:
+/// the source below `template/` and the installed copy at the repository root.
+fn schema_copies() -> [(&'static str, Value); 2] {
+    let installed = repo_root().join(DELIVERABLES_SCHEMA);
+    let installed_text = fs::read_to_string(&installed)
+        .unwrap_or_else(|error| panic!("read {}: {error}", installed.display()));
+    [
+        ("template", core_text(DELIVERABLES_SCHEMA)),
+        ("root", installed_text),
+    ]
+    .map(|(copy, text)| {
+        let schema = serde_json::from_str(&text)
+            .unwrap_or_else(|error| panic!("the {copy} schema is JSON: {error}"));
+        (copy, schema)
+    })
+}
+
+/// Spec 11.1 (HR-241 (1)): `issue.backlog` holds its `$ref` and the
+/// description of the item, and no other keyword, in both copies of the
+/// deliverables schema. A description is an annotation, so the property keeps
+/// every constraint it had.
+#[test]
+fn issue_backlog_carries_its_description_beside_its_ref_in_both_schema_copies() {
+    for (copy, schema) in schema_copies() {
+        assert_eq!(
+            schema["$defs"]["issue"]["properties"]["backlog"],
+            json!({
+                "$ref": "#/$defs/backlogId",
+                "description": ISSUE_BACKLOG_DESCRIPTION,
+            }),
+            "the {copy} schema"
+        );
+    }
+}
+
+/// A pin: the committed review of batch 14 whose first issue names
+/// `backlog: HR-050` validates against this repository's schema once it names
+/// a model, and an id outside the pattern of `backlogId` still fails at that
+/// issue. The description of `issue.backlog` changes no verdict of `validate`.
+#[test]
+fn a_review_issue_with_a_backlog_id_validates_and_a_malformed_id_still_fails() {
+    let root = repo_root();
+    let fixture = root
+        .join("tests")
+        .join("fixtures")
+        .join("batch14-workspace")
+        .join("task-2-review.json");
+    let mut review: Value = serde_json::from_str(
+        &fs::read_to_string(&fixture)
+            .unwrap_or_else(|error| panic!("read {}: {error}", fixture.display())),
+    )
+    .expect("the fixture review is JSON");
+    review["model"] = json!("opus");
+    assert_eq!(
+        review["issues"][0]["backlog"],
+        json!("HR-050"),
+        "the fixture's first issue names its deferral"
+    );
+    let scratch = tempfile::tempdir().expect("tempdir");
+    let validate = |name: &str, review: &Value| {
+        let path = scratch.path().join(name);
+        fs::write(&path, review.to_string()).expect("write the review");
+        houserules()
+            .arg("validate")
+            .arg(&path)
+            .arg("--dir")
+            .arg(&root)
+            .output()
+            .expect("run validate")
+    };
+
+    let valid = validate("valid.json", &review);
+    assert!(
+        valid.status.success(),
+        "{}",
+        String::from_utf8_lossy(&valid.stdout)
+    );
+
+    review["issues"][0]["backlog"] = json!("not valid!");
+    let malformed = validate("malformed.json", &review);
+    assert_eq!(malformed.status.code(), Some(1));
+    let printed = String::from_utf8_lossy(&malformed.stdout);
+    assert!(
+        printed.contains(".issues[0].backlog: must match "),
+        "{printed}"
+    );
+}
+
+/// Spec 11.1 (HR-241 (1)): the task reviewer and the branch reviewer each tell
+/// the reviewer to leave `backlog` out of every issue it files, and name the
+/// controller as the actor that sets it when the fix round defers the finding.
+#[test]
+fn the_reviewer_templates_say_when_an_issue_names_its_deferral() {
+    for file in [TASK_REVIEWER, BRANCH_REVIEWER] {
+        assert_holds(file, &[ISSUE_BACKLOG_SENTENCE]);
+    }
+}
+
+/// Spec 11.2 (HR-241 (2)): the orchestrating skill gives a dispatch into a
+/// worktree the first act, with one arm for each exit status of the check: 0
+/// goes on, 1 resets the worktree to `BASE`, and any other status reports
+/// BLOCKED.
+#[test]
+fn the_orchestrating_skill_opens_a_worktree_dispatch_with_the_base_check() {
+    assert_holds(ORCHESTRATING, &[WORKTREE_FIRST_ACT]);
+}
+
+/// Spec 11.3 (HR-241 (3)): the orchestrating skill runs each controller-run
+/// integration gate through `houserules capture`, with the injected
+/// configuration in the argv.
+#[test]
+fn the_orchestrating_skill_captures_each_integration_gate_with_its_configuration() {
+    assert_holds(ORCHESTRATING, &[INTEGRATION_GATE_CAPTURE]);
+}
+
+/// Spec 11.4 (HR-241 (4)): the eval-run step of the orchestrating skill makes
+/// each scenario brief name the command that runs the suite with the project's
+/// pinned tools, and names the command of the plan or of the project's
+/// documents for a project with no such task.
+#[test]
+fn the_eval_run_briefs_name_the_command_that_runs_the_suite_with_the_pinned_tools() {
+    assert_holds(ORCHESTRATING, &[EVAL_BRIEF_TEST_COMMAND]);
+}
+
+/// Spec 11.5 (HR-241 (5)): the planning skill adds a revision note for a
+/// decision that makes a plan sentence false, and re-reads the plan at batch
+/// close.
+#[test]
+fn the_planning_skill_keeps_the_plan_true_with_revision_notes() {
+    assert_holds(PLANNING, &[PLAN_REVISION_NOTE]);
+}
+
+/// Spec 11.5 (HR-241 (5)): the orchestrating skill, which the controller
+/// follows at batch close and when it rules, carries the plan re-read in its
+/// Batch close section and the same-turn revision note in its Rulings section.
+#[test]
+fn the_orchestrating_skill_keeps_the_plan_true_at_batch_close_and_in_rulings() {
+    for (heading, sentence) in [
+        ("## Batch close", BATCH_CLOSE_PLAN_REREAD),
+        ("## Rulings", RULINGS_PLAN_REVISION_NOTE),
+    ] {
+        assert!(
+            section_text(ORCHESTRATING, heading).contains(sentence),
+            "the section {heading} lacks: {sentence}"
+        );
+    }
+}
+
+// ---- Batch 37: the per-change review layer in the kit texts ---------------------------
+//
+// Spec 7.4 (the seed rule), 7.5 (the finishing skill), 7.6 (the
+// migrating-knowledge skill and the upgrade guide), 10.7 (what `init` writes),
+// case 9 (the process pack's minor version), and case 10 (the guide's parts).
+// The wording gate of spec 3 lives in `host_wording.rs`.
+
+/// The migrating-knowledge skill of the core kit, below `template/`.
+const MIGRATING_KNOWLEDGE: &str = ".claude/skills/migrating-knowledge/SKILL.md";
+
+/// The upgrade guide.
+const UPGRADE_GUIDE: &str = "docs/upgrading-to-2.md";
+
+/// The summary of the seed rule of the evidence bundle, as spec 7.4 gives it.
+/// The knowledge schema caps a summary at 160 characters.
+const SEED_RULE_SUMMARY: &str = "A pull or merge request carries an evidence bundle before review: purpose, work items, tier, criterion, and each run at its head; bundle check enforces it.";
+
+/// The body of `process.risk-tiers` as `knowledge/overrides.json` holds it (ruling 261).
+const RISK_TIERS_BODY: [&str; 8] = [
+    "The tier sets the pipeline's depth. Light: one task; docs, comments, config values, or a dependency bump only; no executable behavior change; no task is critical. The work item's body is the spec, and the project's owner or decider still approves it. The pipeline is an author of the change, one task review, and the live run. It has no plan document and no branch review.",
+    "Standard: every change that is not light. The pipeline is a short spec with the decision gate, a plan, an author of the change, one task review, at most one re-review, and the live run. A branch review runs only for a batch of two or more tasks.",
+    "A critical task is a task whose change alters the commands, flags, or output of a command-line interface, a schema, authentication or security code, or the data that an installed product keeps on disk. It runs inside the standard tier with its own evidence: the plan writes the spec's cases for the task as tests before any code; the author of the change commits them first with one recorded run that shows them failing at the base commit, then makes them pass; the evidence is that run and the whole suite passing at the head (`process.tdd`).",
+    "A critical task gets one task review. The person who runs the work checks each fix by re-running the reviewer's own reproduction and records the check (`process.fix-round-verification-record`). A Critical or Important finding goes to a fresh author of the change; a Minor finding is fixed directly. A fix round that fixes a Critical or Important finding, or that changes files beyond the files its findings name, then gets one review of its fix diff. That review files only new breakage. Only a new Critical or Important finding of it opens a further round, which closes by the check of the person who runs the work; no second fix-diff review runs.",
+    "A lighter tier drops only what its pipeline names: the light tier drops the plan document and the branch review, and the standard tier drops the branch review for a one-task batch. Every tier keeps item selection, the live run, the finish, and rollout and acceptance.",
+    "One tier covers the batch: the highest tier that any of its changes needs. A critical task follows its own evidence rule inside the tier of the batch.",
+    "The plan records the tier and the criterion that selected it. For a light change, the task brief records them. The task review checks the tier, and a wrong tier is a finding.",
+    "A tier moves up during a batch, never down. `process.bounded-review-loop` states the one automatic move.",
+];
+
+/// The `source` of `process.risk-tiers` as `knowledge/overrides.json` holds it (ruling 261).
+const RISK_TIERS_SOURCE: (&str, &str, &str) = ("2026-10-25", "user", "design.md 260");
+
+/// The body of `process.bounded-review-loop` as `knowledge/overrides.json` holds it (ruling 261).
+const BOUNDED_REVIEW_LOOP_BODY: [&str; 5] = [
+    "A fix round that holds only Minor fixes closes with a verification note (`process.fix-round-verification-record`), never with a re-review. The person who runs the work runs the check that each Minor finding names and cites its result in the note.",
+    "A re-review reads the fix diff and the original findings only. It files new findings at their impact (`process.severity-by-impact`). Only a new Critical or Important finding opens a further round. A new Minor finding joins a Minor-only round.",
+    "Re-reviews per task: light 0, standard 1. A critical task gets no re-review of its original findings; it gets one fix-diff review after a fix round that fixes a Critical or Important finding or changes files beyond its findings' files (`process.risk-tiers`). A branch-review fix wave has the same cap as the batch's tier.",
+    "At the cap, the open non-critical findings become one work item with the reason (a deferral under `process.no-tech-debt`). An open Critical finding goes to the project's owner or decider.",
+    "A light task with an Important or Critical finding moves up to the standard tier and gets its one re-review.",
+];
+
+/// The `source` of `process.bounded-review-loop` as `knowledge/overrides.json` holds it (ruling 261).
+const BOUNDED_REVIEW_LOOP_SOURCE: (&str, &str, &str) = ("2026-10-25", "user", "design.md 260");
+
+/// The longest summary that the knowledge schema allows.
+fn summary_limit() -> u64 {
+    let schema: Value = serde_json::from_str(&help_support::read("knowledge/schema.json"))
+        .expect("the knowledge schema is JSON");
+    schema
+        .pointer("/$defs/entry/properties/summary/maxLength")
+        .and_then(Value::as_u64)
+        .expect("the knowledge schema limits the length of a summary")
+}
+
+/// The pack `name` of the kit, parsed.
+fn kit_pack(name: &str) -> Value {
+    let text = help_support::read(&format!("template/packs/{name}.json"));
+    serde_json::from_str(&text).unwrap_or_else(|error| panic!("the {name} pack is JSON: {error}"))
+}
+
+/// Spec 7.4: the process pack carries `process.evidence-before-review`, a rule
+/// that is not standing, in the area `process`, with no `check` (the gate is
+/// the CI step). Its body names `bundle write`, `houserules ci print`, the
+/// budget with a reason, and the exempt authors and branches.
+#[test]
+fn the_process_pack_carries_the_seed_rule_of_the_evidence_bundle() {
+    let pack = process_pack();
+    let entry = pack_entry(&pack, "process.evidence-before-review");
+    assert_eq!(entry["kind"], "rule");
+    assert_eq!(entry["area"], "process");
+    assert!(
+        entry
+            .get("standing")
+            .is_none_or(|standing| standing == &json!(false)),
+        "the seed rule is not standing"
+    );
+    assert!(entry.get("check").is_none(), "the gate is the CI step");
+    assert_eq!(entry["summary"], SEED_RULE_SUMMARY);
+    let length = SEED_RULE_SUMMARY.chars().count() as u64;
+    assert!(
+        length <= summary_limit(),
+        "the summary has {length} characters; the knowledge schema allows {}",
+        summary_limit()
+    );
+    let body = body_text(entry);
+    for phrase in [
+        "`houserules bundle write`",
+        "`houserules ci print`",
+        "`houserules bundle check`",
+        "`Budget reason:` line",
+        "`review.bundle.budgets`",
+        "`review.bundle.exemptAuthors`",
+        "`review.bundle.exemptBranches`",
+        "The entry has no `check`.",
+    ] {
+        assert!(body.contains(phrase), "the seed rule lacks: {phrase}");
+    }
+}
+
+/// Ruling 261 (design.md): `process.risk-tiers` and `process.bounded-review-loop`
+/// in the process pack hold the body and the source of the two overrides of
+/// ruling 260, so that an adopter reads the fix-diff review of a critical task.
+#[test]
+fn the_process_pack_ships_the_fix_diff_review_of_ruling_260() {
+    let pack = process_pack();
+    for (id, body, source) in [
+        (
+            "process.risk-tiers",
+            RISK_TIERS_BODY.as_slice(),
+            RISK_TIERS_SOURCE,
+        ),
+        (
+            "process.bounded-review-loop",
+            BOUNDED_REVIEW_LOOP_BODY.as_slice(),
+            BOUNDED_REVIEW_LOOP_SOURCE,
+        ),
+    ] {
+        let entry = pack_entry(&pack, id);
+        assert_eq!(entry["body"], json!(body), "{id}");
+        assert_eq!(
+            entry["source"],
+            json!({"date": source.0, "by": source.1, "ref": source.2}),
+            "{id}"
+        );
+    }
+}
+
+/// Case 9: the process pack moves one minor version for the added entry and the
+/// two changed bodies, and the writing-style pack one patch version for the
+/// changed wording of the README funnel entry.
+#[test]
+fn the_kit_packs_moved_by_the_class_of_their_change() {
+    assert_eq!(kit_pack("process")["version"], "2.1.0");
+    assert_eq!(kit_pack("writing-style")["version"], "1.0.2");
+}
+
+/// Spec 3: the README funnel entry asks whether "pull or merge requests" are
+/// accepted.
+#[test]
+fn the_readme_funnel_entry_says_pull_or_merge_requests() {
+    let pack = kit_pack("writing-style");
+    let entry = pack_entry(&pack, "writing-style.readme-is-an-adopter-funnel");
+    let body = body_text(entry);
+    assert!(
+        body.contains("whether pull or merge requests are accepted"),
+        "{body}"
+    );
+    assert!(!body.contains("whether pull requests are accepted"));
+}
+
+/// Spec 7.5: the finishing skill writes the bundle with `bundle write` from the
+/// captures of the final gate run before it opens the request, and opens the
+/// request with the CLI of the host. The skill names the check that CI runs on
+/// the description.
+#[test]
+fn the_finishing_skill_writes_the_bundle_and_opens_the_request_with_the_hosts_cli() {
+    assert_holds(
+        FINISHING,
+        &[
+            "Write the evidence bundle, push, and open the pull or merge request.",
+            "`houserules bundle write`",
+            "the intent (`--intent <source>:<ref>`) or the purpose (`--purpose`), from the spec",
+            "the work items of the batch, one `--work-item <id>` for each",
+            "the tier and the criterion, from the plan (`--tier`, `--criterion`)",
+            "the captures of the final gate run at the head, one `--capture <file>` for each",
+            "gh pr create --title",
+            "--body-file",
+            "glab mr create --title",
+            "--description",
+            "houserules bundle check --body",
+        ],
+    );
+    assert_lacks(
+        FINISHING,
+        &["gh pr create --fill", "Push and open a PR.", "pull request"],
+    );
+}
+
+/// Spec 7.5: the orchestrating skill names the bundle step in the Finish row of
+/// its lifecycle table.
+#[test]
+fn the_orchestrating_skill_names_the_bundle_step_in_the_finish_row() {
+    let finish: Vec<String> = package_text(ORCHESTRATING)
+        .lines()
+        .filter(|line| line.starts_with("| Finish |"))
+        .map(flat)
+        .collect();
+    assert_eq!(finish.len(), 1, "{finish:?}");
+    for phrase in [
+        "the evidence bundle (`houserules bundle write`)",
+        "pull or merge request",
+    ] {
+        assert!(finish[0].contains(phrase), "the Finish row lacks: {phrase}");
+    }
+}
+
+/// Ruling 261: the orchestrating skill states the fix-diff review of a critical
+/// task that the process pack now ships, in the critical-task list and in the
+/// review-loop rule, and no longer says that a critical task never gets a
+/// re-review of any kind.
+#[test]
+fn the_orchestrating_skill_states_the_fix_diff_review_of_a_critical_task() {
+    assert_holds(
+        ORCHESTRATING,
+        &[
+            "one task review on the task reviewer's configured model (default opus). It gets no re-review of its original findings.",
+            "A fix round that fixes a Critical or Important finding, or that changes files beyond the files its findings name, then gets one review of its fix diff.",
+            "That review files only new breakage.",
+            "A critical task gets no re-review of its original findings, and one review of its fix diff",
+        ],
+    );
+    assert_lacks(
+        ORCHESTRATING,
+        &[
+            "(default opus), and never a re-review",
+            "A critical task gets none.",
+        ],
+    );
+}
+
+/// The settings of the review layer, the limits, and the three ways of wiring
+/// that spec 7.6 lists. Each row is a part with the phrases that carry it; the
+/// migrating-knowledge skill and the upgrade guide each hold every part.
+const REVIEW_LAYER_PARTS: [(&str, &[&str]); 11] = [
+    (
+        "the output of bundle check",
+        &[
+            "`houserules bundle check --body <file> --base <ref> --head <ref>`",
+            "0 for a clean bundle, 1 when it prints a finding, 2 for a setup error",
+        ],
+    ),
+    (
+        "the output of evidence",
+        &["`houserules evidence --base <ref> --out <file>`"],
+    ),
+    (
+        "the output of route",
+        &[
+            "`houserules route --base <ref> --json <file>`",
+            "`houserules route --base <ref> --no-audit --json <file>`",
+        ],
+    ),
+    (
+        "the record and the notes ref",
+        &[
+            "`houserules record write --base <ref> --head <ref> --out <file>`",
+            "`refs/notes/houserules`",
+            "`git fetch origin refs/notes/houserules:refs/notes/houserules`",
+        ],
+    ),
+    (
+        "the three ways of wiring",
+        &[
+            "**Reference.**",
+            "**Inline.**",
+            "**A file of its own.**",
+            "`houserules ci print`",
+            "`houserules ci write`",
+            "`--mode inline`",
+            "`houserules ci write --host github --sha <sha>`",
+            "`houserules ci write --host gitlab`",
+            "`--host github --mode inline` needs no `--sha`",
+        ],
+    ),
+    (
+        "the GitLab token and its reach",
+        &[
+            "`HOUSERULES_TOKEN`",
+            "a personal access token of a dedicated member",
+            "reaches every project that its user can reach",
+        ],
+    ),
+    (
+        "the expiry of the GitLab token",
+        &["at most 365 days", "rotate it"],
+    ),
+    (
+        "the limit of the sample",
+        &["unsteerable only under a host merge that writes a new commit"],
+    ),
+    (
+        "the condition of the runner floor",
+        &[
+            "`floor-install: runner:<path>`",
+            "fresh runner or an unwritable path",
+        ],
+    ),
+    (
+        "the limit of a request that edits its own wiring",
+        &[
+            "sets its own status and label",
+            "a required status from a protected-branch rule",
+            "the rule-source floor",
+            "required code-owner review",
+        ],
+    ),
+    (
+        "the limits of the two hosts",
+        &[
+            "`workflow_run`",
+            "not to `labeled`",
+            "a description edit starts no pipeline",
+            "`setup` input",
+        ],
+    ),
+];
+
+/// The parts of `REVIEW_LAYER_PARTS` that `text` lacks, as `part: phrase` lines.
+fn missing_parts(text: &str) -> Vec<String> {
+    let mut missing = Vec::new();
+    for (part, phrases) in REVIEW_LAYER_PARTS {
+        for phrase in phrases {
+            if !text.contains(phrase) {
+                missing.push(format!("{part}: {phrase}"));
+            }
+        }
+    }
+    missing
+}
+
+/// Spec 7.6: the migrating-knowledge skill teaches each part of the review
+/// layer, asks the owner for the settings, and asks which file of the project's
+/// own pipeline wires houserules.
+#[test]
+fn the_migrating_knowledge_skill_teaches_each_part_of_the_review_layer() {
+    let skill = flat(&core_text(MIGRATING_KNOWLEDGE));
+    let missing = missing_parts(&skill);
+    assert!(
+        missing.is_empty(),
+        "the skill lacks {} phrase(s):\n{}",
+        missing.len(),
+        missing.join("\n")
+    );
+    for phrase in [
+        "`review.bundle.budgets`",
+        "`review.route.sampleRate`",
+        "`review.bundle.exemptAuthors`",
+        "`review.bundle.exemptBranches`",
+        "`review.intent.sources`",
+        "`review.intent.files`",
+        "which checks declare `covers: true`",
+        "Ask which file of the project's own pipeline wires houserules",
+        "`review.ci.files`",
+    ] {
+        assert!(skill.contains(phrase), "the skill lacks: {phrase}");
+    }
+}
+
+/// Spec 10.7: `init` writes no CI file, so the skill no longer says that it
+/// seeds one for a GitHub-hosted origin, and it points at `houserules ci print`.
+#[test]
+fn the_migrating_knowledge_skill_says_that_init_writes_no_ci_file() {
+    let skill = flat(&core_text(MIGRATING_KNOWLEDGE));
+    for phrase in [
+        "`init` writes no CI file, and `update` writes none again.",
+        "`houserules ci print --host github`",
+    ] {
+        assert!(skill.contains(phrase), "the skill lacks: {phrase}");
+    }
+    for stale in [
+        "only for a GitHub-hosted",
+        "The seeded GitHub workflow does this with",
+        "the seeded workflow runs",
+    ] {
+        assert!(!skill.contains(stale), "the skill still holds: {stale}");
+    }
+}
+
+/// Spec 7.6: the batch-37 section of the upgrade guide holds the same parts, the
+/// rows of the new keys and schema ids, the reds of spec 13 with their remedies,
+/// and what `init` and `update` write now.
+#[test]
+fn the_upgrade_guide_holds_each_part_of_the_review_layer() {
+    let guide = folded_text(UPGRADE_GUIDE);
+    let missing = missing_parts(&guide);
+    assert!(
+        missing.is_empty(),
+        "the guide lacks {} phrase(s):\n{}",
+        missing.len(),
+        missing.join("\n")
+    );
+    let raw = help_support::read(UPGRADE_GUIDE);
+    for heading in [
+        "## The review layer",
+        "### Changes of install schema 2.3.0",
+        "### The reds of the review layer by design",
+    ] {
+        assert!(raw.lines().any(|line| line == heading), "no {heading}");
+    }
+    for phrase in [
+        "| `review` |",
+        "| `reviewLayerOffered` |",
+        "| `covers` |",
+        "| `houserules/pack@1.3.0` |",
+        "| `houserules/overrides@1.2.0` |",
+        "| `houserules/install@2.3.0` |",
+        "`process.evidence-before-review`",
+        "its open requests fail `bundle check` until each carries a bundle",
+        "`update` prints the opt-in line once",
+        "**A fresh install:** no CI file and no red.",
+        "`audit.error`",
+        "**A check that you meant as coverage:** it is not coverage until its entry declares `covers: true`. No red.",
+        "`init` writes no CI file",
+    ] {
+        assert!(guide.contains(phrase), "the guide lacks: {phrase}");
+    }
+    omits(
+        UPGRADE_GUIDE,
+        &guide,
+        &[
+            "**A fresh install:** A fresh install",
+            "**A check that you meant as coverage:** A check that you meant as coverage",
+        ],
+    );
+}
+
+/// The restamp of the install schema: the binary stamps `2.3.0` on a marker of
+/// `2.2.0`, and leaves any other schema as it is. The guide states the pair that
+/// the binary restamps, and no pair that it does not.
+#[test]
+fn the_upgrade_guide_names_the_pair_that_update_restamps() {
+    let guide = folded_text(UPGRADE_GUIDE);
+    for phrase in [
+        "`update` stamps `houserules/install@2.3.0` on a marker of `houserules/install@2.2.0` and prints `wrote .houserules.json (houserules/install@2.3.0)` once",
+        "It leaves a marker of any other schema as it is, `2.1.0` included.",
+    ] {
+        assert!(guide.contains(phrase), "the guide lacks: {phrase}");
+    }
+    assert!(!guide.contains("stamps `houserules/install@2.2.0` on an install of `2.1.0`"));
+}
+
+/// The anchor that a Markdown renderer gives the heading line `heading`: lower
+/// case, each space a hyphen, and no punctuation but hyphens and underscores.
+fn anchor_of(heading: &str) -> String {
+    heading
+        .trim_start_matches('#')
+        .trim()
+        .to_lowercase()
+        .chars()
+        .filter_map(|c| match c {
+            ' ' => Some('-'),
+            c if c.is_alphanumeric() || c == '-' || c == '_' => Some(c),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The hand step "a CI workflow of your own" compares a kept workflow with the
+/// template of the kit. That file is the seeded workflow of one population only:
+/// the step names the form that each other population holds, and each link of
+/// the step lands on a heading of the guide.
+#[test]
+fn the_hand_step_of_a_workflow_of_your_own_names_the_reference_form_of_each_population() {
+    let raw = help_support::read(UPGRADE_GUIDE);
+    let section = raw
+        .split("### Hand step: a CI workflow of your own")
+        .nth(1)
+        .and_then(|rest| rest.split("\n### ").next())
+        .expect("the guide holds the hand step of a workflow of your own");
+    states(
+        UPGRADE_GUIDE,
+        &help_support::folded(section),
+        &[
+            "That file is the form for an install at the top level of the repository with no tracker or the JSON tracker.",
+            "- **The GitHub tracker:** the workflow also holds `issues: read` and the `GH_TOKEN` env.",
+            "- **The Beads tracker:** the workflow also holds the steps that install `bd` and bootstrap the store, and it lacks `persist-credentials: false`.",
+            "- **An install in a subdirectory:** the file is `.github/workflows/knowledge-<folder>.yml`, where `<folder>` is the path of the install below the top level with each `/` replaced by `-`. The `name` is `knowledge (<install path>)`, each of the two triggers has a `paths` filter on `<install path>/**`, and the job has `working-directory: <install path>` as the default of its steps.",
+        ],
+    );
+    let anchors: Vec<String> = raw
+        .lines()
+        .filter(|line| line.starts_with('#'))
+        .map(anchor_of)
+        .collect();
+    let links: Vec<&str> = section
+        .split("](#")
+        .skip(1)
+        .filter_map(|rest| rest.split(')').next())
+        .collect();
+    assert!(
+        links.len() >= 2,
+        "the step links to the hand steps of the two trackers"
+    );
+    for link in links {
+        assert!(
+            anchors.iter().any(|anchor| anchor == link),
+            "no heading of the guide has the anchor #{link}"
+        );
+    }
+}
+
+/// Spec 10.3: the guide quotes the first line of a file of `ci write` and the
+/// line of `update` as the spec gives them. Each names `ci write --force` with the
+/// flags that wrote the file, because a bare `--force` exits 2 for a GitHub
+/// reference file, which needs the `--sha` of the new release.
+#[test]
+fn the_upgrade_guide_quotes_the_rewrite_lines_of_ci_write_with_the_flags_of_the_file() {
+    let guide = folded_text(UPGRADE_GUIDE);
+    states(
+        UPGRADE_GUIDE,
+        &guide,
+        &[
+            "`# Written by houserules ci write; rewrite it with houserules ci write --force and the flags that wrote it.`",
+            "`update: <path> pins houserules <old>; this binary is <new>: run houserules ci write --force with the flags that wrote it (a GitHub reference file takes the --sha of v<new>)`",
+            "Run the command again with the flags that you gave `ci write` the first time.",
+            "For a GitHub reference file, give `--sha` the commit of the tag of the new release.",
+        ],
+    );
+    omits(
+        UPGRADE_GUIDE,
+        &guide,
+        &[
+            "rewrite it with houserules ci write --force.`",
+            "this binary is <new>: run houserules ci write --force`",
+        ],
+    );
+}
+
+/// The hand step "a CI workflow of your own" runs its diff command from the top
+/// level of the repository on the file that the printed line names, `<path>`.
+/// The seeded workflow of an install in a subdirectory is not
+/// `.github/workflows/knowledge.yml`, so a command that names that file exits 2
+/// for it.
+#[test]
+fn the_diff_command_of_the_hand_step_reads_the_file_that_the_printed_line_names() {
+    let raw = help_support::read(UPGRADE_GUIDE);
+    let section = raw
+        .split("### Hand step: a CI workflow of your own")
+        .nth(1)
+        .and_then(|rest| rest.split("\n### ").next())
+        .expect("the guide holds the hand step of a workflow of your own");
+    let folded = help_support::folded(section);
+    states(
+        UPGRADE_GUIDE,
+        &folded,
+        &[
+            "`<path>` is the workflow file, relative to the top level of the repository",
+            "Run the command from the top level of the repository",
+            "template/.github/workflows/knowledge.yml | diff <path> -",
+        ],
+    );
+    omits(
+        UPGRADE_GUIDE,
+        &folded,
+        &["diff .github/workflows/knowledge.yml"],
+    );
+}
+
+/// The record rule teaches the counting rule of `stats` as the code and spec 11.6
+/// state it: a reversal starts with `Reversal:` after optional spaces and an
+/// optional list marker. The text does not say that `stats` counts only a line
+/// that starts with `Reversal:`.
+#[test]
+fn the_reversal_rule_states_the_counting_rule_of_stats() {
+    let pack = process_pack();
+    let body = body_text(pack_entry(&pack, "process.reversals-are-recorded"));
+    assert!(
+        body.contains(
+            "`houserules stats` counts a reversal that starts with `Reversal:` after optional spaces and an optional list marker, and the branch reviewer of the reference workflow also counts a `Reversal:` inside a longer entry."
+        ),
+        "{body}"
+    );
+    assert!(
+        !body.contains("counts only a line that starts with"),
+        "{body}"
+    );
+}
+
+/// The folded text of the repository file `relative`.
+fn folded_text(relative: &str) -> String {
+    help_support::folded(&help_support::read(relative))
+}
+
+/// Spec 10.7 and the carry-over of the CI statements: the upgrade guide no
+/// longer says that `init` writes a CI workflow, that a GitHub origin makes it
+/// write one, or that the reference install holds one; it names the file of the
+/// kit repository that the hand step names, and it states the tail of
+/// ruling 261 for a critical task.
+#[test]
+fn the_upgrade_guide_states_what_init_and_update_write_now() {
+    let guide = folded_text(UPGRADE_GUIDE);
+    omits(
+        UPGRADE_GUIDE,
+        &guide,
+        &[
+            "- `.github/workflows/knowledge.yml`, on a GitHub-hosted origin",
+            "The GitHub origin makes `init` write the CI workflow too.",
+            "and the seeded CI workflow for it. `update` does both too.",
+            "diff .github/workflows/knowledge.yml ../kit-reference/.github/workflows/knowledge.yml",
+            "and the CI workflow of that tracker. Delete",
+            "Copy the two steps from the workflow that `houserules init` writes for the Beads tracker.",
+            "houserules reads no trailer from the body of a pull request.",
+            "A critical task gets one task review and never a re-review.",
+            "`init --tracker github` brings the seeded CI workflow",
+        ],
+    );
+    states(
+        UPGRADE_GUIDE,
+        &guide,
+        &[
+            "It writes no tracker, no workflow, no CI file, no `backlog/` directory, and no eval file.",
+            "Every command that sets `tracker` also writes the `backlogId` pattern of the deliverables schema for the tracker, and brings the seeded CI workflow of an install that holds one to the form of the tracker. It writes no workflow for an install that holds none. `update` does both too.",
+            "Compare it with the seeded workflow of this release, `template/.github/workflows/knowledge.yml` in the houserules repository",
+            "houserules reads no trailer from the body of a pull or merge request.",
+            "A critical task gets one task review and no re-review of its original findings. A fix round that fixes a Critical or Important finding, or that changes files beyond the files its findings name, then gets one review of its fix diff.",
+        ],
+    );
+}
+
+/// The README: the review-layer section, its table-of-contents entry, the rows
+/// of the keys and schema ids, and the statements about `init` that spec 10.7
+/// makes true.
+#[test]
+fn the_readme_has_the_review_layer_section_and_the_rows_of_its_keys() {
+    let raw = help_support::read("README.md");
+    assert!(raw.lines().any(|line| line == "## The review layer"));
+    let readme = help_support::folded(&raw);
+    states(
+        "README.md",
+        &readme,
+        &[
+            "- [Runners](#runners) - [The review layer](#the-review-layer) - [Ownership model](#ownership-model)",
+            "The commands below continue the [quick start](#quick-start): a repository where `houserules init` ran and one commit holds its files.",
+            "houserules route --base HEAD~1",
+            "| `review` |",
+            "| `covers` |",
+            "| `houserules/pack@1.3.0` |",
+            "| `houserules/overrides@1.2.0` |",
+            "`init` writes no CI file.",
+            "`houserules ci print --host github`",
+            "| `evidence` |",
+            "| `route` |",
+            "| `bundle <write\\|check>` |",
+            "| `record <write\\|show\\|list\\|audit>` |",
+            "| `ci <print\\|write>` |",
+            "`stats --records <range>`",
+            "Contributions are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) covers the development workflow, the batch process, and the gates a change must pass.",
+        ],
+    );
+    omits(
+        "README.md",
+        &readme,
+        &[
+            "and a CI workflow on a GitHub-hosted origin",
+            "The CI workflow is written only when your `origin` resolves to GitHub",
+            "`update` backfills it if your origin becomes GitHub-hosted later.",
+            "(GitHub-hosted origin only)",
+            "**A CI gate** (`.github/workflows/knowledge.yml`), on a GitHub-hosted origin",
+            "On other hosts `init` prints a skip note",
+            "The seeded CI workflow checks out the head of a pull request for this reason.",
+            "or reuses a workflow file name",
+            "Pull requests are welcome",
+            "merge requests are welcome",
+        ],
+    );
+}
+
+/// Spec 21.10 and `quality.gates-derive-their-scope`: the CLI table of the
+/// README holds a row for every command that `houserules --help` lists, and the
+/// list comes from the binary, not from this file.
+#[test]
+fn the_readme_cli_table_has_a_row_for_every_command_of_the_help() {
+    let help = String::from_utf8(
+        houserules()
+            .arg("--help")
+            .output()
+            .expect("run --help")
+            .stdout,
+    )
+    .expect("UTF-8 help");
+    let commands: Vec<&str> = help
+        .lines()
+        .skip_while(|line| *line != "Commands:")
+        .skip(1)
+        .take_while(|line| !line.is_empty())
+        .filter_map(|line| line.split_whitespace().next())
+        .filter(|name| *name != "help")
+        .collect();
+    assert!(commands.len() > 20, "{commands:?}");
+    let readme = help_support::read("README.md");
+    let reference = readme
+        .split("## CLI reference")
+        .nth(1)
+        .and_then(|rest| rest.split("\n## ").next())
+        .expect("the README holds a CLI reference");
+    let missing: Vec<&str> = commands
+        .iter()
+        .copied()
+        .filter(|command| {
+            !reference.lines().any(|line| {
+                line.strip_prefix(&format!("| `{command}"))
+                    .is_some_and(|rest| rest.starts_with([' ', '`']))
+            })
+        })
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "the CLI table of the README has no row for: {missing:?}"
+    );
+}
+
+/// The `sh` block of the README review-layer section runs as printed in a fresh
+/// install (the state of the quick start: `init`, then one commit) and prints
+/// the `text` block that follows it.
+#[cfg(unix)]
+#[test]
+fn the_readme_review_layer_block_runs_as_printed_in_a_fresh_install() {
+    let dir = tracker_support::scratch_git_repo();
+    tracker_support::run_ok(dir.path(), &["init"]);
+    tracker_support::commit_all(dir.path(), "chore: install houserules knowledge setup");
+    let blocks =
+        help_support::fenced_blocks_of(&help_support::read("README.md"), "The review layer");
+    let mut ran = 0;
+    for (at, (info, script)) in blocks.iter().enumerate() {
+        if info != "sh" {
+            continue;
+        }
+        let (code, printed) = help_support::run_block(dir.path(), script);
+        let shown = match blocks.get(at + 1) {
+            Some((next, text)) if next == "text" => text.as_str(),
+            _ => "",
+        };
+        assert_eq!(code, 0, "the block exits 0:\n{script}\n{printed}");
+        assert_eq!(
+            printed.trim_end(),
+            shown,
+            "the block does not print the text that follows it:\n{script}"
+        );
+        ran += 1;
+    }
+    assert_eq!(ran, 1, "the review-layer section holds one sh block");
+}
+
+/// The seeded-repository live proof (`houserules.seeded-repo-live-proof`): a
+/// fresh `init` writes no workflow, so the procedure wires the CI with
+/// `ci write` before the pull request, and it runs after the 2.0.0 release.
+#[test]
+fn the_seeded_repo_live_proof_wires_a_fresh_init_with_ci_write() {
+    let entries: Value = serde_json::from_str(&help_support::read("knowledge/houserules.json"))
+        .expect("the topic file is JSON");
+    let entry = entries["entries"]
+        .as_array()
+        .expect("entries")
+        .iter()
+        .find(|entry| entry["id"] == "houserules.seeded-repo-live-proof")
+        .expect("the entry exists");
+    let text = flat(&format!(
+        "{} {}",
+        entry["summary"].as_str().expect("a summary"),
+        body_text(entry)
+    ));
+    for phrase in [
+        "houserules ci write --host github --mode reference --sha <release commit sha>",
+        "after the 2.0.0 release",
+        "HR-253",
+        "hold for an install that a 1.x release seeded, not for the fresh install of the steps above",
+        "It runs from the first release after 2.0.0; at the 2.0.0 release no older release is accepted, so skip it then.",
+    ] {
+        assert!(text.contains(phrase), "the entry lacks: {phrase}");
+    }
+    for stale in [
+        "`init` writes `.github/workflows/knowledge.yml` only when the `origin` remote is GitHub-hosted",
+        "the seeded knowledge workflow must read the version",
+    ] {
+        assert!(!text.contains(stale), "the entry still holds: {stale}");
+    }
 }

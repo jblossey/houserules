@@ -1,4 +1,5 @@
 {
+  "schema": "houserules/audit-result@1.0.0",
   "base": "4723faf",
   "head": "85f272c",
   "ids": [],

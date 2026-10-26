@@ -5,6 +5,7 @@
 //! the kit.
 
 mod locked_file;
+mod tracker_support;
 mod tree_snapshot;
 
 use std::fs;
@@ -12,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
+use tracker_support::sha256_hex;
 
 /// A `Command` for the compiled `houserules` binary under test, with the
 /// self-update phase of `update` switched off.
@@ -101,10 +102,7 @@ fn write_json(dir: &Path, relative: &str, value: &Value) {
 fn pin_of(copy: &Value) -> String {
     let mut canonical = copy.clone();
     canonical.sort_all_objects();
-    Sha256::digest(serde_json::to_vec(&canonical).expect("serialize"))
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    sha256_hex(&serde_json::to_vec(&canonical).expect("serialize"))
 }
 
 /// The kit pack `name` as the binary carries it.

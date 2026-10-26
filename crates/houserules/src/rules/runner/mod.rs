@@ -14,13 +14,14 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use regress::Regex;
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use super::check_shape::{CheckDef, CheckLevel, CheckType, Glob};
 use super::git::{Commit, commits_in, removed_lines, show_file, tree_files};
 use super::git_paths::InstallPrefix;
 use super::glob::glob_match;
 use super::model::Entry;
+use crate::published::audit_result::{AuditRow, RowLevel, RowMode, RowResult};
 
 mod co_change;
 mod commits;
@@ -193,49 +194,46 @@ struct RowBuilder<'a> {
 }
 
 impl RowBuilder<'_> {
-    /// The level of the check as a row prints it. A violated check has this
-    /// word as its result too: `fail` for a `fail` check, `warn` for a `warn`
-    /// check.
-    fn level_name(&self) -> &'static str {
+    /// The level of the check as a row prints it.
+    fn row_level(&self) -> RowLevel {
         match self.level {
-            CheckLevel::Fail => "fail",
-            CheckLevel::Warn => "warn",
+            CheckLevel::Fail => RowLevel::Fail,
+            CheckLevel::Warn => RowLevel::Warn,
         }
     }
 
-    /// The row of the entry with `result` (`pass`, `fail`, `warn`, or
-    /// `skipped`) and `evidence`.
-    fn row(&self, result: &str, evidence: String) -> Value {
-        json!({
-            "id": self.entry.id, "kind": self.entry.kind, "mode": "deterministic",
-            "level": self.level_name(), "result": result, "evidence": evidence,
-        })
+    /// The row of the entry with `result` and `evidence`.
+    fn row(&self, result: RowResult, evidence: String) -> AuditRow {
+        AuditRow {
+            id: self.entry.id.clone(),
+            kind: self.entry.kind.clone(),
+            mode: RowMode::Deterministic,
+            level: Some(self.row_level()),
+            result,
+            evidence,
+            findings: None,
+            sanctioned: None,
+        }
     }
 
     /// The row of a check that holds.
-    fn pass(&self, evidence: String) -> Value {
-        self.row("pass", evidence)
-    }
-
-    /// `row` with the optional field `key` set to `value` (`findings`).
-    fn with(&self, mut row: Value, key: &str, value: Value) -> Value {
-        row[key] = value;
-        row
+    fn pass(&self, evidence: String) -> AuditRow {
+        self.row(RowResult::Pass, evidence)
     }
 
     /// The row of a violated check: `fail` or `warn` by the level of the
     /// check.
-    fn violate(&self, evidence: String) -> Value {
-        self.row(self.level_name(), evidence)
+    fn violate(&self, evidence: String) -> AuditRow {
+        self.row(self.row_level().violation(), evidence)
     }
 }
 
 /// Runs one entry's deterministic `check` and returns its audit row (the
-/// module doc of `audit` says why the row is a raw `Value`, not a typed
-/// model). `check` is passed separately from `entry` (rather than read back
-/// off `entry.check`) so the caller's own `CheckField` match is the one place
-/// that decides "does this entry get its check run at all".
-pub(super) fn run(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result<Value, String> {
+/// module doc of `audit` says why the row type is not a deliverables type).
+/// `check` is passed separately from `entry` (rather than read back off
+/// `entry.check`) so the caller's own `CheckField` match is the one place that
+/// decides "does this entry get its check run at all".
+pub(super) fn run(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result<AuditRow, String> {
     let rows = RowBuilder {
         entry,
         level: check.level,

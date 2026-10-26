@@ -25,6 +25,8 @@ use std::process::ExitCode;
 use serde_json::{Value, json};
 
 use crate::emit::emit;
+use crate::published::id;
+use crate::published::rule_package::{RuleEntry, RulePackage};
 
 use super::check::falsy;
 use super::glob::{areas_for, strip_dot};
@@ -194,7 +196,7 @@ pub(crate) fn get_entries(base: &Base, ids: &[String]) -> Result<Vec<Value>, Str
 /// resolves to (`areas_for`), plus every entry whose own `verify` names
 /// one of `paths` directly, regardless of area or kind. `full` prints
 /// each matching entry whole (`get`'s own shape); otherwise each is
-/// reduced through `index_row`.
+/// reduced through `index_row`. The package names its own schema id.
 ///
 /// `Err` from two causes. First, a declared area glob failing to compile
 /// -- unreachable in practice, since `model::load_base` already compiles
@@ -215,7 +217,7 @@ pub(crate) fn get_entries(base: &Base, ids: &[String]) -> Result<Vec<Value>, Str
 /// malformed element AFTER a match is never type-checked: `verify:
 /// ["<matched path>", 123]` on a `decision`-kind entry exits 0 and
 /// includes the entry, rather than erroring on the trailing `123`.
-pub(crate) fn for_result(base: &Base, paths: &[String], full: bool) -> Result<Value, String> {
+pub(crate) fn for_result(base: &Base, paths: &[String], full: bool) -> Result<RulePackage, String> {
     let path_refs: Vec<&str> = paths.iter().map(String::as_str).collect();
     let areas = areas_for(&path_refs, &base.areas).map_err(|error| error.to_string())?;
     let wanted: HashSet<&str> = paths.iter().map(|p| strip_dot(p)).collect();
@@ -251,17 +253,18 @@ pub(crate) fn for_result(base: &Base, paths: &[String], full: bool) -> Result<Va
     }
     sort_by_id(&mut entries);
 
-    let entries_value = if full {
-        Value::Array(entries)
+    let entries = if full {
+        entries.into_iter().map(RuleEntry).collect()
     } else {
-        Value::Array(entries.iter().map(index_row).collect())
+        entries.iter().map(|e| RuleEntry(index_row(e))).collect()
     };
-    Ok(json!({
-        "paths": paths.iter().map(|p| strip_dot(p)).collect::<Vec<_>>(),
-        "areas": areas,
-        "entries": entries_value,
-        "standing": STANDING_COMMAND,
-    }))
+    Ok(RulePackage {
+        schema: id::<RulePackage>(),
+        paths: paths.iter().map(|p| strip_dot(p).to_string()).collect(),
+        areas,
+        entries,
+        standing: STANDING_COMMAND.to_string(),
+    })
 }
 
 /// `{id, summary}` for every standing rule, then every standing
@@ -351,7 +354,8 @@ pub(crate) fn cmd_for(dir: Option<PathBuf>, paths: Vec<String>, full: bool) -> E
         return ExitCode::from(2);
     }
     match for_result(&base, &paths, full) {
-        Ok(value) => {
+        Ok(package) => {
+            let value = serde_json::to_value(&package).expect("a rule package always serializes");
             print!("{}", emit(&value));
             ExitCode::SUCCESS
         }
@@ -381,6 +385,12 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    /// The package `for_result` builds, as the JSON document `for` prints.
+    fn for_json(base: &Base, paths: &[String], full: bool) -> Value {
+        let package = for_result(base, paths, full).expect("a package");
+        serde_json::to_value(&package).expect("a package serializes")
+    }
 
     /// A standing `process.sequential` rule, with every field a caller
     /// might override.
@@ -764,8 +774,9 @@ mod tests {
         let base = load_base(dir.path()).expect("loads");
 
         assert_eq!(
-            for_result(&base, &["crates/a/src/x.rs".to_string()], false).unwrap(),
+            for_json(&base, &["crates/a/src/x.rs".to_string()], false),
             json!({
+                "schema": "houserules/rule-package@1.0.0",
                 "paths": ["crates/a/src/x.rs"],
                 "areas": ["global", "rust"],
                 "entries": [row("rust.clean", "gotcha", "rust", false, "Clean before retry.")],
@@ -775,14 +786,19 @@ mod tests {
             })
         );
         assert_eq!(
-            for_result(&base, &["README.md".to_string()], false).unwrap(),
-            json!({"paths": ["README.md"], "areas": ["global"], "entries": [], "standing": STANDING_COMMAND})
+            for_json(&base, &["README.md".to_string()], false),
+            json!({
+                "schema": "houserules/rule-package@1.0.0",
+                "paths": ["README.md"], "areas": ["global"], "entries": [],
+                "standing": STANDING_COMMAND,
+            })
         );
         let mut expected_clean = entries[2].clone();
         expected_clean["topic"] = json!("rust");
         assert_eq!(
-            for_result(&base, &["crates/a/src/x.rs".to_string()], true).unwrap(),
+            for_json(&base, &["crates/a/src/x.rs".to_string()], true),
             json!({
+                "schema": "houserules/rule-package@1.0.0",
                 "paths": ["crates/a/src/x.rs"], "areas": ["global", "rust"],
                 "entries": [expected_clean], "standing": STANDING_COMMAND,
             })
@@ -809,8 +825,7 @@ mod tests {
         );
         let base = load_base(dir.path()).expect("loads");
         assert_eq!(
-            for_result(&base, &["crates/a/src/x.rs".to_string()], false)
-                .unwrap()
+            for_json(&base, &["crates/a/src/x.rs".to_string()], false)
                 .get("entries")
                 .cloned()
                 .unwrap(),
@@ -832,8 +847,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            for_result(&base, &["docs/other.md".to_string()], false)
-                .unwrap()
+            for_json(&base, &["docs/other.md".to_string()], false)
                 .get("entries")
                 .cloned()
                 .unwrap(),
@@ -878,7 +892,7 @@ mod tests {
             })],
         );
         let base = load_base(dir.path()).expect("loads");
-        let result = for_result(&base, &["README.md".to_string()], false).unwrap();
+        let result = for_json(&base, &["README.md".to_string()], false);
         assert_eq!(
             result.get("entries").cloned().unwrap(),
             json!([row(
@@ -907,7 +921,7 @@ mod tests {
             })],
         );
         let base = load_base(dir.path()).expect("loads");
-        let result = for_result(&base, &["anything.txt".to_string()], false).unwrap();
+        let result = for_json(&base, &["anything.txt".to_string()], false);
         assert_eq!(
             result.get("entries").cloned().unwrap(),
             json!([{
@@ -938,8 +952,7 @@ mod tests {
         )]);
         for path in ["anything/at/all.rs", "unrelated/other.txt"] {
             assert_eq!(
-                for_result(&base, &[path.to_string()], false)
-                    .unwrap()
+                for_json(&base, &[path.to_string()], false)
                     .get("entries")
                     .cloned()
                     .unwrap(),

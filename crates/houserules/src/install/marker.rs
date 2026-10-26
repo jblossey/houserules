@@ -5,15 +5,18 @@
 //! own, in its order. It validates the keys `init` and `update` read
 //! (`idPrefix`, `version`, `overrides`, `ownedPaths`, `renderers`,
 //! `baselines`, `schema`, `defaultBranch`, `tracker`, `optInOffered`,
-//! `workflow`) and hands out the `packs` key as [`Pin`]s, the `tracker` key as
-//! a `TrackerConfig`, and the `workflow` key as found (`workflow::pins` reads
-//! its shape). The project writes the keys `runners` ([`runners`] has its
-//! shape) and `workspaces`; no writer validates or changes them, and
-//! `check-knowledge` reads them through [`Marker::runner_lines`],
-//! [`Marker::runner`], and [`Marker::workspaces`]. A command names the file by
+//! `reviewLayerOffered`, `workflow`) and hands out the `packs` key as [`Pin`]s,
+//! the `tracker` key as a `TrackerConfig`, and the `workflow` key as found
+//! (`workflow::pins` reads its shape). The project writes the keys `runners`
+//! ([`runners`] has its shape), `workspaces`, and `review` ([`review`] has its
+//! shape); no writer validates or changes them, and `check-knowledge` reads
+//! them through [`Marker::runner_lines`], [`Marker::runner`],
+//! [`Marker::workspaces`], and [`Marker::review`]. A command names the file by
 //! its path. [`read_pins_for_gate`]
 //! reads the same pins for `check-knowledge`, which names the file by its
-//! relative name; [`Marker::read_or_default_for_gate`] reads the whole marker
+//! relative name, and [`pins_of_text`] reads them from a marker that git
+//! holds, which `evidence` names by its commit and top-level path;
+//! [`Marker::read_or_default_for_gate`] reads the whole marker
 //! for its kit-owned citation lint the same way.
 //! [`read_default_branch_for_gate`] reads the `defaultBranch` for `audit`'s
 //! durable-sha check, which words each fault in its own line. No other module
@@ -34,6 +37,7 @@ use crate::archive::{read_json, read_json_as, write_json};
 use crate::root::INSTALL_MARKER;
 use crate::tracker::{Adapter, TrackerConfig};
 
+pub(crate) mod review;
 pub(crate) mod runners;
 
 use runners::RunnerDef;
@@ -165,9 +169,10 @@ pub(crate) struct Marker {
 
 /// The install schema id that `init` stamps and the 1.x conversion writes:
 /// 2.1.0 adds the `tracker`, `workflow`, and `optInOffered` keys to the
-/// marker (batch 34, spec 3.7), and 2.2.0 adds the `runners` and `workspaces`
-/// keys (batch 35, spec 10).
-pub(super) const INSTALL_SCHEMA: &str = "houserules/install@2.2.0";
+/// marker (batch 34, spec 3.7), 2.2.0 adds the `runners` and `workspaces`
+/// keys (batch 35, spec 10), and 2.3.0 adds the `review` and
+/// `reviewLayerOffered` keys (batch 37, spec 6.1 and 10.7).
+pub(super) const INSTALL_SCHEMA: &str = "houserules/install@2.3.0";
 
 /// The folder, relative to the install root, that holds the batch workspaces
 /// while the marker sets no `workspaces` key (batch 35, spec 7). The ignore
@@ -176,7 +181,7 @@ pub(crate) const DEFAULT_WORKSPACES: &str = ".houserules/work";
 
 /// The install schema id that [`Marker::restamp_install_schema`] replaces
 /// with [`INSTALL_SCHEMA`].
-const PREVIOUS_INSTALL_SCHEMA: &str = "houserules/install@2.1.0";
+const PREVIOUS_INSTALL_SCHEMA: &str = "houserules/install@2.2.0";
 
 /// The text that an install schema id starts with.
 const INSTALL_SCHEMA_PREFIX: &str = "houserules/install@";
@@ -254,7 +259,8 @@ impl Marker {
     /// `version` is not a non-empty string (a JSON `null` included, since
     /// `null` is a present value), its `overrides`, `ownedPaths`, or
     /// `renderers` is not an array of strings, its `baselines` is not an
-    /// object of strings, or its `schema` or `defaultBranch` is not a string.
+    /// object of strings, its `schema` or `defaultBranch` is not a string, or
+    /// its `reviewLayerOffered` is not a boolean.
     /// An adopter-hand-edited field never vanishes into a silent default. Only a
     /// file that is not there is absent: a file whose existence cannot be told
     /// is one line with the operating system's own text.
@@ -359,6 +365,11 @@ impl Marker {
             {
                 return Err(format!("{file}: {key} must be an array of strings"));
             }
+        }
+        if let Some(offered) = self.map.get("reviewLayerOffered")
+            && !offered.is_boolean()
+        {
+            return Err(format!("{file}: reviewLayerOffered must be a boolean"));
         }
         self.tracker()?;
         crate::workflow::pins::read(self)?;
@@ -606,10 +617,11 @@ impl Marker {
     }
 
     /// The `defaultBranch`: the branch that the durable-sha check judges
-    /// reachability against. [`Marker::validate`] and
-    /// [`read_default_branch_for_gate`] have rejected a value that is no
-    /// string, so an absent key is the only other case.
-    fn default_branch(&self) -> Option<&str> {
+    /// reachability against, and on which the CI wiring of `houserules ci`
+    /// triggers. [`Marker::validate`] and [`read_default_branch_for_gate`]
+    /// have rejected a value that is no string, so an absent key is the only
+    /// other case.
+    pub(crate) fn default_branch(&self) -> Option<&str> {
         self.map.get("defaultBranch").and_then(Value::as_str)
     }
 
@@ -648,7 +660,7 @@ impl Marker {
         self.map.insert("schema".to_string(), json!(INSTALL_SCHEMA));
     }
 
-    /// Restamps the install schema `houserules/install@2.1.0` to the id that
+    /// Restamps the install schema `houserules/install@2.2.0` to the id that
     /// this binary writes, in the place of the key. Returns `true` when it
     /// changed the key, and `false` for a marker that has another schema or
     /// none, so a second call changes nothing.
@@ -811,6 +823,15 @@ pub(crate) fn read_pins_for_gate(root: &Path) -> Result<BTreeMap<String, Pin>, S
     }
     let value = read_json_as(&path, INSTALL_MARKER)?;
     Marker::from_json(path, INSTALL_MARKER.to_string(), value)?.pins()
+}
+
+/// The pins of the marker whose text is `text`, as [`Marker::pins`] reads
+/// them, with every line naming the marker by `file`. A text that is no JSON
+/// object is one line that names `file`.
+pub(crate) fn pins_of_text(file: &str, text: &str) -> Result<BTreeMap<String, Pin>, String> {
+    let value =
+        serde_json::from_str(text).map_err(|error| format!("{file}: invalid JSON ({error})"))?;
+    Marker::from_json(PathBuf::from(file), file.to_string(), value)?.pins()
 }
 
 /// What the renderers read from the marker.
@@ -983,11 +1004,11 @@ mod tests {
         );
     }
 
-    /// `validate` names a `tracker` key of the wrong shape and an
-    /// `optInOffered` key that is no array of strings, each as one line that
-    /// names the marker.
+    /// `validate` names a `tracker` key of the wrong shape, an `optInOffered`
+    /// key that is no array of strings, and a `reviewLayerOffered` key that is
+    /// no boolean, each as one line that names the marker.
     #[test]
-    fn validate_names_a_tracker_and_an_opt_in_key_of_the_wrong_shape() {
+    fn validate_names_a_tracker_and_an_offer_key_of_the_wrong_shape() {
         let dir = tempfile::tempdir().expect("tempdir");
         let file = dir.path().join(INSTALL_MARKER).display().to_string();
         for (value, fault) in [
@@ -998,6 +1019,10 @@ mod tests {
             (
                 json!({"optInOffered": [1]}),
                 "optInOffered must be an array of strings",
+            ),
+            (
+                json!({"reviewLayerOffered": "yes"}),
+                "reviewLayerOffered must be a boolean",
             ),
         ] {
             std::fs::write(dir.path().join(INSTALL_MARKER), emit(&value)).expect("write");
@@ -1205,6 +1230,40 @@ mod tests {
         let unreadable = read_pins_for_gate(dir.path()).expect_err("a directory");
         assert!(unreadable.starts_with(".houserules.json: "), "{unreadable}");
         assert!(!unreadable.contains(&root), "{unreadable}");
+    }
+
+    /// The pins of marker text that git holds are the pins that the marker
+    /// reader gives, and every line names the marker by the name it is given.
+    #[test]
+    fn the_pins_of_marker_text_come_from_the_marker_reader_under_the_name_given() {
+        let file = "0123456:sub/.houserules.json";
+        let text = json!({"packs": {
+            "b": {"version": "1.0.0", "source": "kit", "sha256": "abc", "addedAreas": ["docs"]},
+            "a": {"version": "2.0.0", "source": "kit", "sha256": "abc", "addedAreas": ["docs"]},
+        }})
+        .to_string();
+
+        assert_eq!(
+            pins_of_text(file, &text),
+            Ok(BTreeMap::from([
+                ("a".to_string(), pin("2.0.0", None)),
+                ("b".to_string(), pin("1.0.0", None)),
+            ]))
+        );
+        assert_eq!(pins_of_text(file, "{}"), Ok(BTreeMap::new()));
+        assert_eq!(
+            pins_of_text(file, "[]"),
+            Err(format!("{file}: not a JSON object"))
+        );
+        assert_eq!(
+            pins_of_text(file, r#"{"packs": []}"#),
+            Err(format!("{file}: packs must be an object"))
+        );
+        let invalid = pins_of_text(file, "{").expect_err("invalid JSON");
+        assert!(
+            invalid.starts_with(&format!("{file}: invalid JSON (")),
+            "{invalid}"
+        );
     }
 
     /// The Claude flag of the render inputs of the install at `root`.
@@ -1638,7 +1697,7 @@ mod tests {
         }
     }
 
-    /// The restamp changes the schema `houserules/install@2.1.0` to the id that
+    /// The restamp changes the schema `houserules/install@2.2.0` to the id that
     /// this binary writes, in the place of the key, and nothing else: a second
     /// call, another schema, and a marker with no schema change nothing.
     #[test]
@@ -1646,13 +1705,13 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let mut marker = marker_in(
             dir.path(),
-            &json!({"idPrefix": "WI", "schema": "houserules/install@2.1.0", "version": "1.4.0"}),
+            &json!({"idPrefix": "WI", "schema": "houserules/install@2.2.0", "version": "1.4.0"}),
         );
 
         assert!(marker.restamp_install_schema());
         assert_eq!(
             marker.map.get("schema"),
-            Some(&json!("houserules/install@2.2.0"))
+            Some(&json!("houserules/install@2.3.0"))
         );
         let keys: Vec<&String> = marker.map.keys().collect();
         assert_eq!(keys, ["idPrefix", "schema", "version"]);
@@ -1660,6 +1719,7 @@ mod tests {
 
         for schema in [
             json!("houserules/install@2.0.0"),
+            json!("houserules/install@2.1.0"),
             json!("houserules/install@3.0.0"),
         ] {
             let mut other = marker_in(dir.path(), &json!({"schema": schema}));

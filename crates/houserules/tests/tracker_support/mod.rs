@@ -1,7 +1,8 @@
 //! Helpers that the test files share: the binary under test, scratch
 //! repositories and copies of directories, command runners and output
 //! assertions, the install shapes the tracker cases start from, the
-//! environment of a hermetic `bd`, the exact lines of spec sections 3.3, 3.4,
+//! environment of a hermetic `bd`, the locale and git configuration of the
+//! caller kept out of a command, the exact lines of spec sections 3.3, 3.4,
 //! 3.8, and 3.10, the lowercase hex SHA-256 digest, and the two forms of a
 //! path that the binary prints: canonical, and quoted for a POSIX shell. A test
 //! file that needs them declares this module, as `install_shape/mod.rs` is
@@ -44,6 +45,30 @@ pub fn houserules() -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_houserules"));
     command.env("HOUSERULES_SKIP_SELF_UPDATE", "1");
     command
+}
+
+/// Leaves the locale and the git configuration of the caller out of
+/// `command` and the git that it starts: `LC_ALL=C`, the system and global
+/// files at the null device, and none of the variables that inject
+/// configuration (`GIT_CONFIG_COUNT` with its `GIT_CONFIG_KEY_<n>` and
+/// `GIT_CONFIG_VALUE_<n>` pairs, and `GIT_CONFIG_PARAMETERS`). A test that pins
+/// text git prints runs its command through this function
+/// (`houserules.pinned-git-text-runs-hermetic`).
+pub fn with_default_git(command: &mut Command) -> &mut Command {
+    for (name, _) in std::env::vars_os() {
+        let injects_configuration = name.to_str().is_some_and(|name| {
+            matches!(name, "GIT_CONFIG_COUNT" | "GIT_CONFIG_PARAMETERS")
+                || name.starts_with("GIT_CONFIG_KEY_")
+                || name.starts_with("GIT_CONFIG_VALUE_")
+        });
+        if injects_configuration {
+            command.env_remove(name);
+        }
+    }
+    command
+        .env("LC_ALL", "C")
+        .env("GIT_CONFIG_SYSTEM", "/dev/null")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
 }
 
 /// This checkout's repository root.
@@ -264,6 +289,50 @@ pub fn declare_json_tracker(dir: &Path) {
     edit_marker(dir, |marker| {
         marker.insert("tracker".to_string(), json!({"adapter": "json"}));
     });
+}
+
+/// Gives the install at `root`, a directory of the repository at `top_level`
+/// that `init` set up, the CI workflow that `init` of an earlier release seeded:
+/// the template of the kit at the path of the install, `knowledge.yml` at the top
+/// level and `knowledge-<folder>.yml` below it, baselined in the marker under
+/// `:/<path>`. `init` writes no workflow now. A subdirectory install gets its
+/// own form: one `update` writes it, and the offer of the review layer, which
+/// that `update` records, is taken out of the marker again. Returns the path of
+/// the workflow below the top level.
+pub fn seed_workflow(top_level: &Path, root: &Path) -> String {
+    let components: Vec<String> = root
+        .strip_prefix(top_level)
+        .expect("the install root lies below the top level")
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    let relative = if components.is_empty() {
+        ".github/workflows/knowledge.yml".to_string()
+    } else {
+        format!(".github/workflows/knowledge-{}.yml", components.join("-"))
+    };
+    let template = fs::read(repo_root().join("template/.github/workflows/knowledge.yml"))
+        .expect("read the template workflow");
+    let file = relative
+        .split('/')
+        .fold(top_level.to_path_buf(), |path, part| path.join(part));
+    fs::create_dir_all(file.parent().expect("a parent directory")).expect("create .github");
+    fs::write(&file, &template).expect("write the workflow");
+    edit_marker(root, |marker| {
+        marker
+            .entry("baselines")
+            .or_insert_with(|| json!({}))
+            .as_object_mut()
+            .expect("baselines is an object")
+            .insert(format!(":/{relative}"), json!(sha256_hex(&template)));
+    });
+    if !components.is_empty() {
+        run_ok(root, &["update"]);
+        edit_marker(root, |marker| {
+            marker.shift_remove("reviewLayerOffered");
+        });
+    }
+    relative
 }
 
 /// Gives `command` the environment of a hermetic `bd` below `home`, which this

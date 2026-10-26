@@ -14,28 +14,30 @@
 //!   malformed `check` is told apart from an absent one: this file's own
 //!   row-building match (below) reports a `Malformed` check as a named,
 //!   exit-2 error, never a judged row.
-//! - `audit`'s own JSON output (`{base, head, ids, changed_files, areas,
-//!   area_files, rules, summary, references}`) is built as `serde_json::Value`
-//!   directly, not through any deliverables-schema type. This is not a
-//!   parse-tolerance judgment (nothing here is *read* untyped) but a
-//!   *shape* one: `audit`'s judged rows carry `result: "open"` — a value
+//! - `audit`'s own JSON output is the typed
+//!   `published::audit_result::AuditResult` (`{schema, base, head, ids,
+//!   changed_files, areas, area_files, rules, summary, stale_sanctions,
+//!   references}`; `stale_sanctions` only when a booking is stale), which
+//!   `gen-schemas` turns into the published `audit-result` schema. It is its
+//!   own type, apart from any deliverables-schema type, for a *shape*
+//!   reason: `audit`'s judged rows carry `result: "open"` — a value
 //!   `.claude/schemas/deliverables.json`'s `auditRow.result` enum
 //!   (`pass`/`fail`/`warn`/`skipped`) explicitly forbids. A report author
 //!   copies only this command's *deterministic* rows into a report's
 //!   `self_audit` (the retrieval protocol's own words: "never hand-written
-//!   rows; the judged rows are the reviewer's") -- the raw `open` rows
-//!   never reach a schema-validated file at all. Reusing the schema-pinned
-//!   `AuditRow`/`AuditRowResult` types here would either make them accept a
-//!   value the schema itself forbids (defeating their whole purpose as a
-//!   schema-exact pin) or require a second, audit-only row representation
-//!   alongside them -- more moving parts than one `Value` builder.
-//! - This is also why this crate carries no typed deliverables model:
-//!   `validate` (see `validate_deliverable.rs`'s module doc) and `stats`
-//!   both aggregate through tolerant `Value` reads too, so no command
-//!   constructs or strictly parses a schema-exact deliverable anywhere in
-//!   this binary. `check_shape.rs`'s `CheckDef` is the one model layer
-//!   that DOES get a real, direct consumer here (the bullet above) and
-//!   stays.
+//!   rows; the judged rows are the reviewer's") -- the `open` rows never
+//!   reach a schema-validated file at all. Reusing a schema-pinned
+//!   deliverables row type here would either make it accept a value the
+//!   schema itself forbids (defeating its whole purpose as a schema-exact
+//!   pin) or require a second, audit-only row representation alongside it.
+//! - This crate carries no typed deliverables model: `validate` (see
+//!   `validate_deliverable.rs`'s module doc) and `stats` both aggregate
+//!   through tolerant `Value` reads, so no command constructs or strictly
+//!   parses a schema-exact deliverable anywhere in this binary. The
+//!   `self_audit` copy of a report is such a tolerant `Value` read too:
+//!   `runner::compare_self_audit` compares it with the JSON of the typed
+//!   result. `check_shape.rs`'s `CheckDef` is the model layer of the checks
+//!   (`runner::run` matches on it).
 //!
 //! ## The rule package
 //!
@@ -68,12 +70,16 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::emit::emit;
+use crate::published::audit_result::{
+    AuditResult, AuditRow, References, RowMode, RowResult, Summary,
+};
+use crate::tracker::Lookup;
 
 use super::deliverable::{read_deliverable_value, workspace_files};
-use super::git::{changed_files, rev};
+use super::git::{changed_files, is_empty_tree, rev};
 use super::git_paths::InstallPrefix;
 use super::glob::area_files;
 use super::model::{Base, Entry, load_base, raw_entry_has_tag};
@@ -97,44 +103,42 @@ pub(crate) struct AuditOptions {
     pub sanctioned: Vec<(String, String)>,
 }
 
-/// `audit`'s result: the JSON result value without the verdict on the
-/// work-item references, whether any row's `result` is `fail`, and the
-/// work-item references of the range and of the deliverables it read, which
-/// `cmd_audit` judges through the installed tracker and adds to the result
-/// (spec 3.7). A `--report` run also hands `cmd_audit` the parsed report and
-/// the ids of the rows that found a filled `self_audit`. `cmd_audit` compares
-/// the copy with the final result (spec 6) and judges again the bookings of
-/// the rows that the comparison moves.
+/// `audit`'s result: the typed result without the verdict on the work-item
+/// references (`references` holds no reference and `summary.reference_fail` is
+/// zero until `cmd_audit` judges them), whether any row's `result` is `fail`,
+/// and the work-item references of the range and of the deliverables it read,
+/// which `cmd_audit` judges through the installed tracker and adds to the
+/// result (spec 3.7). A `--report` run also hands `cmd_audit` the parsed
+/// report and the ids of the rows that found a filled `self_audit`.
+/// `cmd_audit` compares the copy with the final result (spec 6) and judges
+/// again the bookings of the rows that the comparison moves.
 #[derive(Debug)]
 pub(crate) struct AuditOutcome {
-    pub result: Value,
+    pub result: AuditResult,
     pub failed: bool,
     pub(super) references: Vec<Reference>,
     pub(super) report: Option<Value>,
     pub(super) self_audit_rows: Vec<String>,
 }
 
-/// `area_file_map` as a JSON object, preserving its own insertion order --
-/// `glob::area_files` already produces the order this command's own JSON
-/// output ships (`global` first, then each area the first time one of
-/// `changed`'s paths matches it; that function's own doc has the fuller
-/// account), so this is a direct `Value` conversion, no reordering.
-/// Alphabetically sorting the keys here instead would be invisible to a
-/// test comparing parsed `Value`s (key order is not part of a JSON
-/// object's value under equality), but every LIVE `houserules
-/// audit --json` run is a real difference a byte-comparing user or script
-/// can see.
-fn area_files_json(area_file_map: &indexmap::IndexMap<String, Vec<String>>) -> Value {
-    let map: serde_json::Map<String, Value> = area_file_map
-        .iter()
-        .map(|(key, paths)| (key.clone(), json!(paths)))
-        .collect();
-    Value::Object(map)
+/// `true` when `row`'s `mode` is `deterministic`.
+fn is_deterministic(row: &AuditRow) -> bool {
+    row.mode == RowMode::Deterministic
 }
 
-/// `true` when `row`'s `mode` is `"deterministic"`.
-fn is_deterministic(row: &Value) -> bool {
-    row.get("mode").and_then(Value::as_str) == Some("deterministic")
+/// The row of a rule that has no check: a reviewer judges it, and its result
+/// stays `open`.
+fn judged_row(entry: &Entry) -> AuditRow {
+    AuditRow {
+        id: entry.id.clone(),
+        kind: entry.kind.clone(),
+        mode: RowMode::Judged,
+        level: None,
+        result: RowResult::Open,
+        evidence: "\u{2014}".to_string(),
+        findings: None,
+        sanctioned: None,
+    }
 }
 
 /// The tag of an entry only the controller's acts can break.
@@ -189,17 +193,24 @@ fn sanctioned_outside_package_error(base: &Base, rule: &str, is_task_audit: bool
 
 /// Builds the rule package for a git range and runs every member's
 /// deterministic check. A task audit (`opts.report` is set) leaves out an
-/// entry tagged `controller` unless `opts.ids` names it. See this
-/// module's doc for why the result is a raw `Value`.
+/// entry tagged `controller` unless `opts.ids` names it. See this module's
+/// doc for why the result type is not a deliverables type.
 pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, String> {
-    let Some(base_ref) = opts.base_ref else {
+    let Some(base_ref) = &opts.base_ref else {
         return Err("audit needs --base <ref>".to_string());
     };
     if opts.report.is_some() && opts.workspace.is_some() {
         return Err("audit takes --report or --workspace, not both".to_string());
     }
+    let base_sha = rev(&base.root, base_ref)?;
+    audit_range(base, opts, base_sha)
+}
+
+/// Like [`audit`], for a range whose start the caller resolved already:
+/// `base_sha` is the abbreviated sha of a commit, or the full object name of
+/// git's empty tree, which starts the whole history of the head.
+fn audit_range(base: &Base, opts: AuditOptions, base_sha: String) -> Result<AuditOutcome, String> {
     let root = &base.root;
-    let base_sha = rev(root, &base_ref)?;
     let head_sha = rev(root, opts.head_ref.as_deref().unwrap_or("HEAD"))?;
     let prefix = InstallPrefix::of(root)?;
     let changed = changed_files(root, &prefix, &base_sha, &head_sha)?;
@@ -279,10 +290,7 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
             super::model::CheckField::Malformed => {
                 return Err(format!("{id}: malformed check"));
             }
-            super::model::CheckField::Absent => json!({
-                "id": entry.id, "kind": entry.kind, "mode": "judged",
-                "level": Value::Null, "result": "open", "evidence": "\u{2014}",
-            }),
+            super::model::CheckField::Absent => judged_row(entry),
         };
         rows.push(row);
     }
@@ -305,12 +313,9 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
     // comparison of `self_audit` can still move the row of its own check after
     // this loop; `cmd_audit` re-judges those bookings (`rejudge_moved_bookings`).
     let mut stale_sanctions: Vec<String> = Vec::new();
-    let mut sanctioned_fail = 0usize;
+    let mut sanctioned_fail = 0u64;
     for (rule, reference) in &opts.sanctioned {
-        let Some(row) = rows
-            .iter_mut()
-            .find(|row| row.get("id").and_then(Value::as_str) == Some(rule.as_str()))
-        else {
+        let Some(row) = rows.iter_mut().find(|row| row.id == *rule) else {
             return Err(sanctioned_outside_package_error(base, rule, is_task_audit));
         };
         match book_sanction(row, rule, reference) {
@@ -320,19 +325,17 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
         }
     }
 
-    let deterministic_count = rows.iter().filter(|r| is_deterministic(r)).count();
-    let count_where = |result: &str| {
+    let deterministic = rows.iter().filter(|r| is_deterministic(r)).count() as u64;
+    let count_where = |result: RowResult| {
         rows.iter()
-            .filter(|r| {
-                is_deterministic(r) && r.get("result").and_then(Value::as_str) == Some(result)
-            })
-            .count()
+            .filter(|r| is_deterministic(r) && r.result == result)
+            .count() as u64
     };
-    let pass = count_where("pass");
-    let fail = count_where("fail");
-    let warn = count_where("warn");
-    let skipped = count_where("skipped");
-    let judged = rows.len() - deterministic_count;
+    let pass = count_where(RowResult::Pass);
+    let fail = count_where(RowResult::Fail);
+    let warn = count_where(RowResult::Warn);
+    let skipped = count_where(RowResult::Skipped);
+    let judged = rows.len() as u64 - deterministic;
 
     let commits = ctx.commits()?;
     let mut deliverables: Vec<(String, &Value)> = Vec::new();
@@ -350,47 +353,48 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
     let empty_range = commits.is_empty();
     if empty_range {
         for row in rows.iter_mut().filter(|r| is_deterministic(r)) {
-            let evidence = row
-                .get("evidence")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string();
-            row["evidence"] = Value::String(format!("empty range: {evidence}"));
+            row.evidence = format!("empty range: {}", row.evidence);
         }
     }
 
-    let mut summary = json!({
-        "base": base_sha, "head": head_sha, "deterministic": deterministic_count,
-        "pass": pass, "fail": fail, "warn": warn, "skipped": skipped, "judged": judged,
-    });
-    if empty_range {
-        summary["empty_range"] = Value::Bool(true);
-    }
-    // Additive, like `empty_range` above: omitted entirely rather than
-    // printed as 0, so an audit run with no `--sanctioned` at all keeps the
-    // same summary shape an audit with no empty range does.
-    if sanctioned_fail > 0 {
-        summary["sanctioned_fail"] = json!(sanctioned_fail);
-    }
+    // `empty_range` and `sanctioned_fail` are optional keys: the summary omits
+    // them when they are `false` or 0, so the summary of a non-empty range
+    // without `--sanctioned` holds only the counts.
+    let summary = Summary {
+        base: base_sha.clone(),
+        head: head_sha.clone(),
+        deterministic,
+        pass,
+        fail,
+        warn,
+        skipped,
+        judged,
+        empty_range: empty_range.then_some(true),
+        sanctioned_fail: (sanctioned_fail > 0).then_some(sanctioned_fail),
+        reference_fail: 0,
+    };
 
     // A sanctioned fail still counts in `fail` above (its `result` never
     // changed) and still fails the run; a stale booking fails the run too,
     // even though every real row passed, since a stale booking is a
     // finding, not a no-op.
-    let failed = rows
-        .iter()
-        .any(|row| row.get("result").and_then(Value::as_str) == Some("fail"))
-        || !stale_sanctions.is_empty();
-    let mut result = json!({
-        "base": base_sha, "head": head_sha, "ids": opts.ids, "changed_files": changed,
-        "areas": areas, "area_files": area_files_json(&area_file_map),
-        "rules": rows, "summary": summary,
-    });
-    if !stale_sanctions.is_empty() {
-        result["stale_sanctions"] = json!(stale_sanctions);
-    }
+    let failed =
+        rows.iter().any(|row| row.result == RowResult::Fail) || !stale_sanctions.is_empty();
 
     let self_audit_rows = ctx.self_audit_rows();
+    let result = AuditResult {
+        schema: crate::published::id::<AuditResult>(),
+        base: base_sha,
+        head: head_sha,
+        ids: opts.ids,
+        changed_files: changed,
+        areas,
+        area_files: area_file_map,
+        rules: rows,
+        summary,
+        stale_sanctions: (!stale_sanctions.is_empty()).then_some(stale_sanctions),
+        references: References::default(),
+    };
     Ok(AuditOutcome {
         result,
         failed,
@@ -398,6 +402,38 @@ pub(crate) fn audit(base: &Base, opts: AuditOptions) -> Result<AuditOutcome, Str
         report: report_value,
         self_audit_rows,
     })
+}
+
+/// The result of the audit of the range `base_ref` to `head_ref` as `audit
+/// --json` prints it for those two options and no other: the rows of
+/// [`audit`] and the verdict on the work-item references of the range, which
+/// `cmd_audit` adds. A tracker that cannot be built is the `Err`; one that
+/// cannot be reached shows in the `references` of the result, as it does for
+/// `audit`.
+///
+/// A `base_ref` that is the name of git's empty tree starts the whole history
+/// of the head, which the in-process audit of the review commands needs for the
+/// first push to a repository: the audit then reads every path of the head and
+/// every commit that the head reaches. The command `audit` still takes only a
+/// commit for `--base`.
+pub(crate) fn audit_result(
+    base: &Base,
+    base_ref: &str,
+    head_ref: &str,
+) -> Result<AuditResult, String> {
+    let tracker = crate::tracker::lookup(&base.root).map_err(|error| error.to_string())?;
+    let opts = AuditOptions {
+        base_ref: Some(base_ref.to_string()),
+        head_ref: Some(head_ref.to_string()),
+        ..AuditOptions::default()
+    };
+    let mut outcome = if is_empty_tree(base_ref) {
+        audit_range(base, opts, base_ref.to_string())?
+    } else {
+        audit(base, opts)?
+    };
+    judge_references(&tracker, &mut outcome);
+    Ok(outcome.result)
 }
 
 /// What one `--sanctioned` booking made of its row.
@@ -421,45 +457,20 @@ fn stale_line_start(rule: &str, reference: &str) -> String {
 /// Books `reference` on `row`, the row of `rule`, as the result of the row
 /// allows: a judged row and a deterministic `fail` carry `sanctioned`, and the
 /// `fail` also gains the evidence suffix `(sanctioned: <reference>)`.
-fn book_sanction(row: &mut Value, rule: &str, reference: &str) -> Booking {
-    let result = row
-        .get("result")
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .to_string();
+fn book_sanction(row: &mut AuditRow, rule: &str, reference: &str) -> Booking {
     if !is_deterministic(row) {
-        row["sanctioned"] = Value::String(reference.to_string());
+        row.sanctioned = Some(reference.to_string());
         Booking::Judged
-    } else if result == "fail" {
-        let evidence = row
-            .get("evidence")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string();
-        row["evidence"] = Value::String(format!("{evidence} (sanctioned: {reference})"));
-        row["sanctioned"] = Value::String(reference.to_string());
+    } else if row.result == RowResult::Fail {
+        row.evidence = format!("{} (sanctioned: {reference})", row.evidence);
+        row.sanctioned = Some(reference.to_string());
         Booking::Failed
     } else {
         Booking::Stale(format!(
-            "{}row result is \"{result}\", not fail",
-            stale_line_start(rule, reference)
+            "{}row result is \"{}\", not fail",
+            stale_line_start(rule, reference),
+            row.result.as_str()
         ))
-    }
-}
-
-/// Sets `sanctioned_fail` in the `summary` of an audit result to `count`. The
-/// audit prints the key before `reference_fail`; a key that is not there yet
-/// takes that place.
-fn put_sanctioned_fail(summary: &mut Value, count: usize) {
-    let Some(map) = summary.as_object_mut() else {
-        return;
-    };
-    if let Some(slot) = map.get_mut("sanctioned_fail") {
-        *slot = json!(count);
-    } else if let Some(index) = map.keys().position(|key| key == "reference_fail") {
-        map.shift_insert(index, "sanctioned_fail".to_string(), json!(count));
-    } else {
-        map.insert("sanctioned_fail".to_string(), json!(count));
     }
 }
 
@@ -471,34 +482,21 @@ fn put_sanctioned_fail(summary: &mut Value, count: usize) {
 /// result keeps a stale line that names it. A row that still passes keeps the
 /// first judgement.
 fn rejudge_moved_bookings(
-    result: &mut Value,
+    result: &mut AuditResult,
     comparing: &[String],
     sanctioned: &[(String, String)],
 ) {
-    let mut stale: Vec<String> = result["stale_sanctions"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|line| line.as_str().map(str::to_string))
-        .collect();
-    let mut sanctioned_fail = result["summary"]["sanctioned_fail"]
-        .as_u64()
-        .and_then(|count| usize::try_from(count).ok())
-        .unwrap_or(0);
+    let mut stale = result.stale_sanctions.clone().unwrap_or_default();
+    let mut sanctioned_fail = result.summary.sanctioned_fail.unwrap_or(0);
     let mut moved = false;
     for (rule, reference) in sanctioned
         .iter()
         .filter(|(rule, _)| comparing.contains(rule))
     {
-        let Some(row) = result["rules"]
-            .as_array_mut()
-            .into_iter()
-            .flatten()
-            .find(|row| row.get("id").and_then(Value::as_str) == Some(rule.as_str()))
-        else {
+        let Some(row) = result.rules.iter_mut().find(|row| row.id == *rule) else {
             continue;
         };
-        if row["result"] == "pass" {
+        if row.result == RowResult::Pass {
             continue;
         }
         moved = true;
@@ -520,15 +518,9 @@ fn rejudge_moved_bookings(
         return;
     }
     if sanctioned_fail > 0 {
-        put_sanctioned_fail(&mut result["summary"], sanctioned_fail);
+        result.summary.sanctioned_fail = Some(sanctioned_fail);
     }
-    if stale.is_empty() {
-        if let Some(map) = result.as_object_mut() {
-            map.remove("stale_sanctions");
-        }
-    } else {
-        result["stale_sanctions"] = json!(stale);
-    }
+    result.stale_sanctions = (!stale.is_empty()).then_some(stale);
 }
 
 // ---- CLI --------------------------------------------------------------------------
@@ -586,7 +578,7 @@ fn parse_sanctioned(raw: Vec<String>) -> Result<Vec<(String, String)>, String> {
 /// reads the work-item references of its range: the `Work-Item:` and
 /// `Deferred:` trailers of each commit, and the `issues[].backlog` ids of the
 /// deliverables it reads (`trailers::collect`). It judges them
-/// (`trailers::judge`) before it prints the result, and the result holds the
+/// (`judge_references`) before it prints the result, and the result holds the
 /// verdict: `references` (`checked`, `passed`, `skipped`, and one line in
 /// `failures` for each failure) and the `reference_fail` count of the summary.
 /// With a tracker, it prints each failure line on stderr too, and exits 1 when
@@ -667,8 +659,7 @@ pub(crate) fn cmd_audit(
             return ExitCode::from(2);
         }
     };
-    let verdict = trailers::judge(&tracker, &outcome.references);
-    add_verdict(&mut outcome.result, &verdict);
+    let verdict = judge_references(&tracker, &mut outcome);
     if let Some(report) = &outcome.report {
         outcome.failed |= runner::compare_self_audit(
             &base.root,
@@ -678,13 +669,15 @@ pub(crate) fn cmd_audit(
         );
         rejudge_moved_bookings(&mut outcome.result, &outcome.self_audit_rows, &sanctioned);
     }
+    let printed =
+        emit(&serde_json::to_value(&outcome.result).expect("an audit result always serializes"));
     if let Some(path) = &json
-        && let Err(error) = std::fs::write(path, emit(&outcome.result))
+        && let Err(error) = std::fs::write(path, &printed)
     {
         eprintln!("{}: {error}", path.display());
         return ExitCode::from(2);
     }
-    print!("{}", emit(&outcome.result));
+    print!("{printed}");
     for line in verdict.stderr_lines() {
         eprintln!("{line}");
     }
@@ -695,18 +688,24 @@ pub(crate) fn cmd_audit(
     }
 }
 
-/// Adds the verdict on the work-item references to the audit `result`: the
-/// `references` object (`checked`, `passed`, `skipped`, and the `failures`
-/// lines) and the `reference_fail` count of the summary. The `fail` count of
-/// the summary stays the count of the rule rows.
-fn add_verdict(result: &mut Value, verdict: &trailers::Verdict) {
-    result["summary"]["reference_fail"] = json!(verdict.failures.len());
-    result["references"] = json!({
-        "checked": verdict.checked,
-        "passed": verdict.passed,
-        "skipped": verdict.skipped,
-        "failures": verdict.failures,
-    });
+/// Judges the work-item references of `outcome` against `tracker` (spec 3.4
+/// and 3.7) and adds the verdict to its result: the `references` object
+/// (`checked`, `passed`, `skipped`, and the `failures` lines) and the
+/// `reference_fail` count of the summary. The `fail` count of the summary stays
+/// the count of the rule rows. Gives the verdict, which also holds the stderr
+/// lines and the exit code of a tracker error. `cmd_audit` and [`audit_result`]
+/// share this one step, so the in-process audit and `audit --json` print the
+/// same references.
+fn judge_references(tracker: &Lookup, outcome: &mut AuditOutcome) -> trailers::Verdict {
+    let verdict = trailers::judge(tracker, &outcome.references);
+    outcome.result.summary.reference_fail = verdict.failures.len() as u64;
+    outcome.result.references = References {
+        checked: verdict.checked as u64,
+        passed: verdict.passed as u64,
+        skipped: verdict.skipped as u64,
+        failures: verdict.failures.clone(),
+    };
+    verdict
 }
 
 #[cfg(test)]
@@ -719,6 +718,12 @@ mod tests {
 
     use super::*;
     use crate::rules::model::load_base;
+
+    /// The result of `outcome` as the JSON document that `audit` prints, which
+    /// the tests below read by key.
+    fn printed(outcome: &AuditOutcome) -> Value {
+        serde_json::to_value(&outcome.result).expect("an audit result serializes")
+    }
 
     // ---- fixture builders ----
 
@@ -967,7 +972,7 @@ mod tests {
             },
         )
         .unwrap();
-        outcome.result["rules"][0].clone()
+        printed(&outcome)["rules"][0].clone()
     }
 
     fn write_workspace(reports: &[(&str, Value)]) -> tempfile::TempDir {
@@ -1028,7 +1033,7 @@ mod tests {
         .expect("audit");
         assert!(outcome.failed);
 
-        let rows = outcome.result["rules"].as_array().unwrap().clone();
+        let rows = printed(&outcome)["rules"].as_array().unwrap().clone();
         let summary_view: Vec<(String, String, String)> = rows
             .iter()
             .map(|r| {
@@ -1085,9 +1090,9 @@ mod tests {
             &json!("no --report given")
         );
 
-        let summary = &outcome.result["summary"];
-        assert_eq!(summary["base"], outcome.result["base"]);
-        assert_eq!(summary["head"], outcome.result["head"]);
+        let summary = &printed(&outcome)["summary"];
+        assert_eq!(summary["base"], printed(&outcome)["base"]);
+        assert_eq!(summary["head"], printed(&outcome)["head"]);
         assert_eq!(summary["deterministic"], json!(6));
         assert_eq!(summary["pass"], json!(0));
         assert_eq!(summary["fail"], json!(3));
@@ -1096,7 +1101,7 @@ mod tests {
         assert_eq!(summary["judged"], json!(2));
         assert!(summary.get("empty_range").is_none());
 
-        let data = &outcome.result;
+        let data = &printed(&outcome);
         assert_eq!(data["ids"], json!(["process.proc"]));
         assert_eq!(
             data["changed_files"],
@@ -1136,7 +1141,8 @@ mod tests {
         commit(root, "feat: touch infra", None);
         let base = load_base(root).unwrap();
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
-        let ids: Vec<&str> = outcome.result["rules"]
+        let printed_outcome = printed(&outcome);
+        let ids: Vec<&str> = printed_outcome["rules"]
             .as_array()
             .unwrap()
             .iter()
@@ -1160,7 +1166,8 @@ mod tests {
         commit(root, "feat: touch infra", None);
         let base = load_base(root).unwrap();
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
-        let ids: Vec<&str> = outcome.result["rules"]
+        let printed_outcome = printed(&outcome);
+        let ids: Vec<&str> = printed_outcome["rules"]
             .as_array()
             .unwrap()
             .iter()
@@ -1187,8 +1194,9 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(outcome.result["summary"]["empty_range"], json!(true));
-        let rows = outcome.result["rules"].as_array().unwrap();
+        assert_eq!(printed(&outcome)["summary"]["empty_range"], json!(true));
+        let printed_outcome = printed(&outcome);
+        let rows = printed_outcome["rules"].as_array().unwrap();
         let deterministic: Vec<&Value> = rows
             .iter()
             .filter(|r| r["mode"] == "deterministic")
@@ -1246,7 +1254,7 @@ mod tests {
         assert!(outcome.failed);
         assert_eq!(
             row_field(
-                outcome.result["rules"].as_array().unwrap(),
+                printed(&outcome)["rules"].as_array().unwrap(),
                 "infra.a19",
                 "evidence"
             ),
@@ -1272,7 +1280,8 @@ mod tests {
         )
         .unwrap();
         assert!(!outcome2.failed);
-        let rows2 = outcome2.result["rules"].as_array().unwrap();
+        let printed_outcome2 = printed(&outcome2);
+        let rows2 = printed_outcome2["rules"].as_array().unwrap();
         let view: Vec<(String, String, String)> = rows2
             .iter()
             .map(|r| {
@@ -1311,7 +1320,7 @@ mod tests {
                 ("rust.judged".into(), "open".into(), "\u{2014}".into()),
             ]
         );
-        let summary2 = &outcome2.result["summary"];
+        let summary2 = &printed(&outcome2)["summary"];
         assert_eq!(summary2["deterministic"], json!(6));
         assert_eq!(summary2["pass"], json!(6));
         assert_eq!(summary2["fail"], json!(0));
@@ -1370,7 +1379,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(outcome.result["rules"][0]["result"], json!("warn"));
+        assert_eq!(printed(&outcome)["rules"][0]["result"], json!("warn"));
 
         let pass_report = root.join("report-pass.json");
         std::fs::write(
@@ -1387,7 +1396,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(outcome2.result["rules"][0]["result"], json!("pass"));
+        assert_eq!(printed(&outcome2)["rules"][0]["result"], json!("pass"));
     }
 
     /// An implementer report missing a live-run recipe warns instead of a
@@ -1418,7 +1427,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(outcome.result["rules"][0]["result"], json!("warn"));
+        assert_eq!(printed(&outcome)["rules"][0]["result"], json!("warn"));
 
         let empty_report = root.join("report-empty.json");
         std::fs::write(
@@ -1435,7 +1444,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(outcome2.result["rules"][0]["result"], json!("pass"));
+        assert_eq!(printed(&outcome2)["rules"][0]["result"], json!("pass"));
     }
 
     /// The draft state of an implementer report: `self_audit` is an explicit
@@ -1501,7 +1510,7 @@ mod tests {
         .unwrap();
 
         assert!(outcome.failed);
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["result"], json!("fail"));
         assert_eq!(
             row["evidence"],
@@ -1605,7 +1614,7 @@ mod tests {
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
         assert_eq!(
             row_field(
-                outcome.result["rules"].as_array().unwrap(),
+                printed(&outcome)["rules"].as_array().unwrap(),
                 "process.dotcochange",
                 "evidence"
             ),
@@ -1637,7 +1646,7 @@ mod tests {
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
         assert_eq!(
             row_field(
-                outcome.result["rules"].as_array().unwrap(),
+                printed(&outcome)["rules"].as_array().unwrap(),
                 "process.recordonly",
                 "evidence"
             ),
@@ -1667,7 +1676,7 @@ mod tests {
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
         assert_eq!(
             row_field(
-                outcome.result["rules"].as_array().unwrap(),
+                printed(&outcome)["rules"].as_array().unwrap(),
                 "process.recordmixed",
                 "evidence"
             ),
@@ -1699,7 +1708,7 @@ mod tests {
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
         assert_eq!(
             row_field(
-                outcome.result["rules"].as_array().unwrap(),
+                printed(&outcome)["rules"].as_array().unwrap(),
                 "process.recordmulti",
                 "evidence"
             ),
@@ -1718,7 +1727,8 @@ mod tests {
         commit(root, "bad subject", None);
         let base = load_base(root).unwrap();
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
-        let rows = outcome.result["rules"].as_array().unwrap();
+        let printed_outcome = printed(&outcome);
+        let rows = printed_outcome["rules"].as_array().unwrap();
         let view: Vec<(String, String, String)> = rows
             .iter()
             .map(|r| {
@@ -1743,7 +1753,8 @@ mod tests {
         commit(root, "chore: cargo", None);
         let base_again = load_base(root).unwrap();
         let again = audit(&base_again, audit_opts(&base_sha)).unwrap();
-        let again_rows = again.result["rules"].as_array().unwrap();
+        let printed_again = printed(&again);
+        let again_rows = printed_again["rules"].as_array().unwrap();
         assert_eq!(
             row_field(again_rows, "rust.append", "evidence"),
             &json!("not triggered")
@@ -1814,7 +1825,8 @@ mod tests {
         commit(root, "ok: real commit", Some("No trailer here."));
         let base = load_base(root).unwrap();
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
-        let rows = outcome.result["rules"].as_array().unwrap();
+        let printed_outcome = printed(&outcome);
+        let rows = printed_outcome["rules"].as_array().unwrap();
         assert_eq!(
             row_field(rows, "process.bodyonly", "result"),
             &json!("pass")
@@ -1836,7 +1848,7 @@ mod tests {
         commit(root, "feat: at limit", Some(&"x".repeat(100)));
         let base = load_base(root).unwrap();
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["id"], json!("process.bodylimit"));
         assert_eq!(row["result"], json!("pass"));
         assert_eq!(row["evidence"], json!("1 commits checked"));
@@ -1853,7 +1865,7 @@ mod tests {
         commit(root, "feat: over limit", Some(&"x".repeat(101)));
         let base = load_base(root).unwrap();
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["id"], json!("process.bodylimit"));
         assert_eq!(row["result"], json!("fail"));
         assert_eq!(
@@ -1880,7 +1892,7 @@ mod tests {
         );
         let base = load_base(root).unwrap();
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["id"], json!("process.bodylimit"));
         assert_eq!(row["result"], json!("pass"), "{row}");
     }
@@ -1901,7 +1913,7 @@ mod tests {
         );
         let base = load_base(root).unwrap();
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["id"], json!("process.subject"));
         assert_eq!(row["result"], json!("fail"), "{row}");
     }
@@ -1919,7 +1931,7 @@ mod tests {
         commit(root, "chore: unrelated", None);
         let base = load_base(root).unwrap();
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["id"], json!("process.reportcheck"));
         assert_eq!(row["result"], json!("pass"));
         assert_eq!(row["evidence"], json!("not triggered"));
@@ -1950,7 +1962,7 @@ mod tests {
         let base = load_base(root).unwrap();
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
         assert!(
-            outcome.result["rules"]
+            printed(&outcome)["rules"]
                 .as_array()
                 .unwrap()
                 .iter()
@@ -1978,7 +1990,7 @@ mod tests {
         );
         let base = load_base(root).unwrap();
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["id"], json!("process.nocoauthor"));
         assert_eq!(row["result"], json!("fail"));
         assert_eq!(
@@ -2004,7 +2016,7 @@ mod tests {
         commit(root, "ok: second", None);
         let base = load_base(root).unwrap();
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["id"], json!("process.stateful"));
         assert_eq!(row["result"], json!("pass"));
         assert_eq!(row["evidence"], json!("2 commits checked"));
@@ -2042,8 +2054,8 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(outcome.result["changed_files"], json!(["topic.txt"]));
-        let row = &outcome.result["rules"][0];
+        assert_eq!(printed(&outcome)["changed_files"], json!(["topic.txt"]));
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["id"], json!("process.mainonly"));
         assert_eq!(row["result"], json!("pass"));
         assert_eq!(row["evidence"], json!("0 files checked"));
@@ -2086,7 +2098,7 @@ mod tests {
         )
         .unwrap();
         assert!(outcome.failed);
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["result"], json!("fail"));
         assert_eq!(
             row["evidence"],
@@ -2132,7 +2144,7 @@ mod tests {
         )
         .unwrap();
         assert!(outcome.failed);
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["result"], json!("fail"));
         assert_eq!(
             row["evidence"],
@@ -2168,7 +2180,7 @@ mod tests {
         )
         .unwrap();
         assert!(!outcome.failed);
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["result"], json!("pass"));
         assert_eq!(
             row["evidence"],
@@ -2198,7 +2210,7 @@ mod tests {
         )
         .unwrap();
         assert!(!outcome.failed);
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["result"], json!("pass"));
         assert_eq!(row["evidence"], json!("not triggered by any report"));
     }
@@ -2224,7 +2236,7 @@ mod tests {
         )
         .unwrap();
         assert!(outcome.failed);
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["result"], json!("fail"));
         assert_eq!(
             row["evidence"],
@@ -2262,7 +2274,7 @@ mod tests {
         )
         .unwrap();
         assert!(outcome.failed);
-        let row = &outcome.result["rules"][0];
+        let row = &printed(&outcome)["rules"][0];
         assert_eq!(row["result"], json!("fail"));
         assert_eq!(
             row["evidence"],
@@ -2455,7 +2467,7 @@ mod tests {
     /// gives, run as `kind` with `ids` on `--ids`.
     fn controller_package(kind: AuditKind, ids: &[&str]) -> Vec<String> {
         let outcome = controller_audit(kind, ids, &[]).expect("audit");
-        let mut package: Vec<String> = outcome.result["rules"]
+        let mut package: Vec<String> = printed(&outcome)["rules"]
             .as_array()
             .unwrap()
             .iter()
@@ -2576,7 +2588,7 @@ mod tests {
         )
         .expect("audit");
         assert_eq!(
-            outcome.result["stale_sanctions"],
+            printed(&outcome)["stale_sanctions"],
             json!([
                 "--sanctioned rust.controller-checked=spec 3.1: row result is \"pass\", not fail"
             ])
@@ -2622,7 +2634,8 @@ mod tests {
             },
         )
         .unwrap();
-        let rows = outcome.result["rules"].as_array().unwrap();
+        let printed_outcome = printed(&outcome);
+        let rows = printed_outcome["rules"].as_array().unwrap();
         let row = rows.iter().find(|r| r["id"] == "process.commits").unwrap();
         assert_eq!(row["result"], json!("fail"));
         assert_eq!(
@@ -2631,8 +2644,8 @@ mod tests {
                 "commit \"bad subject line\" does not match ^(feat|fix|chore|docs|test): .+ (sanctioned: spec section 6)"
             )
         );
-        assert_eq!(outcome.result["summary"]["sanctioned_fail"], json!(1));
-        assert!(outcome.result.get("stale_sanctions").is_none());
+        assert_eq!(printed(&outcome)["summary"]["sanctioned_fail"], json!(1));
+        assert!(printed(&outcome).get("stale_sanctions").is_none());
         assert!(outcome.failed, "a sanctioned fail still fails the run");
     }
 
@@ -2651,7 +2664,8 @@ mod tests {
             },
         )
         .unwrap();
-        let rows = outcome.result["rules"].as_array().unwrap();
+        let printed_outcome = printed(&outcome);
+        let rows = printed_outcome["rules"].as_array().unwrap();
         let row = rows.iter().find(|r| r["id"] == "process.commits").unwrap();
         assert_eq!(row["sanctioned"], json!("spec section 6"));
     }
@@ -2663,7 +2677,8 @@ mod tests {
     fn sanctioned_judged_rule_is_not_stale() {
         let outcome =
             controller_audit(AuditKind::Plain, &[], &["process.plain-standing"]).expect("audit");
-        let rows = outcome.result["rules"].as_array().unwrap();
+        let printed_outcome = printed(&outcome);
+        let rows = printed_outcome["rules"].as_array().unwrap();
         let row = rows
             .iter()
             .find(|r| r["id"] == "process.plain-standing")
@@ -2676,8 +2691,12 @@ mod tests {
                 "sanctioned": "spec 3.1",
             })
         );
-        assert!(outcome.result.get("stale_sanctions").is_none());
-        assert!(outcome.result["summary"].get("sanctioned_fail").is_none());
+        assert!(printed(&outcome).get("stale_sanctions").is_none());
+        assert!(
+            printed(&outcome)["summary"]
+                .get("sanctioned_fail")
+                .is_none()
+        );
         assert!(!outcome.failed, "a booked judged rule fails nothing");
     }
 
@@ -2702,12 +2721,16 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            outcome.result["stale_sanctions"],
+            printed(&outcome)["stale_sanctions"],
             json!([
                 "--sanctioned process.commits=spec section 6: row result is \"pass\", not fail"
             ])
         );
-        assert!(outcome.result["summary"].get("sanctioned_fail").is_none());
+        assert!(
+            printed(&outcome)["summary"]
+                .get("sanctioned_fail")
+                .is_none()
+        );
         assert!(outcome.failed, "a stale booking still fails the run");
     }
 
@@ -2767,8 +2790,12 @@ mod tests {
         let (dir, base_sha) = make_repo_with_one_bad_commit_subject();
         let base = load_base(dir.path()).unwrap();
         let outcome = audit(&base, audit_opts(&base_sha)).unwrap();
-        assert!(outcome.result["summary"].get("sanctioned_fail").is_none());
-        assert!(outcome.result.get("stale_sanctions").is_none());
+        assert!(
+            printed(&outcome)["summary"]
+                .get("sanctioned_fail")
+                .is_none()
+        );
+        assert!(printed(&outcome).get("stale_sanctions").is_none());
     }
 
     #[test]
@@ -2813,6 +2840,91 @@ mod tests {
                 "process.commits".to_string(),
                 "https://x.test/?a=b".to_string()
             )])
+        );
+    }
+
+    /// The in-process audit of a range gives the rows of `audit` and the
+    /// verdict on the work-item references that `cmd_audit` adds: the
+    /// `Work-Item` trailer of the range is counted as skipped in an install
+    /// with no tracker, where `audit` alone leaves `references` empty.
+    #[test]
+    fn audit_result_gives_the_rows_of_audit_and_the_verdict_on_the_references() {
+        let dir = make_repo(&audit_entries());
+        let root = dir.path();
+        let base_sha = git(root, &["rev-parse", "HEAD"]).trim().to_string();
+        write_file(root, "docs/x.md", "text\n");
+        commit(root, "docs: change", Some("Work-Item: HR-1"));
+        let base = load_base(root).expect("load base");
+
+        let outcome = audit(&base, audit_opts(&base_sha)).expect("audit");
+        let result = audit_result(&base, &base_sha, "HEAD").expect("audit result");
+
+        assert_eq!(result.rules, outcome.result.rules);
+        assert_eq!(result.changed_files, ["docs/x.md"]);
+        assert_eq!(outcome.result.references, References::default());
+        assert_eq!(result.references.skipped, 1);
+        assert_eq!(result.references.checked, 0);
+        assert!(result.references.failures.is_empty());
+        assert_eq!(result.summary.reference_fail, 0);
+    }
+
+    /// The name of git's empty tree in the repository `root`.
+    fn empty_tree_of(root: &Path) -> String {
+        git(root, &["hash-object", "-t", "tree", "--stdin"])
+            .trim()
+            .to_string()
+    }
+
+    /// The range from git's empty tree is the whole history: its audit
+    /// reads every path of the head and every commit that the head reaches.
+    #[test]
+    fn audit_result_of_the_empty_tree_audits_every_path_and_every_commit_of_the_head() {
+        let dir = make_repo(&audit_entries());
+        let root = dir.path();
+        write_file(root, "docs/x.md", "text\n");
+        commit(root, "docs: change", Some("Work-Item: HR-1"));
+        write_file(root, "docs/y.md", "text\n");
+        commit(root, "docs: more", Some("Work-Item: HR-2"));
+        let base = load_base(root).expect("load base");
+        let empty = empty_tree_of(root);
+
+        let result = audit_result(&base, &empty, "HEAD").expect("audit result");
+
+        let mut tracked: Vec<String> = git(root, &["ls-tree", "-r", "--name-only", "HEAD"])
+            .lines()
+            .map(str::to_string)
+            .collect();
+        tracked.sort();
+        let mut audited = result.changed_files.clone();
+        audited.sort();
+        assert_eq!(audited, tracked);
+        assert_eq!(result.base, empty);
+        assert_eq!(result.summary.base, empty);
+        assert_eq!(result.references.skipped, 2);
+        assert!(result.summary.empty_range.is_none());
+    }
+
+    /// `audit` itself stays as it was: the empty tree is no ref for `--base`.
+    #[test]
+    fn audit_refuses_the_empty_tree_as_a_base_ref() {
+        let dir = make_repo(&audit_entries());
+        let base = load_base(dir.path()).expect("load base");
+        let empty = empty_tree_of(dir.path());
+
+        assert_eq!(
+            audit(&base, audit_opts(&empty)).err(),
+            Some(format!("bad ref \"{empty}\""))
+        );
+    }
+
+    #[test]
+    fn audit_result_names_a_ref_that_does_not_resolve() {
+        let dir = make_repo(&audit_entries());
+        let base = load_base(dir.path()).expect("load base");
+
+        assert_eq!(
+            audit_result(&base, "no-such-ref", "HEAD").unwrap_err(),
+            "bad ref \"no-such-ref\""
         );
     }
 }

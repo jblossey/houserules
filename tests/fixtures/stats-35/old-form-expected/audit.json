@@ -1,4 +1,5 @@
 {
+  "schema": "houserules/audit-result@1.0.0",
   "base": "<base>",
   "head": "<head>",
   "ids": [],

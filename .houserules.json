@@ -4,11 +4,11 @@
   "baselines": {
     "tools/claude-session-start.sh": "9a35725d9b0a90f851bb7974b57f9d94769a78f7d544c472bcd216cc5d408f7d",
     ".githooks/commit-msg": "32b161b8b965d50eee8aad833fad1387a74a72be6ad008fff6a3c3eae0dc9739",
-    ".claude/skills/migrating-knowledge/SKILL.md": "b975d6e9978d6c1a2729bebed6c54ec6ae2d55103fdebc0700db540c34e1c9de",
-    "knowledge/schema.json": "a1bc73a4c0741b95e3fd7dfeec26d587af64f125f4138f535b089a6d3c3bef73",
+    ".claude/skills/migrating-knowledge/SKILL.md": "f0aaf7c0c4cd7e19e0666ef983a214498db73bfca6a687d53c53f0e4f0f2c2c5",
+    "knowledge/schema.json": "f3dcdc8d64631e6f4efc2b7ee236315fdde2c313e93ea537ed7f8c89a6c1e605",
     ".claude/skills/houserules-step/SKILL.md": "b6115464930bf3bf9b191bdd82806a622c2bbe3368a99ae81fe3dbd45d451df2",
     "tools/houserules-step.sh": "4ef925ee22cea10899c98358bfbcaa84c64f68c8ae61a25a8e503d144eae94a5",
-    ".claude/schemas/deliverables.json": "a9a7c6b1d8d655b2b4b5df8d1bacda2bb3bbc8e3cfe741dfa1311a110089e46f",
+    ".claude/schemas/deliverables.json": "3171ffaac4ba1081ae72044bae5b64830ee0ca026b4fc4bc1275df9f3cd13f90",
     "backlog/schema.json": "bd1d0e7e14513f9e5db68941665b3eacf1e79fe946e7aca17740608af9548944"
   },
   "ownedPaths": [
@@ -25,9 +25,9 @@
       "addedAreas": []
     },
     "process": {
-      "version": "2.0.1",
+      "version": "2.1.0",
       "source": "kit",
-      "sha256": "bd6805c705d5ae96d44b7975b1a8fea4051319dba1d1467638eda4a6be5ea721",
+      "sha256": "0484ed819ac249ea82a727021c7cce540d0beccde5f9b2eb82c90918db0a1735",
       "addedAreas": []
     },
     "quality": {
@@ -43,16 +43,16 @@
       "addedAreas": []
     },
     "writing-style": {
-      "version": "1.0.1",
+      "version": "1.0.2",
       "source": "kit",
-      "sha256": "37288facc38829050413653f66881b64f43167110ed8e9eeb878d4a054d5841a",
+      "sha256": "96797a15b1cbf71f274ab45e3f66185c1d2de98247594e43bafa3e3f296e4e55",
       "addedAreas": []
     }
   },
   "renderers": [
     "claude"
   ],
-  "schema": "houserules/install@2.2.0",
+  "schema": "houserules/install@2.3.0",
   "tracker": {
     "adapter": "json"
   },
@@ -63,17 +63,17 @@
     "name": "reference",
     "version": "1.4.0",
     "files": {
-      ".claude/agents/branch-reviewer.md": "204365e45cd9625f5d0d06bcfccba711bc2fabdb088d82dc0997e00eaaad759f",
+      ".claude/agents/branch-reviewer.md": "13da26c23be8f2eaff4c6e238bd79218cf22a53430c6b35137c889b010dec7ae",
       ".claude/agents/implementer.md": "ae01e32b174a267131280c0c87259489ffa0eff129a4e08802f05fc9a6133a8a",
       ".claude/agents/spec-reviewer.md": "b3da2127a5443906885967bedaec9c7b06c9df5556033d09dfa32df1c8064cbb",
-      ".claude/agents/task-reviewer.md": "87191aed5c57091c911295340daed313a910f6f0d2454d69a9349c10093656ce",
+      ".claude/agents/task-reviewer.md": "70616e1cefeb114780d2714636689fa1f2985c792debcb064a69c55ac892e067",
       ".claude/evals/dependency-add.json": "892b7749151278e0c3ab6b75eafdb98b8b811abe48777d4df0bc3b083a2d9af5",
       ".claude/evals/docs-edit.json": "8be43f8c174b5ec65a95b6e1c84133521fed6a077fbae5516729f7e9e1c1f2f3",
       ".claude/evals/seeded-violations.json": "22f0f76c0f8bb18a1fcc5e2354bfeaab39aa52137d7e86e3c46019a16dbc61a7",
       ".claude/skills/designing/SKILL.md": "aa70308e0e9d58e94c688e257c5bd7f405b67afedef90b21909ab633e96cd2a5",
-      ".claude/skills/finishing-a-feature/SKILL.md": "c2d0c4b667abda4cdef64b64049b47ebc68218378a3c6d8acae395d6a3c73715",
-      ".claude/skills/orchestrating/SKILL.md": "b62d8169088ef44f215232cbe8d5e927d888b50e8866d3f2c139a725aba95b18",
-      ".claude/skills/planning/SKILL.md": "9c2ca86e3a74ad9f7bbfe0264038c8e8501f5f9742eceadb2428f5cb295e2ca2",
+      ".claude/skills/finishing-a-feature/SKILL.md": "301fa2343725f7910efcc7184e71c2cce24c3dbe182234201969684580a83d55",
+      ".claude/skills/orchestrating/SKILL.md": "02869f51c033924931ca458fb3b53bdca0ddb7246c4e9d279e9af882917a402c",
+      ".claude/skills/planning/SKILL.md": "8acab72b9077e8e5697851351f6a830f7673d36cb8c96eaae1d518f3ab14eaf2",
       "tools/reference-session-start.sh": "55993fb855bfd1117362b5eb60db6c6638176ea84dc69e48422ca7e29992b574"
     },
     "models": {
@@ -83,5 +83,35 @@
       "task-reviewer": "opus"
     }
   },
-  "workspaces": ".superpowers/sdd"
+  "workspaces": ".superpowers/sdd",
+  "review": {
+    "route": {
+      "default": "owner-review"
+    },
+    "bundle": {
+      "exemptAuthors": [
+        "dependabot[bot]"
+      ],
+      "exemptBranches": [
+        "release-please--*"
+      ]
+    },
+    "intent": {
+      "sources": [
+        "work-item",
+        "file"
+      ],
+      "files": [
+        "docs/specs/*.md",
+        "docs/plans/*.md"
+      ]
+    },
+    "ci": {
+      "files": [
+        ".github/workflows/review.yml",
+        ".github/workflows/houserules-review.yml",
+        ".github/workflows/ci.yml"
+      ]
+    }
+  }
 }

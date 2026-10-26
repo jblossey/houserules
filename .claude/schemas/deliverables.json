@@ -498,6 +498,7 @@
           "type": "boolean"
         },
         "backlog": {
+          "description": "The id of the filed deferral that holds this finding; set it only for a finding that the fix round defers (process.no-tech-debt).",
           "$ref": "#/$defs/backlogId"
         }
       }

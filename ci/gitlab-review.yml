@@ -1,0 +1,654 @@
+# The review layer of houserules for GitLab, as a file for include:remote.
+#
+# Each install has five jobs: houserules-<key>-gates, -floor, -report, -record,
+# and -record-push. Only report and record-push name the environment that holds
+# the project variable HOUSERULES_TOKEN. Neither of them runs houserules, the
+# setup command, or code of the project.
+#
+# No CI/CD variable carries text of the request into a script. The description
+# and the author come from the API into a file.
+#
+# The line with the release annotation below is the one release version of this
+# file. The release tooling bumps it with the crate version, and a test pins the
+# two together.
+spec:
+  inputs:
+    dir:
+      description: The path of the houserules install below the git top level.
+      default: .
+      regex: ^[A-Za-z0-9._/-]+$
+    key:
+      description: The name of this install in job names, artifacts, and the token environment; root for a top-level install, else the install path with each character outside letters, digits, hyphens, and underscores replaced by a hyphen. It may start with a hyphen or an underscore.
+      default: root
+      regex: ^[A-Za-z0-9_-]+$
+    setup:
+      description: A shell command that runs before the audit in the gates and record jobs, for example a build of the project tools.
+      default: ''
+    install:
+      description: release installs the release of this file; none expects the setup command to put houserules on the PATH.
+      default: release
+      options: [release, none]
+    floor-install:
+      description: 'The binary of the floor job. release installs the release of this file; runner:<path> uses an executable that the runner provides at an absolute path, only on a fresh runner or an unwritable path; default-branch builds houserules from the default branch with cargo, so the image needs cargo.'
+      default: release
+      regex: ^(release|default-branch|runner:/.+)$
+    tracker:
+      description: The tracker of the install, for the jobs that resolve work items. beads bootstraps the store; github needs gh and GH_TOKEN from the setup command and the project variables. json or empty needs nothing.
+      default: ''
+      regex: ^(json|github|beads)?$
+    stage:
+      description: The stage of the jobs.
+      default: test
+    image:
+      description: An image with git 2.41 or later, curl, and jq. The default is pinned by digest and has git 2.56.0, curl 8.14.1, and jq 1.7 on its PATH.
+      default: mcr.microsoft.com/devcontainers/base:trixie@sha256:6ee2b4097c75d33e9a94d941577a3286e5d629434fba384688b06daeeaaeac99
+    token-environment:
+      description: The environment scope of the project variable HOUSERULES_TOKEN. The default is houserules- and the key.
+      default: houserules-$HOUSERULES_KEY
+---
+.houserules-$[[ inputs.key ]]-base:
+  image: $[[ inputs.image ]]
+  stage: $[[ inputs.stage ]]
+  # GitLab copies each default: keyword of the adopter into a job that does not set it. A
+  # before_script, hook, service, or cache would run beside HOUSERULES_TOKEN or in the floor.
+  inherit:
+    default: [tags, retry, interruptible]
+  variables:
+    GIT_DEPTH: '0'
+    HOUSERULES_VERSION: '1.4.0' # x-release-please-version
+    HOUSERULES_DIR: $[[ inputs.dir ]]
+    HOUSERULES_KEY: $[[ inputs.key ]]
+    HOUSERULES_SH:
+      value: |
+        hr_fail() {
+          printf '%s%s\n' "${HOUSERULES_ERROR_PREFIX-}" "$1"
+          exit 1
+        }
+        hr_notice() {
+          printf '%s%s\n' "${HOUSERULES_NOTICE_PREFIX-}" "$1"
+        }
+        hr_bin() {
+          printf '%s/houserules-bin' "${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+        }
+        hr_use_bin() {
+          PATH="$1:$PATH"
+          export PATH
+          if [ -n "${GITHUB_PATH:-}" ]; then
+            printf '%s\n' "$1" >> "$GITHUB_PATH"
+          fi
+        }
+        hr_at_least() {
+          awk -v have="$1" -v need="$2" '
+            function core(v, s) { s = v; sub(/[-+].*/, "", s); return s }
+            BEGIN {
+              split(core(have), h, ".")
+              split(core(need), n, ".")
+              for (i = 1; i <= 3; i++) {
+                if (h[i] + 0 > n[i] + 0) exit 0
+                if (h[i] + 0 < n[i] + 0) exit 1
+              }
+              older = (have ~ /-/ && need !~ /-/) ? 1 : 0
+              exit older
+            }'
+        }
+        hr_check_minimum() {
+          [ -n "${HOUSERULES_MINIMUM_VERSION:-}" ] || return 0
+          hr_found=$(houserules --version) || hr_fail "houserules: the installed binary does not run"
+          hr_found=${hr_found##* }
+          hr_at_least "$hr_found" "$HOUSERULES_MINIMUM_VERSION" || hr_fail "houserules $hr_found is older than $HOUSERULES_MINIMUM_VERSION, which this unit needs; raise the version input"
+        }
+        hr_install_release() {
+          [ -n "${HOUSERULES_VERSION:-}" ] || hr_fail "houserules: the version input is required when install or floor-install is release"
+          if ! printf '%s\n' "$HOUSERULES_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
+            hr_shown=$(printf '%s' "$HOUSERULES_VERSION" | tr -c '0-9A-Za-z.+-' '?' | cut -c1-40)
+            hr_fail "houserules: the version '$hr_shown' is not a release version such as MAJOR.MINOR.PATCH"
+          fi
+          hr_url="https://github.com/jblossey/houserules/releases/download/v${HOUSERULES_VERSION}/houserules-installer.sh"
+          hr_installer=$(curl --proto '=https' --tlsv1.2 -LsSf "$hr_url") || hr_fail "houserules: cannot download $hr_url; the release does not exist, has no installer, or GitHub was unreachable"
+          printf '%s\n' "$hr_installer" | HOUSERULES_UNMANAGED_INSTALL="$(hr_bin)" sh || hr_fail "houserules: the installer of release $HOUSERULES_VERSION failed"
+          [ -x "$(hr_bin)/houserules" ] || hr_fail "houserules: the installer of release $HOUSERULES_VERSION wrote no binary"
+          hr_use_bin "$(hr_bin)"
+          hr_check_minimum
+        }
+        hr_build_default_branch() {
+          hr_src=${HOUSERULES_DEFAULT_SRC:-}
+          [ -f "$hr_src/crates/houserules/Cargo.toml" ] || hr_fail "houserules: the default branch holds no crates/houserules, so floor-install default-branch cannot build it"
+          hr_root="$(hr_bin)-build"
+          (
+            cd "$hr_src" || exit 1
+            if command -v rustup > /dev/null 2>&1; then
+              hr_toolchain=$(rustup show active-toolchain 2> /dev/null | awk 'NR == 1 { print $1 }') || hr_toolchain=
+              if [ -n "$hr_toolchain" ]; then
+                RUSTUP_TOOLCHAIN=$hr_toolchain
+                export RUSTUP_TOOLCHAIN
+              fi
+            fi
+            cargo install --locked --path "$hr_src/crates/houserules" --bin houserules --root "$hr_root"
+          ) || hr_fail "houserules: cargo cannot build houserules from the default branch"
+          hr_use_bin "$hr_root/bin"
+        }
+        hr_link_runner_binary() {
+          [ -f "$1" ] && [ -x "$1" ] || hr_fail "houserules: floor-install runner:$1 names no executable file on this runner"
+          mkdir -p "$(hr_bin)"
+          ln -sf "$1" "$(hr_bin)/houserules"
+          hr_use_bin "$(hr_bin)"
+        }
+        hr_install() {
+          case "$2:$1" in
+            install:release | floor:release) hr_install_release ;;
+            install:none) ;;
+            floor:none) hr_fail "houserules: floor-install must not be none, because the floor must not run a binary that the request built" ;;
+            floor:default-branch) hr_build_default_branch ;;
+            floor:runner:/*) hr_link_runner_binary "${1#runner:}" ;;
+            floor:runner:*) hr_fail "houserules: floor-install runner:<path> needs an absolute path" ;;
+            install:*) hr_fail "houserules: install must be release or none" ;;
+            *) hr_fail "houserules: floor-install must be release, default-branch, or runner:<path>" ;;
+          esac
+        }
+        hr_require_binary() {
+          command -v houserules > /dev/null 2>&1 || hr_fail "houserules: houserules is not on the PATH, so with install none the setup command must put it there"
+        }
+        hr_intent() {
+          # LC_ALL=C: [[:space:]] is then the ASCII set that bundle check reads (spec 7.1), in every locale
+          LC_ALL=C awk '
+            function ticks(line, count) {
+              count = 0
+              while (substr(line, count + 1, 1) == "`") count++
+              return count
+            }
+            BEGIN { fence = 0; in_section = 0 }
+            {
+              run = ticks($0)
+              rest = substr($0, run + 1)
+              if (fence > 0) {
+                if (run >= fence && rest ~ /^[[:space:]]*$/) fence = 0
+                next
+              }
+              if (run >= 3 && index(rest, "`") == 0) { fence = run; next }
+              if (in_section && /^## /) exit
+              if (/^## Evidence bundle[[:space:]]*$/) { in_section = 1; next }
+              if (in_section && /^Intent:/) { sub(/^Intent:[[:space:]]*/, ""); sub(/[[:space:]]*$/, ""); print; exit }
+            }
+          ' "$1"
+        }
+        hr_notes_ref() {
+          hr_dir=${1#./}
+          hr_dir=${hr_dir%/}
+          case $hr_dir in
+            '' | .) printf 'refs/notes/houserules' ;;
+            *) printf 'refs/notes/houserules-sub/%s' "$hr_dir" ;;
+          esac
+        }
+        hr_fetch_notes() {
+          hr_listed=$(hr_git ls-remote "$1" "$2") || hr_fail "houserules: cannot read the notes ref $2 from the remote"
+          if printf '%s\n' "$hr_listed" | awk -v ref="$2" '$2 == ref { found = 1 } END { exit !found }'; then
+            hr_git fetch -q --no-tags "$1" "+$2:$3" || hr_fail "houserules: cannot fetch the notes ref $2"
+            return 0
+          fi
+          return 1
+        }
+        hr_push_note() {
+          hr_side=refs/notes/houserules-fetched
+          GIT_AUTHOR_NAME=houserules
+          GIT_AUTHOR_EMAIL=houserules@users.noreply.invalid
+          GIT_COMMITTER_NAME=houserules
+          GIT_COMMITTER_EMAIL=houserules@users.noreply.invalid
+          export GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+          hr_git fetch -q --no-tags --depth=1 "$1" "$3" || hr_fail "houserules: cannot fetch the commit $3"
+          hr_tries=0
+          while [ "$hr_tries" -lt 3 ]; do
+            hr_tries=$((hr_tries + 1))
+            if hr_fetch_notes "$1" "$2" "$hr_side"; then
+              if git notes --ref="$hr_side" show "$3" > /dev/null 2>&1; then
+                hr_notice "houserules: the remote notes ref already holds a record for $3, and it stays as it is"
+                return 0
+              fi
+              if git rev-parse -q --verify "$2" > /dev/null; then
+                git notes --ref="$2" merge -q -s theirs "$hr_side"
+              else
+                git update-ref "$2" "$hr_side"
+              fi
+            fi
+            if ! git notes --ref="$2" show "$3" > /dev/null 2>&1; then
+              git notes --ref="$2" add -F "$4" "$3"
+            fi
+            if hr_git push -q "$1" "$2:$2" > /dev/null 2>&1; then
+              return 0
+            fi
+          done
+          hr_fail "houserules: the remote rejected the notes ref $2 three times; run the job again"
+        }
+      expand: false
+
+houserules-$[[ inputs.key ]]-gates:
+  extends: .houserules-$[[ inputs.key ]]-base
+  variables:
+    HOUSERULES_SOURCE: $[[ inputs.install ]]
+    HOUSERULES_TRACKER: $[[ inputs.tracker ]]
+    HOUSERULES_SETUP:
+      value: $[[ inputs.setup ]]
+      expand: false
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - |
+      set -eu
+      eval "$HOUSERULES_SH"
+      if [ "${CI_PIPELINE_SOURCE:-}" = merge_request_event ]; then
+        base_sha=$CI_MERGE_REQUEST_DIFF_BASE_SHA
+        head_sha=${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA:-$CI_COMMIT_SHA}
+        git checkout -q --detach "$head_sha"
+      fi
+      hr_install "$HOUSERULES_SOURCE" install
+      if [ -n "$HOUSERULES_SETUP" ]; then
+        eval "$HOUSERULES_SETUP"
+      fi
+      hr_require_binary
+      if [ "$HOUSERULES_TRACKER" = beads ]; then
+        archive=beads_1.3.1_linux_amd64.tar.gz
+        base=https://github.com/gastownhall/beads/releases/download/v1.3.1
+        bd_dir="$(hr_bin)-bd"
+        mkdir -p "$bd_dir"
+        (
+          cd "$bd_dir"
+          curl --proto '=https' --tlsv1.2 -fsSLO "$base/$archive"
+          curl --proto '=https' --tlsv1.2 -fsSLO "$base/checksums.txt"
+          sha256sum --check --ignore-missing checksums.txt
+          tar -xzf "$archive"
+        )
+        hr_use_bin "$bd_dir"
+        BD_DISABLE_METRICS=1 DO_NOT_TRACK=1 bd bootstrap --yes
+      fi
+      out="houserules-evidence-$HOUSERULES_KEY"
+      mkdir -p "$out"
+      status=0
+      houserules check-knowledge --dir "$HOUSERULES_DIR" || status=1
+      houserules check-backlog --dir "$HOUSERULES_DIR" || status=1
+      if [ "${CI_PIPELINE_SOURCE:-}" = merge_request_event ]; then
+        if curl --silent --show-error --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" --output "$out/request.json" "$CI_API_V4_URL/projects/$CI_MERGE_REQUEST_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID"; then
+          jq -r '.description // ""' "$out/request.json" > "$out/description.md"
+          author=$(jq -r '.author.username // ""' "$out/request.json")
+        else
+          status=1
+          : > "$out/description.md"
+          author=
+        fi
+        houserules audit --base "$base_sha" --head "$head_sha" --json "$out/audit.json" --dir "$HOUSERULES_DIR" || status=1
+        houserules bundle check --body "$out/description.md" --base "$base_sha" --head "$head_sha" --author="$author" --head-ref="$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" --dir "$HOUSERULES_DIR" || status=1
+        set -- --base "$base_sha" --head "$head_sha" --dir "$HOUSERULES_DIR"
+        if [ -s "$out/audit.json" ]; then
+          set -- "$@" --audit "$out/audit.json"
+        fi
+        intent=$(hr_intent "$out/description.md")
+        if [ -n "$intent" ]; then
+          houserules evidence "$@" --intent="$intent" --out "$out/evidence.md" --json "$out/evidence.json" || houserules evidence "$@" --out "$out/evidence.md" --json "$out/evidence.json" || status=1
+        else
+          houserules evidence "$@" --out "$out/evidence.md" --json "$out/evidence.json" || status=1
+        fi
+        houserules route "$@" --json "$out/route.json" || status=1
+      fi
+      exit "$status"
+  artifacts:
+    name: houserules-evidence-$[[ inputs.key ]]
+    paths:
+      - houserules-evidence-$[[ inputs.key ]]/
+    when: always
+    expire_in: 1 week
+
+houserules-$[[ inputs.key ]]-floor:
+  extends: .houserules-$[[ inputs.key ]]-base
+  variables:
+    HOUSERULES_SOURCE: $[[ inputs.floor-install ]]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - |
+      set -eu
+      eval "$HOUSERULES_SH"
+      if [ "$HOUSERULES_SOURCE" = default-branch ]; then
+        git fetch -q origin "+refs/heads/$CI_DEFAULT_BRANCH:refs/remotes/origin/$CI_DEFAULT_BRANCH"
+        # cargo reads .cargo/config.toml above the source it builds, and rustup reads
+        # rust-toolchain.toml above its working directory: no folder of this source lies in the request.
+        HOUSERULES_DEFAULT_SRC=$(mktemp -d)
+        export HOUSERULES_DEFAULT_SRC
+        hr_project=$(cd "${CI_PROJECT_DIR:-$PWD}" && pwd -P)
+        hr_source=$(cd "$HOUSERULES_DEFAULT_SRC" && pwd -P)
+        case $hr_source/ in
+          "$hr_project"/*) hr_fail "houserules: the source of the default branch is inside the checkout of the request" ;;
+        esac
+        git worktree add -q --detach "$HOUSERULES_DEFAULT_SRC" "origin/$CI_DEFAULT_BRANCH"
+      fi
+      hr_install "$HOUSERULES_SOURCE" floor
+      base_sha=$CI_MERGE_REQUEST_DIFF_BASE_SHA
+      head_sha=${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA:-$CI_COMMIT_SHA}
+      git checkout -q --detach "$head_sha"
+      houserules route --no-audit --base "$base_sha" --head "$head_sha" --json floor.json --dir "$HOUSERULES_DIR"
+      route=$(jq -r '.route // empty' floor.json 2> /dev/null) || route=
+      case $route in
+        auto-merge-eligible | owner-review | senior-review) printf 'HOUSERULES_FLOOR_ROUTE=%s\n' "$route" > floor.env ;;
+        *) hr_fail "houserules: route --no-audit wrote no valid route" ;;
+      esac
+  artifacts:
+    reports:
+      dotenv: floor.env
+    expire_in: 1 day
+
+houserules-$[[ inputs.key ]]-report:
+  extends: .houserules-$[[ inputs.key ]]-base
+  variables:
+    GIT_STRATEGY: none
+    HOUSERULES_ROUTE_SH:
+      value: |
+        hr_route_of() {
+          [ -f "$1" ] || return 0
+          jq -r 'if (.route | type) == "string" and (.route == "auto-merge-eligible" or .route == "owner-review" or .route == "senior-review") then .route else empty end' "$1" 2> /dev/null || true
+        }
+        hr_route_rank() {
+          case $1 in
+            auto-merge-eligible) echo 0 ;;
+            owner-review) echo 1 ;;
+            *) echo 2 ;;
+          esac
+        }
+        applied_route() {
+          if [ -z "$4" ] || [ "$3" != "$4" ]; then
+            printf 'notice=houserules: the head of the request is not %.7s now, or it cannot be read; this run writes nothing\n' "$3"
+            return 0
+          fi
+          hr_gates=$(hr_route_of "$1")
+          hr_floor=$(hr_route_of "$2")
+          if [ -z "$hr_gates" ]; then
+            printf 'notice=houserules: the gates document is missing or invalid; the floor alone decides\n'
+            hr_gates_shown=missing
+            hr_gates_rank=0
+          else
+            hr_gates_shown=$hr_gates
+            hr_gates_rank=$(hr_route_rank "$hr_gates")
+          fi
+          if [ -z "$hr_floor" ]; then
+            printf 'notice=houserules: the floor document is missing or invalid; the applied route is at least owner-review\n'
+            hr_floor_shown=missing
+            hr_floor_rank=1
+          else
+            hr_floor_shown=$hr_floor
+            hr_floor_rank=$(hr_route_rank "$hr_floor")
+          fi
+          hr_rank=$hr_gates_rank
+          if [ "$hr_floor_rank" -gt "$hr_rank" ]; then
+            hr_rank=$hr_floor_rank
+          fi
+          case $hr_rank in
+            0) hr_applied=auto-merge-eligible ;;
+            1) hr_applied=owner-review ;;
+            *) hr_applied=senior-review ;;
+          esac
+          printf 'route=%s\n' "$hr_applied"
+          printf 'line=Applied route: %s (computed %s, floor %s)\n' "$hr_applied" "$hr_gates_shown" "$hr_floor_shown"
+        }
+      expand: false
+  environment:
+    name: $[[ inputs.token-environment ]]
+    action: access
+  needs:
+    - job: houserules-$[[ inputs.key ]]-gates
+      artifacts: true
+    - job: houserules-$[[ inputs.key ]]-floor
+      artifacts: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: always
+  script:
+    - |
+      set -eu
+      unset GIT_TRACE GIT_CURL_VERBOSE GIT_TRACE_CURL
+      eval "$HOUSERULES_SH"
+      eval "$HOUSERULES_ROUTE_SH"
+      out="houserules-evidence-$HOUSERULES_KEY"
+      install=${HOUSERULES_DIR#./}
+      install=${install%/}
+      if [ -z "$install" ]; then
+        install=.
+      fi
+      if [ "$install" = . ]; then
+        context='houserules/route'
+        label_prefix='houserules'
+      else
+        context="houserules/route ($install)"
+        label_prefix="houserules $install"
+      fi
+      marker="<!-- houserules:evidence $install -->"
+      project=$CI_MERGE_REQUEST_PROJECT_ID
+      request="$CI_API_V4_URL/projects/$project/merge_requests/$CI_MERGE_REQUEST_IID"
+      body="$out/comment.md"
+      mkdir -p "$out"
+      show_packet() {
+        if [ -f "$out/evidence.md" ]; then
+          cat "$out/evidence.md"
+        fi
+      }
+      if [ "${CI_MERGE_REQUEST_SOURCE_PROJECT_ID:-$project}" != "$project" ]; then
+        hr_notice "houserules: this merge request comes from a fork, so this run posts nothing; the packet follows"
+        show_packet
+        exit 0
+      fi
+      own_head=${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA:-$CI_COMMIT_SHA}
+      floor_doc="$out/floor-document.json"
+      rm -f "$floor_doc"
+      if [ -n "${HOUSERULES_FLOOR_ROUTE:-}" ]; then
+        jq -n --arg route "$HOUSERULES_FLOOR_ROUTE" '{route: $route}' > "$floor_doc"
+      fi
+      current=
+      if curl --silent --show-error --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" --output "$out/request.json" "$request"; then
+        current=$(jq -r '.sha // empty' "$out/request.json")
+      fi
+      result=$(applied_route "$out/route.json" "$floor_doc" "$own_head" "$current")
+      printf '%s\n' "$result" | sed -n 's/^notice=//p' | while IFS= read -r notice; do
+        hr_notice "$notice"
+      done
+      route=$(printf '%s\n' "$result" | sed -n 's/^route=//p')
+      line=$(printf '%s\n' "$result" | sed -n 's/^line=//p')
+      if [ -z "$route" ]; then
+        exit 0
+      fi
+      {
+        printf '%s\n' "$marker"
+        printf '%s\n' "$line"
+        if [ -f "$out/evidence.md" ]; then
+          if [ "$(sed -n 1p "$out/evidence.md")" = "$marker" ]; then
+            sed 1d "$out/evidence.md"
+          else
+            cat "$out/evidence.md"
+          fi
+        else
+          printf '\nhouserules: the gates job wrote no evidence packet.\n'
+        fi
+      } > "$body"
+      if [ -z "${HOUSERULES_TOKEN:-}" ]; then
+        hr_notice "houserules: HOUSERULES_TOKEN is not set for the environment $CI_ENVIRONMENT_NAME, so this run posts nothing; create the token as a masked and hidden project variable with that environment scope"
+        cat "$body"
+        exit 0
+      fi
+      refused() {
+        hr_notice "houserules: GitLab refused a request, so the token may lack the api scope or the Developer role; the applied route is $route and this run posted no more"
+        exit 0
+      }
+      api() {
+        api_method=$1
+        api_path=$2
+        shift 2
+        curl --silent --show-error --fail --request "$api_method" --header "PRIVATE-TOKEN: $HOUSERULES_TOKEN" "$@" "$CI_API_V4_URL$api_path"
+      }
+      jq -Rs '{body: .}' "$body" > "$body.json"
+      api GET /user --output "$out/me.json" || refused
+      me=$(jq -r '.id' "$out/me.json")
+      : > "$out/notes.ndjson"
+      page=1
+      while [ "$page" -le 50 ]; do
+        api GET "/projects/$project/merge_requests/$CI_MERGE_REQUEST_IID/notes?sort=asc&order_by=created_at&per_page=100&page=$page" --output "$out/notes-page.json" || refused
+        jq -c '.[]' "$out/notes-page.json" >> "$out/notes.ndjson"
+        if [ "$(jq length "$out/notes-page.json")" -lt 100 ]; then
+          break
+        fi
+        page=$((page + 1))
+      done
+      note_id=$(jq -rs --argjson me "$me" --arg marker "$marker" 'map(select(.system != true and .author.id == $me and ((.body | split("\n")[0] | rtrimstr("\r")) == $marker))) | last | .id // empty' "$out/notes.ndjson")
+      if [ -n "$note_id" ]; then
+        api PUT "/projects/$project/merge_requests/$CI_MERGE_REQUEST_IID/notes/$note_id" --header 'Content-Type: application/json' --data "@$body.json" --output /dev/null || refused
+      else
+        api POST "/projects/$project/merge_requests/$CI_MERGE_REQUEST_IID/notes" --header 'Content-Type: application/json' --data "@$body.json" --output /dev/null || refused
+      fi
+      api POST "/projects/$project/statuses/$own_head" --data-urlencode state=success --data-urlencode "name=$context" --data-urlencode "description=$route" --output /dev/null || refused
+      remove=
+      for candidate in auto-merge-eligible owner-review senior-review; do
+        name="$label_prefix: $candidate"
+        api POST "/projects/$project/labels" --data-urlencode "name=$name" --data-urlencode color=#1d76db --output /dev/null 2> /dev/null || true
+        if [ "$candidate" != "$route" ]; then
+          remove="${remove:+$remove,}$name"
+        fi
+      done
+      api PUT "/projects/$project/merge_requests/$CI_MERGE_REQUEST_IID" --data-urlencode "add_labels=$label_prefix: $route" --data-urlencode "remove_labels=$remove" --output /dev/null || refused
+
+houserules-$[[ inputs.key ]]-record:
+  extends: .houserules-$[[ inputs.key ]]-base
+  variables:
+    HOUSERULES_SOURCE: $[[ inputs.install ]]
+    HOUSERULES_TRACKER: $[[ inputs.tracker ]]
+    HOUSERULES_SETUP:
+      value: $[[ inputs.setup ]]
+      expand: false
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - |
+      set -eu
+      eval "$HOUSERULES_SH"
+      hr_install "$HOUSERULES_SOURCE" install
+      if [ -n "$HOUSERULES_SETUP" ]; then
+        eval "$HOUSERULES_SETUP"
+      fi
+      hr_require_binary
+      if [ "$HOUSERULES_TRACKER" = beads ]; then
+        archive=beads_1.3.1_linux_amd64.tar.gz
+        base_url=https://github.com/gastownhall/beads/releases/download/v1.3.1
+        bd_dir="$(hr_bin)-bd"
+        mkdir -p "$bd_dir"
+        (
+          cd "$bd_dir"
+          curl --proto '=https' --tlsv1.2 -fsSLO "$base_url/$archive"
+          curl --proto '=https' --tlsv1.2 -fsSLO "$base_url/checksums.txt"
+          sha256sum --check --ignore-missing checksums.txt
+          tar -xzf "$archive"
+        )
+        hr_use_bin "$bd_dir"
+        BD_DISABLE_METRICS=1 DO_NOT_TRACK=1 bd bootstrap --yes
+      fi
+      out="houserules-record-$HOUSERULES_KEY"
+      mkdir -p "$out"
+      ref=$(hr_notes_ref "$HOUSERULES_DIR")
+      key=$CI_COMMIT_SHA
+      hr_git() {
+        git "$@"
+      }
+      # The "|| true" tolerates an absent notes ref (return 1). When ls-remote fails, hr_fail exits the
+      # job with status 1: this push gets no record until the job runs again.
+      hr_fetch_notes origin "$ref" "$ref" || true
+      empty_tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+      base=${CI_COMMIT_BEFORE_SHA:-}
+      if [ -z "$(printf '%s' "$base" | tr -d 0)" ]; then
+        base=$empty_tree
+      elif ! git cat-file -e "$base^{commit}" 2> /dev/null; then
+        hr_notice "houserules: $(printf '%.7s' "$base") is not in this clone (a force push?); no record for this push"
+        exit 0
+      fi
+      set -- --base "$base" --head "$key" --key "$key" --host gitlab --out "$out/record.json" --dir "$HOUSERULES_DIR"
+      if [ "$base" != "$empty_tree" ]; then
+        houserules audit --base "$base" --head "$key" --json "$out/audit.json" --dir "$HOUSERULES_DIR" || true
+        if [ -s "$out/audit.json" ]; then
+          set -- "$@" --audit "$out/audit.json"
+        fi
+      fi
+      iid=
+      listed=
+      if curl --silent --show-error --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" --output "$out/merge-requests.json" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/commits/$key/merge_requests"; then
+        listed=yes
+        iid=$(jq -r --arg key "$key" '[.[] | select(.state == "merged")] | (map(select(.merge_commit_sha == $key or .squash_commit_sha == $key or .sha == $key)) + .) | .[0].iid // empty' "$out/merge-requests.json")
+      fi
+      # A push with no merged request has no approvers for record-push to read; a failed listing leaves them unknown.
+      if [ -z "$listed" ] || [ -n "$iid" ]; then
+        set -- "$@" --reviewers-pending
+      fi
+      if [ -n "$iid" ] && curl --silent --show-error --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" --output "$out/request.json" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$iid"; then
+        jq -r '.description // ""' "$out/request.json" > "$out/description.md"
+        set -- "$@" --bundle "$out/description.md"
+        printf '%s\n' "$iid" > "$out/iid"
+      fi
+      houserules record write "$@"
+  artifacts:
+    name: houserules-record-$[[ inputs.key ]]
+    paths:
+      - houserules-record-$[[ inputs.key ]]/
+    expire_in: 1 week
+
+houserules-$[[ inputs.key ]]-record-push:
+  extends: .houserules-$[[ inputs.key ]]-base
+  variables:
+    GIT_STRATEGY: none
+    HOUSERULES_REVIEWERS_JQ:
+      value: |
+        ($approvers | map(tostring) | unique) as $sorted
+        | ($sorted[:20] | map(.[:100])) as $named
+        | last(range(0; ($named | length) + 1) | select(($named[:.] | tojson | utf8bytelength) <= 3072)) as $kept
+        | .reviewers = $named[:$kept]
+        | if ($sorted | length) > $kept then .reviewers_more = (($sorted | length) - $kept) else del(.reviewers_more) end
+        | .reviewers_pending = false
+      expand: false
+  environment:
+    name: $[[ inputs.token-environment ]]
+    action: access
+  needs:
+    - job: houserules-$[[ inputs.key ]]-record
+      artifacts: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - |
+      set -eu
+      unset GIT_TRACE GIT_CURL_VERBOSE GIT_TRACE_CURL
+      eval "$HOUSERULES_SH"
+      if [ -z "${HOUSERULES_TOKEN:-}" ]; then
+        hr_notice "houserules: HOUSERULES_TOKEN is not set for the environment $CI_ENVIRONMENT_NAME, so this run pushes nothing; create the token as a masked and hidden project variable with that environment scope"
+        exit 0
+      fi
+      out="$PWD/houserules-record-$HOUSERULES_KEY"
+      note="$out/record.json"
+      if [ ! -s "$note" ]; then
+        hr_notice "houserules: the record job wrote no record for this push, so this run pushes nothing"
+        exit 0
+      fi
+      ref=$(hr_notes_ref "$HOUSERULES_DIR")
+      iid=
+      if [ -f "$out/iid" ]; then
+        iid=$(cat "$out/iid")
+      fi
+      case $iid in
+        '' | *[!0-9]*) iid= ;;
+      esac
+      if [ -n "$iid" ]; then
+        if curl --silent --show-error --fail --header "PRIVATE-TOKEN: $HOUSERULES_TOKEN" --output "$out/approvals.json" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$iid/approvals"; then
+          approvers=$(jq -c '[.approved_by[]? | .user.username // empty]' "$out/approvals.json")
+          jq -c --argjson approvers "$approvers" "$HOUSERULES_REVIEWERS_JQ" "$note" > "$note.set"
+          mv "$note.set" "$note"
+        else
+          hr_notice "houserules: the approvals of the merge request cannot be read, so the record keeps reviewers_pending"
+        fi
+      fi
+      auth=$(printf 'oauth2:%s' "$HOUSERULES_TOKEN" | base64 | tr -d '\n')
+      hr_git() {
+        git -c "http.extraHeader=Authorization: Basic ${auth}" "$@"
+      }
+      scratch=$(mktemp -d)
+      cd "$scratch"
+      git init -q --bare .
+      git remote add origin "${CI_SERVER_URL}/${CI_PROJECT_PATH}.git"
+      hr_push_note origin "$ref" "$CI_COMMIT_SHA" "$note"

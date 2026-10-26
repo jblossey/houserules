@@ -1,8 +1,10 @@
-//! The seeded CI workflow per adapter (spec 4.8): the content that every command
-//! setting `tracker`, and `update`, write for JSON, GitHub, Beads, and no
-//! tracker, in the form at the git top level and in the form of a
-//! subdirectory install. Each file passes `actionlint`, and a file that the
-//! project changed gets the hand step that names the lines to add.
+//! The seeded CI workflow per adapter (spec 4.8). `update`, and every command
+//! that sets `tracker`, keep an existing seeded workflow at the content of its
+//! adapter: JSON, GitHub, Beads, or no tracker. The content has one form at the
+//! git top level and one form for a subdirectory install. `init` seeds no
+//! workflow (spec 10.7), so each case starts from the workflow that an earlier
+//! release seeded (`seed_workflow`). Each file passes `actionlint`. A file that
+//! the project changed gets the hand step that names the lines to add.
 //!
 //! `actionlint` comes from `mise.toml` (`mise install`); a test fails, and does
 //! not skip, when it is missing. A Beads install here is a marker that names
@@ -21,7 +23,7 @@ use serde_json::json;
 use tracker_support::hermetic_bd;
 use tracker_support::{
     assert_actionlint_passes, commit_all, edit_marker, git, houserules, read_json, repo_root,
-    run_ok, scratch_git_repo, sha256_hex, stderr, stdout,
+    run_ok, scratch_git_repo, seed_workflow, sha256_hex, stderr, stdout,
 };
 
 /// The workflow of an install at the git top level.
@@ -47,8 +49,8 @@ fn mise_pin(key: &str) -> String {
     line.trim_end_matches('"').to_string()
 }
 
-/// A scratch repository with a GitHub `origin`, so that `init` writes the CI
-/// workflow.
+/// A scratch repository with a GitHub `origin`, where the GitHub tracker reads
+/// its repository.
 fn repository() -> tempfile::TempDir {
     let dir = scratch_git_repo();
     git(
@@ -60,6 +62,18 @@ fn repository() -> tempfile::TempDir {
             "https://github.com/acme/widgets.git",
         ],
     );
+    dir
+}
+
+/// A scratch repository with an install that an earlier release seeded with
+/// the CI workflow, and then the command `after`, when there is one.
+fn seeded_install(after: &[&str]) -> tempfile::TempDir {
+    let dir = repository();
+    run_ok(dir.path(), &["init"]);
+    seed_workflow(dir.path(), dir.path());
+    if !after.is_empty() {
+        run_ok(dir.path(), after);
+    }
     dir
 }
 
@@ -90,14 +104,16 @@ fn update_without_bd(dir: &Path) -> std::process::Output {
         .expect("run houserules update")
 }
 
-/// An install on the Beads tracker: the marker names `beads`, and `update`
-/// writes the workflow of the adapter.
-fn beads_install(dir: &Path, init_args: &[&str]) {
-    run_ok(dir, init_args);
-    edit_marker(dir, |marker| {
+/// An install on the Beads tracker, in `root` below the repository at `top`:
+/// the workflow was seeded earlier, the marker names `beads`, and `update`
+/// brings the workflow to the form of the adapter.
+fn beads_install(top: &Path, root: &Path, init_args: &[&str]) {
+    run_ok(root, init_args);
+    seed_workflow(top, root);
+    edit_marker(root, |marker| {
         marker.insert("tracker".to_string(), json!({"adapter": "beads"}));
     });
-    let output = update_without_bd(dir);
+    let output = update_without_bd(root);
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     assert_eq!(stderr(&output), format!("{BD_MISSING}\n"));
 }
@@ -147,9 +163,8 @@ fn mise_toml_pins_actionlint_to_an_exact_release() {
 /// steps of the template, byte for byte, and passes `actionlint`.
 #[test]
 fn no_tracker_and_json_keep_the_template_and_pass_actionlint() {
-    for args in [vec!["init"], vec!["init", "--tracker", "json"]] {
-        let dir = repository();
-        run_ok(dir.path(), &args);
+    for args in [vec!["update"], vec!["init", "--tracker", "json"]] {
+        let dir = seeded_install(&args);
 
         assert_eq!(text(dir.path(), WORKFLOW), template_workflow(), "{args:?}");
         assert_actionlint_passes(&dir.path().join(WORKFLOW));
@@ -160,8 +175,7 @@ fn no_tracker_and_json_keep_the_template_and_pass_actionlint() {
 /// `check-backlog` and `audit`, the token env, and nothing else.
 #[test]
 fn github_adds_job_permissions_and_the_token_to_the_two_gate_steps() {
-    let dir = repository();
-    run_ok(dir.path(), &["init", "--tracker", "github"]);
+    let dir = seeded_install(&["init", "--tracker", "github"]);
 
     let workflow = text(dir.path(), WORKFLOW);
 
@@ -190,12 +204,12 @@ fn workflow_wrote_lines(output: &str) -> usize {
 }
 
 /// Spec 4.8: one command prints one `wrote` line for each file that it writes.
-/// `init --tracker github` builds the workflow in the form of the adapter
-/// before its first write, so the file is written once, and its baseline holds
-/// that form. A second run writes nothing.
+/// `init --tracker github` brings the seeded workflow to the form of the
+/// adapter in one write, and its baseline holds that form. A second run writes
+/// nothing.
 #[test]
-fn init_with_the_github_tracker_writes_the_ci_workflow_once_in_the_form_of_the_adapter() {
-    let dir = repository();
+fn init_with_the_github_tracker_brings_the_seeded_workflow_to_the_form_of_the_adapter_once() {
+    let dir = seeded_install(&[]);
 
     let first = run_ok(dir.path(), &["init", "--tracker", "github"]);
 
@@ -224,9 +238,9 @@ fn init_with_the_github_tracker_writes_the_ci_workflow_once_in_the_form_of_the_a
 /// issue prefix.
 #[cfg(unix)]
 #[test]
-fn init_with_the_beads_tracker_writes_the_ci_workflow_once_in_the_form_of_the_adapter() {
+fn init_with_the_beads_tracker_brings_the_seeded_workflow_to_the_form_of_the_adapter_once() {
     use std::os::unix::fs::PermissionsExt;
-    let dir = repository();
+    let dir = seeded_install(&[]);
     let bd = dir.path().join(".git").join("stand-in-bd");
     fs::write(
         &bd,
@@ -265,7 +279,7 @@ fn init_with_the_beads_tracker_writes_the_ci_workflow_once_in_the_form_of_the_ad
 #[test]
 fn beads_installs_bd_at_the_pinned_release_and_bootstraps_the_store() {
     let dir = repository();
-    beads_install(dir.path(), &["init"]);
+    beads_install(dir.path(), dir.path(), &["init"]);
 
     let workflow = text(dir.path(), WORKFLOW);
 
@@ -307,11 +321,15 @@ fn beads_installs_bd_at_the_pinned_release_and_bootstraps_the_store() {
 #[test]
 fn a_subdirectory_install_gets_the_lines_of_its_adapter() {
     let github = repository();
-    fs::create_dir(github.path().join("sub")).expect("create sub/");
-    run_ok(&github.path().join("sub"), &["init", "--tracker", "github"]);
+    let github_root = github.path().join("sub");
+    fs::create_dir(&github_root).expect("create sub/");
+    run_ok(&github_root, &["init"]);
+    seed_workflow(github.path(), &github_root);
+    run_ok(&github_root, &["init", "--tracker", "github"]);
     let beads = repository();
-    fs::create_dir(beads.path().join("sub")).expect("create sub/");
-    beads_install(&beads.path().join("sub"), &["init"]);
+    let beads_root = beads.path().join("sub");
+    fs::create_dir(&beads_root).expect("create sub/");
+    beads_install(beads.path(), &beads_root, &["init"]);
 
     let file = ".github/workflows/knowledge-sub.yml";
     let github_text = text(github.path(), file);
@@ -341,8 +359,7 @@ fn a_subdirectory_install_gets_the_lines_of_its_adapter() {
 /// baselined, and a second `update` prints nothing about it.
 #[test]
 fn update_moves_a_workflow_at_its_baseline_to_the_content_of_the_adapter() {
-    let dir = repository();
-    run_ok(dir.path(), &["init"]);
+    let dir = seeded_install(&[]);
     edit_marker(dir.path(), |marker| {
         marker.insert(
             "tracker".to_string(),
@@ -370,6 +387,38 @@ fn update_moves_a_workflow_at_its_baseline_to_the_content_of_the_adapter() {
     commit_all(dir.path(), "update");
     let second = run_ok(dir.path(), &["update"]);
     assert!(!stdout(&second).contains(WORKFLOW), "{}", stdout(&second));
+}
+
+/// The workflow `text`, the seeded form of no tracker, with the lines that the
+/// tracker `adapter` needs added as YAML (`update` reads the copy as YAML, so a
+/// comment adds nothing): `issues: read` and the token env of the two gate steps
+/// for GitHub, and the steps that install `bd` and bootstrap the store, without
+/// the input that drops the persisted credential, for Beads.
+fn with_the_lines_of(adapter: &str, text: &str) -> String {
+    match adapter {
+        "github" => text
+            .replace(
+                "      contents: read\n",
+                "      contents: read\n      issues: read\n",
+            )
+            .replace(
+                "      - run: houserules check-backlog\n",
+                &format!("      - run: houserules check-backlog\n{GITHUB_TOKEN}"),
+            )
+            .replace(
+                "          --head ${{ github.event.pull_request.head.sha }}\n",
+                &format!(
+                    "          --head ${{{{ github.event.pull_request.head.sha }}}}\n{GITHUB_TOKEN}"
+                ),
+            ),
+        "beads" => text
+            .replace("          persist-credentials: false\n", "")
+            .replace(
+                "      - run: houserules check-backlog\n",
+                "      - run: bd bootstrap --yes\n      - run: houserules check-backlog\n",
+            ),
+        _ => text.to_string(),
+    }
 }
 
 /// Spec 4.8: a workflow that the project changed stays, and `update` names the
@@ -403,8 +452,7 @@ fn a_changed_workflow_gets_the_hand_step_that_names_the_lines_to_add() {
         ("github", github_steps),
         ("beads", vec![beads_step, persist_step]),
     ] {
-        let dir = repository();
-        run_ok(dir.path(), &["init"]);
+        let dir = seeded_install(&[]);
         let mut changed = text(dir.path(), WORKFLOW);
         changed.push_str("# our own step\n");
         fs::write(dir.path().join(WORKFLOW), &changed).expect("change the workflow");
@@ -434,13 +482,7 @@ fn a_changed_workflow_gets_the_hand_step_that_names_the_lines_to_add() {
         }
         assert_eq!(text(dir.path(), WORKFLOW), changed, "{adapter}");
 
-        let mut complete = changed.clone();
-        if adapter == "beads" {
-            complete = complete.replace("          persist-credentials: false\n", "");
-        }
-        complete.push_str(
-            "# permissions: issues: read, env: GH_TOKEN: ${{ github.token }}, bd bootstrap\n",
-        );
+        let complete = with_the_lines_of(adapter, &changed);
         fs::write(dir.path().join(WORKFLOW), &complete).expect("add the lines");
         let output = update_without_bd(dir.path());
         assert!(

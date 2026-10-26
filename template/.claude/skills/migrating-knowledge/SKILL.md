@@ -1,6 +1,6 @@
 ---
 name: migrating-knowledge
-description: Use to migrate existing knowledge — AGENTS.md or CLAUDE.md prose, docs, wikis, code comments, PR templates, lint and CI configs — into `knowledge/*.json`, after `init` in a codebase that already has it, or when adopting houserules in an existing project.
+description: Use to migrate existing knowledge — AGENTS.md or CLAUDE.md prose, docs, wikis, code comments, pull or merge request templates, lint and CI configs — into `knowledge/*.json`, after `init` in a codebase that already has it, or when adopting houserules in an existing project.
 ---
 
 # Migrating existing knowledge
@@ -23,7 +23,8 @@ knowledge — not on a fresh project, which starts with nothing to migrate.
 Two sections below run regardless, fresh project or migration alike, right
 after `init`: "Elicit your own operating discipline" and "Generate your own
 CI gate" — a fresh project has no existing knowledge to move, but it still
-needs its own ruled discipline and its own CI gate. Work the rest topic by
+needs its own ruled discipline and its own CI gate. A project that wires the
+review layer answers "Elicit the review settings" as well. Work the rest topic by
 topic and gate after each one (see Gates below); do not migrate everything
 before the first check.
 
@@ -63,7 +64,8 @@ Knowledge hides in:
   project-instructions file) — prose rules, workflow steps, warnings.
 - **`docs/`, wikis, READMEs** — design records, decisions, how-tos.
 - **Code comments** that state a constraint, not just what the code does.
-- **PR and review templates** — the checklist a reviewer runs by hand.
+- **Pull or merge request templates and review templates** — the checklist a
+  reviewer runs by hand.
 - **Lint and CI configs** — a rule enforced in YAML or a linter plugin is
   still a rule; the entry documents it, the config still enforces it.
 - **Past conversations and an agent's own memory** — a fact or
@@ -199,9 +201,9 @@ names the project's own ruling:
   merge queue? Record it as a `process.*` rule (`standing: true`); the
   merge step of the reference workflow follows the shipped fast-forward-only
   default until this entry says otherwise.
-- **Commit attribution** - may a commit or PR description carry a
-  co-author, session, or tool-attribution trailer? Record it as a
-  `security-hygiene.*` rule; `houserules check-commit` enforces only the
+- **Commit attribution** - may a commit or the description of a pull or merge
+  request carry a co-author, session, or tool-attribution trailer? Record it as
+  a `security-hygiene.*` rule; `houserules check-commit` enforces only the
   `commits` checks of the installed packs (the Conventional Commits check
   of the `process` pack, for one) until a `commits`-type check on this
   entry adds an attribution gate of your own.
@@ -220,30 +222,180 @@ the two apart.
 
 ## Generate your own CI gate
 
-`init` seeds `.github/workflows/knowledge.yml` only for a GitHub-hosted
-`origin`; every other host gets a printed skip note and nothing written,
-since a GitHub Actions workflow runs nowhere else. Generate the equivalent
-gate for your own host, right after `init`, fresh project or migration
-alike: install in the CI image the `houserules` release that
-`.houserules.json` records in its `version` field, then run the same three
-steps the seeded workflow runs — `houserules check-knowledge`,
-`houserules check-backlog`, and, on a pull/merge request, `houserules audit
---base <the request's base sha> --head <the request's head sha>` — on every
-push and pull/merge request.
-The shell installer of release `<version>` is
-`https://github.com/jblossey/houserules/releases/download/v<version>/houserules-installer.sh`.
-Do not install the latest release: it can run a check that your kit files
-do not satisfy until you run `houserules update` and commit the result.
-Name the job and its trigger once written, so the wiring is a claim
-someone can grep against. Prove it with a real run before trusting it, not
-a syntax check alone.
+`init` writes no CI file, and `update` writes none again. Right after `init`,
+fresh project or migration alike, ask which host the project uses (`github` or
+`gitlab`; a self-hosted GitHub counts as `github`, and a self-managed GitLab as
+`gitlab`), and wire the gates into the pipeline of the project. The jobs run
+`houserules check-knowledge`, `houserules check-backlog`, and, on a pull or
+merge request, `houserules audit --base <the request's base sha> --head <the
+request's head sha>`, on every push and every pull or merge request. They also
+run the review layer (see "Wire the review layer" below). `houserules ci` prints
+or writes the wiring, and it never edits a CI file that it did not create.
+`houserules ci print` gives the first two of three ways, and `houserules ci write`
+gives the third:
 
-Check out the head of the pull or merge request, not a merge commit, before
-the audit when the project uses `runner` checks: `audit` needs the working
-tree to be the tree at `--head`. The seeded GitHub workflow does this with
-`ref: ${{ github.event.pull_request.head.sha }}` on its checkout step. Add the
-install step of each tool of `runners` to the job as well; the seeded workflow
-installs none.
+- **Reference.** `houserules ci print --host github` or `--host gitlab` prints
+  the lines that call the unit of this release, and writes nothing. The unit is
+  a reusable workflow on GitHub, pinned by the commit sha of the release tag:
+  the output names the `git ls-remote` command that resolves the sha. It is a
+  file for `include: remote` on GitLab, with an `integrity` hash. Add the lines
+  to the pipeline file of the project.
+- **Inline.** With `--mode inline`, `houserules ci print` prints the jobs of the
+  unit with the inputs of the install filled in. Use it for a project that keeps the
+  jobs in its own pipeline file, for a self-hosted GitHub (it cannot call a
+  workflow on github.com by default), and for a GitLab that cannot reach
+  github.com.
+- **A file of its own.** `houserules ci write --host github --sha <sha>`, with
+  the commit of the release tag as `<sha>`, or `houserules ci write --host
+  gitlab`, creates a new file that holds the same lines and adds its path to
+  `review.ci.files`. `--host github --mode inline` needs no `--sha`. It never
+  writes into an existing file. `houserules ci write --template` writes the
+  template of the pull or merge request, and only where the host reads none
+  yet.
+
+`--host` defaults to the host of the `origin` remote when that is github.com or
+gitlab.com. Another origin needs the flag. Ask which file of the project's own
+pipeline wires houserules, and add its path to `review.ci.files` in
+`.houserules.json`: `ci write` adds its own file, and `ci print` ends with the
+line that says so. A change to a file of `review.ci.files` then routes to
+`senior-review`.
+
+For any other host, write the steps by hand. Install in the CI image the
+`houserules` release that `.houserules.json` records in its `version` field,
+then run the same three steps. The shell installer of release `<version>` is
+`https://github.com/jblossey/houserules/releases/download/v<version>/houserules-installer.sh`.
+Do not install the latest release: it can run a check that your kit files do
+not satisfy until you run `houserules update` and commit the result. Name the
+job and its trigger once written, so the wiring is a claim someone can grep
+against. Prove it with a real run before trusting it, not a syntax check alone.
+
+Check out the head of the pull or merge request, not a merge commit, before the
+audit when the project uses `runner` checks: `audit` needs the working tree to
+be the tree at `--head`. The jobs of the unit do this. Add the install step of
+each tool of `runners` to the job as well: pass it to the `setup` input of the
+unit, or add it to the job by hand.
+
+## Wire the review layer
+
+The review layer gives each pull or merge request one report and each merge one
+record. Each command below is a function of the layer. A command reads the
+repository and files. No command talks to the host beyond the tracker that the
+install names: the GitHub tracker runs gh, as audit does. The jobs of the unit
+talk to the host. Wire the output that a function writes, not the command
+alone.
+
+### The evidence packet
+
+`houserules evidence --base <ref> --out <file>` writes the reviewer packet as
+Markdown. The packet starts with the uncovered surface: the changed lines that
+no check with `covers: true` read. It lists the intent, the failed, warned,
+proven, and judged rules, the size of the diff, and the route. With `--audit
+<file>`, the result of `audit --json` for the same range, it runs no second
+audit. With `--json <file>` it also writes the document
+`houserules/evidence@1.0.0`. It exits 0 whatever the audit finds. The jobs of the
+unit post the packet as the one comment of the install.
+
+### The route
+
+`houserules route --base <ref> --json <file>` decides `auto-merge-eligible`,
+`owner-review`, or `senior-review`. `houserules route --base <ref> --no-audit
+--json <file>` computes the floor, which runs no project tool: wire it into a
+job that runs no project code, and apply at least the floor. Both commands exit
+0 for every route. A project with no `review.route` setting gets `owner-review`
+for each change, and `senior-review` for a change to a rule source.
+
+### The evidence bundle
+
+`houserules bundle write` writes the bundle section from the captures of the
+final gate run. `houserules bundle check --body <file> --base <ref> --head <ref>`
+reads the description of the request from a file and prints a line for each
+finding. Its exit status is the gate: 0 for a clean bundle, 1 when it prints a
+finding, 2 for a setup error. Pass `--author` and `--head-ref` so that an exempt
+author or branch passes. On GitHub the description is a field of the event
+file. On GitLab read the request through the API: the predefined variable holds
+only the first 2,700 characters.
+
+### The change record
+
+`houserules record write --base <ref> --head <ref> --out <file>` computes the
+record of a push to the default branch. Without `--out` it writes a git note
+under `refs/notes/houserules` (`refs/notes/houserules-sub/<install path>` for an
+install below the top level of the repository). Only the jobs of the unit push
+the ref. A clone does not fetch it:
+`git fetch origin refs/notes/houserules:refs/notes/houserules`. Then
+`houserules record show <sha>` prints the record and checks its rule hashes
+against git.
+
+### The intent of a change
+
+The intent of a change is what it was meant to do. `review.intent.sources` lists
+the adapters to run, `work-item` and `file`. `review.intent.files` lists the
+globs of the files that the `file` adapter reads, for example
+`docs/plans/*.md`. The `Intent: <source>:<ref>` line of the bundle names one
+intent directly.
+
+### The GitLab token
+
+The job token of GitLab cannot post a note, set a commit status, set a label,
+read approvals, or push. The jobs `report` and `record-push` read the CI/CD
+variable `HOUSERULES_TOKEN`, which the project creates masked and hidden, with
+the environment scope `houserules-<key>` (`<key>` is `root` for an install at
+the top level). Only those two jobs name that environment, so the jobs that run
+houserules, `setup`, or the code of the request cannot read the token. Prefer a
+project access token (the scopes `api` and `write_repository`, the role
+Developer). On gitlab.com Free, project access tokens need Premium or Ultimate:
+use a personal access token of a dedicated member with the role Developer, and
+tell the project that a personal access token reaches every project that its user
+can reach. An access token expires after at most 365 days: rotate it. Until then
+`report` and `record-push` print their notice and post and push nothing, and the
+pipeline stays green.
+
+### The limits of the review layer
+
+State these limits to the project:
+
+- On GitHub, a label or a status that the job token sets starts no workflow run.
+  A workflow that acts on the route listens to `workflow_run` of the review
+  workflow, not to `labeled`.
+- The post-merge sample is unsteerable only under a host merge that writes a new
+  commit (a squash, a merge commit, or a rebase on the host). Under a
+  fast-forward merge the key of the record is the head of the author, so the
+  author knows the draw before the merge.
+- A project that needs tools for its runner checks passes the install step to the
+  `setup` input of the unit. The job that computes the floor runs no `setup`.
+- A request runs its own edited CI definition on both hosts. A request that edits
+  the wiring sets its own status and label. The mitigation is a required status
+  from a protected-branch rule, plus the rule-source floor: a file in
+  `review.ci.files` routes to `senior-review`. A request that edits a file of
+  `review.ci.files` also controls its own run, which a required code-owner review
+  of those files mitigates (a `CODEOWNERS` rule on GitHub, code owners with
+  approval rules on GitLab, a Premium feature).
+- `floor-install: runner:<path>` holds only on a fresh runner or an unwritable
+  path: a GitHub-hosted runner, a GitLab docker executor, or a runner user that
+  cannot write the path. On a reused runner the request could replace the file.
+- On GitLab, a description edit starts no pipeline. Run the pipeline again to
+  check the new description.
+
+## Elicit the review settings
+
+Ask the project's owner for each setting, as you ask for the merge discipline
+above. houserules ships no number. Write the answers to the `review` key of
+`.houserules.json`; `houserules check-knowledge` checks the key:
+
+- the diff budget of each risk tier (`review.bundle.budgets`), and the files that
+  leave the diff size (`review.diffExclude`);
+- the route thresholds: which areas and paths give `auto-merge-eligible` (each
+  needs `maxDiffLines` and `maxUncoveredShare`), which give `senior-review`, and
+  the score thresholds; and `review.route.sampleRate`, which an
+  `auto-merge-eligible` area or path needs;
+- the exempt authors and branches (`review.bundle.exemptAuthors` and
+  `review.bundle.exemptBranches`), for example a dependency bot and a release
+  tool;
+- the intent sources and files (`review.intent.sources` and
+  `review.intent.files`);
+- which checks declare `covers: true`. A check is coverage only when its entry
+  declares it, and no entry of the kit does. A change that no covering check
+  reads lists every changed line as uncovered.
 
 ## Run an external tool with a runner check
 
@@ -395,9 +547,10 @@ houserules sets `BD_DISABLE_METRICS=1` and `DO_NOT_TRACK=1` on every `bd` it
 starts, so an adopter never sends bd usage events through houserules. A user's
 own `bd` calls keep bd's own setting.
 
-A CI job needs the data too. The seeded CI workflow of a Beads install installs
-`bd` at the pinned release and runs `bd bootstrap` in its fresh clone before
-the gates run. A CI job of your own needs the same two steps. End a session
+A CI job needs the data too. The jobs that `houserules ci print` wires for a
+Beads install, and the workflow that an earlier release seeded, install `bd` at
+the pinned release and run `bd bootstrap` in the fresh clone before the gates
+run. A CI job of your own needs the same two steps. End a session
 with `bd dolt push`, so the data travels.
 
 Move the data from `backlog/`: create one issue per item, with the fields of

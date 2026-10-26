@@ -227,6 +227,19 @@ pub(crate) struct Base {
     pub archived_ids: BTreeSet<String>,
 }
 
+impl Base {
+    /// The globs of the files that the check of the entry `id` reads, when the
+    /// check declares `covers: true`. Empty for an unknown id, an entry with
+    /// no check or a malformed one, and a check that does not declare it
+    /// (`CheckDef::covered_globs`).
+    pub(crate) fn covering_globs(&self, id: &str) -> Vec<String> {
+        match self.entries.get(id).map(|entry| &entry.check) {
+            Some(CheckField::Valid(check)) => check.covered_globs(),
+            _ => Vec::new(),
+        }
+    }
+}
+
 /// `true` when the raw entry `id` carries `tag` in its `tags` array. Only
 /// an exact tag counts; an unknown `id`, or a `tags` field that is no
 /// array, counts as no tags.
@@ -1782,5 +1795,48 @@ mod tests {
             error.to_string(),
             format!("{}: invalid JSON ({parse_error})", path.display())
         );
+    }
+
+    #[test]
+    fn covering_globs_names_the_files_of_a_check_that_declares_covers() {
+        let root = tree();
+        let covering = |id: &str, check: Value| {
+            let mut entry = entry(id, "A rule.");
+            entry["check"] = check;
+            entry
+        };
+        local_topic(
+            root.path(),
+            "demo",
+            "Demo",
+            &[
+                covering(
+                    "demo.covering",
+                    json!({"type": "grep-absent", "level": "fail", "files": ["src/**", "lib/*.rs"],
+                           "pattern": "x", "scope": "tree", "covers": true}),
+                ),
+                covering(
+                    "demo.plain",
+                    json!({"type": "grep-absent", "level": "fail", "files": "src/**",
+                           "pattern": "x", "scope": "tree"}),
+                ),
+                covering(
+                    "demo.malformed",
+                    json!({"type": "no-such-type", "level": "fail", "covers": true}),
+                ),
+                entry("demo.unchecked", "A rule with no check."),
+            ],
+        );
+        let base = load_base(root.path()).expect("load the base");
+
+        assert_eq!(base.covering_globs("demo.covering"), ["src/**", "lib/*.rs"]);
+        for id in [
+            "demo.plain",
+            "demo.malformed",
+            "demo.unchecked",
+            "demo.unknown",
+        ] {
+            assert_eq!(base.covering_globs(id), Vec::<String>::new(), "{id}");
+        }
     }
 }

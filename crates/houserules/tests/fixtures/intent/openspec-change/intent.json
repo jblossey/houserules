@@ -1,0 +1,15 @@
+{
+  "source": "openspec",
+  "ref": "add-rate-limit",
+  "title": "Add rate limiting to the public API",
+  "why": "One client that retries in a tight loop takes the API down for every other client. A limit for each client keeps a noisy client from starving the rest.",
+  "tasks": { "done": 2, "total": 4 },
+  "requirements": { "added": 2, "modified": 1, "removed": 1, "renamed": 1, "total": null },
+  "validation": { "tool": "openspec", "ok": true, "summary": "1 of 1 valid" },
+  "artifacts": [
+    "openspec/changes/add-rate-limit/design.md",
+    "openspec/changes/add-rate-limit/proposal.md",
+    "openspec/changes/add-rate-limit/specs/api/spec.md",
+    "openspec/changes/add-rate-limit/tasks.md"
+  ]
+}

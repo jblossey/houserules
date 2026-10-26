@@ -1,5 +1,5 @@
 //! `init` writes the 2.0 install (batch 33, spec sections 3, 7, and 9; batch 34,
-//! spec 4.6): the marker `houserules/install@2.2.0`, the `knowledge-base` pack
+//! spec 4.6): the marker `houserules/install@2.3.0`, the `knowledge-base` pack
 //! with its pin, no other pack, no topic file, and the Claude Code files only
 //! with `--target claude`.
 //! Each case runs the compiled binary against a scratch git repository.
@@ -9,11 +9,12 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use serde_json::{Map, Value, json};
-use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
+mod tracker_support;
 mod tree_snapshot;
 
+use tracker_support::sha256_hex;
 use tree_snapshot::{assert_same_tree, snapshot};
 
 /// A `Command` for the compiled `houserules` binary under test. This file
@@ -147,10 +148,7 @@ fn canonical_sha256(pack: &str) -> String {
     .expect("read the template pack");
     let parsed: Value = serde_json::from_str(&text).expect("parse the template pack");
     let bytes = serde_json::to_vec(&sorted(&parsed)).expect("serialize");
-    Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    sha256_hex(&bytes)
 }
 
 /// The version of a template pack.
@@ -196,7 +194,7 @@ fn init_writes_the_2_0_marker() {
             "baselines"
         ]
     );
-    assert_eq!(marker["schema"], json!("houserules/install@2.2.0"));
+    assert_eq!(marker["schema"], json!("houserules/install@2.3.0"));
     assert_eq!(marker["version"], json!(env!("CARGO_PKG_VERSION")));
     assert_eq!(marker["idPrefix"], json!("WI"));
     assert_eq!(marker["renderers"], json!([]));
@@ -510,29 +508,17 @@ fn init_keeps_a_kit_owned_file_the_project_changed_and_its_baseline() {
 /// `init` never touches a path in `ownedPaths`. A file the project changed
 /// stays as it is and is listed as `kept`; a file the project deleted stays
 /// absent and is not listed. The paths cover each write of `init` outside the
-/// pack copies: a kit-owned file, a seed-once file, the CI workflow, and the
-/// hook entry of `.claude/settings.json`.
+/// pack copies: a kit-owned file, a seed-once file, and the hook entry of
+/// `.claude/settings.json`.
 #[test]
 fn init_never_touches_a_path_the_project_owns() {
     let dir = scratch_git_repo();
-    let status = Command::new("git")
-        .args([
-            "remote",
-            "add",
-            "origin",
-            "https://github.com/example/example.git",
-        ])
-        .current_dir(dir.path())
-        .status()
-        .expect("add the remote");
-    assert!(status.success(), "adding the remote failed");
     init_lines(dir.path(), &["--target", "claude"]);
     let changed_script = "tools/houserules-step.sh";
     let own_settings = ".claude/settings.json";
     let deleted = [
         ".claude/skills/migrating-knowledge/SKILL.md",
         "docs/README.md",
-        ".github/workflows/knowledge.yml",
     ];
     fs::write(dir.path().join(changed_script), b"the project's own script")
         .expect("write the script");
@@ -541,13 +527,7 @@ fn init_never_touches_a_path_the_project_owns() {
         fs::remove_file(dir.path().join(file)).expect("remove an owned file");
     }
     let mut stamp = marker(dir.path());
-    stamp["ownedPaths"] = json!([
-        changed_script,
-        own_settings,
-        deleted[0],
-        deleted[1],
-        deleted[2]
-    ]);
+    stamp["ownedPaths"] = json!([changed_script, own_settings, deleted[0], deleted[1]]);
     write_marker(dir.path(), &stamp);
     let stamped = marker(dir.path());
     let before = without_marker(snapshot(dir.path()));
@@ -1133,4 +1113,88 @@ fn init_target_claude_adds_no_hook_entry_to_an_owned_settings_file() {
         "{lines:?}"
     );
     assert_eq!(marker(dir.path())["renderers"], json!(["claude"]));
+}
+
+/// The line `init` prints in place of a CI file, with the host `host`
+/// (spec 10.7).
+fn no_ci_file_line(host: &str) -> String {
+    format!(
+        "init: houserules wrote no CI file; to run the gates and the review layer in your pipeline, run houserules ci print --host {host}"
+    )
+}
+
+/// Adds the `origin` remote `url` to the repository at `dir`.
+fn add_origin(dir: &Path, url: &str) {
+    let status = Command::new("git")
+        .args(["remote", "add", "origin", url])
+        .current_dir(dir)
+        .status()
+        .expect("add the remote");
+    assert!(status.success(), "adding the remote failed");
+}
+
+/// Case 8: `init` on a GitHub, a GitLab, another-host, and a no-origin
+/// repository writes no CI file and prints its line once, with the detected
+/// host, or `github or gitlab` when no host is detected. A second `init`
+/// prints the line again and changes nothing.
+#[test]
+fn init_writes_no_ci_file_and_prints_its_line_with_the_detected_host() {
+    for (origin, host) in [
+        (Some("https://github.com/acme/widgets.git"), "github"),
+        (Some("git@gitlab.com:acme/widgets.git"), "gitlab"),
+        (
+            Some("https://git.example.org/acme/widgets.git"),
+            "github or gitlab",
+        ),
+        (
+            Some("git@github.example.org:acme/widgets.git"),
+            "github or gitlab",
+        ),
+        (None, "github or gitlab"),
+    ] {
+        let dir = scratch_git_repo();
+        if let Some(url) = origin {
+            add_origin(dir.path(), url);
+        }
+
+        let first = init_lines(dir.path(), &[]);
+
+        let line = no_ci_file_line(host);
+        assert_eq!(
+            first.iter().filter(|printed| **printed == line).count(),
+            1,
+            "{origin:?}: {first:?}"
+        );
+        let tree = snapshot(dir.path());
+        for path in tree.keys() {
+            assert!(
+                !path.starts_with(".github/")
+                    && !path.starts_with(".gitlab")
+                    && !path.ends_with(".gitlab-ci.yml"),
+                "{origin:?}: init wrote {path}"
+            );
+        }
+        let second = init_lines(dir.path(), &[]);
+        assert!(second.contains(&line), "{origin:?}: {second:?}");
+        assert_same_tree(&tree, &snapshot(dir.path()), "a second init");
+    }
+}
+
+/// Case 8: a subdirectory install prints the same line and writes no file
+/// outside its root.
+#[test]
+fn init_in_a_subdirectory_prints_its_line_and_writes_nothing_outside_its_root() {
+    let dir = scratch_git_repo();
+    add_origin(dir.path(), "https://gitlab.com/acme/widgets.git");
+    let sub = dir.path().join("sub");
+    fs::create_dir(&sub).expect("create sub/");
+
+    let lines = init_lines(&sub, &[]);
+
+    assert!(lines.contains(&no_ci_file_line("gitlab")), "{lines:?}");
+    let outside: Vec<String> = snapshot(dir.path())
+        .into_keys()
+        .filter(|path| !path.starts_with("sub/"))
+        .collect();
+    assert_eq!(outside, Vec::<String>::new());
 }

@@ -6,9 +6,9 @@
 //! filesystem alone: no git setting (`GIT_DIR`, `GIT_WORK_TREE`,
 //! `core.worktree`) changes which directory it names. [`other_installs`]
 //! lists the other `.houserules.json` files of the repository, and
-//! [`refuse_overlap`] refuses a new install that nests with one of them or
-//! that would write the CI workflow file of one of them. `init` calls it for
-//! a root with no marker yet only: an existing install is no new root.
+//! [`refuse_overlap`] refuses a new install that nests with one of them. `init`
+//! calls it for a root with no marker yet only: an existing install is no new
+//! root.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -16,8 +16,6 @@ use std::path::{Path, PathBuf};
 use crate::node_path::resolve_like_node;
 use crate::root::INSTALL_MARKER;
 use crate::rules::{ListingFailure, listed_by_name};
-
-use super::ci_workflow::workflow_path;
 
 /// An install root's place in its git repository.
 #[derive(Debug, PartialEq, Eq)]
@@ -78,7 +76,7 @@ fn nearest_ancestor_holding_git(dir: &Path) -> Option<&Path> {
 /// same rule. A `target` outside any repository, one that does not exist yet,
 /// and one that cannot be resolved are refused with the `git init` advice,
 /// which prints `target` as passed. A path component that is no UTF-8 is one
-/// named line, since no workflow name can be made from it.
+/// named line, since the placement keeps the path as text.
 pub(super) fn locate(target: &Path) -> Result<Placement, String> {
     if target.join(".git").exists() {
         return Ok(Placement {
@@ -107,7 +105,7 @@ pub(super) fn locate(target: &Path) -> Result<Placement, String> {
         .map(|part| {
             part.as_os_str().to_str().map(str::to_string).ok_or_else(|| {
                 format!(
-                    "{}: the path holds a name that is no UTF-8, so no workflow file name can be made from it",
+                    "{}: the path holds a name that is no UTF-8; houserules reads the path of an install as UTF-8 text",
                     resolved.display()
                 )
             })
@@ -158,13 +156,11 @@ fn is_proper_ancestor(ancestor: &[String], path: &[String]) -> bool {
 }
 
 /// Refuses, with one line that names the other install, an install root
-/// that lies inside the root of one of `others`, one that holds the root of
-/// one of them, and one whose workflow file name one of them already uses.
-/// `others` is sorted, so the first of them that clashes is the one named.
-/// An install at the git top level lies above every other install.
+/// that lies inside the root of one of `others` and one that holds the root of
+/// one of them. `others` is sorted, so the first of them that clashes is the
+/// one named. An install at the git top level lies above every other install.
 pub(super) fn refuse_overlap(placement: &Placement, others: &[Vec<String>]) -> Result<(), String> {
     let own = placement.root();
-    let own_workflow = workflow_path(&placement.components);
     for other in others {
         let named = root_of(&placement.top_level, other).display().to_string();
         if is_proper_ancestor(other, &placement.components) {
@@ -176,12 +172,6 @@ pub(super) fn refuse_overlap(placement: &Placement, others: &[Vec<String>]) -> R
         if is_proper_ancestor(&placement.components, other) {
             return Err(format!(
                 "{}: the install root holds the install at {named}; houserules installs do not nest",
-                own.display()
-            ));
-        }
-        if workflow_path(other) == own_workflow {
-            return Err(format!(
-                "{}: the CI workflow file {own_workflow} belongs to the install at {named}; give this install a directory whose path makes another file name",
                 own.display()
             ));
         }
@@ -354,7 +344,7 @@ mod tests {
         assert_eq!(
             error,
             format!(
-                "{}: the path holds a name that is no UTF-8, so no workflow file name can be made from it",
+                "{}: the path holds a name that is no UTF-8; houserules reads the path of an install as UTF-8 text",
                 resolved.display()
             )
         );
@@ -489,19 +479,13 @@ mod tests {
         );
     }
 
-    /// Two roots that give one workflow file name are refused: the folder
-    /// name replaces each `/` with `-`.
+    /// Two roots whose paths make one name once each `/` becomes `-` do not
+    /// clash: `init` writes no workflow file.
     #[test]
-    fn two_roots_with_one_workflow_file_name_are_refused() {
-        let others = [root(&["b", "c"])];
-
+    fn two_roots_that_make_one_dashed_name_do_not_clash() {
         assert_eq!(
-            refuse_overlap(&placement(&["b-c"]), &others),
-            Err(format!(
-                "{}: the CI workflow file .github/workflows/knowledge-b-c.yml belongs to the install at {}; give this install a directory whose path makes another file name",
-                at(&["b-c"]),
-                at(&["b", "c"])
-            ))
+            refuse_overlap(&placement(&["b-c"]), &[root(&["b", "c"])]),
+            Ok(())
         );
     }
 

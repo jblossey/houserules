@@ -1,0 +1,1676 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jblossey.github.io/houserules/schemas/change-record/1.0.0.json",
+  "title": "Change record",
+  "description": "The record of one merge: the range that landed, the rules it was judged under, the audit, the intent, the evidence, the route, the sample draw, the bundle of the request, the reviewers, and the post-merge audit.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "description": "The schema id, `houserules/change-record@1.0.0`.",
+      "type": "string",
+      "const": "houserules/change-record@1.0.0"
+    },
+    "install": {
+      "description": "The path of the install from the git top level; `.` for a top-level install.",
+      "type": "string"
+    },
+    "key": {
+      "description": "The full sha of the commit that the note annotates: the last commit of the push.",
+      "type": "string"
+    },
+    "base": {
+      "description": "The full sha of the commit that `--base` names, or the name of git's empty tree for a range from the start of the history.",
+      "type": "string"
+    },
+    "head": {
+      "description": "The full sha of the head commit of the range.",
+      "type": "string"
+    },
+    "merge_base": {
+      "description": "The full sha of the merge base of `base` and `head`; `null` for a range from the empty tree.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "commits": {
+      "description": "The commits of the range, oldest first, or after a cut their number, the first, and the last. The minimal record has no such key.",
+      "$ref": "#/$defs/Commits"
+    },
+    "written_by": {
+      "description": "The writer of the record: `houserules <version>`.",
+      "type": "string"
+    },
+    "host": {
+      "description": "The host of the request, or `null` for a record written by hand.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Host"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rules": {
+      "description": "The rule package that judged the range.",
+      "$ref": "#/$defs/Rules"
+    },
+    "audit": {
+      "description": "What the audit of the range found.",
+      "$ref": "#/$defs/Audit"
+    },
+    "intent": {
+      "description": "The intents of the change, as the packet lists them.",
+      "$ref": "#/$defs/Intents"
+    },
+    "evidence": {
+      "description": "The evidence document of the change without its `rules`, `intent`, and `route`. The minimal record has no such key.",
+      "$ref": "#/$defs/RecordEvidence"
+    },
+    "route": {
+      "description": "The route decision, computed at merge over the range that landed.",
+      "$ref": "#/$defs/RecordRoute"
+    },
+    "sample": {
+      "description": "The post-merge sample draw; `null` for a route other than `auto-merge-eligible`.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Sample"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "bundle": {
+      "description": "The evidence bundle of the request, parsed; `null` for a push with no request or a description with no bundle. The minimal record has no such key.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RecordBundle"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reviewers": {
+      "description": "The approvers, sorted, without repeats, at most 20, each cut to 100 characters. Empty while `reviewers_pending` is `true`.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reviewers_more": {
+      "description": "The number of approvers past the 20 of `reviewers`. The key is absent when there is none.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "reviewers_pending": {
+      "description": "`true` when the record holds no reviewers yet: a later job has not set them (spec 10.4), or the approvers could not be read and stay unknown (spec 10.1 and 10.4).",
+      "type": "boolean"
+    },
+    "links": {
+      "description": "The work items of the range. The minimal record has no such key.",
+      "$ref": "#/$defs/Links"
+    },
+    "post_merge_audit": {
+      "description": "The verdict of the audit after the merge; `null` until `record audit` sets it.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PostMergeAudit"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "truncated": {
+      "description": "The fields that the size budget shortened, in the order of the cuts (spec 8.4); `[\"all\"]` for the minimal record.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "install",
+    "key",
+    "base",
+    "head",
+    "merge_base",
+    "written_by",
+    "host",
+    "rules",
+    "audit",
+    "intent",
+    "route",
+    "sample",
+    "reviewers",
+    "reviewers_pending",
+    "post_merge_audit",
+    "truncated"
+  ],
+  "$defs": {
+    "Commits": {
+      "description": "The commits of a range, in the form the budget left them.",
+      "anyOf": [
+        {
+          "description": "Every commit of the range, oldest first.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "The range after a cut.",
+          "$ref": "#/$defs/CommitsSummary"
+        }
+      ]
+    },
+    "CommitsSummary": {
+      "description": "A range of commits cut to its ends.",
+      "type": "object",
+      "properties": {
+        "count": {
+          "description": "The number of commits of the range.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "first": {
+          "description": "The first commit, the oldest.",
+          "type": "string"
+        },
+        "last": {
+          "description": "The last commit, the newest.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "count",
+        "first",
+        "last"
+      ]
+    },
+    "Host": {
+      "description": "The host of the request that a record came from.",
+      "oneOf": [
+        {
+          "description": "GitHub or a self-hosted GitHub.",
+          "type": "string",
+          "const": "github"
+        },
+        {
+          "description": "GitLab or a self-managed GitLab.",
+          "type": "string",
+          "const": "gitlab"
+        }
+      ]
+    },
+    "Rules": {
+      "description": "The rule package that judged a range (spec 8.2): the hashes of the rule sources at both ends, and the packs that the install pins at the head.",
+      "type": "object",
+      "properties": {
+        "merge_base_hash": {
+          "description": "The SHA-256 of the rule sources at the merge base; `null` when the merge base holds none.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "merge_base_rules": {
+          "description": "`present` when the merge base holds rule sources, `absent` when it holds none: the first request of a fresh install, or a range from the empty tree.",
+          "type": "string",
+          "enum": [
+            "present",
+            "absent"
+          ]
+        },
+        "head_hash": {
+          "description": "The SHA-256 of the rule sources at the head.",
+          "type": "string"
+        },
+        "audited_with": {
+          "description": "The rules that judged the range: the rules of the head.",
+          "$ref": "#/$defs/AuditedWith"
+        },
+        "packs": {
+          "description": "The packs that the marker of the install pins at the head, sorted by name. The minimal record lists none.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PackPin"
+          }
+        }
+      },
+      "required": [
+        "merge_base_hash",
+        "merge_base_rules",
+        "head_hash",
+        "audited_with",
+        "packs"
+      ]
+    },
+    "AuditedWith": {
+      "description": "The commit whose rules judged a range. Today it is the head only.",
+      "oneOf": [
+        {
+          "description": "The rules of the head commit.",
+          "type": "string",
+          "const": "head"
+        }
+      ]
+    },
+    "PackPin": {
+      "description": "A knowledge pack that the install pins.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The name of the pack.",
+          "type": "string"
+        },
+        "version": {
+          "description": "The version of the pack.",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "The SHA-256 of the copy of the pack in the install.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "sha256"
+      ]
+    },
+    "Audit": {
+      "description": "What the audit of the range found.",
+      "type": "object",
+      "properties": {
+        "summary": {
+          "description": "The counts of the rows, as `audit --json` gives them.",
+          "$ref": "#/$defs/Summary"
+        },
+        "rules": {
+          "description": "The id, mode, and result of each row. The key is absent after a cut.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuditedRow"
+          }
+        },
+        "references": {
+          "description": "The verdict on the work-item references of the range, as `audit --json` gives it: the counts, and one line for each failure. The minimal record has no such key.",
+          "$ref": "#/$defs/References"
+        },
+        "error": {
+          "description": "The line of an audit that could not run, or `null`. The minimal record has no such key.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "summary"
+      ]
+    },
+    "Summary": {
+      "description": "The counts of the rows of an audit result.",
+      "type": "object",
+      "properties": {
+        "base": {
+          "description": "The short sha of the commit that `--base` names.",
+          "type": "string"
+        },
+        "head": {
+          "description": "The short sha of the commit that `--head` names.",
+          "type": "string"
+        },
+        "deterministic": {
+          "description": "The number of rows with the mode `deterministic`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "pass": {
+          "description": "The number of deterministic rows with the result `pass`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "fail": {
+          "description": "The number of deterministic rows with the result `fail`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "warn": {
+          "description": "The number of deterministic rows with the result `warn`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "skipped": {
+          "description": "The number of deterministic rows with the result `skipped`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "judged": {
+          "description": "The number of rows with the mode `judged`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "empty_range": {
+          "description": "`true` when the range holds no commit. Absent otherwise.",
+          "type": "boolean"
+        },
+        "sanctioned_fail": {
+          "description": "The number of failed rows that hold `sanctioned`. Absent when there is none.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "reference_fail": {
+          "description": "The number of lines in `references.failures`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "base",
+        "head",
+        "deterministic",
+        "pass",
+        "fail",
+        "warn",
+        "skipped",
+        "judged",
+        "reference_fail"
+      ]
+    },
+    "AuditedRow": {
+      "description": "One row of the audit as the record keeps it.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The id of the knowledge entry.",
+          "type": "string"
+        },
+        "mode": {
+          "description": "Whether the audit ran a check for the rule.",
+          "$ref": "#/$defs/RowMode"
+        },
+        "result": {
+          "description": "The result of the row; `open` for a judged row.",
+          "$ref": "#/$defs/RowResult"
+        }
+      },
+      "required": [
+        "id",
+        "mode",
+        "result"
+      ]
+    },
+    "RowMode": {
+      "description": "Whether the audit ran a check for a rule.",
+      "oneOf": [
+        {
+          "description": "The rule has a check, and the audit ran it.",
+          "type": "string",
+          "const": "deterministic"
+        },
+        {
+          "description": "The rule has no check; a reviewer judges it.",
+          "type": "string",
+          "const": "judged"
+        }
+      ]
+    },
+    "RowResult": {
+      "description": "The result of one row.",
+      "oneOf": [
+        {
+          "description": "The check holds.",
+          "type": "string",
+          "const": "pass"
+        },
+        {
+          "description": "A check of level `fail` is violated.",
+          "type": "string",
+          "const": "fail"
+        },
+        {
+          "description": "A check of level `warn` is violated.",
+          "type": "string",
+          "const": "warn"
+        },
+        {
+          "description": "The check did not run.",
+          "type": "string",
+          "const": "skipped"
+        },
+        {
+          "description": "A judged row: a reviewer decides.",
+          "type": "string",
+          "const": "open"
+        }
+      ]
+    },
+    "References": {
+      "description": "What the audit decided about the work-item references of the range: the `Work-Item:` and `Deferred:` trailers of its commits and the backlog ids of the deliverables it read.",
+      "type": "object",
+      "properties": {
+        "checked": {
+          "description": "The number of references that the tracker judged, passed or failed.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "passed": {
+          "description": "The number of references among those checked that passed.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "skipped": {
+          "description": "The number of references that the audit did not judge: all of them when the install has no tracker, when the tracker cannot be reached, or when the tracker answered with an error.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "failures": {
+          "description": "One line for each failure, in the order that the audit prints them on stderr.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "checked",
+        "passed",
+        "skipped",
+        "failures"
+      ]
+    },
+    "Intents": {
+      "description": "The intents of a change in the form the budget left them.",
+      "anyOf": [
+        {
+          "description": "Each intent with every field of the contract of spec 4.9.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecordIntent"
+          }
+        },
+        {
+          "description": "The minimal record: the source and the ref of each intent.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IntentName"
+          }
+        }
+      ]
+    },
+    "RecordIntent": {
+      "description": "An intent as the record keeps it: the contract of spec 4.9.",
+      "type": "object",
+      "properties": {
+        "source": {
+          "description": "The name of the adapter, such as `work-item` or `file`.",
+          "type": "string"
+        },
+        "ref": {
+          "description": "The id that the adapter gives the intent.",
+          "type": "string"
+        },
+        "title": {
+          "description": "The title, or `null`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "why": {
+          "description": "Why the change exists, or `null`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tasks": {
+          "description": "The counts of the task list, or `null`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Tasks"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requirements": {
+          "description": "The counts of the requirements, or `null`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Requirements"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "validation": {
+          "description": "The result of a spec tool's validation, or `null`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Validation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifacts": {
+          "description": "The paths that the adapter read, or after a cut their number.",
+          "$ref": "#/$defs/Artifacts"
+        },
+        "unresolved": {
+          "description": "The line of the adapter for a named intent that does not resolve. The key is absent for an intent that resolves.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "ref",
+        "title",
+        "why",
+        "tasks",
+        "requirements",
+        "validation",
+        "artifacts"
+      ]
+    },
+    "Tasks": {
+      "description": "The counts of a task list.",
+      "type": "object",
+      "properties": {
+        "done": {
+          "description": "The tasks that are checked.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "total": {
+          "description": "All tasks.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "done",
+        "total"
+      ]
+    },
+    "Requirements": {
+      "description": "The counts of the requirements that a change adds, edits, removes, and renames. A count that the source does not give is `null`.",
+      "type": "object",
+      "properties": {
+        "added": {
+          "description": "The requirements that the change adds, or `null`.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "modified": {
+          "description": "The requirements that the change modifies, or `null`.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "removed": {
+          "description": "The requirements that the change removes, or `null`.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "renamed": {
+          "description": "The requirements that the change renames, or `null`.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "total": {
+          "description": "All requirements, or `null`.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "added",
+        "modified",
+        "removed",
+        "renamed",
+        "total"
+      ]
+    },
+    "Validation": {
+      "description": "The result of a spec tool's validation, read from a file that a caller passes; no adapter runs the tool.",
+      "type": "object",
+      "properties": {
+        "tool": {
+          "description": "The name of the tool.",
+          "type": "string"
+        },
+        "ok": {
+          "description": "Whether the tool judged the spec valid.",
+          "type": "boolean"
+        },
+        "summary": {
+          "description": "The tool's one-line summary.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "ok",
+        "summary"
+      ]
+    },
+    "Artifacts": {
+      "description": "The paths that an adapter read, in the form the budget left them.",
+      "anyOf": [
+        {
+          "description": "The paths.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "The number of paths, after a cut.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      ]
+    },
+    "IntentName": {
+      "description": "The name of an intent: the only fields that the minimal record keeps.",
+      "type": "object",
+      "properties": {
+        "source": {
+          "description": "The name of the adapter.",
+          "type": "string"
+        },
+        "ref": {
+          "description": "The id that the adapter gives the intent, at most 150 bytes once serialized.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "ref"
+      ]
+    },
+    "RecordEvidence": {
+      "description": "The evidence of the change: the document of spec 5.9 without its `rules`, `intent`, and `route`, which the record holds on its own.",
+      "type": "object",
+      "properties": {
+        "schema": {
+          "description": "The schema id of the evidence document, `houserules/evidence@1.0.0`.",
+          "type": "string"
+        },
+        "install": {
+          "description": "The path of the install from the git top level.",
+          "type": "string"
+        },
+        "base": {
+          "description": "The base of the range.",
+          "type": "string"
+        },
+        "head": {
+          "description": "The head of the range.",
+          "type": "string"
+        },
+        "merge_base": {
+          "description": "The merge base of the range, or `null`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "diff": {
+          "description": "The size of the diff.",
+          "$ref": "#/$defs/Diff"
+        },
+        "uncovered": {
+          "description": "The part of the change that no covering check read.",
+          "$ref": "#/$defs/RecordUncovered"
+        },
+        "failed": {
+          "description": "The deterministic rules with the result `fail`, sorted by id.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecordRuleRow"
+          }
+        },
+        "warned": {
+          "description": "The deterministic rules with the result `warn`, sorted by id.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecordRuleRow"
+          }
+        },
+        "proven": {
+          "description": "The deterministic rules with the result `pass`, sorted by id. After a cut a row keeps its id alone.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecordRuleRow"
+          }
+        },
+        "judged": {
+          "description": "The rules that have no check, with the verdict of a review. After a cut the evidence of a row is `null`.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/JudgedRow"
+          }
+        },
+        "skipped": {
+          "description": "The deterministic rules that did not apply to the change, sorted by id.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecordRuleRow"
+          }
+        },
+        "work_items": {
+          "description": "The `Work-Item` ids of the range, sorted; the first 50 after a cut.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "work_items_more": {
+          "description": "The number of ids past the listed ones. The key is absent when none was cut.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "schema",
+        "install",
+        "base",
+        "head",
+        "merge_base",
+        "diff",
+        "uncovered",
+        "failed",
+        "warned",
+        "proven",
+        "judged",
+        "skipped",
+        "work_items"
+      ]
+    },
+    "Diff": {
+      "description": "The size of the diff of the range, without the paths that `review.diffExclude` leaves out.",
+      "type": "object",
+      "properties": {
+        "files": {
+          "description": "The paths that count.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "added": {
+          "description": "The lines added.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "deleted": {
+          "description": "The lines deleted.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "lines": {
+          "description": "The lines added and deleted.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "excluded": {
+          "description": "The paths that `review.diffExclude` leaves out.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "files",
+        "added",
+        "deleted",
+        "lines",
+        "excluded"
+      ]
+    },
+    "RecordUncovered": {
+      "description": "The part of a change that no covering check read, in the form the budget left it.",
+      "type": "object",
+      "properties": {
+        "lines": {
+          "description": "The changed lines of the uncovered paths.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "total_lines": {
+          "description": "The changed lines of all paths.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "share": {
+          "description": "`lines` over `total_lines`, from 0 to 1.",
+          "type": "number",
+          "format": "double"
+        },
+        "paths": {
+          "description": "The uncovered paths, or after a cut their number for each kind.",
+          "$ref": "#/$defs/UncoveredPaths"
+        }
+      },
+      "required": [
+        "lines",
+        "total_lines",
+        "share",
+        "paths"
+      ]
+    },
+    "UncoveredPaths": {
+      "description": "The uncovered paths in the form the budget left them.",
+      "anyOf": [
+        {
+          "description": "The paths, sorted by path.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecordUncoveredPath"
+          }
+        },
+        {
+          "description": "The number of paths of each kind, in the order of the kinds of spec 4.2; a kind with no path is left out.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "propertyNames": {
+            "enum": [
+              "text",
+              "deleted",
+              "renamed",
+              "empty",
+              "binary",
+              "mode",
+              "symlink",
+              "submodule"
+            ]
+          }
+        }
+      ]
+    },
+    "RecordUncoveredPath": {
+      "description": "A changed path that no covering check read.",
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "The path from the install root. A deleted path is its old path.",
+          "type": "string"
+        },
+        "old_path": {
+          "description": "The path before a rename, or `null`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "What happened to the path.",
+          "$ref": "#/$defs/ChangeKind"
+        },
+        "ranges": {
+          "description": "The lines that the hunks of the path touch, or after a cut their number.",
+          "$ref": "#/$defs/Ranges"
+        },
+        "empty": {
+          "description": "For the kind `empty` only: whether the range adds or deletes the file. The key is absent for every other kind.",
+          "$ref": "#/$defs/EmptyChange"
+        }
+      },
+      "required": [
+        "path",
+        "old_path",
+        "kind",
+        "ranges"
+      ]
+    },
+    "ChangeKind": {
+      "description": "What happened to one changed path. The change analysis gives each path one kind (spec 4.2). Serialized, a kind is its lower-case name.",
+      "oneOf": [
+        {
+          "description": "Added or edited text: the path has hunks.",
+          "type": "string",
+          "const": "text"
+        },
+        {
+          "description": "A deleted file that held lines.",
+          "type": "string",
+          "const": "deleted"
+        },
+        {
+          "description": "A rename with no edit: the path has no hunk.",
+          "type": "string",
+          "const": "renamed"
+        },
+        {
+          "description": "An empty file that was added or deleted.",
+          "type": "string",
+          "const": "empty"
+        },
+        {
+          "description": "A binary file.",
+          "type": "string",
+          "const": "binary"
+        },
+        {
+          "description": "A change of the file mode only.",
+          "type": "string",
+          "const": "mode"
+        },
+        {
+          "description": "A symbolic link (mode `120000`).",
+          "type": "string",
+          "const": "symlink"
+        },
+        {
+          "description": "A submodule (mode `160000`).",
+          "type": "string",
+          "const": "submodule"
+        }
+      ]
+    },
+    "Ranges": {
+      "description": "The lines that the hunks of a path touch, in the form the budget left them.",
+      "anyOf": [
+        {
+          "description": "One range for each hunk, in the order of the diff.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LineRange"
+          }
+        },
+        {
+          "description": "The lines of all hunks: the lines added and the lines deleted.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      ]
+    },
+    "LineRange": {
+      "description": "The lines that one hunk of a changed path touches. Serialized, a range is one of two objects: `{\"start\": s, \"end\": e}` or `{\"after\": n, \"deleted\": k}`.",
+      "anyOf": [
+        {
+          "description": "The lines `start` to `end` of the file, counted from 1. For a deleted file they are the lines of the old file.",
+          "type": "object",
+          "properties": {
+            "start": {
+              "description": "The first line.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "end": {
+              "description": "The last line.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ]
+        },
+        {
+          "description": "A hunk that only deletes lines: `deleted` lines went away after line `after` of the new file. `after` is 0 when the deletion is at the top.",
+          "type": "object",
+          "properties": {
+            "after": {
+              "description": "The line of the new file after which the lines went away.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "deleted": {
+              "description": "The number of lines that went away.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "after",
+            "deleted"
+          ]
+        }
+      ]
+    },
+    "EmptyChange": {
+      "description": "Whether an empty file was added or deleted. An empty file has no hunk and no rename, so its kind alone does not tell the two apart. Serialized, it is its lower-case name.",
+      "oneOf": [
+        {
+          "description": "The range adds the empty file.",
+          "type": "string",
+          "const": "added"
+        },
+        {
+          "description": "The range deletes the empty file.",
+          "type": "string",
+          "const": "deleted"
+        }
+      ]
+    },
+    "RecordRuleRow": {
+      "description": "The row of a deterministic rule as the record keeps it.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The id of the knowledge entry.",
+          "type": "string"
+        },
+        "evidence": {
+          "description": "What the check found. The key is absent after a cut of a passing row.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "JudgedRow": {
+      "description": "The row of a rule that has no check, with the verdict of the review file.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The id of the knowledge entry.",
+          "type": "string"
+        },
+        "verdict": {
+          "description": "The result of the `rule_adherence` row of the review file for the id, or `open` for any result other than `pass`, `fail`, and `warn`. `null` when there is no review file or it has no row for the id.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Verdict"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence": {
+          "description": "The evidence of that row; `null` when there is no row or it has none.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "verdict",
+        "evidence"
+      ]
+    },
+    "Verdict": {
+      "description": "The verdict of a review on a judged rule.",
+      "oneOf": [
+        {
+          "description": "The review found the rule kept.",
+          "type": "string",
+          "const": "pass"
+        },
+        {
+          "description": "The review found the rule broken.",
+          "type": "string",
+          "const": "fail"
+        },
+        {
+          "description": "The review found a fault that fails nothing.",
+          "type": "string",
+          "const": "warn"
+        },
+        {
+          "description": "The review gave no verdict: its row was skipped or holds another result.",
+          "type": "string",
+          "const": "open"
+        }
+      ]
+    },
+    "RecordRoute": {
+      "description": "The route decision of the range in the form the budget left it: the document of spec 6.4, or after the last cut its route and floor flag.",
+      "type": "object",
+      "properties": {
+        "schema": {
+          "description": "The schema id of the route document, `houserules/route@1.0.0`. The minimal record has no such key.",
+          "type": "string"
+        },
+        "install": {
+          "description": "The install path. The minimal record has no such key.",
+          "type": "string"
+        },
+        "head": {
+          "description": "The head of the range. The minimal record has no such key.",
+          "type": "string"
+        },
+        "route": {
+          "description": "The route of the change: the highest route of the reasons.",
+          "$ref": "#/$defs/Route"
+        },
+        "floor": {
+          "description": "`true` for the tool-free floor, which reads no audit row.",
+          "type": "boolean"
+        },
+        "inputs": {
+          "description": "What the rules read. The minimal record has no such key.",
+          "$ref": "#/$defs/RecordInputs"
+        },
+        "reasons": {
+          "description": "One reason for each rule that was evaluated. The minimal record has no such key.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Reason"
+          }
+        }
+      },
+      "required": [
+        "route",
+        "floor"
+      ]
+    },
+    "Route": {
+      "description": "How closely a change gets reviewed. The variants are ordered from the lowest route to the highest, so `Ord` picks the stricter of two routes. Serialized, a route is its kebab-case name.",
+      "oneOf": [
+        {
+          "description": "No review is required before the change merges.",
+          "type": "string",
+          "const": "auto-merge-eligible"
+        },
+        {
+          "description": "The project owner reviews the change.",
+          "type": "string",
+          "const": "owner-review"
+        },
+        {
+          "description": "A senior reviewer reviews the change.",
+          "type": "string",
+          "const": "senior-review"
+        }
+      ]
+    },
+    "RecordInputs": {
+      "description": "The inputs of a route decision in the form the budget left them.",
+      "type": "object",
+      "properties": {
+        "failed": {
+          "description": "The ids of the failed rows that no booking accepted, sorted.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "warned": {
+          "description": "The ids of the warned rows, sorted.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "areas": {
+          "description": "The areas that hold a changed path, each with its paths or their number.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/PathList"
+          }
+        },
+        "no_area": {
+          "description": "The changed paths in no area, or their number.",
+          "$ref": "#/$defs/PathList"
+        },
+        "paths": {
+          "description": "The entries of `review.route.paths` that match a changed path.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecordPathInput"
+          }
+        },
+        "diff_lines": {
+          "description": "The lines added and deleted, without the excluded paths.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "uncovered_share": {
+          "description": "The share of the changed lines that no covering check read; `null` in a floor.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "score": {
+          "description": "The external score, or `null`.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "rule_sources_changed": {
+          "description": "The changed rule sources, or their number.",
+          "$ref": "#/$defs/PathList"
+        }
+      },
+      "required": [
+        "failed",
+        "warned",
+        "areas",
+        "no_area",
+        "paths",
+        "diff_lines",
+        "uncovered_share",
+        "score",
+        "rule_sources_changed"
+      ]
+    },
+    "PathList": {
+      "description": "A list of paths in the form the budget left it.",
+      "anyOf": [
+        {
+          "description": "The paths, sorted.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "The number of paths, after a cut.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      ]
+    },
+    "RecordPathInput": {
+      "description": "One entry of `review.route.paths` that matches a changed path.",
+      "type": "object",
+      "properties": {
+        "glob": {
+          "description": "The glob of the entry.",
+          "type": "string"
+        },
+        "route": {
+          "description": "The route of the entry.",
+          "$ref": "#/$defs/Route"
+        },
+        "paths": {
+          "description": "The changed paths that the glob matches, or their number.",
+          "$ref": "#/$defs/PathList"
+        }
+      },
+      "required": [
+        "glob",
+        "route",
+        "paths"
+      ]
+    },
+    "Reason": {
+      "description": "One reason of a route decision: what a rule read and the route that it gave. A rule that found nothing, and a limit or a threshold that the change stays within, give `auto-merge-eligible`, the lowest route.",
+      "type": "object",
+      "properties": {
+        "rule": {
+          "description": "The rule that the reason belongs to.",
+          "$ref": "#/$defs/ReasonRule"
+        },
+        "input": {
+          "description": "What the rule read: the id of a row, the name of an area, a glob, or the key of `inputs` for the other rules and for a rule that found nothing.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value that the rule compared with its limit or threshold, or the number of paths of a rule that names paths, 0 for a rule that found nothing; `null` for a rule with none of these.",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "threshold": {
+          "description": "The limit or the threshold, or `null` for a rule that has none.",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "route": {
+          "description": "The route that the rule gave.",
+          "$ref": "#/$defs/Route"
+        },
+        "paths": {
+          "description": "The first 20 paths of a rule that names paths, sorted.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "more_paths": {
+          "description": "The number of paths beyond the 20 of `paths`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "decisive": {
+          "description": "`true` for a reason at the final route.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "rule",
+        "input",
+        "value",
+        "threshold",
+        "route",
+        "paths",
+        "more_paths",
+        "decisive"
+      ]
+    },
+    "ReasonRule": {
+      "description": "The rule that a reason belongs to. A rule with a limit has one reason for its route and one for each limit. A rule that found nothing has one reason that counts 0.",
+      "oneOf": [
+        {
+          "description": "A rule source changed: the knowledge folder, the marker of the install, or a CI file of the project.",
+          "type": "string",
+          "const": "rule-sources"
+        },
+        {
+          "description": "A deterministic row failed and no booking accepted it.",
+          "type": "string",
+          "const": "failed"
+        },
+        {
+          "description": "A deterministic row warned.",
+          "type": "string",
+          "const": "warned"
+        },
+        {
+          "description": "The route of an area that holds a changed path.",
+          "type": "string",
+          "const": "area"
+        },
+        {
+          "description": "The `maxDiffLines` limit of an area at `auto-merge-eligible`.",
+          "type": "string",
+          "const": "area-diff"
+        },
+        {
+          "description": "The `maxUncoveredShare` limit of an area at `auto-merge-eligible`.",
+          "type": "string",
+          "const": "area-share"
+        },
+        {
+          "description": "Changed paths that match no area.",
+          "type": "string",
+          "const": "no-area"
+        },
+        {
+          "description": "The route of an entry of `review.route.paths` whose glob matches a changed path.",
+          "type": "string",
+          "const": "path"
+        },
+        {
+          "description": "The `maxDiffLines` limit of a path entry at `auto-merge-eligible`.",
+          "type": "string",
+          "const": "path-diff"
+        },
+        {
+          "description": "The `maxUncoveredShare` limit of a path entry at `auto-merge-eligible`.",
+          "type": "string",
+          "const": "path-share"
+        },
+        {
+          "description": "The score against `seniorScore`.",
+          "type": "string",
+          "const": "score-senior"
+        },
+        {
+          "description": "The score against `ownerScore`.",
+          "type": "string",
+          "const": "score-owner"
+        },
+        {
+          "description": "A change with no changed path takes the default route.",
+          "type": "string",
+          "const": "default"
+        }
+      ]
+    },
+    "Sample": {
+      "description": "The post-merge sample draw of a record (spec 8.5).",
+      "type": "object",
+      "properties": {
+        "rate": {
+          "description": "The `review.route.sampleRate` at the draw.",
+          "type": "number",
+          "format": "double"
+        },
+        "sampled": {
+          "description": "Whether the draw on the key is below the rate: the record is sampled.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "rate",
+        "sampled"
+      ]
+    },
+    "RecordBundle": {
+      "description": "The evidence bundle of the request, parsed (spec 7.1).",
+      "type": "object",
+      "properties": {
+        "purpose": {
+          "description": "The text of the `Purpose:` line.",
+          "type": "string"
+        },
+        "intent": {
+          "description": "The text of the `Intent:` line, or `null`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "work_items": {
+          "description": "The work items of the `Work items:` line; the first 50 after a cut.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "work_items_more": {
+          "description": "The number of work items past the listed ones. The key is absent when none was cut.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "tier": {
+          "description": "The text of the `Risk tier:` line.",
+          "type": "string"
+        },
+        "criterion": {
+          "description": "The text of the `Criterion:` line.",
+          "type": "string"
+        },
+        "budget_reason": {
+          "description": "The text of the `Budget reason:` line.",
+          "type": "string"
+        },
+        "runs": {
+          "description": "The verification runs of the bundle; the first 20 after a cut.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecordRun"
+          }
+        },
+        "runs_more": {
+          "description": "The number of runs past the listed ones. The key is absent when none was cut.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "purpose",
+        "intent",
+        "work_items",
+        "tier",
+        "criterion",
+        "budget_reason",
+        "runs"
+      ]
+    },
+    "RecordRun": {
+      "description": "One verification run of the bundle: the facts of its capture header.",
+      "type": "object",
+      "properties": {
+        "argv": {
+          "description": "The command and its arguments; empty for a header that does not parse.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exit": {
+          "description": "The exit code of the run, or `null`.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "head": {
+          "description": "The full sha of `HEAD` when the run started, or `null`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "description": "The SHA-256 of the header line.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "argv",
+        "exit",
+        "head",
+        "sha256"
+      ]
+    },
+    "Links": {
+      "description": "The work items of the range in the form the budget left them.",
+      "type": "object",
+      "properties": {
+        "work_items": {
+          "description": "The `Work-Item` ids of the range, sorted; the first 50 after a cut.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "work_items_more": {
+          "description": "The number of ids past the listed ones. The key is absent when none was cut.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "work_items"
+      ]
+    },
+    "PostMergeAudit": {
+      "description": "The audit of a merged change that a person ran after the merge.",
+      "type": "object",
+      "properties": {
+        "verdict": {
+          "description": "The verdict of the audit.",
+          "$ref": "#/$defs/AuditVerdict"
+        },
+        "by": {
+          "description": "Who audited; at most 100 bytes.",
+          "type": "string"
+        },
+        "note": {
+          "description": "A note on the audit, or `null`; at most 1,000 bytes.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "verdict",
+        "by",
+        "note"
+      ]
+    },
+    "AuditVerdict": {
+      "description": "The verdict of a post-merge audit.",
+      "oneOf": [
+        {
+          "description": "The merged change is sound.",
+          "type": "string",
+          "const": "pass"
+        },
+        {
+          "description": "The merged change is not sound.",
+          "type": "string",
+          "const": "fail"
+        }
+      ]
+    }
+  }
+}

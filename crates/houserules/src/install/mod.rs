@@ -36,10 +36,12 @@
 //! default of spec 4.6. It holds the `KIT_OWNED` files, the `SEED_ONCE` files,
 //! the `DEFAULT_PACKS` as copies in `knowledge/packs/` with their pins in
 //! `.houserules.json` (a new install only), the `.houserules/` line of
-//! `.gitignore`, the CI workflow, and the marker with `schema`
-//! `houserules/install@2.2.0`. It installs no tracker and no workflow, and so
-//! writes none of the five 1.x topic files, no `backlog/` file, and no file of
-//! a workflow. `init --tracker json` installs the JSON tracker (`classes`' own
+//! `.gitignore`, and the marker with `schema` `houserules/install@2.3.0`. It
+//! writes no CI file (spec 10.7) and prints the line that names `houserules ci
+//! print`, with the host of the `origin` remote when it is `github.com` or
+//! `gitlab.com`. It installs no tracker and no workflow, and so writes none of
+//! the five 1.x topic files, no `backlog/` file, and no file of a workflow.
+//! `init --tracker json` installs the JSON tracker (`classes`' own
 //! module doc names the file classes; `tracker`'s names the trackers).
 //! `init --tracker <adapter>` writes the `tracker` key of the marker last,
 //! after the files of the adapter, so a stop in between leaves a tree that the
@@ -85,9 +87,9 @@
 //! `init` refuses before it writes anything and names it.
 //!
 //! `init` never seeds a path in `ownedPaths` (a `KIT_OWNED` or `SEED_ONCE`
-//! file, the CI workflow, or `.claude/settings.json`): such a path is kept
-//! when it exists and left absent when it does not. A new install has no
-//! `ownedPaths`, so a pack copy and `knowledge/areas.json` never fall in them.
+//! file, or `.claude/settings.json`): such a path is kept when it exists and
+//! left absent when it does not. A new install has no `ownedPaths`, so a pack
+//! copy and `knowledge/areas.json` never fall in them.
 //!
 //! When `init` seeds `knowledge/areas.json` itself, each area in it that
 //! holds the globs of a kit pack came with that pack: the pin of the first
@@ -105,14 +107,13 @@
 //! An install root is the git top level or a directory below it
 //! (`location`'s own module doc has the placement). An install below the top
 //! level keeps `.claude/`, `.githooks/`, and its knowledge base in its own
-//! root, and writes one file outside it: its CI workflow at the top level
-//! (`workflow`'s own module doc has the form and the file name), baselined
-//! under the key `:/<path>`. `init` refuses a new root that nests with another
-//! install of the repository and one whose workflow file name another
-//! install uses, before it writes anything; a root that already holds its
-//! `.houserules.json` is no new root, and `init` runs no such check there.
-//! `update` accepts a directory below the top level only when it holds a
-//! `.houserules.json`, and rewrites only the workflow file of its own
+//! root. An install that an earlier release seeded keeps its CI workflow at the
+//! top level (`ci_workflow`'s own module doc has the form and the file name),
+//! baselined under the key `:/<path>`. `init` refuses a new root that nests
+//! with another install of the repository before it writes anything; a root
+//! that already holds its `.houserules.json` is no new root, and `init` runs no
+//! such check there. `update` accepts a directory below the top level only when
+//! it holds a `.houserules.json`, and rewrites only the workflow file of its own
 //! install.
 //!
 //! # `update` and the ownership baseline
@@ -160,13 +161,12 @@
 //! - Every `SEED_ONCE` path that is entirely absent is written (a later kit
 //!   release can add one after an install's `init` already ran) unless
 //!   `ownedPaths` lists it; a file that exists is adopter data and stays. The
-//!   CI workflow is backfilled the same way, but only once
-//!   `origin_is_github_hosted` is true for the target; a non-GitHub origin
-//!   leaves it silently absent. An install with the JSON tracker and a
-//!   `backlog/` directory gets each absent `TRACKER_DATA` file the same way,
-//!   and keeps `backlog/schema.json` current as a D3 file; with the
-//!   directory missing, `update` writes nothing under `backlog/`, so that the
-//!   tracker stays unreachable until the project restores its data.
+//!   CI workflow is no `SEED_ONCE` file: `update` writes none, and one that
+//!   the project deleted stays absent (spec 10.7). An install with the JSON
+//!   tracker and a `backlog/` directory gets each absent `TRACKER_DATA` file
+//!   the same way, and keeps `backlog/schema.json` current as a D3 file; with
+//!   the directory missing, `update` writes nothing under `backlog/`, so that
+//!   the tracker stays unreachable until the project restores its data.
 //! - The ignore line of `.gitignore` (`ensure_ignore_line`): `.houserules/`
 //!   replaces the older line `.houserules/step/` in its place, with the line
 //!   ending of the file, and is added where neither line is present. `update`
@@ -175,13 +175,21 @@
 //! - Each hand step that the earlier steps left is printed as `hand step:
 //!   <text>` (`hand_steps` holds every text).
 //! - The restamp of the install schema: a marker with the schema
-//!   `houserules/install@2.1.0` gets `houserules/install@2.2.0` in the write of
+//!   `houserules/install@2.2.0` gets `houserules/install@2.3.0` in the write of
 //!   the marker that ends `update`, and `update` prints `wrote .houserules.json
-//!   (houserules/install@2.2.0)` after that write. The step tests its own
+//!   (houserules/install@2.3.0)` after that write. The step tests its own
 //!   state, so a run that stopped before the write restamps at the next run, and
 //!   a second `update` prints no such line (`houserules.migrations-finish-after-a-stop`).
-//!   The keys `runners` and `workspaces` stay as found (`marker`'s own module
-//!   doc).
+//!   The keys `runners`, `workspaces`, and `review` stay as found (`marker`'s
+//!   own module doc).
+//! - The opt-in line of an install that holds the seeded CI workflow
+//!   (`ci_files`' own module doc): once, in the write of the marker that ends
+//!   `update`, which records `reviewLayerOffered`. The line follows that write,
+//!   so that a run that stopped before it prints the line at the next run.
+//! - The pin line of each tracked file of the repository that `houserules ci
+//!   write` created with another version than the binary's (`ci_files`). The
+//!   scan runs before the first write, so that a file that cannot be read stops
+//!   `update` before it changes anything.
 //!
 //! An install with no `baselines` recorded at all needs no separate migration
 //! step: `baseline::classify` treats an unrecorded item the same way whether
@@ -242,13 +250,11 @@
 //! not in a git repository (`location::locate`: a target outside one, one
 //! that does not exist yet, and a file name `git init`), a new target (one
 //! with no `.houserules.json` yet) that nests with another install of the
-//! repository or that would write another install's workflow file
-//! (`location::refuse_overlap`), a target whose path a workflow cannot hold
-//! (`Workflow::for_install`), a malformed
-//! `--id-prefix`, and a pre-existing `.houserules.json` that is not valid JSON, is valid
-//! JSON but not an object, carries an invalid `idPrefix`, carries an
-//! empty/non-string `version`, or carries a `defaultBranch` that is no string
-//! (`audit` reads that key). An invalid-JSON marker's inner message text is
+//! repository (`location::refuse_overlap`), a malformed `--id-prefix`, and a
+//! pre-existing `.houserules.json` that is not valid JSON, is valid JSON but
+//! not an object, carries an invalid `idPrefix`, carries an empty/non-string
+//! `version`, or carries a `defaultBranch` that is no string (`audit` reads
+//! that key). An invalid-JSON marker's inner message text is
 //! `serde_json`'s own (`read_json_object`'s own doc), the same shape
 //! `rules::deliverable::read_deliverable_value` carries for the same
 //! reason. A pre-existing `.houserules.json` with no `schema` key is an
@@ -302,7 +308,9 @@
 //! writes any file (HR-216). `tests/update.rs`'s own never-`init`ed test pins
 //! the line (its own doc comment and `seeded_repo`'s carry the fuller account).
 
+pub(crate) mod ci_files;
 mod ci_workflow;
+pub(crate) use ci_workflow::workflow_path;
 mod classes;
 mod conversion;
 pub(crate) mod hand_steps;
@@ -519,25 +527,35 @@ fn is_overridden(overrides: &[String], key: &str) -> bool {
     overrides.iter().any(|item| item == key)
 }
 
-/// `true` when `target`'s configured `origin` remote resolves to a
-/// GitHub-hosted URL: `git config --get remote.origin.url`, read locally
-/// with no network call, matched for a `github.com` host segment against
-/// every real remote form (`https://github.com/<org>/<repo>.git`,
-/// `git@github.com:<org>/<repo>.git`, `ssh://git@github.com/<org>/<repo>`)
-/// -- the host segment is the same literal substring in all three. `false`
-/// covers every non-matching case alike: no `origin` configured at all (a
-/// bare `git init`, most of this crate's own test fixtures), a `git`
-/// invocation that fails outright, and an `origin` hosted anywhere else
-/// (GitLab, Bitbucket, a self-hosted forge) -- `seed`/`update` read this as
-/// one boolean gate, never distinguishing why it came back `false`.
-fn origin_is_github_hosted(target: &Path) -> bool {
-    origin_url(target).is_some_and(|url| url.to_lowercase().contains("github.com"))
+/// The host that the `origin` remote of `target` names when it is `github.com`
+/// or `gitlab.com`: `github` or `gitlab` (spec 10.3). Another host, a
+/// self-hosted forge among them, and a repository with no `origin` give `None`.
+pub(crate) fn detected_host(target: &Path) -> Option<&'static str> {
+    match host_of_url(&origin_url(target)?).as_str() {
+        "github.com" => Some("github"),
+        "gitlab.com" => Some("gitlab"),
+        _ => None,
+    }
+}
+
+/// The host name of the remote `url`, in lowercase, in every real remote form:
+/// `https://[<user>@]<host>[:<port>]/<path>`, `ssh://git@<host>/<path>`, and
+/// `git@<host>:<path>`. A path of the file system, which names no host, gives
+/// itself.
+pub(crate) fn host_of_url(url: &str) -> String {
+    let url = url.trim();
+    let authority = match url.split_once("://") {
+        Some((_, rest)) => rest.split('/').next().unwrap_or_default(),
+        None => url.split(':').next().unwrap_or_default(),
+    };
+    let host = authority.rsplit('@').next().unwrap_or_default();
+    host.split(':').next().unwrap_or_default().to_lowercase()
 }
 
 /// The URL of the `origin` remote of the repository of `target`
 /// (`git config --get remote.origin.url`, read locally with no network
 /// call), or `None` when there is none or `git` fails.
-fn origin_url(target: &Path) -> Option<String> {
+pub(crate) fn origin_url(target: &Path) -> Option<String> {
     let output = Command::new("git")
         .args(["config", "--get", "remote.origin.url"])
         .current_dir(target)
@@ -988,38 +1006,14 @@ fn seed_gitignore(target: &Path, owned: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-/// Seeds the CI workflow of the install once, at the git top level, when the
-/// origin is GitHub hosted, and baselines it under its top-level key. An
-/// existing file is kept; an absent path in `owned` stays absent; a
-/// non-GitHub origin skips the write and says why. Every line names the file
-/// by its path below the top level.
-fn seed_workflow(
-    placement: &Placement,
-    workflow: &Workflow,
-    owned: &[String],
-    baselines: &mut Map<String, Value>,
-) -> Result<(), String> {
-    let file = workflow.path.as_str();
-    if placement.top_level.join(file).exists() {
-        println!("kept {file}");
-        return Ok(());
-    }
-    if is_overridden(owned, file) {
-        return Ok(());
-    }
-    if !origin_is_github_hosted(&placement.top_level) {
-        println!(
-            "skipped {file} (origin is not GitHub-hosted; see the migrating-knowledge skill to add your own CI gate)"
-        );
-        return Ok(());
-    }
-    write_into(&placement.top_level, file, &workflow.content)?;
-    println!("wrote {file}");
-    baselines.insert(
-        workflow.key.clone(),
-        json!(baseline::hash(&workflow.content)),
+/// Prints the line of `init` that says it wrote no CI file and names the command
+/// that prints the CI wiring (spec 10.7). `<host>` is the detected host
+/// (`detected_host`), else `github or gitlab`.
+fn print_no_ci_file_line(target: &Path) {
+    let host = detected_host(target).unwrap_or("github or gitlab");
+    println!(
+        "init: houserules wrote no CI file; to run the gates and the review layer in your pipeline, run houserules ci print --host {host}"
     );
-    Ok(())
 }
 
 /// Seeds `.claude/settings.json`, or merges the `SessionStart` hook entries
@@ -1092,14 +1086,16 @@ fn seed_workflow_hook(target: &Path, marker: &Marker) -> Result<(), String> {
 /// `KIT_OWNED` files (`seed_kit_owned`), the absent `SEED_ONCE` files, the
 /// `DEFAULT_PACKS` with their pins (a new install only: an existing 2.0 install
 /// gets no pack and no area, spec C18), the `.houserules/` line of
-/// `.gitignore`, the deliverables schema and the CI workflow for a GitHub-hosted
-/// origin (each in the form of the tracker that the same command installs, so
-/// that the tracker's own write of it finds it current; with no tracker flag,
-/// in the form of the tracker that the marker names, HR-220), and
-/// `.claude/settings.json` with the hook entry; then it stamps
-/// `.houserules.json` and renders the generated markdown. It writes no file
-/// that exists but five (this module's own doc names them), and it never
-/// seeds a path in the marker's owned paths. Without
+/// `.gitignore`, the deliverables schema (in the form of the tracker that the
+/// same command installs, so that the tracker's own write of it finds it
+/// current; with no tracker flag, in the form of the tracker that the marker
+/// names, HR-220), and `.claude/settings.json` with the hook entry; then it
+/// stamps `.houserules.json` and renders the generated markdown. It writes no
+/// CI file, and prints the line that says so (`print_no_ci_file_line`) when
+/// the install holds no seeded workflow after the run (`Workflow::is_held_by`;
+/// a tracker command can rewrite the workflow that an earlier release seeded).
+/// It writes no file that exists but five (this module's own doc names them),
+/// and it never seeds a path in the marker's owned paths. Without
 /// `target_claude`, and on an install whose `renderers` lacks `claude`, it
 /// leaves out the Claude Code files and the hook entry (spec 7, C9) and
 /// prints the line that enables them. Every payload file this writes is
@@ -1109,13 +1105,13 @@ fn seed_workflow_hook(target: &Path, marker: &Marker) -> Result<(), String> {
 /// over an install that already committed to a prefix cannot backfill a
 /// `PREFIXED` file under a different one. An install of houserules 1.x is
 /// refused: `update` converts it. So is a new install root (one with no
-/// marker yet) that nests with another install of the repository or that
-/// would write another install's workflow file (`location::refuse_overlap`),
-/// and a root whose path a workflow cannot hold (`Workflow::for_install`);
-/// each refusal comes before any write. A target that holds its own marker is
-/// no new root: `init` runs no overlap check there, as `update` runs none, so
-/// that the remedy of line A (`init --tracker json`) works on an install
-/// whose repository tracks another `.houserules.json` below the root.
+/// marker yet) that nests with another install of the repository
+/// (`location::refuse_overlap`); the refusal comes before any write. It
+/// refuses no root for a workflow file name: an install that holds no workflow
+/// needs none. A target that holds its own marker is no new root: `init` runs
+/// no overlap check there, as `update` runs none, so that the remedy of line A
+/// (`init --tracker json`) works on an install whose repository tracks another
+/// `.houserules.json` below the root.
 ///
 /// With a `workflow_request`, `init` refuses before any write when the install
 /// has no tracker and `request` names none (spec 4.3), and installs the
@@ -1157,14 +1153,6 @@ fn seed(
         return Err(workflow::needs_tracker_at_init(manifest));
     }
     let effective_prefix = marker.id_prefix_or(&prefix);
-    let adapter = match &tracker_install {
-        Some(install) => Some(install.config.adapter),
-        None => marker.tracker()?.map(|config| config.adapter),
-    };
-    let workflow = Workflow::for_install(
-        &placement,
-        &ci_workflow::template_for(adapter, &effective_prefix)?,
-    )?;
     let backlog_id_pattern = match &tracker_install {
         Some(install) => sync::BacklogIdPattern::Named(
             tracker::install_backlog_id_pattern(target, &effective_prefix, install)
@@ -1201,7 +1189,6 @@ fn seed(
         seed_areas_of_installed_packs(target, &mut pins)?;
     }
     seed_gitignore(target, &owned)?;
-    seed_workflow(&placement, &workflow, &owned, &mut baselines)?;
     if claude {
         seed_settings(target, &effective_prefix, &owned)?;
         seed_workflow_hook(target, &marker)?;
@@ -1226,6 +1213,9 @@ fn seed(
     println!("houserules: initialized {}", target.display());
     if !claude {
         println!("{ENABLE_CLAUDE_LINE}");
+    }
+    if !Workflow::is_held_by(&placement, &marker) {
+        print_no_ci_file_line(target);
     }
     println!("next: houserules check-knowledge && houserules check-backlog");
     Ok(())
@@ -1435,8 +1425,9 @@ pub(crate) fn seed_tracker_files(
     Ok(lines)
 }
 
-/// Writes the seeded CI workflow of the install for the tracker `adapter`
-/// (`ci_workflow::write_for`); the lines name each file written.
+/// Brings the seeded CI workflow of the install to the form of the tracker
+/// `adapter` (`ci_workflow::write_for`); an install that holds none gets none.
+/// The lines name each file written.
 pub(crate) fn write_ci_workflow(
     root: &Path,
     marker: &mut Marker,
@@ -1549,18 +1540,16 @@ fn convert_or_move_packs(
 }
 
 /// Writes every `SEED_ONCE` path that is absent and that `owned` does not
-/// list (a later kit release can add one after the install's `init` ran), and
-/// the CI workflow of the install when it is absent, not owned, and the
-/// origin is GitHub hosted; a D3 file gets its baseline. With the JSON
-/// tracker (`plan.json_tracker`) it also writes each absent `TRACKER_DATA` file
-/// and the schema of the tracker. The deliverables schema holds the `backlogId`
-/// pattern of the plan (`sync::deliverables_content`).
+/// list (a later kit release can add one after the install's `init` ran); a D3
+/// file gets its baseline. With the JSON tracker (`plan.json_tracker`) it also
+/// writes each absent `TRACKER_DATA` file and the schema of the tracker. The
+/// deliverables schema holds the `backlogId` pattern of the plan
+/// (`sync::deliverables_content`). It writes no CI workflow (spec 10.7).
 fn backfill_missing_files(
     plan: &sync::Plan,
-    placement: &Placement,
     baselines: &mut Map<String, Value>,
 ) -> Result<(), String> {
-    let (target, prefix, owned, workflow) = (plan.target, plan.prefix, plan.owned, plan.workflow);
+    let (target, prefix, owned) = (plan.target, plan.prefix, plan.owned);
     let tracker_data: &[&str] = if plan.json_tracker { TRACKER_DATA } else { &[] };
     let tracker_schema: &[&str] = if plan.json_tracker {
         &[TRACKER_SCHEMA]
@@ -1577,18 +1566,6 @@ fn backfill_missing_files(
         if D3_FILES.contains(file) || *file == TRACKER_SCHEMA {
             baselines.insert(file.to_string(), json!(baseline::hash(&content)));
         }
-    }
-    let top_level_workflow = placement.top_level.join(&workflow.path);
-    if !top_level_workflow.exists()
-        && !is_overridden(owned, &workflow.path)
-        && origin_is_github_hosted(&placement.top_level)
-    {
-        write_into(&placement.top_level, &workflow.path, &workflow.content)?;
-        println!("wrote {}", workflow.path);
-        baselines.insert(
-            workflow.key.clone(),
-            json!(baseline::hash(&workflow.content)),
-        );
     }
     Ok(())
 }
@@ -1624,7 +1601,13 @@ fn tracker_backlog_id_pattern(
 /// pack moves (`pack_moves`) and the one-id-one-source step
 /// (`pack::one_source`); the file sync (`sync`); then the retired paths, the
 /// seed-once backfill, the restamp of `.houserules.json` (its install schema
-/// included), the render, and the stamped-to-running version drift.
+/// and the offer of the review layer included), the opt-in line and the pin
+/// lines of the CI wiring (`ci_files`), the render, and the stamped-to-running
+/// version drift. The scan for the pin lines comes first and stops `update`
+/// before any write when it cannot read a tracked file. The file name of the
+/// seeded workflow is built only for an install that holds the workflow
+/// (`Workflow::held_by_install`), so that no install path is refused for a
+/// workflow that does not exist.
 /// Every `KIT_OWNED` file is overwritten, kept, or -- unless the project
 /// owns it -- restored if the project deleted it, since kit machinery that
 /// the project has not claimed is always present after `update`. Every
@@ -1660,18 +1643,20 @@ fn update(target: &Path, given: &Path, id_prefix: Option<String>) -> Result<(), 
     }
     let previously_seeded = marker.is_1_x() || target.join(SCHEMA_FILE).exists();
     let effective_prefix = marker.id_prefix_or(&prefix);
-    let workflow = Workflow::for_install(
-        &placement,
-        &payload_content(ci_workflow::TEMPLATE_PATH, &effective_prefix)?,
-    )?;
+    let ci_pin_lines = ci_files::pin_lines(target, &placement.top_level, &kit_version())?;
 
     let mut hand_steps = Vec::new();
     if previously_seeded {
+        let workflow = Workflow::held_by_install(
+            &placement,
+            &payload_content(ci_workflow::TEMPLATE_PATH, &effective_prefix)?,
+            &marker,
+        )?;
         let ctx = conversion::Context {
             root: target,
             top_level: &placement.top_level,
             prefix: &effective_prefix,
-            workflow: &workflow,
+            workflow: workflow.as_ref(),
         };
         hand_steps = convert_or_move_packs(&ctx, &mut marker)?;
         marker = Marker::read_or_default(target, &prefix)?;
@@ -1681,9 +1666,10 @@ fn update(target: &Path, given: &Path, id_prefix: Option<String>) -> Result<(), 
     let mut baselines = marker.baselines();
     let adapter = marker.tracker()?.map(|config| config.adapter);
     let json_tracker = adapter == Some(Adapter::Json) && target.join("backlog").is_dir();
-    let kit_workflow = Workflow::for_install(
+    let kit_workflow = Workflow::held_by_install(
         &placement,
         &ci_workflow::template_for(adapter, &effective_prefix)?,
+        &marker,
     )?;
     let backlog_id_pattern = tracker_backlog_id_pattern(target, &marker)?;
     let plan = sync::Plan {
@@ -1695,7 +1681,7 @@ fn update(target: &Path, given: &Path, id_prefix: Option<String>) -> Result<(), 
         adapter,
         backlog_id_pattern: &backlog_id_pattern,
         top_level: &placement.top_level,
-        workflow: &kit_workflow,
+        workflow: kit_workflow.as_ref(),
     };
 
     let mut sync_lines = Vec::new();
@@ -1712,7 +1698,7 @@ fn update(target: &Path, given: &Path, id_prefix: Option<String>) -> Result<(), 
     }
 
     if previously_seeded {
-        backfill_missing_files(&plan, &placement, &mut baselines)?;
+        backfill_missing_files(&plan, &mut baselines)?;
     }
     if let Some(change) = ensure_ignore_line(target, &owned)?
         && change != IgnoreChange::Present
@@ -1729,10 +1715,22 @@ fn update(target: &Path, given: &Path, id_prefix: Option<String>) -> Result<(), 
     let stamped_version = marker.version().unwrap_or("none").to_string();
     let running_version = kit_version();
     let restamped_schema = marker.restamp_install_schema();
+    let offered_workflow = kit_workflow.as_ref().filter(|workflow| {
+        !marker.review_layer_offered() && !is_overridden(&owned, &workflow.path)
+    });
+    if offered_workflow.is_some() {
+        marker.set_review_layer_offered();
+    }
     marker.restamp(&running_version, &effective_prefix, baselines);
     marker.write()?;
     if restamped_schema {
         println!("wrote {} ({INSTALL_SCHEMA})", crate::root::INSTALL_MARKER);
+    }
+    if let Some(workflow) = offered_workflow {
+        println!("{}", ci_files::opt_in_line(&workflow.path));
+    }
+    for line in &ci_pin_lines {
+        println!("{line}");
     }
     crate::rules::render_and_report(target)?;
     println!("kit {stamped_version} -> {running_version}");
@@ -1927,8 +1925,8 @@ mod tests {
         );
     }
 
-    /// A scratch git repository, `origin` unset -- `origin_is_github_hosted`'s
-    /// own no-remote-configured case.
+    /// A scratch git repository, `origin` unset -- `detected_host`'s own
+    /// no-remote-configured case.
     fn git_repo_with_no_origin() -> tempfile::TempDir {
         let dir = tempfile::tempdir().expect("tempdir");
         let status = std::process::Command::new("git")
@@ -1952,28 +1950,38 @@ mod tests {
         dir
     }
 
+    /// The host of `origin` is `github` or `gitlab` for `github.com` and
+    /// `gitlab.com` in every remote form, and is not detected for any other
+    /// host: a host that only starts or ends like them, a self-hosted forge, a
+    /// path of the file system, and a repository with no `origin`.
     #[test]
-    fn origin_is_github_hosted_true_for_an_https_github_origin() {
-        let dir = git_repo_with_origin("https://github.com/jblossey/houserules.git");
-        assert!(origin_is_github_hosted(dir.path()));
-    }
+    fn detected_host_names_github_and_gitlab_in_every_remote_form() {
+        for (url, expected) in [
+            ("https://github.com/jblossey/houserules.git", Some("github")),
+            ("git@github.com:jblossey/houserules.git", Some("github")),
+            ("ssh://git@github.com/jblossey/houserules", Some("github")),
+            (
+                "ssh://git@github.com:22/jblossey/houserules",
+                Some("github"),
+            ),
+            ("https://user:secret@GitHub.com/o/r.git", Some("github")),
+            ("github.com:o/r.git", Some("github")),
+            ("https://gitlab.com/o/r.git", Some("gitlab")),
+            ("git@gitlab.com:group/sub/r.git", Some("gitlab")),
+            ("https://github.com.evil.example/o/r.git", None),
+            ("https://notgithub.com/o/r.git", None),
+            ("https://www.github.com/o/r.git", None),
+            ("https://git.example.org/github.com/r.git", None),
+            ("https://gitlab.example.org/o/r.git", None),
+            ("git@github.example.org:o/r.git", None),
+            ("/srv/git/github.com", None),
+            ("../github.com/r.git", None),
+        ] {
+            let dir = git_repo_with_origin(url);
 
-    #[test]
-    fn origin_is_github_hosted_true_for_an_ssh_style_github_origin() {
-        let dir = git_repo_with_origin("git@github.com:jblossey/houserules.git");
-        assert!(origin_is_github_hosted(dir.path()));
-    }
-
-    #[test]
-    fn origin_is_github_hosted_false_with_no_origin_configured() {
-        let dir = git_repo_with_no_origin();
-        assert!(!origin_is_github_hosted(dir.path()));
-    }
-
-    #[test]
-    fn origin_is_github_hosted_false_for_a_non_github_origin() {
-        let dir = git_repo_with_origin("https://gitlab.com/jblossey/houserules.git");
-        assert!(!origin_is_github_hosted(dir.path()));
+            assert_eq!(detected_host(dir.path()), expected, "{url}");
+        }
+        assert_eq!(detected_host(git_repo_with_no_origin().path()), None);
     }
 
     /// This checkout's `template/` directory, resolved at compile time from

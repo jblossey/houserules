@@ -915,7 +915,8 @@ fn expected_result(name: &str) -> Value {
 /// a workspace as raw JSON, so a workspace of the old form (batch 35 and
 /// earlier) gives the result that the committed files hold. Those files are the
 /// output of the binary of batch 35 on this workspace, with the placeholders of
-/// `normalized`.
+/// `normalized`; `audit.json` also holds the `schema` key that the audit result
+/// prints first.
 #[test]
 fn stats_and_audit_workspace_read_an_old_form_workspace_as_before() {
     let (root, base, head) = knowledge_repository();

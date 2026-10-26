@@ -58,9 +58,10 @@ pub(super) fn ci_lacks_the_github_permissions(path: &str) -> String {
 }
 
 /// The seeded CI workflow (spec 8.5): the file at `path` is the project's, it
-/// holds `contents: read`, and it lacks `issues: read`, which the GitHub tracker
-/// needs. The step adds the line to the permissions of the copy, so that the job
-/// never holds two `permissions` keys.
+/// holds `contents: read` or another value of `contents`, and its mapping holds
+/// no `issues` scope, which the GitHub tracker needs. The step adds the line to
+/// the permissions of the copy, so that the job never holds two `permissions`
+/// keys.
 pub(super) fn ci_lacks_issues_read(path: &str) -> String {
     format!(
         "{path} lacks issues: read, which the github tracker needs; add issues: read to the permissions of the gates job"
@@ -68,19 +69,19 @@ pub(super) fn ci_lacks_issues_read(path: &str) -> String {
 }
 
 /// The seeded CI workflow (spec 8.5, design.md 5.226): the file at `path` is the
-/// project's, its gates job holds a `permissions` mapping, and the mapping lacks
-/// `contents: read`; or the copy uses the GitHub tracker, holds `issues: read`,
-/// and lacks `contents: read`. The step adds the line to the permissions of the
-/// copy, so that the job never holds two `permissions` keys. It is the step of
-/// every form.
+/// project's, its gates job holds a `permissions` mapping, and the mapping holds
+/// no `contents` scope; or the copy uses the GitHub tracker, holds `issues:
+/// read`, and holds no `contents` scope. The step adds the line to the
+/// permissions of the copy, so that the job never holds two `permissions` keys.
+/// It is the step of every form.
 pub(super) fn ci_lacks_contents_read_in_the_permissions(path: &str) -> String {
     format!("{path} lacks contents: read; add contents: read to the permissions of the gates job")
 }
 
 /// The seeded CI workflow (spec 8.5, design.md 5.226): the file at `path` is the
 /// project's, its gates job holds a `permissions` mapping, and the mapping holds
-/// neither `contents: read` nor `issues: read`, which the GitHub tracker needs.
-/// The step adds both lines to the permissions of the copy.
+/// neither a `contents` scope nor an `issues` scope, which the GitHub tracker
+/// needs. The step adds both lines to the permissions of the copy.
 pub(super) fn ci_lacks_the_github_scopes_in_the_permissions(path: &str) -> String {
     format!(
         "{path} lacks the permissions that the github tracker needs; add contents: read and issues: read to the permissions of the gates job"
@@ -99,6 +100,42 @@ pub(super) fn ci_grants_write_all(path: &str, github: bool) -> String {
     };
     format!(
         "{path} grants write-all; replace permissions: write-all with permissions: {{{scopes}}} in the gates job"
+    )
+}
+
+/// The seeded CI workflow (spec 10.7): the file at `path` is the project's, and
+/// the `permissions` mapping of its job `job`, which runs `houserules
+/// check-knowledge`, grants `contents: write`. The step replaces the scope, so
+/// that the job never holds two `contents` keys.
+pub(super) fn ci_grants_contents_write(path: &str, job: &str) -> String {
+    format!("{path} grants contents: write in the {job} job; replace it with contents: read")
+}
+
+/// The seeded CI workflow (spec 10.7): the file at `path` is the project's, and
+/// the `permissions` mapping of its job `job`, which runs `houserules
+/// check-knowledge`, holds the scope `scope` with `value`, which is not `read`
+/// (`contents: none` or `issues: write`, for example). The step replaces the
+/// value, so that the job never holds two `scope` keys. `contents: write` has
+/// its own step (`ci_grants_contents_write`).
+pub(super) fn ci_sets_a_scope(path: &str, job: &str, scope: &str, value: &str) -> String {
+    format!("{path} sets {scope}: {value} in the {job} job; replace it with {scope}: read")
+}
+
+/// The seeded CI workflow (spec 10.7): the file at `path` is the project's, and
+/// no job of it has a step that runs `houserules check-knowledge`, so `update`
+/// finds no gates job to read the permissions of.
+pub(super) fn ci_has_no_gates_job(path: &str) -> String {
+    format!(
+        "{path} has no job that runs houserules check-knowledge; houserules update checks no permissions there"
+    )
+}
+
+/// The seeded CI workflow (spec 10.7): the file at `path` is the project's, and
+/// the YAML parser rejects it. `parser_line` is the parser's own line, so that
+/// the project finds the place.
+pub(super) fn ci_is_not_valid_yaml(path: &str, parser_line: &str) -> String {
+    format!(
+        "{path} is not valid YAML ({parser_line}); houserules update checks no permissions there"
     )
 }
 
@@ -199,7 +236,7 @@ pub(super) fn schema_unreadable() -> String {
 /// houserules 1.x released, so `update` kept it.
 pub(super) fn workflow_differs(path: &str) -> String {
     format!(
-        "{path} differs from every workflow that houserules 1.x released, so houserules update kept it; compare it with the workflow that houserules init writes, and merge the rest by hand"
+        "{path} differs from every workflow that houserules 1.x released, so houserules update kept it; compare it with the seeded workflow of this release, template/.github/workflows/knowledge.yml in the houserules repository, and merge the rest by hand"
     )
 }
 
@@ -307,6 +344,19 @@ mod tests {
             ),
             ("ci_grants_write_all", ci_grants_write_all("<path>", false)),
             ("ci_grants_write_all", ci_grants_write_all("<path>", true)),
+            (
+                "ci_grants_contents_write",
+                ci_grants_contents_write("<path>", "<job>"),
+            ),
+            (
+                "ci_sets_a_scope",
+                ci_sets_a_scope("<path>", "<job>", "<scope>", "<value>"),
+            ),
+            ("ci_has_no_gates_job", ci_has_no_gates_job("<path>")),
+            (
+                "ci_is_not_valid_yaml",
+                ci_is_not_valid_yaml("<path>", "<parser-line>"),
+            ),
             ("ci_lacks_the_github_env", ci_lacks_the_github_env("<path>")),
             (
                 "ci_lacks_the_beads_steps",

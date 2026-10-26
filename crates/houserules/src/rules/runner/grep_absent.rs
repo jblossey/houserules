@@ -1,7 +1,6 @@
 //! The `grep-absent` check: a pattern that no file in scope may match.
 
-use serde_json::Value;
-
+use crate::published::audit_result::AuditRow;
 use crate::rules::check_shape::{CheckDef, Scope};
 
 use super::{AuditContext, RowBuilder, compile_check_regex, filter_matching};
@@ -13,7 +12,7 @@ pub(super) fn run(
     check: &CheckDef,
     ctx: &AuditContext,
     rows: &RowBuilder,
-) -> Result<Value, String> {
+) -> Result<AuditRow, String> {
     let pool: Vec<String> = if check.scope == Some(Scope::Tree) {
         ctx.tree()?
     } else {

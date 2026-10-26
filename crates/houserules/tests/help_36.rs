@@ -19,11 +19,9 @@ mod help_support;
 mod tracker_support;
 
 use std::fs;
-#[cfg(unix)]
-use std::path::Path;
-#[cfg(unix)]
-use std::process::Command;
 
+#[cfg(unix)]
+use help_support::{fenced_blocks_of, run_block};
 use help_support::{folded, help_of, help_of_args, omits, read, states};
 use serde_json::{Value, json};
 use tempfile::TempDir;
@@ -191,30 +189,6 @@ fn readme_has_an_evidence_section_with_its_runnable_usage() {
     );
 }
 
-/// The info string and the body of each fenced block of the section `heading`
-/// (the text after `## `) of `markdown`, in order.
-#[cfg(unix)]
-fn fenced_blocks_of(markdown: &str, heading: &str) -> Vec<(String, String)> {
-    let mut blocks = Vec::new();
-    let mut in_section = false;
-    let mut open: Option<(String, Vec<&str>)> = None;
-    for line in markdown.lines() {
-        if let Some((info, body)) = open.as_mut() {
-            if line.starts_with("```") {
-                blocks.push((info.clone(), body.join("\n")));
-                open = None;
-            } else {
-                body.push(line);
-            }
-        } else if let Some(title) = line.strip_prefix("## ") {
-            in_section = title == heading;
-        } else if in_section && let Some(info) = line.strip_prefix("```") {
-            open = Some((info.to_string(), Vec::new()));
-        }
-    }
-    blocks
-}
-
 /// `output` with its first SHA-256 digest named `<hash of the file>` and its
 /// second `<hash in the report>`, the words that the README gives the two
 /// digests of a changed capture: the digests change with each capture, because
@@ -235,62 +209,6 @@ fn naming_the_digests(output: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
-}
-
-/// Leaves the git configuration of the caller out of `command`: the system and
-/// global files are the null device, and the variables that inject
-/// configuration are removed (`GIT_CONFIG_COUNT` with its `GIT_CONFIG_KEY_<n>`
-/// and `GIT_CONFIG_VALUE_<n>` pairs, and `GIT_CONFIG_PARAMETERS`). The README
-/// shows what git prints in its default configuration.
-#[cfg(unix)]
-fn with_default_git_config(command: &mut Command) -> &mut Command {
-    for (name, _) in std::env::vars_os() {
-        let injects_configuration = name.to_str().is_some_and(|name| {
-            matches!(name, "GIT_CONFIG_COUNT" | "GIT_CONFIG_PARAMETERS")
-                || name.starts_with("GIT_CONFIG_KEY_")
-                || name.starts_with("GIT_CONFIG_VALUE_")
-        });
-        if injects_configuration {
-            command.env_remove(name);
-        }
-    }
-    command
-        .env("GIT_CONFIG_SYSTEM", "/dev/null")
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-}
-
-/// `sh -c` on `script` in `dir`, with the binary under test first on `PATH`,
-/// a git identity, the default git configuration, and the standard error on
-/// the standard output. Returns the exit code and what the script printed.
-#[cfg(unix)]
-fn run_block(dir: &Path, script: &str) -> (i32, String) {
-    let binary = Path::new(env!("CARGO_BIN_EXE_houserules"));
-    let path = format!(
-        "{}:{}",
-        binary
-            .parent()
-            .expect("the binary has a directory")
-            .display(),
-        std::env::var("PATH").unwrap_or_default()
-    );
-    let output = with_default_git_config(
-        Command::new("sh")
-            .arg("-c")
-            .arg(format!("exec 2>&1\n{script}"))
-            .current_dir(dir)
-            .env("PATH", path)
-            .env("HOUSERULES_SKIP_SELF_UPDATE", "1")
-            .env("GIT_AUTHOR_NAME", "t")
-            .env("GIT_AUTHOR_EMAIL", "t@t.t")
-            .env("GIT_COMMITTER_NAME", "t")
-            .env("GIT_COMMITTER_EMAIL", "t@t.t"),
-    )
-    .output()
-    .expect("run sh");
-    (
-        output.status.code().expect("sh exits with a code"),
-        String::from_utf8(output.stdout).expect("UTF-8 output"),
-    )
 }
 
 /// Every `sh` block of the evidence section runs as printed, top to bottom, in
@@ -482,29 +400,30 @@ fn install_with_the_process_pack_of_batch_35() -> TempDir {
 }
 
 /// Case 10: `update` of a batch-35 install moves the copy of the `process` pack
-/// to its next patch version, which carries the reworded bodies, and a second
+/// to the version of the kit, which carries the reworded bodies, and a second
 /// `update` moves nothing.
 #[test]
-fn update_moves_the_process_pack_of_batch_35_to_its_patch_version() {
+fn update_moves_the_process_pack_of_batch_35_to_the_version_of_the_kit() {
     let dir = install_with_the_process_pack_of_batch_35();
     let old = process_pack_of_batch_35();
     assert_eq!(old["version"], json!("2.0.0"));
 
     let output = run_ok(dir.path(), &["update"]);
 
+    let kit: Value = serde_json::from_str(&read("template/packs/process.json"))
+        .expect("parse the kit process pack");
+    let version = kit["version"].as_str().expect("the kit pack has a version");
     let lines: Vec<String> = stdout(&output).lines().map(str::to_string).collect();
     assert!(
-        lines.contains(&"moved pack process from 2.0.0 to 2.0.1".to_string()),
+        lines.contains(&format!("moved pack process from 2.0.0 to {version}")),
         "{lines:?}"
     );
     let moved = read_json(dir.path(), "knowledge/packs/process.json");
-    let kit: Value = serde_json::from_str(&read("template/packs/process.json"))
-        .expect("parse the kit process pack");
     assert_eq!(moved, kit);
-    assert_eq!(moved["version"], json!("2.0.1"));
+    assert_eq!(moved["version"], json!(version));
     assert_eq!(
         read_json(dir.path(), ".houserules.json")["packs"]["process"]["version"],
-        json!("2.0.1")
+        json!(version)
     );
     assert!(
         !moved

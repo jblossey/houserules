@@ -257,22 +257,55 @@ fn extra_files_are_anchored_to_the_repository_root() {
     }
 }
 
-/// `extra-files` carries exactly one entry: the `/.houserules.json`
-/// `json`/`jsonpath` update that folds this repository's own kit-version
-/// restamp into the release PR itself (`houserules.post-release-restamp`,
-/// branch review batch 24 issue 2). `template/.github/workflows/
-/// knowledge.yml`'s former entry is retired (issue 1: the seeded workflow
-/// holds no version literal and needs no per-release rewrite), so this is
-/// the array's only member, not one of several.
+/// `extra-files` carries exactly two entries, both version entries:
+///
+/// - the `/.houserules.json` `json`/`jsonpath` update that folds this
+///   repository's own kit-version restamp into the release PR itself
+///   (`houserules.post-release-restamp`, branch review batch 24 issue 2);
+/// - the `generic` update of `/ci/gitlab-review.yml`, the GitLab unit of the
+///   review layer, whose one line that carries the release annotation holds the
+///   release version (`ci_units.rs` pins that line to the crate's version).
+///   The `generic` updater replaces the first version on the annotated line and
+///   nothing else.
+///
+/// `template/.github/workflows/knowledge.yml`'s former entry is retired (issue
+/// 1: the seeded workflow holds no version literal and needs no per-release
+/// rewrite). The GitHub unit `.github/workflows/houserules-review.yml` has no
+/// entry: it holds no release version, because release-please's token cannot
+/// change a workflow file (design.md 253).
 #[test]
 fn extra_files_contains_only_the_version_entry() {
     let config = config();
     assert_eq!(
         config["extra-files"],
         serde_json::json!([
-            { "type": "json", "path": "/.houserules.json", "jsonpath": "$.version" }
+            { "type": "json", "path": "/.houserules.json", "jsonpath": "$.version" },
+            { "type": "generic", "path": "/ci/gitlab-review.yml" }
         ])
     );
+}
+
+/// No `extra-files` entry sits under `template/` (a bot commit there trips the
+/// payload-stamp gate: `houserules.payload-embeds-checkout-bytes`) or under
+/// `.github/workflows/` (release-please's token cannot change a workflow file).
+#[test]
+fn no_extra_file_sits_under_the_template_or_the_workflows() {
+    let config = config();
+    for entry in config["extra-files"].as_array().expect("an array") {
+        let path = match entry {
+            serde_json::Value::String(path) => path.as_str(),
+            other => other["path"].as_str().expect("an entry with a path"),
+        };
+        let path = path.trim_start_matches('/');
+        assert!(
+            !path.starts_with("template/") && !path.starts_with(".github/workflows/"),
+            "extra-files entry {path:?} sits under template/ or .github/workflows/"
+        );
+        assert!(
+            repo_root().join(path).is_file(),
+            "extra-files entry {path:?} names a file of the repository"
+        );
+    }
 }
 
 /// The config never names `package.json` -- as a `package-name`

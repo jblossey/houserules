@@ -128,9 +128,6 @@ const SEED_ONCE: &[&str] = &[
     "CLAUDE.md",
 ];
 
-/// The CI workflow, the one D3 file that only a GitHub-hosted target gets.
-const GITHUB_HOSTED_SEED_ONCE: &[&str] = &[".github/workflows/knowledge.yml"];
-
 /// `env!("CARGO_PKG_VERSION")` at THIS test binary's own compile time --
 /// `install/mod.rs`'s own copy of `kit_version` (that function's own doc has
 /// the account).
@@ -727,9 +724,11 @@ fn update_restamps_the_baseline_of_a_d3_file_it_writes() {
     );
 }
 
-/// A baselined D3 file that is missing is restored, like a kit-owned file.
+/// A baselined workflow that the project deleted stays absent (spec 10.7):
+/// `update` writes none and prints nothing about it. Another D3 file that is
+/// missing is restored, like a kit-owned file.
 #[test]
-fn update_restores_a_missing_baselined_workflow() {
+fn update_does_not_restore_a_deleted_workflow() {
     let dir = seeded_repo();
     edit_marker(dir.path(), |marker| {
         mark_as_2_0(marker);
@@ -738,11 +737,11 @@ fn update_restores_a_missing_baselined_workflow() {
 
     let lines = update_lines(dir.path());
 
-    assert!(lines.contains(&format!("wrote {WORKFLOW}")), "{lines:?}");
-    assert_eq!(
-        fs::read(dir.path().join(WORKFLOW)).unwrap(),
-        template_bytes(WORKFLOW)
+    assert!(
+        !lines.iter().any(|line| line.contains(WORKFLOW)),
+        "{lines:?}"
     );
+    assert!(!dir.path().join(WORKFLOW).exists());
 }
 
 /// A kit-owned script whose bytes already match keeps its executable bit
@@ -883,16 +882,12 @@ fn update_keeps_the_project_text_of_an_existing_agents_md_file() {
     );
 }
 
-/// `seeded_repo`'s own `init` already skipped every `GITHUB_HOSTED_SEED_ONCE`
-/// path (no `origin` remote on a plain `scratch_git_repo`); a plain `update`
-/// leaves it missing and silent, the same convention `RETIRED`'s absence
-/// gets, since nothing has changed about the target's origin.
+/// `seeded_repo`'s own `init` wrote no CI workflow; a plain `update` leaves it
+/// missing and silent, the same convention `RETIRED`'s absence gets.
 #[test]
-fn update_silently_leaves_the_github_hosted_only_file_absent_without_a_github_origin() {
+fn update_silently_leaves_the_workflow_absent_without_a_github_origin() {
     let dir = seeded_repo();
-    for file in GITHUB_HOSTED_SEED_ONCE {
-        assert!(!dir.path().join(file).exists(), "{file} was seeded");
-    }
+    assert!(!dir.path().join(WORKFLOW).exists(), "{WORKFLOW} was seeded");
 
     let output = houserules()
         .args(["update", "--dir"])
@@ -905,25 +900,23 @@ fn update_silently_leaves_the_github_hosted_only_file_absent_without_a_github_or
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8(output.stdout).unwrap();
-    for file in GITHUB_HOSTED_SEED_ONCE {
-        assert!(
-            !stdout.contains(file),
-            "update reported {file} in:\n{stdout}"
-        );
-        assert!(!dir.path().join(file).exists(), "{file} was backfilled");
-    }
+    assert!(
+        !stdout.contains(WORKFLOW),
+        "update reported {WORKFLOW} in:\n{stdout}"
+    );
+    assert!(
+        !dir.path().join(WORKFLOW).exists(),
+        "{WORKFLOW} was backfilled"
+    );
 }
 
 /// A target that becomes GitHub-hosted after its original `init` (an
-/// `origin` remote added later) has its `GITHUB_HOSTED_SEED_ONCE` file
-/// backfilled on the next `update`, the same way any other newly
-/// qualifying `SEED_ONCE` path is.
+/// `origin` remote added later) gets no workflow from the next `update`: it
+/// writes no CI file (spec 10.7).
 #[test]
-fn update_backfills_the_github_hosted_only_file_once_origin_becomes_github_hosted() {
+fn update_writes_no_workflow_once_the_origin_becomes_github_hosted() {
     let dir = seeded_repo();
-    for file in GITHUB_HOSTED_SEED_ONCE {
-        assert!(!dir.path().join(file).exists(), "{file} was seeded");
-    }
+    assert!(!dir.path().join(WORKFLOW).exists(), "{WORKFLOW} was seeded");
     let status = Command::new("git")
         .args([
             "remote",
@@ -947,23 +940,21 @@ fn update_backfills_the_github_hosted_only_file_once_origin_becomes_github_hoste
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8(output.stdout).unwrap();
-    for file in GITHUB_HOSTED_SEED_ONCE {
-        assert!(
-            stdout.contains(&format!("wrote {file}\n")),
-            "got:\n{stdout}"
-        );
-        let backfilled = fs::read(dir.path().join(file)).unwrap();
-        let template = fs::read(repo_root().join("template").join(file)).unwrap();
-        assert_eq!(backfilled, template);
-    }
+    assert!(
+        !stdout.contains(WORKFLOW),
+        "update reported {WORKFLOW} in:\n{stdout}"
+    );
+    assert!(
+        !dir.path().join(WORKFLOW).exists(),
+        "{WORKFLOW} was written"
+    );
 }
 
-/// A path in `ownedPaths` on the still-absent `GITHUB_HOSTED_SEED_ONCE` path means
-/// "deleted on purpose" even once the origin becomes GitHub-hosted: `update`
-/// leaves it absent and prints nothing about it, the same as any other
-/// overridden `SEED_ONCE` path.
+/// A path in `ownedPaths` on the still-absent workflow means "deleted on
+/// purpose" even once the origin becomes GitHub-hosted: `update` leaves it
+/// absent and prints nothing about it, the same as any other overridden path.
 #[test]
-fn update_does_not_backfill_an_owned_github_hosted_only_file() {
+fn update_does_not_write_an_owned_workflow() {
     let dir = seeded_repo();
     let status = Command::new("git")
         .args([
@@ -980,7 +971,7 @@ fn update_does_not_backfill_an_owned_github_hosted_only_file() {
     let marker_path = dir.path().join(".houserules.json");
     let mut marker: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
-    marker["ownedPaths"] = serde_json::json!(GITHUB_HOSTED_SEED_ONCE);
+    marker["ownedPaths"] = serde_json::json!([WORKFLOW]);
     fs::write(
         &marker_path,
         format!("{}\n", serde_json::to_string_pretty(&marker).unwrap()),
@@ -998,13 +989,11 @@ fn update_does_not_backfill_an_owned_github_hosted_only_file() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8(output.stdout).unwrap();
-    for file in GITHUB_HOSTED_SEED_ONCE {
-        assert!(
-            !stdout.contains(file),
-            "update reported {file} in:\n{stdout}"
-        );
-        assert!(!dir.path().join(file).exists());
-    }
+    assert!(
+        !stdout.contains(WORKFLOW),
+        "update reported {WORKFLOW} in:\n{stdout}"
+    );
+    assert!(!dir.path().join(WORKFLOW).exists());
 }
 
 /// A path in `ownedPaths` on a missing `SEED_ONCE` path means "deleted on purpose":

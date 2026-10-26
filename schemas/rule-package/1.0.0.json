@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jblossey.github.io/houserules/schemas/rule-package/1.0.0.json",
+  "title": "Rule package",
+  "description": "The rules that a set of changed paths pulls in. `for` prints it with one index row per entry; `for --full` prints each stored entry whole.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "description": "The schema id, `houserules/rule-package@1.0.0`.",
+      "type": "string",
+      "const": "houserules/rule-package@1.0.0"
+    },
+    "paths": {
+      "description": "The paths asked for, each without a leading `./`.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "areas": {
+      "description": "The areas that the paths resolve to, sorted.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "entries": {
+      "description": "The entries that apply to the paths, sorted by id.",
+      "type": "array",
+      "items": {
+        "description": "An index row, or with --full the stored entry whole.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "area": {
+            "type": "string"
+          },
+          "standing": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "area",
+          "summary"
+        ]
+      }
+    },
+    "standing": {
+      "description": "The command that prints the standing rules.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "paths",
+    "areas",
+    "entries",
+    "standing"
+  ]
+}

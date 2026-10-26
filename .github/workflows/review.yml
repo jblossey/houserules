@@ -1,0 +1,49 @@
+# This repository reviews its own pull requests with its own review unit,
+# houserules-review.yml. The unit sits in this repository, so the call names it
+# by path, and the run uses the unit at the commit of this file.
+#
+# install is none because setup builds the binary of the request's head. The
+# floor job builds the default branch, because the release that the kit stamps
+# has none of the review commands.
+#
+# The job grants the union of the permissions of the jobs of the unit. Each job
+# of the unit narrows its own token to the scopes it needs.
+name: review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    permissions:
+      contents: write
+      pull-requests: write
+      statuses: write
+      issues: write
+    uses: ./.github/workflows/houserules-review.yml
+    with:
+      install: none
+      floor-install: default-branch
+      # The toolchain is the rust version that mise.toml pins. The rustup of the runner
+      # installs that toolchain at the exact version, and only when the runner lacks it.
+      # The version of rustup itself is the version of the runner.
+      setup: |
+        toolchain=$(awk '/^rust[[:space:]]*=/ { if (match($0, /[0-9]+\.[0-9]+\.[0-9]+/)) print substr($0, RSTART, RLENGTH); exit }' mise.toml)
+        if [ -z "$toolchain" ]; then
+          echo "::error::houserules: mise.toml pins no rust version"
+          exit 1
+        fi
+        if ! rustup run "$toolchain" rustc --version > /dev/null 2>&1; then
+          rustup toolchain install "$toolchain" --profile minimal
+        fi
+        root=${CARGO_INSTALL_ROOT:-${RUNNER_TEMP:?RUNNER_TEMP is not set}/houserules-tree}
+        rustup run "$toolchain" cargo install --locked --path crates/houserules --bin houserules --root "$root"
+        if [ -n "${GITHUB_PATH:-}" ]; then
+          echo "$root/bin" >> "$GITHUB_PATH"
+        fi

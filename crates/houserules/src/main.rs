@@ -62,7 +62,8 @@
 //! packs of an install (`pack/mod.rs`'s own module doc has the full
 //! account). D4 (`install::refuse_install_schema`) refuses a tree before a
 //! command runs and exits 2 with one named line. `main` runs it before every
-//! command but `files` and `update` (`d4_guard` lists the commands); `update`
+//! command but `files`, `capture`, a `bundle write` with no `--intent`, and
+//! `update` (`d4_guard` lists the commands); `update`
 //! runs it after its self-update phase and before its repo phase (spec C22),
 //! so that it can install the release that the line names. A command that
 //! reads the install refuses a tree whose install schema is missing or older
@@ -84,8 +85,10 @@ mod install;
 mod node_path;
 mod pack;
 mod packs;
+mod published;
 mod report_claims;
 mod report_facts;
+mod review;
 mod root;
 mod rules;
 #[cfg(test)]
@@ -188,6 +191,18 @@ enum Command {
     /// set, is a relative path inside the install root. While
     /// `workspaces` is not set, it names the default location
     /// `.houserules/work` when that folder exists and git does not ignore it.
+    /// Checks the `review` key of `.houserules.json`: a route must be
+    /// `auto-merge-eligible`, `owner-review`, or `senior-review`; an area of
+    /// `review.route.areas` must be an area of `knowledge/areas.json`; a glob
+    /// must compile; a route of `auto-merge-eligible` needs `maxDiffLines` and
+    /// `maxUncoveredShare` in its area or path entry, and
+    /// `review.route.sampleRate` in the key; `review.route.default` and
+    /// `review.route.warn` must not be `auto-merge-eligible`; a share, rate, or
+    /// score must lie between 0 and 1; a count must not be negative; an intent
+    /// source must be one that this binary reads; `review.record.maxBytes` must
+    /// be at least 8192; one line names the key of each fault. Checks that a
+    /// check sets `covers` only when it reads files: a `commits` check and a
+    /// `report-field` check read none.
     /// Names each `verify` path that git ignores, since a fresh clone lacks
     /// it: commit a copy under a tracked path and verify that. Outside a git
     /// work tree it runs no ignore test. Prints each override and exclusion on
@@ -447,10 +462,32 @@ enum Command {
     /// `reversals`: the `Reversal:` lines of the `progress.md` in that
     /// workspace. The `packs` key sums entries, standing entries, judged
     /// rows, and violations for `local` and for each installed pack.
+    /// `--records <range>` adds the key `review_coverage`: the change records
+    /// whose key is in the range, those with a reviewer, both counts for each
+    /// route and each area, the sampled records, and the audited records with
+    /// their verdicts. Without a workspace, `stats` then prints only that key.
+    /// `stats` counts a ledger line as a reversal when it starts with
+    /// `Reversal:` after optional spaces and an optional list marker (`- `, `* `,
+    /// or `+ `). For each other ledger line that holds `Reversal:`, the command
+    /// prints one warning on stderr.
     Stats {
-        /// One or more workspace directories to aggregate.
-        #[arg(required = true, value_name = "WORKSPACE")]
+        /// One or more workspace directories to aggregate. Required unless
+        /// `--records` is given.
+        #[arg(required_unless_present = "records", value_name = "WORKSPACE")]
         workspaces: Vec<PathBuf>,
+        /// A git revision range, such as `v1.0..main`. Adds the key
+        /// `review_coverage` for the change records whose key is in the range,
+        /// and exits 2 for a clone with no notes ref, for a range that git cannot
+        /// read, and for a range that reaches past the history of a shallow clone.
+        /// A range reaches past the history of a shallow clone when the commits of
+        /// one side that the other side does not reach (for a range of one
+        /// revision, the commits it reaches) include a shallow commit, when an end
+        /// is a full object name that the clone lacks, or when an end is a relative
+        /// revision (`<rev>~<n>` or `<rev>^<n>`) that does not resolve while its
+        /// `<rev>` does. A range with any other end that git cannot resolve, an
+        /// abbreviated object name included, is a range that git cannot read.
+        #[arg(long, value_name = "RANGE")]
+        records: Option<String>,
         /// Reads only the N most recent of the workspaces. A workspace is
         /// more recent by the YYYY-MM-DD prefix of its folder name, then by
         /// name; a folder with no date prefix is the oldest. N above the
@@ -585,12 +622,10 @@ enum Command {
         /// every read command's `--dir` above, this is not resolved against
         /// an enclosing install -- the directory itself is the root. It must
         /// exist and lie in a git repository: the top level, or a directory
-        /// below it for a subdirectory install, which writes its CI workflow
-        /// at the top level as `.github/workflows/knowledge-<folder>.yml`.
+        /// below it for a subdirectory install.
         /// A new install root (one with no `.houserules.json` yet) is
-        /// refused when it nests with another install of the repository or
-        /// would write another install's workflow file; a directory that
-        /// holds its own `.houserules.json` is no new root.
+        /// refused when it nests with another install of the repository; a
+        /// directory that holds its own `.houserules.json` is no new root.
         #[arg(long)]
         dir: Option<PathBuf>,
         /// The backlog id prefix seeded schemas carry; defaults to `WI`.
@@ -647,8 +682,9 @@ enum Command {
     /// `init` seeds and `update` keeps current through a baseline, the
     /// tracker files, which `init --tracker json` writes, the files of the
     /// reference workflow, which `init --workflow reference` writes, and the
-    /// data file of the workflow. Each path is in one class. The CI workflow
-    /// is a D3 file that only a GitHub-hosted target gets.
+    /// data file of the workflow. Each path is in one class. A seeded CI
+    /// workflow is a D3 file; init writes none (houserules ci prints or writes
+    /// the CI wiring).
     Files,
     /// Self-updates the installed binary first, where the install channel
     /// supports it (`HOUSERULES_SKIP_SELF_UPDATE` opts out), then updates the
@@ -727,6 +763,20 @@ enum Command {
     /// is asked to replace the scalar with the block. A workflow of the Beads
     /// tracker that holds `persist-credentials: false` gets a hand step that
     /// removes it, because `bd bootstrap --yes` needs the persisted credential.
+    /// The gates job of a kept copy is each job with a step that runs
+    /// `houserules check-knowledge`, read as YAML whatever its name and
+    /// indentation, and the markers are read per job: a `permissions` mapping
+    /// with `contents: write` is asked to replace it with `contents: read`; a
+    /// copy with no such job gets one hand step, and so does a file that is not
+    /// valid YAML, with the parser's line. `update` writes no CI workflow: one
+    /// that the project deleted stays absent. An install that holds the seeded
+    /// workflow gets one line, once, that names `houserules ci print --host
+    /// github` for the review layer, and `reviewLayerOffered` in
+    /// `.houserules.json` records it. For each tracked file of the repository
+    /// that `houserules ci write` created with another version than the
+    /// binary's, it prints one line that names `houserules ci write --force`
+    /// with the flags that wrote the file. A GitHub reference file takes the
+    /// `--sha` of the new release.
     /// It writes each seed-once file that is missing and, on an install with the
     /// JSON tracker, each tracker data file that is missing. While `renderers`
     /// lacks `claude`, it skips the Claude Code files. It brings `.gitignore` to hold
@@ -737,9 +787,9 @@ enum Command {
     /// absent (`wrote .gitignore`), and prints no line for a `.gitignore` that
     /// holds `.houserules/` already. A `.gitignore` that `ownedPaths` lists
     /// stays as found. It restamps the install schema
-    /// `houserules/install@2.1.0` to `houserules/install@2.2.0` and prints
-    /// `wrote .houserules.json (houserules/install@2.2.0)` once; a second run
-    /// prints no such line. The keys `runners` and `workspaces` of
+    /// `houserules/install@2.2.0` to `houserules/install@2.3.0` and prints
+    /// `wrote .houserules.json (houserules/install@2.3.0)` once; a second run
+    /// prints no such line. The keys `runners`, `workspaces`, and `review` of
     /// `.houserules.json` keep their values. It deletes any retired kit file
     /// still present, prints each hand step that the project has left (`hand
     /// step: ...`), and reports the stamped-to-running version drift. Every
@@ -922,6 +972,77 @@ enum Command {
         #[command(subcommand)]
         action: PackCommand,
     },
+    /// Decides the review route of a change, `auto-merge-eligible`,
+    /// `owner-review`, or `senior-review`, and prints it. The route is the
+    /// highest route that any rule gives. A changed rule source gives
+    /// `senior-review`, whatever the configuration. A failed row of the audit
+    /// gives `owner-review` unless a `--sanctioned` booking accepted it. A
+    /// warned row gives `review.route.warn`. Each area that holds a changed path
+    /// gives its route, else `review.route.default`. A changed path in no area
+    /// gives `review.route.default`. Each entry of `review.route.paths` whose
+    /// glob matches a changed path gives its route. An area or a path entry with
+    /// the route `auto-merge-eligible` keeps it only while the diff size is at
+    /// most its `maxDiffLines` and the uncovered share is at most its
+    /// `maxUncoveredShare`; past either, it gives `owner-review`. `--score`
+    /// gives `senior-review` from `seniorScore` and `owner-review` from
+    /// `ownerScore`. A change with no changed path and no changed rule source
+    /// takes `review.route.default`. A project that sets no route gets
+    /// `owner-review` for each change, except a change to a rule source, which
+    /// gets `senior-review`. The audit rows come from `--audit`, else from an
+    /// audit that the command runs in process. `--no-audit` computes the
+    /// tool-free floor: it runs no check, reads no audit row and no uncovered
+    /// share, and prints `floor: <route>` in place of `route: <route>`. The
+    /// command prints `route: <route>`, then one line for each reason at that
+    /// route, sorted; a rule that names paths prints at most 20 of them and then
+    /// `and <k> more`. `--json` also writes the decision document
+    /// `houserules/route@1.0.0`. It exits 0 for every route. It exits 2 for a
+    /// setup error, for example: a ref that is no commit, an `--audit` file of
+    /// another range or that is no audit result, an audit that cannot run, a
+    /// `review` key with a fault, a `--score` outside 0 to 1, a `--score` when
+    /// `review.route.ownerScore` and `review.route.seniorScore` are both
+    /// missing, a git older than 2.41, or a `--json` file that cannot be
+    /// written.
+    Route(review::route::RouteArgs),
+    /// Writes the reviewer packet of a change. The packet starts with the
+    /// uncovered surface: the changed files and line ranges that no check with
+    /// `covers: true` read. Then it lists the intent of the change, the failed,
+    /// warned, proven, and judged rules, the size of the diff with the work
+    /// items, and the route. It prints the packet as Markdown on stdout, for a
+    /// comment on a pull or merge request, or writes it to `--out`. `--json`
+    /// also writes the document `houserules/evidence@1.0.0`. The audit rows come
+    /// from `--audit`, else from an audit that the command runs in process.
+    /// `--review` names a review deliverable: a judged rule then shows the
+    /// verdict of that review. `--intent <source>:<ref>` adds an intent to the
+    /// packet, as the `Intent:` line of an evidence bundle writes it. A packet
+    /// over 60,000 characters is cut, and each cut list ends with the count of
+    /// the items that it leaves out. The packet is the same for the same range
+    /// and the same rules. It exits 0 whatever the audit finds. It exits 2 for a
+    /// setup error, for example: a ref that is no commit, an `--audit` file of
+    /// another range or that is no audit result, a `--review` file that is no
+    /// review deliverable, an `--intent` whose source is no adapter, a `--score`
+    /// outside 0 to 1, a git older than 2.41, or an `--out` or `--json` file that
+    /// cannot be written.
+    Evidence(review::evidence::EvidenceArgs),
+    /// Writes and checks the evidence bundle of a pull or merge request. The
+    /// bundle is a section of the description of the request: the purpose or an
+    /// intent, the work items, the risk tier with its criterion, and each
+    /// verification run as its capture header with the tail of its output.
+    /// `bundle write` writes the section from captures. `bundle check` reads a
+    /// description and fails a missing or wrong part.
+    Bundle(review::bundle::BundleArgs),
+    /// Wires the review layer into the CI pipeline of a project for GitHub or GitLab. The
+    /// layer is a set of jobs that this release publishes as a reusable workflow for GitHub and
+    /// as a file for `include: remote` for GitLab. `ci print` prints the lines that call the
+    /// published jobs, or the jobs themselves with the inputs of the install filled in, and
+    /// writes nothing. `ci write` creates a new file of its own with the same text and adds its
+    /// path to `review.ci.files`. The command never edits a CI file that it did not create.
+    Ci(review::ci::CiArgs),
+    /// Keeps a change record for each merge as a git note. `record write`
+    /// computes the record of a pushed range and writes it as a note, or to a
+    /// file. `record show` prints the record of a commit and checks its rule
+    /// hashes against git. `record list` lists the records of a range, one line
+    /// for each. `record audit` sets the post-merge audit of a record.
+    Record(review::record::RecordArgs),
 }
 
 /// The `pack` subcommands.
@@ -984,9 +1105,10 @@ enum PackCommand {
 }
 
 /// How `main` runs D4 before a command, with the `--dir` that names its install
-/// root, or `None` for the three commands that `main` leaves out: `files` and
-/// `capture` read no install and run on any tree, and `update` runs D4 itself
-/// after its self-update phase (`install::cmd_update`, spec C22). `init` refuses a 1.x
+/// root, or `None` for the commands that `main` leaves out: `files`, `capture`,
+/// and a `bundle write` with no `--intent` read no install and run on any tree,
+/// and `update` runs D4 itself after its self-update phase
+/// (`install::cmd_update`, spec C22). `init` refuses a 1.x
 /// install with its own line, so it runs on a tree with no install schema or
 /// an older one (`Guard::ConvertsInstall`); every other command reads the
 /// install (`Guard::ReadsInstall`). The match names every variant, so a new
@@ -1015,6 +1137,11 @@ fn d4_guard(command: &Command) -> Option<(install::Guard, &Option<PathBuf>)> {
         | Command::CheckReportClaims { dir, .. }
         | Command::ReportFacts { dir, .. }
         | Command::Archive { dir } => Some((ReadsInstall, dir)),
+        Command::Route(args) => Some((ReadsInstall, &args.dir)),
+        Command::Evidence(args) => Some((ReadsInstall, &args.dir)),
+        Command::Bundle(args) => args.dir().map(|dir| (ReadsInstall, dir)),
+        Command::Ci(args) => Some((ReadsInstall, args.dir())),
+        Command::Record(args) => Some((ReadsInstall, args.dir())),
         Command::Pack { action } => Some((
             ReadsInstall,
             match action {
@@ -1121,9 +1248,10 @@ fn main() -> ExitCode {
         Some(Command::Validate { files, dir }) => rules::cmd_validate(dir, files),
         Some(Command::Stats {
             workspaces,
+            records,
             window,
             dir,
-        }) => rules::cmd_stats(dir, workspaces, window),
+        }) => rules::cmd_stats(dir, workspaces, window, records),
         Some(Command::Index {
             area,
             topic,
@@ -1212,6 +1340,11 @@ fn main() -> ExitCode {
             PackCommand::Remove { name, dir } => pack::cmd_pack_remove(dir, name),
             PackCommand::Upgrade { name, tag, dir } => pack::cmd_pack_upgrade(dir, name, tag),
         },
+        Some(Command::Route(args)) => review::route::cmd_route(args),
+        Some(Command::Evidence(args)) => review::evidence::cmd_evidence(args),
+        Some(Command::Bundle(args)) => review::bundle::cmd_bundle(args),
+        Some(Command::Ci(args)) => review::ci::cmd_ci(args),
+        Some(Command::Record(args)) => review::record::cmd_record(args),
     }
 }
 
@@ -1244,7 +1377,7 @@ mod tests {
     /// none carries a `long_about` distinct from its own short `about`
     /// either. Enumerated from `Cli::command().get_subcommands()` -- the
     /// same set clap itself renders, not a hand-typed list -- exactly the
-    /// 24 `Command` variants (clap's own built-in `help` subcommand is
+    /// 29 `Command` variants (clap's own built-in `help` subcommand is
     /// rendered separately and is not itself one of `get_subcommands()`'s
     /// entries).
     #[test]
@@ -1253,8 +1386,8 @@ mod tests {
         let subcommands: Vec<_> = command.get_subcommands().collect();
         assert_eq!(
             subcommands.len(),
-            24,
-            "expected the full subcommand surface (24 Command variants), got: {:?}",
+            29,
+            "expected the full subcommand surface (29 Command variants), got: {:?}",
             subcommands.iter().map(|s| s.get_name()).collect::<Vec<_>>()
         );
         for subcommand in subcommands {
@@ -1561,12 +1694,12 @@ mod tests {
         );
     }
 
-    /// The CLI surface: exactly these 24 subcommand names, in `--help`'s own
+    /// The CLI surface: exactly these subcommand names, in `--help`'s own
     /// declaration order. The count assertion above cannot see a same-length
     /// rename, because a renamed variant keeps `get_subcommands().len()`;
     /// comparing the names themselves does.
     #[test]
-    fn the_cli_surface_names_exactly_these_24_subcommands() {
+    fn the_cli_surface_names_exactly_these_subcommands() {
         let command = Cli::command();
         let names: Vec<&str> = command.get_subcommands().map(|s| s.get_name()).collect();
         assert_eq!(
@@ -1596,9 +1729,78 @@ mod tests {
                 "report-facts",
                 "archive",
                 "pack",
+                "route",
+                "evidence",
+                "bundle",
+                "ci",
+                "record",
             ],
-            "the CLI surface (the 1.0 surface of design.md 5.82, then `pack` and `defer`) changed"
+            "the CLI surface (the 1.0 surface of design.md 5.82, then `pack`, `defer`, `route`, `evidence`, `bundle`, `ci`, and `record`) changed"
         );
+    }
+
+    /// `bundle` has exactly these two subcommands, each with a short `about`
+    /// and no `long_about` beyond it, as every top-level subcommand has.
+    #[test]
+    fn the_bundle_subcommands_are_exactly_write_and_check() {
+        let command = Cli::command();
+        let bundle = command
+            .find_subcommand("bundle")
+            .expect("bundle is declared");
+        let names: Vec<&str> = bundle.get_subcommands().map(|s| s.get_name()).collect();
+        assert_eq!(names, ["write", "check"]);
+        for subcommand in bundle.get_subcommands() {
+            let about = subcommand.get_about().map(ToString::to_string);
+            let long_about = subcommand.get_long_about().map(ToString::to_string);
+            assert!(about.is_some(), "{}: no about", subcommand.get_name());
+            assert!(
+                long_about.is_none() || long_about == about,
+                "{}: long_about {long_about:?} diverges from about {about:?}",
+                subcommand.get_name(),
+            );
+        }
+    }
+
+    /// `record` has exactly these four subcommands, each with a short `about`
+    /// and no `long_about` beyond it, as every top-level subcommand has.
+    #[test]
+    fn the_record_subcommands_are_exactly_write_show_list_and_audit() {
+        let command = Cli::command();
+        let record = command
+            .find_subcommand("record")
+            .expect("record is declared");
+        let names: Vec<&str> = record.get_subcommands().map(|s| s.get_name()).collect();
+        assert_eq!(names, ["write", "show", "list", "audit"]);
+        for subcommand in record.get_subcommands() {
+            let about = subcommand.get_about().map(ToString::to_string);
+            let long_about = subcommand.get_long_about().map(ToString::to_string);
+            assert!(about.is_some(), "{}: no about", subcommand.get_name());
+            assert!(
+                long_about.is_none() || long_about == about,
+                "{}: long_about {long_about:?} diverges from about {about:?}",
+                subcommand.get_name(),
+            );
+        }
+    }
+
+    /// `ci` has exactly these two subcommands, each with a short `about` and no
+    /// `long_about` beyond it, as every top-level subcommand has.
+    #[test]
+    fn the_ci_subcommands_are_exactly_print_and_write() {
+        let command = Cli::command();
+        let ci = command.find_subcommand("ci").expect("ci is declared");
+        let names: Vec<&str> = ci.get_subcommands().map(|s| s.get_name()).collect();
+        assert_eq!(names, ["print", "write"]);
+        for subcommand in ci.get_subcommands() {
+            let about = subcommand.get_about().map(ToString::to_string);
+            let long_about = subcommand.get_long_about().map(ToString::to_string);
+            assert!(about.is_some(), "{}: no about", subcommand.get_name());
+            assert!(
+                long_about.is_none() || long_about == about,
+                "{}: long_about {long_about:?} diverges from about {about:?}",
+                subcommand.get_name(),
+            );
+        }
     }
 
     /// `pack` has exactly these four subcommands, each with a short `about`

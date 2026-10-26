@@ -21,47 +21,19 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, ExitStatus, Stdio};
 
 use jiff::Timestamp;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 use tempfile::NamedTempFile;
 
-/// The `schema` value that `capture` writes.
+pub(crate) use crate::published::capture::Header;
+
+/// The `schema` value that `capture` writes. It equals the schema id of
+/// [`Header`], `published::id::<Header>()`.
 pub(crate) const SCHEMA: &str = "houserules/capture@1.0.0";
 
 /// The most bytes of command output that `capture` holds in memory at once
 /// while it converts the output to UTF-8.
 const CONVERT_BUFFER_LEN: usize = 64 * 1024;
-
-/// The header of a capture file: line 1, one JSON object whose keys follow the
-/// order of the fields.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub(crate) struct Header {
-    /// The schema id, `houserules/capture@1.0.0` when `capture` writes it.
-    pub(crate) schema: String,
-    /// The command and its arguments.
-    pub(crate) argv: Vec<String>,
-    /// The absolute current directory of the run.
-    pub(crate) cwd: String,
-    /// The start of the run: RFC 3339 in UTC with nine fractional digits.
-    pub(crate) start: String,
-    /// The end of the run, in the form of `start`.
-    pub(crate) end: String,
-    /// The exit code, or `None` when a signal ended the command.
-    pub(crate) exit: Option<i32>,
-    /// The signal number that ended the command, or `None`.
-    pub(crate) signal: Option<i32>,
-    /// The full sha of HEAD, or `None` outside a git work tree (a `.git`
-    /// directory and a bare repository count as outside), before the first
-    /// commit, and when `git status` fails.
-    pub(crate) head: Option<String>,
-    /// Whether `git status --porcelain` printed a line; `None` exactly when
-    /// `head` is `None`.
-    pub(crate) dirty: Option<bool>,
-    /// The number of byte sequences that were not UTF-8 and that `capture`
-    /// replaced with U+FFFD.
-    pub(crate) lossy: u64,
-}
 
 /// A capture file read back: its header and its bytes.
 #[derive(Debug, PartialEq, Eq)]
@@ -118,7 +90,7 @@ pub(crate) fn read(path: &Path) -> Result<Capture, ReadError> {
 }
 
 /// The header on line 1 of `bytes`, or the reason that `bytes` is no capture.
-fn parse_header(bytes: &[u8]) -> Result<Header, String> {
+pub(crate) fn parse_header(bytes: &[u8]) -> Result<Header, String> {
     if bytes.is_empty() {
         return Err("it is empty".to_string());
     }
@@ -647,6 +619,11 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn the_written_schema_value_is_the_published_id_of_the_header() {
+        assert_eq!(SCHEMA, crate::published::id::<Header>());
     }
 
     /// A valid header.

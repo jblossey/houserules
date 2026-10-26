@@ -98,8 +98,9 @@ pub(super) struct Context<'a> {
     pub(super) top_level: &'a Path,
     /// The id prefix of the install.
     pub(super) prefix: &'a str,
-    /// The CI workflow of the install.
-    pub(super) workflow: &'a Workflow,
+    /// The seeded CI workflow of the install, when the install holds one
+    /// (`Workflow::held_by_install`).
+    pub(super) workflow: Option<&'a Workflow>,
 }
 
 /// The `knowledge/` directory of the install, built one component at a time.
@@ -258,7 +259,6 @@ pub(super) fn convert(
     }
     let schema_kit = payload_content(SCHEMA_FILE, ctx.prefix)?;
     let schema_disk = read_if_present(&join_components(ctx.root, SCHEMA_FILE))?;
-    let workflow_disk = read_if_present(&join_components(ctx.top_level, &ctx.workflow.path))?;
     let owned = |path: &str| plan.owned_paths.iter().any(|owned| owned == path);
     let schema = d3::decide_schema(
         schema_disk.as_deref(),
@@ -266,13 +266,20 @@ pub(super) fn convert(
         &schema_kit,
         ctx.prefix,
     )?;
-    let workflow = d3::decide_workflow(
-        workflow_disk.as_deref(),
-        owned(&ctx.workflow.path),
-        &ctx.workflow.content,
-        &ctx.workflow.path,
-        ctx.prefix,
-    )?;
+    let workflow = ctx
+        .workflow
+        .map(|workflow| {
+            let disk = read_if_present(&join_components(ctx.top_level, &workflow.path))?;
+            d3::decide_workflow(
+                disk.as_deref(),
+                owned(&workflow.path),
+                &workflow.content,
+                &workflow.path,
+                ctx.prefix,
+            )
+            .map(|decision| (workflow, decision))
+        })
+        .transpose()?;
 
     let mut hand_steps = Vec::new();
     write_overrides_document(ctx, &plan)?;
@@ -315,15 +322,17 @@ pub(super) fn convert(
         &mut baselines,
         &mut hand_steps,
     )?;
-    apply_d3(
-        ctx.top_level,
-        &ctx.workflow.path,
-        &ctx.workflow.key,
-        &ctx.workflow.content,
-        &workflow,
-        &mut baselines,
-        &mut hand_steps,
-    )?;
+    if let Some((workflow, decision)) = &workflow {
+        apply_d3(
+            ctx.top_level,
+            &workflow.path,
+            &workflow.key,
+            &workflow.content,
+            decision,
+            &mut baselines,
+            &mut hand_steps,
+        )?;
+    }
     marker.set_baselines(baselines);
     marker.write()?;
 

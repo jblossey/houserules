@@ -1,0 +1,355 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jblossey.github.io/houserules/schemas/audit-result/1.0.0.json",
+  "title": "Audit result",
+  "description": "The result of `houserules audit` for a range of commits: the rules of the package with one row each, the counts of the rows, and the verdict on the work-item references of the range.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "description": "The schema id, `houserules/audit-result@1.0.0`.",
+      "type": "string",
+      "const": "houserules/audit-result@1.0.0"
+    },
+    "base": {
+      "description": "The short sha of the commit that `--base` names.",
+      "type": "string"
+    },
+    "head": {
+      "description": "The short sha of the commit that `--head` names, `HEAD` by default.",
+      "type": "string"
+    },
+    "ids": {
+      "description": "The ids that `--ids` adds to the package, in the order given.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "changed_files": {
+      "description": "The files that the range adds, copies, modifies, or renames, as paths from the install root, in the order of the diff.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "areas": {
+      "description": "The areas that the changed files touch, sorted.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "area_files": {
+      "description": "The changed files of each area. `global` comes first; every other area follows in the order in which a changed file first matches it.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "rules": {
+      "description": "One row for each rule of the package, sorted by id.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/AuditRow"
+      }
+    },
+    "summary": {
+      "description": "The counts of the rows.",
+      "$ref": "#/$defs/Summary"
+    },
+    "stale_sanctions": {
+      "description": "One line for each `--sanctioned` booking on a deterministic row that did not fail. Absent when there is none.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "references": {
+      "description": "The verdict on the work-item references of the range.",
+      "$ref": "#/$defs/References"
+    }
+  },
+  "required": [
+    "schema",
+    "base",
+    "head",
+    "ids",
+    "changed_files",
+    "areas",
+    "area_files",
+    "rules",
+    "summary",
+    "references"
+  ],
+  "$defs": {
+    "AuditRow": {
+      "description": "The row of one rule in an audit result.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The id of the knowledge entry.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "The kind of the entry.",
+          "type": "string"
+        },
+        "mode": {
+          "description": "Whether the audit ran a check for the rule or leaves the rule to a reviewer.",
+          "$ref": "#/$defs/RowMode"
+        },
+        "level": {
+          "description": "The level of the check, or `null` for a judged row.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RowLevel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "result": {
+          "description": "What the check found, or `open` for a judged row.",
+          "$ref": "#/$defs/RowResult"
+        },
+        "evidence": {
+          "description": "The line that names what the check found, or `—` for a judged row.",
+          "type": "string"
+        },
+        "findings": {
+          "description": "The results of a `runner` check with a SARIF tool that count, in the order of the calls. Only the row of such a check holds the key.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Finding"
+          }
+        },
+        "sanctioned": {
+          "description": "The reference of the `--sanctioned` booking on the row. Only a judged row and a failed deterministic row hold the key.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "mode",
+        "level",
+        "result",
+        "evidence"
+      ]
+    },
+    "RowMode": {
+      "description": "Whether the audit ran a check for a rule.",
+      "oneOf": [
+        {
+          "description": "The rule has a check, and the audit ran it.",
+          "type": "string",
+          "const": "deterministic"
+        },
+        {
+          "description": "The rule has no check; a reviewer judges it.",
+          "type": "string",
+          "const": "judged"
+        }
+      ]
+    },
+    "RowLevel": {
+      "description": "The level of a check: what a violation of the check counts as.",
+      "oneOf": [
+        {
+          "description": "A violation fails the audit.",
+          "type": "string",
+          "const": "fail"
+        },
+        {
+          "description": "A violation warns and fails nothing.",
+          "type": "string",
+          "const": "warn"
+        }
+      ]
+    },
+    "RowResult": {
+      "description": "The result of one row.",
+      "oneOf": [
+        {
+          "description": "The check holds.",
+          "type": "string",
+          "const": "pass"
+        },
+        {
+          "description": "A check of level `fail` is violated.",
+          "type": "string",
+          "const": "fail"
+        },
+        {
+          "description": "A check of level `warn` is violated.",
+          "type": "string",
+          "const": "warn"
+        },
+        {
+          "description": "The check did not run.",
+          "type": "string",
+          "const": "skipped"
+        },
+        {
+          "description": "A judged row: a reviewer decides.",
+          "type": "string",
+          "const": "open"
+        }
+      ]
+    },
+    "Finding": {
+      "description": "One result of a `runner` check that counts, as the row lists it.",
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "The file, relative to the install root with `/` separators. A location outside the root keeps the fully resolved URI of its base when it has one, else the URI as the tool wrote it. `null` for a result with no location.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "line": {
+          "description": "The line in `path`; `null` with no path or no region.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "rule": {
+          "description": "The id of the rule, or `(no rule id)`.",
+          "type": "string"
+        },
+        "message": {
+          "description": "The text of the message, or `(no message)`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "line",
+        "rule",
+        "message"
+      ]
+    },
+    "Summary": {
+      "description": "The counts of the rows of an audit result.",
+      "type": "object",
+      "properties": {
+        "base": {
+          "description": "The short sha of the commit that `--base` names.",
+          "type": "string"
+        },
+        "head": {
+          "description": "The short sha of the commit that `--head` names.",
+          "type": "string"
+        },
+        "deterministic": {
+          "description": "The number of rows with the mode `deterministic`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "pass": {
+          "description": "The number of deterministic rows with the result `pass`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "fail": {
+          "description": "The number of deterministic rows with the result `fail`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "warn": {
+          "description": "The number of deterministic rows with the result `warn`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "skipped": {
+          "description": "The number of deterministic rows with the result `skipped`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "judged": {
+          "description": "The number of rows with the mode `judged`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "empty_range": {
+          "description": "`true` when the range holds no commit. Absent otherwise.",
+          "type": "boolean"
+        },
+        "sanctioned_fail": {
+          "description": "The number of failed rows that hold `sanctioned`. Absent when there is none.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "reference_fail": {
+          "description": "The number of lines in `references.failures`.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "base",
+        "head",
+        "deterministic",
+        "pass",
+        "fail",
+        "warn",
+        "skipped",
+        "judged",
+        "reference_fail"
+      ]
+    },
+    "References": {
+      "description": "What the audit decided about the work-item references of the range: the `Work-Item:` and `Deferred:` trailers of its commits and the backlog ids of the deliverables it read.",
+      "type": "object",
+      "properties": {
+        "checked": {
+          "description": "The number of references that the tracker judged, passed or failed.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "passed": {
+          "description": "The number of references among those checked that passed.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "skipped": {
+          "description": "The number of references that the audit did not judge: all of them when the install has no tracker, when the tracker cannot be reached, or when the tracker answered with an error.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "failures": {
+          "description": "One line for each failure, in the order that the audit prints them on stderr.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "checked",
+        "passed",
+        "skipped",
+        "failures"
+      ]
+    }
+  }
+}

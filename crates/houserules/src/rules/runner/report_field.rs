@@ -7,6 +7,7 @@ use std::path::Path;
 
 use serde_json::{Map, Value};
 
+use crate::published::audit_result::{AuditResult, AuditRow, RowLevel, RowResult};
 use crate::rules::check_shape::{CheckDef, Glob};
 use crate::rules::git::full_commit_sha;
 
@@ -75,7 +76,7 @@ pub(super) fn run(
     check: &CheckDef,
     ctx: &AuditContext,
     rows: &RowBuilder,
-) -> Result<Value, String> {
+) -> Result<AuditRow, String> {
     let trigger = filter_matching(ctx.changed, &check.if_changed)?;
     if trigger.is_empty() {
         return Ok(rows.pass("not triggered".to_string()));
@@ -86,7 +87,7 @@ pub(super) fn run(
     if let Some(reports) = ctx.reports {
         return judge_reports(check, rows, reports);
     }
-    Ok(rows.row("skipped", "no --report given".to_string()))
+    Ok(rows.row(RowResult::Skipped, "no --report given".to_string()))
 }
 
 /// The row of a `--report` run. A filled `self_audit` marks the row for the
@@ -100,7 +101,7 @@ fn judge_report(
     rows: &RowBuilder,
     report: &Value,
     trigger: &str,
-) -> Value {
+) -> AuditRow {
     let field = check.field.as_deref().unwrap_or_default();
     if self_audit_is_present(report, field) {
         if has_field(report, field) {
@@ -158,7 +159,7 @@ fn judge_reports(
     check: &CheckDef,
     rows: &RowBuilder,
     reports: &[(String, Value)],
-) -> Result<Value, String> {
+) -> Result<AuditRow, String> {
     let field = check.field.as_deref().unwrap_or_default();
     let has_valid_files_changed = |data: &Value| matches!(data.get("files_changed"), Some(Value::Array(items)) if items.iter().all(Value::is_string));
     if let Some((name, _)) = reports
@@ -341,12 +342,13 @@ fn summary_compared(summary: &Value, counted: &[CountedRow]) -> Value {
 }
 
 /// The JSON path of the first difference between the `self_audit` copy and
-/// the final output `result` of this run, or `None` when they agree. The
-/// compared set is the summary (`summary_compared`: the counts less the rows of
-/// `comparing` on each side, so a copy that lacks those rows keeps its counts)
-/// and the rows without the rows of `comparing`. `result` is read as the audit
-/// built it, before the comparison moves any row. The copy's rows are all
-/// kept, so a judged row that someone wrote into the copy is a difference.
+/// the final output `result` of this run, as the audit prints it, or `None`
+/// when they agree. The compared set is the summary (`summary_compared`: the
+/// counts less the rows of `comparing` on each side, so a copy that lacks
+/// those rows keeps its counts) and the rows without the rows of `comparing`.
+/// `result` is read as the audit built it, before the comparison moves any
+/// row. The copy's rows are all kept, so a judged row that someone wrote into
+/// the copy is a difference.
 fn self_audit_difference(copy: &Value, result: &Value, comparing: &[String]) -> Option<String> {
     let recorded_summary = summary_compared(
         copy.get("summary").unwrap_or(&Value::Null),
@@ -401,7 +403,9 @@ fn is_row_of(row: &Value, ids: &[String]) -> bool {
 
 /// Compares the `self_audit` of `report` with the final output `result` of
 /// this run, and sets the verdict on the rows of `comparing` (the rows of the
-/// checks that found a filled `self_audit`; spec 6).
+/// checks that found a filled `self_audit`; spec 6). The copy is the JSON of
+/// the report, so the comparison reads the result as the JSON that the audit
+/// prints (`self_audit_difference`) and sets the verdict on the typed rows.
 ///
 /// The comparison happens only when the copy covers this run's range: each
 /// recorded `base` and `head` must name the same commit as the sha of the run,
@@ -414,7 +418,7 @@ pub(in crate::rules) fn compare_self_audit(
     root: &Path,
     report: &Value,
     comparing: &[String],
-    result: &mut Value,
+    result: &mut AuditResult,
 ) -> bool {
     let Some(copy) = report.get(SELF_AUDIT_FIELD).filter(|copy| !copy.is_null()) else {
         return false;
@@ -422,14 +426,8 @@ pub(in crate::rules) fn compare_self_audit(
     if comparing.is_empty() {
         return false;
     }
-    let run_base = result["summary"]["base"]
-        .as_str()
-        .unwrap_or_default()
-        .to_string();
-    let run_head = result["summary"]["head"]
-        .as_str()
-        .unwrap_or_default()
-        .to_string();
+    let run_base = result.summary.base.clone();
+    let run_head = result.summary.head.clone();
     let covers_this_run = same_commit(root, recorded_sha(copy, "base"), &run_base)
         && same_commit(root, recorded_sha(copy, "head"), &run_head);
     if !covers_this_run {
@@ -443,44 +441,41 @@ pub(in crate::rules) fn compare_self_audit(
             range(&run_base, &run_head),
         );
         for row in rows_of(result, comparing) {
-            let evidence = row["evidence"].as_str().unwrap_or_default().to_string();
-            row["evidence"] = Value::String(format!("{evidence}; {note}"));
+            row.evidence = format!("{}; {note}", row.evidence);
         }
         return false;
     }
-    let Some(path) = self_audit_difference(copy, result, comparing) else {
+    let printed = serde_json::to_value(&*result).expect("an audit result always serializes");
+    let Some(path) = self_audit_difference(copy, &printed, comparing) else {
         return false;
     };
     let mut failed = false;
-    let mut moved: Vec<&'static str> = Vec::new();
+    let (mut now_failing, mut now_warning) = (0, 0);
     for row in rows_of(result, comparing) {
-        let verdict = if row["level"] == "warn" {
-            "warn"
+        let verdict = row.level.map_or(RowResult::Fail, RowLevel::violation);
+        if verdict == RowResult::Fail {
+            failed = true;
+            now_failing += 1;
         } else {
-            "fail"
-        };
-        failed |= verdict == "fail";
-        row["result"] = Value::String(verdict.to_string());
-        row["evidence"] = Value::String(format!("self_audit differs at {path}"));
-        moved.push(verdict);
+            now_warning += 1;
+        }
+        row.result = verdict;
+        row.evidence = format!("self_audit differs at {path}");
     }
-    for verdict in moved {
-        let pass = result["summary"]["pass"].as_u64().unwrap_or(0);
-        result["summary"]["pass"] = Value::from(pass.saturating_sub(1));
-        let count = result["summary"][verdict].as_u64().unwrap_or(0);
-        result["summary"][verdict] = Value::from(count + 1);
-    }
+    let summary = &mut result.summary;
+    summary.pass = summary.pass.saturating_sub(now_failing + now_warning);
+    summary.fail += now_failing;
+    summary.warn += now_warning;
     failed
 }
 
 /// The rows of `result` that belong to the entries in `ids`, for the
 /// comparison to change.
-fn rows_of<'a>(result: &'a mut Value, ids: &[String]) -> Vec<&'a mut Value> {
-    result["rules"]
-        .as_array_mut()
-        .into_iter()
-        .flatten()
-        .filter(|row| is_row_of(row, ids))
+fn rows_of<'a>(result: &'a mut AuditResult, ids: &[String]) -> Vec<&'a mut AuditRow> {
+    result
+        .rules
+        .iter_mut()
+        .filter(|row| ids.contains(&row.id))
         .collect()
 }
 

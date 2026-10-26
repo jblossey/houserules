@@ -91,6 +91,9 @@ const COVERED: &[&[&str]] = &[
     &["check-backlog"],
     &["check-commit", "--from", "HEAD"],
     &["audit", "--base", "HEAD"],
+    &[
+        "bundle", "check", "--body", "b.md", "--base", "HEAD", "--head", "HEAD",
+    ],
     &["validate", "report.json"],
     &["render", "--check"],
     &["render"],

@@ -115,7 +115,7 @@ impl Repo {
             &serde_json::to_string(&topic).expect("serialize the topic"),
         );
         let marker = json!({
-            "schema": "houserules/install@2.2.0", "defaultBranch": "main", "runners": runners,
+            "schema": "houserules/install@2.3.0", "defaultBranch": "main", "runners": runners,
         });
         repo.write(
             ".houserules.json",

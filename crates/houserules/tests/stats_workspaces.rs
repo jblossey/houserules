@@ -103,7 +103,8 @@ fn stats_without_a_workspace_is_a_usage_error_naming_the_positional() {
     assert!(stderr.contains("<WORKSPACE>..."), "{stderr}");
 }
 
-/// `stats --help` names one or more workspaces.
+/// `stats --help` names one or more workspaces. The positional is optional in
+/// the usage line, because `--records` stands for the workspaces (spec 8.3).
 #[test]
 fn stats_help_names_one_or_more_workspaces() {
     let output = houserules()
@@ -112,7 +113,7 @@ fn stats_help_names_one_or_more_workspaces() {
         .expect("run stats --help");
     let help = String::from_utf8(output.stdout).expect("utf8 stdout");
     assert!(
-        help.contains("Usage: houserules stats [OPTIONS] <WORKSPACE>..."),
+        help.contains("Usage: houserules stats [OPTIONS] [WORKSPACE]..."),
         "{help}"
     );
     assert!(help.contains("One or more workspace directories"), "{help}");

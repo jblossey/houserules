@@ -129,6 +129,7 @@ fn identify(command: &str) -> &'static str {
         _ if command.ends_with("--bin vacuous-exception-gate") => "vacuous-exception-gate",
         _ if command.ends_with("--bin payload-stamp-gate") => "payload-stamp-gate",
         _ if command.ends_with("--bin dist-generate-check") => "dist-generate-check",
+        _ if command.ends_with("--bin gen-schemas -- --check") => "gen-schemas",
         _ if command.contains("mingw-w64") => "mingw-toolchain",
         _ => panic!(
             "run command has no known identifier: {command:?} -- add a match arm in \
@@ -163,6 +164,7 @@ const ALIASES: &[(&str, &[&str])] = &[
     ("vacuous-exception-gate", &["vacuous-exception gate"]),
     ("payload-stamp-gate", &["payload-stamp gate"]),
     ("dist-generate-check", &["dist-generate-check gate"]),
+    ("gen-schemas", &["gen-schemas --check"]),
     ("mingw-toolchain", &["mingw-w64"]),
 ];
 
@@ -288,19 +290,19 @@ fn extract_ci_run_lines_preserves_document_order() {
 }
 
 /// The live corpus proof: ci.yml's own run steps, parsed fresh, are
-/// exactly eight today (`checks`: the mingw-w64 install, lint, test,
-/// audit; `rust`: fmt, clippy, test; `check-commit`: one) -- a growth or
-/// shrink here means ci.yml changed shape, which this pinned count
+/// exactly nine today (`checks`: the mingw-w64 install, lint, the schema
+/// check, test, audit; `rust`: fmt, clippy, test; `check-commit`: one) -- a
+/// growth or shrink here means ci.yml changed shape, which this pinned count
 /// catches even for a command `identify` would otherwise classify under
 /// an existing, already-matched identifier (a second `cargo clippy`
 /// line, say).
 #[test]
-fn ci_yml_declares_exactly_eight_run_steps_today() {
+fn ci_yml_declares_exactly_nine_run_steps_today() {
     let path = repo_root().join(".github/workflows/ci.yml");
     let yaml = fs::read_to_string(&path)
         .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
     let commands = extract_ci_run_lines(&yaml);
-    assert_eq!(commands.len(), 8, "{commands:?}");
+    assert_eq!(commands.len(), 9, "{commands:?}");
 }
 
 /// The live parity proof (HR-117's own reason to exist): every command
@@ -362,7 +364,7 @@ fn every_ci_run_command_has_a_matching_mention_in_the_task_gates_mirror_ci_entry
 /// could omit a real lint step exactly the way the outer CI-job list
 /// once omitted `check-commit`. Parses `mise.toml` fresh and checks each
 /// of its ten members the same way the outer test checks ci.yml's own
-/// eight.
+/// nine.
 #[test]
 fn every_mise_lint_member_has_a_matching_mention_in_the_task_gates_mirror_ci_entry() {
     let path = repo_root().join("mise.toml");

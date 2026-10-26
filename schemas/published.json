@@ -1,0 +1,28 @@
+{
+  "files": [
+    {
+      "path": "audit-result/1.0.0.json",
+      "sha256": "df4fa7e24a88e852f16f8bddd0dff731268470dde74db328e25b0cd4b3ff0471"
+    },
+    {
+      "path": "capture/1.0.0.json",
+      "sha256": "0477b96427cbc4d5728baf1d0e18ef688706839ad2fe2aee57d2e4acc3b80dc5"
+    },
+    {
+      "path": "change-record/1.0.0.json",
+      "sha256": "125d390e48ebbdfc6c94f7e4cc5127204b1e3e0d39e83ae4df0b82587799e8e5"
+    },
+    {
+      "path": "evidence/1.0.0.json",
+      "sha256": "9eef7491f3c0e7ade625d707fe3376d2f182547dfb5c44019841969f9cf26d0d"
+    },
+    {
+      "path": "route/1.0.0.json",
+      "sha256": "b67c7bcd604f244252b65a5a4978fe3e037cfa150746b593a0a6ac6d371bbc3d"
+    },
+    {
+      "path": "rule-package/1.0.0.json",
+      "sha256": "0521a1b886aca6b7d061e09791b4f7db9fba9371a1093039bd292d6e03369846"
+    }
+  ]
+}

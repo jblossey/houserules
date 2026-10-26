@@ -1,11 +1,13 @@
 //! `init --dir <subdir>` and several installs in one repository (batch 33,
 //! spec section 8, C12): an install below the git top level keeps `.claude/`
-//! and `.githooks/` in its root, writes its CI workflow at the top level as
-//! `.github/workflows/knowledge-<folder>.yml` with `working-directory`, a
-//! `paths` filter, and its own name, and baselines that file under git's
-//! top-level pathspec form. `init` refuses a second install whose workflow
-//! file name or root clashes with another install. Each case runs the
-//! compiled binary against a scratch git repository with a GitHub origin.
+//! and `.githooks/` in its root and writes nothing outside it (spec 10.7). An
+//! install that an earlier release seeded keeps its CI workflow at the top
+//! level as `.github/workflows/knowledge-<folder>.yml` with `working-directory`,
+//! a `paths` filter, and its own name, baselined under the top-level pathspec
+//! form of the repository, and `update` keeps that file current
+//! (`seed_workflow` makes the state). `init` refuses a second install whose
+//! root nests with another install. Each case runs the compiled binary against
+//! a scratch repository with a GitHub origin.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -17,7 +19,7 @@ use tempfile::TempDir;
 mod tracker_support;
 mod tree_snapshot;
 
-use tracker_support::{quoted, resolved};
+use tracker_support::{quoted, resolved, seed_workflow, sha256_hex};
 use tree_snapshot::{assert_same_tree, snapshot};
 
 /// A `Command` for the compiled `houserules` binary under test.
@@ -44,8 +46,8 @@ fn git(dir: &Path, args: &[&str]) {
     assert!(status.success(), "git {args:?} failed");
 }
 
-/// A scratch git repository whose `origin` is a GitHub URL, so `init`
-/// writes the CI workflow. The path is canonical, so the paths the binary
+/// A scratch repository whose `origin` is a GitHub URL, which `init` does not
+/// use to write a CI file. The path is canonical, so the paths the binary
 /// prints match the paths built here.
 fn github_repo() -> (TempDir, PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -179,11 +181,10 @@ fn assert_subdirectory_workflow(top: &Path, file: &str, path: &str) {
 }
 
 /// `init --dir sub` installs in `sub`: `.claude/`, `tools/`, the
-/// knowledge base, and the marker live in the install root, and the one file
-/// outside it is the CI workflow at the top level, in the subdirectory form
-/// and baselined under git's top-level pathspec form.
+/// knowledge base, and the marker live in the install root, and `init` writes
+/// no file outside it (spec 10.7).
 #[test]
-fn init_dir_installs_in_the_subdirectory_and_writes_its_workflow_at_the_top_level() {
+fn init_dir_installs_in_the_subdirectory_and_writes_nothing_outside_it() {
     let (_dir, top) = github_repo();
     fs::create_dir_all(top.join("sub")).expect("create sub/");
     fs::write(top.join("other.txt"), "other content\n").expect("write other.txt");
@@ -205,18 +206,33 @@ fn init_dir_installs_in_the_subdirectory_and_writes_its_workflow_at_the_top_leve
         .into_keys()
         .filter(|path| !path.starts_with("sub/"))
         .collect();
-    assert_eq!(
-        outside,
-        [".github/workflows/knowledge-sub.yml", "other.txt"]
-    );
+    assert_eq!(outside, ["other.txt"]);
     assert_eq!(
         fs::read_to_string(top.join("sub/code.rs")).unwrap(),
         "fn main() {}\n"
     );
     assert!(
-        lines.contains(&"wrote .github/workflows/knowledge-sub.yml".to_string()),
+        !lines.iter().any(|line| line.contains("knowledge-sub.yml")),
         "{lines:?}"
     );
+    let baselines = marker(&top.join("sub"))["baselines"].clone();
+    assert!(
+        baselines[":/.github/workflows/knowledge-sub.yml"].is_null(),
+        "{baselines}"
+    );
+}
+
+/// A subdirectory install that an earlier release seeded keeps its workflow at
+/// the top level in the subdirectory form, baselined under the top-level
+/// pathspec form of the repository; `update` keeps that file current.
+#[test]
+fn a_seeded_subdirectory_install_keeps_its_workflow_in_the_subdirectory_form() {
+    let (_dir, top) = github_repo();
+    init_ok(&top.join("sub"));
+
+    let file = seed_workflow(&top, &top.join("sub"));
+
+    assert_eq!(file, ".github/workflows/knowledge-sub.yml");
     assert_subdirectory_workflow(&top, "knowledge-sub.yml", "sub");
     let baselines = marker(&top.join("sub"))["baselines"].clone();
     assert!(
@@ -225,13 +241,23 @@ fn init_dir_installs_in_the_subdirectory_and_writes_its_workflow_at_the_top_leve
     );
 }
 
-/// An install at the top level keeps `.github/workflows/knowledge.yml`, the
-/// template as it is, and baselines it under the same top-level form.
+/// An install at the top level that an earlier release seeded keeps
+/// `.github/workflows/knowledge.yml`, the template as it is, baselined under
+/// the same top-level form, and `update` leaves it as it is. A plain `init`
+/// writes none.
 #[test]
 fn an_install_at_the_top_level_keeps_the_template_workflow_and_baselines_it() {
     let (_dir, top) = github_repo();
-
     init_ok(&top);
+    assert!(!top.join(".github").exists(), "init writes no workflow");
+
+    seed_workflow(&top, &top);
+    let output = houserules()
+        .args(["update", "--dir"])
+        .arg(&top)
+        .output()
+        .expect("run update");
+    assert!(output.status.success());
 
     assert_eq!(
         fs::read_to_string(top.join(".github/workflows/knowledge.yml")).unwrap(),
@@ -297,14 +323,16 @@ fn every_command_from_inside_the_subdirectory_finds_the_install() {
     }
 }
 
-/// Several installs in one repository: each writes its own workflow file,
-/// `<folder>` being the root's path with each `/` replaced by `-`, and
-/// `update --dir` in each rewrites only its own file.
+/// Several installs in one repository that an earlier release seeded: each
+/// holds its own workflow file, `<folder>` being the root's path with each `/`
+/// replaced by `-`, and `update --dir` in each rewrites only its own file.
 #[test]
-fn several_installs_each_write_and_update_only_their_own_workflow() {
+fn several_installs_each_update_only_their_own_workflow() {
     let (_dir, top) = github_repo();
     init_ok(&top.join("a"));
     init_ok(&top.join("b/c"));
+    seed_workflow(&top, &top.join("a"));
+    seed_workflow(&top, &top.join("b/c"));
 
     assert_subdirectory_workflow(&top, "knowledge-a.yml", "a");
     assert_subdirectory_workflow(&top, "knowledge-b-c.yml", "b/c");
@@ -319,8 +347,18 @@ fn several_installs_each_write_and_update_only_their_own_workflow() {
     }
 
     let workflows = top.join(".github/workflows");
-    fs::remove_file(workflows.join("knowledge-a.yml")).expect("remove a's workflow");
-    fs::remove_file(workflows.join("knowledge-b-c.yml")).expect("remove b/c's workflow");
+    let stale = template_workflow();
+    for (root, file) in [("a", "knowledge-a.yml"), ("b/c", "knowledge-b-c.yml")] {
+        fs::write(workflows.join(file), &stale).expect("write the stale workflow");
+        let mut stamp = marker(&top.join(root));
+        stamp["baselines"][format!(":/.github/workflows/{file}")] =
+            Value::String(sha256_hex(stale.as_bytes()));
+        fs::write(
+            top.join(root).join(".houserules.json"),
+            format!("{}\n", serde_json::to_string_pretty(&stamp).unwrap()),
+        )
+        .expect("write the marker");
+    }
     let update = |root: &str| {
         let output = houserules()
             .args(["update", "--dir"])
@@ -341,8 +379,12 @@ fn several_installs_each_write_and_update_only_their_own_workflow() {
         "{stdout}"
     );
     assert!(!stdout.contains("knowledge-b-c.yml"), "{stdout}");
-    assert!(workflows.join("knowledge-a.yml").is_file());
-    assert!(!workflows.join("knowledge-b-c.yml").exists());
+    assert_subdirectory_workflow(&top, "knowledge-a.yml", "a");
+    assert_eq!(
+        fs::read_to_string(workflows.join("knowledge-b-c.yml")).unwrap(),
+        stale,
+        "update in a leaves the workflow of b/c"
+    );
 
     let stdout = update("b/c");
     assert!(
@@ -353,11 +395,10 @@ fn several_installs_each_write_and_update_only_their_own_workflow() {
 }
 
 /// `init` refuses, changing nothing, with one line that names the other
-/// install: a root inside another install, a root that holds another
-/// install, and a workflow file name that another install already uses
-/// (`b-c` and `b/c`). Each line is pinned whole.
+/// install: a root inside another install, and a root that holds another
+/// install. Each line is pinned whole.
 #[test]
-fn init_refuses_a_nested_install_and_a_workflow_name_clash_and_changes_nothing() {
+fn init_refuses_a_nested_install_and_changes_nothing() {
     let (_dir, top) = github_repo();
     init_ok(&top.join("a"));
     init_ok(&top.join("b/c"));
@@ -390,14 +431,6 @@ fn init_refuses_a_nested_install_and_a_workflow_name_clash_and_changes_nothing()
                 bc.display()
             ),
         ),
-        (
-            top.join("b-c"),
-            format!(
-                "{}: the CI workflow file .github/workflows/knowledge-b-c.yml belongs to the install at {}; give this install a directory whose path makes another file name\n",
-                top.join("b-c").display(),
-                bc.display()
-            ),
-        ),
     ];
     for (target, expected) in cases {
         fs::create_dir_all(&target).expect("create the target");
@@ -416,6 +449,19 @@ fn init_refuses_a_nested_install_and_a_workflow_name_clash_and_changes_nothing()
     assert_same_tree(&before, &snapshot(&top), "the refusals");
 }
 
+/// Two roots whose paths make one dashed name (`b-c` and `b/c`) are two
+/// installs: `init` writes no workflow file whose name could clash.
+#[test]
+fn init_accepts_a_root_whose_dashed_name_equals_that_of_another_install() {
+    let (_dir, top) = github_repo();
+    init_ok(&top.join("b/c"));
+
+    let lines = init_ok(&top.join("b-c"));
+
+    assert!(top.join("b-c/.houserules.json").is_file(), "{lines:?}");
+    assert!(!top.join(".github").exists());
+}
+
 /// `init` in an existing install's own root is no second install: it seeds
 /// what is missing and keeps what exists (C12).
 #[test]
@@ -432,20 +478,20 @@ fn init_in_the_own_root_of_an_install_is_no_second_install() {
         "{lines:?}"
     );
     assert!(
-        lines.contains(&"kept .github/workflows/knowledge-a.yml".to_string()),
+        !lines.iter().any(|line| line.contains(".github/workflows")),
         "{lines:?}"
     );
 }
 
 /// `init` on a target that holds its own marker refuses no placement that
 /// `update` accepts, and `update` runs no overlap check: the install is no
-/// new root. Each of the three overlaps that `init` refuses for a new root
+/// new root. Each of the two overlaps that `init` refuses for a new root
 /// leaves `init` on the existing install at exit 0 and the tree as it was: a
-/// marker below the root (a vendored project or a fixture), a marker above
-/// it, and a marker whose folder makes the same workflow file name.
+/// marker below the root (a vendored project or a fixture), and a marker above
+/// it.
 #[test]
 fn init_on_an_existing_install_runs_no_overlap_check() {
-    for (install, other) in [("a", "a/vendor"), ("b/c", "b"), ("x/y", "x-y")] {
+    for (install, other) in [("a", "a/vendor"), ("b/c", "b")] {
         let (_dir, top) = github_repo();
         init_ok(&top.join(install));
         fs::create_dir_all(top.join(other)).expect("create the other root");
@@ -487,7 +533,8 @@ fn init_below_a_top_level_install_is_refused() {
 
 /// Review focus 5: a folder name with a space, a non-ASCII letter, or a
 /// single quote keeps the workflow file name, the `paths` filter, the
-/// `working-directory`, and the baseline key valid (quoted in YAML).
+/// `working-directory`, and the baseline key valid (quoted in YAML) in the
+/// workflow that `update` keeps for a seeded install.
 #[test]
 fn a_folder_name_with_a_space_a_non_ascii_letter_or_a_quote_gives_a_valid_workflow() {
     for (folder, file) in [
@@ -498,6 +545,7 @@ fn a_folder_name_with_a_space_a_non_ascii_letter_or_a_quote_gives_a_valid_workfl
         let (_dir, top) = github_repo();
 
         init_ok(&top.join(folder));
+        seed_workflow(&top, &top.join(folder));
 
         assert_subdirectory_workflow(&top, file, folder);
         let key = format!(":/.github/workflows/{file}");
@@ -508,34 +556,10 @@ fn a_folder_name_with_a_space_a_non_ascii_letter_or_a_quote_gives_a_valid_workfl
     }
 }
 
-/// A folder name with a character that a GitHub path filter reads as a
-/// pattern is refused with one line, and nothing is written: the filter
-/// would never match the folder.
+/// With no origin, a subdirectory install writes no workflow, and `init` says
+/// that it wrote no CI file and names no detected host.
 #[test]
-fn init_refuses_a_folder_name_that_a_path_filter_reads_as_a_pattern() {
-    let (_dir, top) = github_repo();
-    let target = top.join("a+b");
-    fs::create_dir_all(&target).expect("create the target");
-    let before = snapshot(&top);
-
-    let output = init(&target);
-
-    assert_eq!(output.status.code(), Some(2));
-    assert_eq!(output.stdout, b"");
-    assert_eq!(
-        String::from_utf8(output.stderr).unwrap(),
-        format!(
-            "{}: the install path \"a+b\" holds the character '+', which a GitHub path filter reads as a pattern; choose a directory without it\n",
-            target.display()
-        )
-    );
-    assert_same_tree(&before, &snapshot(&top), "init in a folder named a pattern");
-}
-
-/// With no GitHub origin, a subdirectory install writes no workflow and
-/// says why, naming the file it would have written.
-#[test]
-fn a_subdirectory_install_without_a_github_origin_skips_its_workflow() {
+fn a_subdirectory_install_without_an_origin_writes_no_workflow() {
     let dir = tempfile::tempdir().expect("tempdir");
     git(dir.path(), &["init", "-q"]);
     let top = resolved(dir.path());
@@ -544,7 +568,7 @@ fn a_subdirectory_install_without_a_github_origin_skips_its_workflow() {
 
     assert!(
         lines.contains(
-            &"skipped .github/workflows/knowledge-sub.yml (origin is not GitHub-hosted; see the migrating-knowledge skill to add your own CI gate)"
+            &"init: houserules wrote no CI file; to run the gates and the review layer in your pipeline, run houserules ci print --host github or gitlab"
                 .to_string()
         ),
         "{lines:?}"

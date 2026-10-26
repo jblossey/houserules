@@ -1,5 +1,7 @@
 //! The read-only token of the seeded CI workflow (spec 8.5; case 9 and the
-//! workflow half of case 10). Every form of the workflow, at the git top level
+//! workflow half of case 10). `init` seeds no workflow now (spec 10.7), so each
+//! case starts from the workflow that an earlier release seeded
+//! (`seed_workflow`). Every form of the workflow, at the git top level
 //! and in the subdirectory form, runs its gates job with `contents: read`. The
 //! json, GitHub, and no-tracker forms also drop the persisted credential of the
 //! checkout; the Beads form keeps it, because `bd bootstrap` fetches from the
@@ -25,7 +27,7 @@ use serde_json::json;
 use tempfile::TempDir;
 use tracker_support::{
     assert_actionlint_passes, commit_all, count_lines, edit_marker, git, houserules, read_json,
-    repo_root, run_ok, scratch_git_repo, sha256_hex, stderr, stdout,
+    repo_root, run_ok, scratch_git_repo, seed_workflow, sha256_hex, stderr, stdout,
 };
 
 /// The workflow of an install at the git top level.
@@ -193,8 +195,8 @@ fn beads_steps_step(path: &str, bd_version: &str) -> String {
     )
 }
 
-/// A scratch repository with a GitHub `origin`, so that `init` writes the CI
-/// workflow.
+/// A scratch repository with a GitHub `origin`, where the GitHub tracker reads
+/// its repository.
 fn repository() -> TempDir {
     let dir = scratch_git_repo();
     git(
@@ -245,8 +247,9 @@ struct Install {
 }
 
 impl Install {
-    /// An install on `tracker` at the git top level, or in `sub/`. A Beads
-    /// install is a plain `init` whose marker then names `beads`.
+    /// An install on `tracker` at the git top level, or in `sub/`, whose
+    /// workflow an earlier release seeded. A Beads install is a plain `init`
+    /// whose marker then names `beads`.
     fn new(tracker: Tracker, in_subdirectory: bool) -> Self {
         let repo = repository();
         let root = if in_subdirectory {
@@ -256,10 +259,10 @@ impl Install {
         } else {
             repo.path().to_path_buf()
         };
+        run_ok(&root, &["init"]);
+        seed_workflow(repo.path(), &root);
         match tracker {
-            Tracker::None => {
-                run_ok(&root, &["init"]);
-            }
+            Tracker::None => {}
             Tracker::Json => {
                 run_ok(&root, &["init", "--tracker", "json"]);
             }
@@ -267,7 +270,6 @@ impl Install {
                 run_ok(&root, &["init", "--tracker", "github"]);
             }
             Tracker::Beads => {
-                run_ok(&root, &["init"]);
                 edit_marker(&root, |marker| {
                     marker.insert("tracker".to_string(), json!({"adapter": "beads"}));
                 });
@@ -594,13 +596,13 @@ fn a_kept_copy_gets_one_hand_step_for_each_marker_it_lacks() {
             vec![],
         ),
         (
-            "a json copy whose comment holds the permissions",
+            "a json copy whose comment holds the permissions: a comment is no marker",
             Tracker::Json,
             Box::new(|form| format!("{}# contents: read\n", previous_form(Tracker::Json, form))),
-            vec![persist_credentials_step(w)],
+            vec![contents_read_step(w), persist_credentials_step(w)],
         ),
         (
-            "a json copy whose comment holds the persist input",
+            "a json copy whose comment holds the persist input: a comment is no marker",
             Tracker::Json,
             Box::new(|form| {
                 format!(
@@ -608,7 +610,7 @@ fn a_kept_copy_gets_one_hand_step_for_each_marker_it_lacks() {
                     previous_form(Tracker::Json, form)
                 )
             }),
-            vec![contents_read_step(w)],
+            vec![contents_read_step(w), persist_credentials_step(w)],
         ),
         (
             "a json copy that lacks the permissions, the ref, and the persist input",

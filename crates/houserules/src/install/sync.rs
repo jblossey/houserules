@@ -12,7 +12,8 @@
 //! as well (spec 4.7, C35): its bytes stand for the baseline. Each file gets one
 //! outcome:
 //!
-//! - missing: written, and listed as `wrote <file>`;
+//! - missing: written, and listed as `wrote <file>`; the seeded CI workflow is
+//!   the exception, which stays absent (spec 10.7);
 //! - at its baseline: written with the kit's content and listed when its
 //!   bytes change; a file whose bytes would not change is neither written
 //!   nor listed, so a second `update` prints no `wrote` line. Either way the
@@ -80,8 +81,9 @@ pub(super) struct Plan<'a> {
     /// The directory of the repository's top level, where the workflow file
     /// lies.
     pub(super) top_level: &'a Path,
-    /// The workflow file of the install.
-    pub(super) workflow: &'a Workflow,
+    /// The seeded workflow file of the install, when the install holds one
+    /// (`Workflow::held_by_install`).
+    pub(super) workflow: Option<&'a Workflow>,
 }
 
 /// Syncs every file of `plan` that the project does not own, restamps
@@ -109,7 +111,6 @@ pub(super) fn sync_owned_files(
     let schema = payload_content(SCHEMA_FILE, plan.prefix)?;
     let deliverables = deliverables_content(plan.target, plan.prefix, plan.backlog_id_pattern)?;
     let tracker_schema = payload_content(TRACKER_SCHEMA, plan.prefix)?;
-    let workflow = plan.workflow;
     let mut d3_files = vec![
         (plan.target, SCHEMA_FILE, SCHEMA_FILE, &schema),
         (
@@ -118,20 +119,22 @@ pub(super) fn sync_owned_files(
             DELIVERABLES_FILE,
             &deliverables,
         ),
-        (
+    ];
+    if let Some(workflow) = plan.workflow {
+        d3_files.push((
             plan.top_level,
             workflow.path.as_str(),
             workflow.key.as_str(),
             &workflow.content,
-        ),
-    ];
+        ));
+    }
     if plan.json_tracker {
         d3_files.push((plan.target, TRACKER_SCHEMA, TRACKER_SCHEMA, &tracker_schema));
     }
     for (base, file, key, content) in d3_files {
         if baselines.contains_key(key) && !is_overridden(plan.owned, file) {
             let kept = sync_file(base, file, key, content, &[], baselines, lines)?;
-            if kept && key == workflow.key {
+            if kept && plan.workflow.is_some_and(|workflow| workflow.key == key) {
                 let current = fs::read(base.join(file))
                     .map_err(|error| format!("{}: {error}", base.join(file).display()))?;
                 hand_steps.extend(ci_workflow::hand_step_for_kept(

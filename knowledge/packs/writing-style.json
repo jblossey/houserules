@@ -1,6 +1,6 @@
 {
   "name": "writing-style",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "schema": "houserules/pack@1.0.0",
   "topics": {
     "writing-style": {
@@ -117,7 +117,7 @@
         "A gate is an instruction too: when a check is added to a tool, the surrounding protocol's own intermediate artifact states are part of the conditioned state space - a hardened validator that rejects the protocol's own in-progress draft (a terminal status alongside a still-null field the protocol fills in later) is fixed by migrating the flow, not by special-casing the draft.",
         "A shipped instruction that names a repo-local resource states what every other population does instead: a closing act's false-positive arm that names a resource only one population (the source-carrying one) has, branches explicitly on source-present vs. installed-binary populations rather than assuming the resource exists everywhere.",
         "An instruction naming the populations it governs enumerates all of them: test the sentence against each population the code path actually handles, not just the two most common ones.",
-        "A procedure's state space includes the states its own automation creates: walk every generated commit and bot-authored change through the gates the procedure depends on - an automated PR's own commit is as much a state to cover as a human one.",
+        "A procedure's state space includes the states its own automation creates: walk every generated commit and bot-authored change through the gates the procedure depends on - the commit of an automated pull or merge request is as much a state to cover as a human one.",
         "A ruling with a named set of outcomes states the count in every text that lists them ('one of three ways'), so a grep for the count finds a text that lists fewer (a contested finding had three outcomes, and two texts named two)."
       ],
       "tags": [
@@ -138,7 +138,7 @@
       "standing": false,
       "summary": "A README is an adopter funnel: value, install, runnable usage, then depth; keep out process history, provenance narration, and claims that rot with releases.",
       "body": [
-        "Order the file as a funnel (an evaluator can stop early, a user finds install and usage fast, a contributor reads to the end): title; a few meaningful badges; a one-liner under 120 characters matching the repository description; a short what/who/why description; a table of contents once the file passes 100 lines; install, with updating as a subsection; usage whose commands run exactly as written, with real output shown; deeper concepts; a reference section or a link to one; contributing (where to ask questions, whether pull requests are accepted); license last.",
+        "Order the file as a funnel (an evaluator can stop early, a user finds install and usage fast, a contributor reads to the end): title; a few meaningful badges; a one-liner under 120 characters matching the repository description; a short what/who/why description; a table of contents once the file passes 100 lines; install, with updating as a subsection; usage whose commands run exactly as written, with real output shown; deeper concepts; a reference section or a link to one; contributing (where to ask questions, whether pull or merge requests are accepted); license last.",
         "Keep out: maintainer evidence and verification narration, internal ids and ruling citations, changelog prose, marketing claims, and version-bound statements that go stale at the next release. State current facts plainly and keep provenance in the project's own records; link out for depth instead of inlining it.",
         "Derived from standard-readme's specification, The Art of README's cognitive funneling, and makeareadme.com; re-check current guidance before a large rewrite."
       ],

@@ -47,6 +47,11 @@ fn check_fields(check_type: &str) -> Option<&'static [&'static str]> {
     }
 }
 
+/// The check types that read no file of the tree: a `commits` check reads
+/// commit messages and a `report-field` check reads a report. Neither can
+/// declare `covers`.
+const READS_NO_FILE: [&str; 2] = ["commits", "report-field"];
+
 /// JavaScript-style truthiness for a JSON value read through
 /// `serde_json`: absent, `null`, `false`, `0`, and `""` are falsy; every
 /// array, object, non-empty string, non-zero number, and `true` is
@@ -175,10 +180,11 @@ fn regex_validity_message(pattern: &str, flags: &str) -> Option<String> {
 }
 
 /// Reports, for one entry's `check` object, every field its `type` requires
-/// (`check_fields`) and the `commits` type's own "needs one of four" rule
-/// (`subject`, `body_absent`, `body_line_max`, or `require_trailer`). An
-/// unknown `type` gives none: the schema reports it. `at` prefixes every
-/// message. `check_shape` runs this first.
+/// (`check_fields`), the `commits` type's own "needs one of four" rule
+/// (`subject`, `body_absent`, `body_line_max`, or `require_trailer`), and a
+/// `covers` key on a `commits` or `report-field` check, which reads no file
+/// (spec 4.4). An unknown `type` gives none: the schema reports it. `at`
+/// prefixes every message. `check_shape` runs this first.
 fn required_field_findings(check: &Value, at: &str, errors: &mut Vec<String>) {
     let check_type = check.get("type").and_then(Value::as_str).unwrap_or("");
     let Some(fields) = check_fields(check_type) else {
@@ -188,6 +194,11 @@ fn required_field_findings(check: &Value, at: &str, errors: &mut Vec<String>) {
         if check.get(*field).is_none() {
             errors.push(format!("{at}: check \"{check_type}\" needs \"{field}\""));
         }
+    }
+    if READS_NO_FILE.contains(&check_type) && check.get("covers").is_some() {
+        errors.push(format!(
+            "{at}: check \"{check_type}\" cannot declare \"covers\": it reads no file"
+        ));
     }
     if check_type == "commits"
         && falsy(check.get("subject"))
@@ -766,8 +777,8 @@ fn ignored_verify_paths(base: &Base) -> Result<BTreeSet<String>, String> {
 /// the second stage. The trailing group comes last in both cases, so it never
 /// hides the other stage: the findings of `pack_findings` (the pins,
 /// `overrides.json`, one id one source), the `CLAUDE.md` import, the lines
-/// about the `runners` and `workspaces` keys and the tools that runner checks
-/// name (`check_marker_keys`), the line of a git fault of the ignore test of
+/// about the `runners`, `workspaces`, and `review` keys and the tools that
+/// runner checks name (`check_marker_keys`), the line of a git fault of the ignore test of
 /// the `verify` paths, the compression markers, and the archive.
 pub(crate) fn check_base(base: &Base) -> Vec<String> {
     let mut archive_errors = Vec::new();
@@ -1629,6 +1640,90 @@ mod tests {
             )),
             "{errors:#?}"
         );
+    }
+
+    /// `covers` on a check that reads no file is one line, whatever its value:
+    /// a `commits` check reads commit messages and a `report-field` check reads
+    /// a report.
+    #[test]
+    fn covers_is_one_line_on_a_check_that_reads_no_file() {
+        let mut errors = Vec::new();
+        check_shape(
+            &json!({
+                "type": "commits", "level": "warn", "require_trailer": "Work-Item",
+                "covers": true,
+            }),
+            "knowledge/a.json a.trailer",
+            &mut errors,
+        );
+        check_shape(
+            &json!({
+                "type": "report-field", "level": "warn", "if": "**", "field": "concerns",
+                "covers": false,
+            }),
+            "knowledge/a.json a.report",
+            &mut errors,
+        );
+        assert_eq!(
+            errors,
+            [
+                "knowledge/a.json a.trailer: check \"commits\" cannot declare \"covers\": it reads no file",
+                "knowledge/a.json a.report: check \"report-field\" cannot declare \"covers\": it reads no file",
+            ]
+        );
+    }
+
+    /// `covers` on a check that reads files is no line.
+    #[test]
+    fn covers_is_no_line_on_a_check_that_reads_files() {
+        for check in [
+            json!({"type": "grep-absent", "level": "fail", "files": "**", "pattern": "x", "scope": "tree", "covers": true}),
+            json!({"type": "co-change", "level": "warn", "if": "a/**", "then": "b/**", "covers": true}),
+            json!({"type": "diff-append-only", "level": "fail", "files": "**", "covers": true}),
+            json!({"type": "durable-sha", "level": "warn", "files": "**", "covers": true}),
+            json!({"type": "runner", "level": "fail", "tool": "lint", "covers": true}),
+        ] {
+            let mut errors = Vec::new();
+            check_shape(&check, "knowledge/a.json a.b", &mut errors);
+            assert_eq!(errors, Vec::<String>::new(), "{check}");
+        }
+    }
+
+    /// Each check type of the knowledge schema either reads files or reads
+    /// none: `READS_NO_FILE` and the five types below partition the type enum
+    /// of `template/knowledge/schema.json`. A type added to the schema fails
+    /// this test until it takes a side, so that it cannot take `covers` by
+    /// default.
+    #[test]
+    fn covers_is_classified_for_every_check_type_of_the_schema() {
+        const READS_FILES: [&str; 5] = [
+            "grep-absent",
+            "co-change",
+            "diff-append-only",
+            "durable-sha",
+            "runner",
+        ];
+        let schema: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(template_root().join("knowledge/schema.json"))
+                .expect("read the knowledge schema"),
+        )
+        .expect("parse the knowledge schema");
+        let mut types: Vec<&str> = schema
+            .pointer("/$defs/check/properties/type/enum")
+            .and_then(Value::as_array)
+            .expect("the type enum of a check")
+            .iter()
+            .map(|check_type| check_type.as_str().expect("a type name"))
+            .collect();
+        let mut classified: Vec<&str> = READS_NO_FILE
+            .iter()
+            .chain(READS_FILES.iter())
+            .copied()
+            .collect();
+        types.sort_unstable();
+        classified.sort_unstable();
+
+        assert_eq!(classified, types);
     }
 
     /// Reports a topic whose name differs from its file name.

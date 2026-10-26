@@ -4,8 +4,8 @@
 //! module) and `check-commit` call.
 
 use regress::Regex;
-use serde_json::Value;
 
+use crate::published::audit_result::AuditRow;
 use crate::rules::check_shape::{CheckDef, CheckLevel};
 use crate::rules::git::Commit;
 use crate::rules::trailers;
@@ -186,7 +186,7 @@ pub(super) fn run(
     check: &CheckDef,
     ctx: &AuditContext,
     rows: &RowBuilder,
-) -> Result<Value, String> {
+) -> Result<AuditRow, String> {
     let compiled = CommitsCheck::compile(&rows.entry.id, check)?;
     let commits = ctx.commits()?;
     for commit in &commits {

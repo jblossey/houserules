@@ -387,7 +387,7 @@ mod tests {
         write(
             dir.path(),
             ".houserules.json",
-            &json!({"schema": "houserules/install@2.2.0"}),
+            &json!({"schema": "houserules/install@2.3.0"}),
         );
         dir
     }

@@ -10,7 +10,10 @@ use std::path::Path;
 use std::process::{Command, Output};
 
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
+
+mod tracker_support;
+
+use tracker_support::sha256_hex;
 
 /// The kit pack that every case installs.
 const PACK: &str = "quality";
@@ -54,10 +57,7 @@ fn write_json(path: &Path, value: &Value) {
 fn pack_pin(copy: &Value) -> String {
     let mut canonical = copy.clone();
     canonical.sort_all_objects();
-    Sha256::digest(serde_json::to_vec(&canonical).expect("serialize"))
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    sha256_hex(&serde_json::to_vec(&canonical).expect("serialize"))
 }
 
 /// Moves the `version` and the `sha256` of the pin of `<PACK>` in

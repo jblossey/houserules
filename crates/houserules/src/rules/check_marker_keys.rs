@@ -1,8 +1,9 @@
 //! The findings of `check-knowledge` about the keys of `.houserules.json`
-//! that carry the runner and workspace settings (batch 35, spec 3.3 and 7):
-//! the faults of the `runners` and `workspaces` keys, the default location of
-//! the workspaces when git does not ignore it, and each `runner` check that
-//! names a tool the marker does not define.
+//! that carry the runner, workspace, and review settings (batch 35, spec 3.3
+//! and 7; batch 37, spec 6.1): the faults of the `runners`, `workspaces`, and
+//! `review` keys, the default location of the workspaces when git does not
+//! ignore it, and each `runner` check that names a tool the marker does not
+//! define.
 //!
 //! A marker that cannot be read gives nothing here: the pin check, the
 //! kit-citation lint, and the render check each name the defect of the marker.
@@ -20,10 +21,12 @@ use super::model::{Base, CheckField};
 
 /// The findings, in this order: the faults of `runners`, the fault of
 /// `workspaces` or, while the key is not set, the line for an unignored default
-/// location, then one line for each active entry whose `runner` check names
-/// an undefined tool, by entry id, at the file that holds the entry. A
-/// `runner` check with no `tool` names no tool: `check::check_shape` reports
-/// it, for an entry of every source.
+/// location, the faults of `review` (each area of `review.route.areas` that
+/// `knowledge/areas.json` does not define included, in the order of
+/// `Marker::review_in_areas`), then one line for each active entry whose
+/// `runner` check names an undefined tool, by entry id, at the file that holds
+/// the entry. A `runner` check with no `tool` names no tool:
+/// `check::check_shape` reports it, for an entry of every source.
 pub(super) fn findings(base: &Base) -> Vec<String> {
     let Ok(marker) = Marker::read_or_default_for_gate(&base.root, "WI") else {
         return Vec::new();
@@ -33,6 +36,10 @@ pub(super) fn findings(base: &Base) -> Vec<String> {
         Err(line) => findings.push(line),
         Ok(None) => findings.extend(unignored_default_location(&base.root)),
         Ok(Some(_)) => {}
+    }
+    let areas: Vec<&str> = base.areas.iter().map(|(name, _)| name.as_str()).collect();
+    if let Err(lines) = marker.review_in_areas(&areas) {
+        findings.extend(lines);
     }
     let mut entries: Vec<_> = base.entries.values().collect();
     entries.sort_by(|left, right| left.id.cmp(&right.id));
@@ -189,6 +196,88 @@ mod tests {
             findings(&base),
             [
                 "knowledge/packs/demo.json demo.lint: runner tool \"semgrep\" is not defined in .houserules.json runners"
+            ]
+        );
+    }
+
+    /// Rewrites `knowledge/areas.json` of `dir` with the areas `names`, which
+    /// match no path, and loads the base again.
+    fn reload_with_areas(dir: &TempDir, names: &[&str]) -> Base {
+        let areas: serde_json::Map<String, Value> = names
+            .iter()
+            .map(|name| (name.to_string(), json!({"paths": []})))
+            .collect();
+        fs::write(
+            dir.path().join("knowledge/areas.json"),
+            serde_json::to_string(&areas).expect("serialize the areas"),
+        )
+        .expect("write areas.json");
+        crate::rules::load_base(dir.path()).expect("load the base")
+    }
+
+    /// An area of `review.route.areas` that `knowledge/areas.json` does not
+    /// define is one line; an area that it defines gets none.
+    #[test]
+    fn an_area_of_the_review_route_that_areas_json_does_not_define_is_named() {
+        let (dir, _) = base_with(&[]);
+        write_marker(
+            &dir,
+            &json!({"review": {"route": {"areas": {
+                "docs": {"route": "owner-review"},
+                "nowhere": {"route": "owner-review"},
+            }}}}),
+        );
+        let base = reload_with_areas(&dir, &["docs"]);
+
+        assert_eq!(
+            findings(&base),
+            [".houserules.json: review.route.areas.nowhere is not an area of knowledge/areas.json"]
+        );
+    }
+
+    /// An undefined area keeps its line while the key holds another fault:
+    /// the line of the area comes first, in the order of the sections.
+    #[test]
+    fn an_undefined_area_is_named_beside_another_fault_of_the_key() {
+        let (dir, _) = base_with(&[]);
+        write_marker(
+            &dir,
+            &json!({"review": {
+                "route": {"areas": {"nowhere": {"route": "owner-review"}}},
+                "record": {"maxBytes": 100},
+            }}),
+        );
+        let base = reload_with_areas(&dir, &["docs"]);
+
+        assert_eq!(
+            findings(&base),
+            [
+                ".houserules.json: review.route.areas.nowhere is not an area of knowledge/areas.json",
+                ".houserules.json: review.record.maxBytes must be an integer of at least 8192",
+            ]
+        );
+    }
+
+    /// The faults of `review` come after the lines of `runners` and
+    /// `workspaces` and before the lines of undefined tools.
+    #[test]
+    fn the_review_lines_come_after_the_marker_lines_and_before_the_undefined_tools() {
+        let (_dir, base) = base_with_marker(
+            &json!({
+                "runners": {"semgrep": {"command": []}},
+                "workspaces": "/abs",
+                "review": {"route": {"default": "never"}},
+            }),
+            runner_check("other"),
+        );
+
+        assert_eq!(
+            findings(&base),
+            [
+                ".houserules.json: runners.semgrep.command must be a non-empty array of strings",
+                ".houserules.json: workspaces must be a relative path inside the install root",
+                ".houserules.json: review.route.default must be \"owner-review\" or \"senior-review\"",
+                "knowledge/test.json team.lint: runner tool \"other\" is not defined in .houserules.json runners",
             ]
         );
     }

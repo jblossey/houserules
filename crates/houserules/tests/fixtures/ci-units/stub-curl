@@ -1,0 +1,84 @@
+#!/bin/sh
+# A stand-in for curl in the tests of the review units (ci_units.rs).
+#
+# Every call adds one line to $STUB_LOG: the arguments, separated by a space. A
+# call answers from the file $STUB_DIR/replies/<method><path> (every character
+# outside A-Z, a-z, and 0-9 becomes an underscore; the host and the query are
+# left out, and a query with page=<n> for n above 1 adds _page<n>), or with []
+# for a read and {} for a write when no such file exists. The answer goes to the
+# file of --output, else to the output. A file $STUB_DIR/fail/<name> makes that
+# call fail with the exit status 22, as --fail does for an HTTP error; a file
+# $STUB_DIR/refuse-writes does the same for every call but a read. --data @<file>
+# copies the body to $STUB_DIR/input-<number of the call>.
+set -u
+touch "$STUB_LOG"
+count=$(wc -l < "$STUB_LOG")
+count=$((count + 1))
+printf '%s\n' "$*" >> "$STUB_LOG"
+method=GET
+output=
+url=
+data=
+while [ $# -gt 0 ]; do
+  case $1 in
+    --request | -X)
+      method=$2
+      shift 2
+      ;;
+    --output | -o)
+      output=$2
+      shift 2
+      ;;
+    --data | -d | --data-binary)
+      data=$2
+      shift 2
+      ;;
+    --header | -H | --proto | --data-urlencode | --max-time | --connect-timeout)
+      shift 2
+      ;;
+    -*)
+      shift
+      ;;
+    *)
+      url=$1
+      shift
+      ;;
+  esac
+done
+path=${url#*://}
+path=/${path#*/}
+query=
+case $path in
+  *\?*)
+    query=${path#*\?}
+    path=${path%%\?*}
+    ;;
+esac
+suffix=
+case "&$query&" in
+  *"&page="[2-9]*) suffix=_page$(printf '%s' "$query" | sed 's/.*page=\([0-9]*\).*/\1/') ;;
+esac
+name=$(printf '%s%s%s' "$method" "$path" "$suffix" | tr -c 'A-Za-z0-9' '_')
+if [ "$method" != GET ] && [ -e "$STUB_DIR/refuse-writes" ]; then
+  echo "curl: (22) The requested URL returned error: 403" >&2
+  exit 22
+fi
+if [ -e "$STUB_DIR/fail/$name" ]; then
+  echo "curl: (22) The requested URL returned error: 404" >&2
+  exit 22
+fi
+case $data in
+  @*) cp "${data#@}" "$STUB_DIR/input-$count" ;;
+esac
+if [ -f "$STUB_DIR/replies/$name" ]; then
+  reply=$(cat "$STUB_DIR/replies/$name")
+elif [ "$method" = GET ]; then
+  reply='[]'
+else
+  reply='{}'
+fi
+if [ -n "$output" ]; then
+  printf '%s\n' "$reply" > "$output"
+else
+  printf '%s\n' "$reply"
+fi

@@ -43,3 +43,7 @@ A task that changes the implementer template, the task-reviewer template, or an 
 ## 5. Approve
 
 Write the plan to `docs/plans/`. Each factual claim in it about where things live cites the enumeration that found it. Take the plan to the project's owner or decider when they ask for it.
+
+## 6. Keep the plan true
+
+A decision that makes a sentence of the plan false adds a revision note to the plan in the same turn. At batch close, re-read the declared file set of each task (its Files line) and the plan's Global constraints, when it has them, against the tree. Add a revision note for each sentence that no longer holds.

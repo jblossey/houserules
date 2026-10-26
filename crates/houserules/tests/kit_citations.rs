@@ -22,7 +22,10 @@ use std::process::{Command, Output};
 
 use regress::Regex;
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
+
+mod tracker_support;
+
+use tracker_support::sha256_hex;
 
 /// The entry every case below deletes. Two kit-owned files cite it:
 /// `branch-reviewer.md` and the `orchestrating` skill.
@@ -366,10 +369,7 @@ fn install_older_kit_skill(root: &Path, local_edit: bool) {
         older.clone()
     };
     fs::write(root.join(FINISHING_SKILL), text).expect("write the older skill");
-    let hash: String = Sha256::digest(older.as_bytes())
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
+    let hash = sha256_hex(older.as_bytes());
     edit_stamp(root, |stamp| {
         stamp["workflow"]["files"][FINISHING_SKILL] = json!(hash);
     });
@@ -659,10 +659,7 @@ fn retiring_an_uncited_kit_entry_with_an_override_ends_green() {
 fn pack_pin(copy: &Value) -> String {
     let mut canonical = copy.clone();
     canonical.sort_all_objects();
-    Sha256::digest(serde_json::to_vec(&canonical).expect("serialize"))
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    sha256_hex(&serde_json::to_vec(&canonical).expect("serialize"))
 }
 
 /// The kit's `process` pack, as `template/packs/process.json` ships it.

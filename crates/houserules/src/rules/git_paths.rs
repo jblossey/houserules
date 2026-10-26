@@ -10,12 +10,13 @@
 //! itself.
 //!
 //! This module is also the one module that runs `git ls-files`. The binary
-//! holds three listings: [`tracked_files`] (the index), [`listed_by_name`]
-//! (the files of one name, tracked or untracked and not ignored), and
-//! [`submodule_paths`] (the submodules of the index). Each caller keeps its
-//! own handling of a failure and of a path that is no UTF-8. A lint test
-//! (`tests/ls_files_home.rs`) fails when another module passes the `ls-files`
-//! argument to git.
+//! holds four listings: [`tracked_files`] (the index below the working
+//! directory), [`tracked_from_top_level`] (the index of the whole repository),
+//! [`listed_by_name`] (the files of one name, tracked or untracked and not
+//! ignored), and [`submodule_paths`] (the submodules of the index). Each
+//! caller keeps its own handling of a failure and of a path that is no UTF-8.
+//! A lint test (`tests/ls_files_home.rs`) fails when another module passes the
+//! `ls-files` argument to git.
 
 use std::io;
 use std::path::Path;
@@ -47,7 +48,7 @@ impl InstallPrefix {
     }
 
     /// The prefix as git prints it: `sub/`, empty at the top level.
-    pub(super) fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         &self.0
     }
 
@@ -123,6 +124,40 @@ pub(crate) fn tracked_files(root: &Path) -> Option<(Vec<String>, Vec<String>)> {
         }
     }
     Some((files, skipped))
+}
+
+/// Every path of the index of the repository that holds `root`, whatever the
+/// directory `root` is: `/`-separated, from the git top level, in the order git
+/// prints them (`ls-files --full-name -- :/`). A subdirectory install sees the
+/// files outside its own root too. A path that is no UTF-8 is left out: the
+/// callers read files that houserules wrote, and the path of such a file is a
+/// JSON string. A failure is one line: the error of the operating system when
+/// git does not run, else git's own first line.
+pub(crate) fn tracked_from_top_level(root: &Path) -> Result<Vec<String>, String> {
+    let output = Command::new("git")
+        .args(["ls-files", "-z", "--full-name", "--", ":/"])
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("cannot run git: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let line = stderr
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .unwrap_or("git ls-files failed");
+        return Err(format!(
+            "cannot list the tracked files of the repository at {}: {line}",
+            root.display()
+        ));
+    }
+    Ok(output
+        .stdout
+        .split(|&byte| byte == 0)
+        .filter(|entry| !entry.is_empty())
+        .filter_map(|entry| std::str::from_utf8(entry).ok())
+        .map(str::to_string)
+        .collect())
 }
 
 /// Why [`listed_by_name`] gave no listing.
@@ -361,6 +396,109 @@ mod tests {
         assert!(
             matches!(&failure, ListingFailure::Failed(line) if *line == expected),
             "{failure:?}"
+        );
+    }
+
+    /// The listing from the top level holds every tracked path of the
+    /// repository, whatever the directory it runs in: a subdirectory sees the
+    /// paths outside itself too, and an untracked file is no entry.
+    #[test]
+    fn tracked_from_top_level_lists_the_whole_index_from_a_subdirectory() {
+        let repo = scratch_repo();
+        let root = repo.path();
+        for (path, text) in [
+            ("top.txt", "top\n"),
+            ("sub/in.txt", "in\n"),
+            ("other/out.txt", "out\n"),
+            ("untracked.txt", "untracked\n"),
+        ] {
+            let path = root.join(path);
+            std::fs::create_dir_all(path.parent().expect("a parent")).expect("create the folder");
+            std::fs::write(&path, text).expect("write the file");
+        }
+        let status = Command::new("git")
+            .args(["add", "top.txt", "sub", "other"])
+            .current_dir(root)
+            .status()
+            .expect("run git add");
+        assert!(status.success(), "git add failed");
+
+        let mut listed = tracked_from_top_level(&root.join("sub")).expect("a listing");
+        listed.sort();
+
+        assert_eq!(listed, ["other/out.txt", "sub/in.txt", "top.txt"]);
+        let mut from_top = tracked_from_top_level(root).expect("a listing");
+        from_top.sort();
+        assert_eq!(from_top, listed);
+    }
+
+    /// A path that is no UTF-8 is left out; the others stay. The entry is seeded
+    /// through the index, because not every file system takes the name.
+    #[cfg(unix)]
+    #[test]
+    fn tracked_from_top_level_leaves_out_a_path_that_is_no_utf8() {
+        use std::os::unix::ffi::OsStrExt;
+        use std::process::Stdio;
+
+        let repo = scratch_repo();
+        let root = repo.path();
+        let blob = Command::new("git")
+            .args(["hash-object", "-w", "--stdin"])
+            .current_dir(root)
+            .stdin(Stdio::null())
+            .output()
+            .expect("run git hash-object");
+        assert!(blob.status.success(), "git hash-object failed");
+        let blob = String::from_utf8(blob.stdout).expect("an object id");
+        for raw in [&b"caf\xe9.txt"[..], b"plain.txt"] {
+            let status = Command::new("git")
+                .args([
+                    "update-index",
+                    "--add",
+                    "--cacheinfo",
+                    "100644",
+                    blob.trim(),
+                ])
+                .arg(std::ffi::OsStr::from_bytes(raw))
+                .current_dir(root)
+                .status()
+                .expect("run git update-index");
+            assert!(status.success(), "git update-index failed");
+        }
+
+        assert_eq!(
+            tracked_from_top_level(root).expect("a listing"),
+            ["plain.txt"]
+        );
+    }
+
+    /// A directory that is no work tree is a failure that holds the first line
+    /// of git's own message. The message follows the host locale, so the test
+    /// reads the expected line from git in the same directory.
+    #[test]
+    fn tracked_from_top_level_fails_with_the_first_line_of_gits_message_outside_a_work_tree() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let message = Command::new("git")
+            .arg("ls-files")
+            .current_dir(dir.path())
+            .output()
+            .expect("run git ls-files")
+            .stderr;
+        let expected = String::from_utf8_lossy(&message)
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .expect("git names the failure")
+            .to_string();
+
+        let error = tracked_from_top_level(dir.path()).expect_err("a failure");
+
+        assert_eq!(
+            error,
+            format!(
+                "cannot list the tracked files of the repository at {}: {expected}",
+                dir.path().display()
+            )
         );
     }
 

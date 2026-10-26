@@ -1,0 +1,14 @@
+{
+  "source": "spec-kit",
+  "ref": "001-rate-limit",
+  "title": "Feature Specification: Rate limiting",
+  "why": "Limit the requests of each API client so that one noisy client cannot starve the rest.",
+  "tasks": { "done": 1, "total": 3 },
+  "requirements": { "added": null, "modified": null, "removed": null, "renamed": null, "total": 3 },
+  "validation": null,
+  "artifacts": [
+    "specs/001-rate-limit/plan.md",
+    "specs/001-rate-limit/spec.md",
+    "specs/001-rate-limit/tasks.md"
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jblossey.github.io/houserules/schemas/capture/1.0.0.json",
+  "title": "Capture header",
+  "description": "The header of a capture file: line 1, one JSON object whose keys follow the order of the fields.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "description": "The schema id, `houserules/capture@1.0.0` when `capture` writes it.",
+      "type": "string",
+      "const": "houserules/capture@1.0.0"
+    },
+    "argv": {
+      "description": "The command and its arguments.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cwd": {
+      "description": "The absolute current directory of the run.",
+      "type": "string"
+    },
+    "start": {
+      "description": "The start of the run: RFC 3339 in UTC with nine fractional digits.",
+      "type": "string"
+    },
+    "end": {
+      "description": "The end of the run, in the form of `start`.",
+      "type": "string"
+    },
+    "exit": {
+      "description": "The exit code, or `null` when a signal ended the command.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int32"
+    },
+    "signal": {
+      "description": "The signal number that ended the command, or `null`.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int32"
+    },
+    "head": {
+      "description": "The full sha of HEAD, or `null` outside a git work tree (a `.git` directory and a bare repository count as outside), before the first commit, and when `git status` fails.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "dirty": {
+      "description": "Whether `git status --porcelain` printed a line; `null` exactly when `head` is `null`.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "lossy": {
+      "description": "The number of byte sequences that were not UTF-8 and that `capture` replaced with U+FFFD.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "schema",
+    "argv",
+    "cwd",
+    "start",
+    "end",
+    "exit",
+    "signal",
+    "head",
+    "dirty",
+    "lossy"
+  ]
+}

@@ -129,7 +129,7 @@ fn read_file(dir: &Path, relative: &str) -> Vec<u8> {
 }
 
 /// A scratch repository that a real 1.4.0 `init` seeded, with a GitHub
-/// `origin` first so that `init` seeds the CI workflow.
+/// `origin` first so that the `init` of 1.4.0 seeds the CI workflow.
 fn install_1_4_0() -> tempfile::TempDir {
     let dir = scratch_git_repo();
     git(

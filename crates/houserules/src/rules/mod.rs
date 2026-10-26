@@ -21,9 +21,11 @@
 //! `validate_deliverable.rs`'s own
 //! module docs for the data-layer reasoning). `check_shape::CheckDef`
 //! wires into `model::Entry.check` and the audit engine (`audit`).
-//! `stats` composes two more modules: `cost` (the measurements of one
-//! workspace and the `workspaces` and `cost` keys) and `proposals` (the
-//! `rules` and `proposals` keys, rated against the loaded knowledge base).
+//! `stats` composes three more modules: `cost` (the measurements of one
+//! workspace and the `workspaces` and `cost` keys), `proposals` (the
+//! `rules` and `proposals` keys, rated against the loaded knowledge base), and
+//! `review_coverage` (the `review_coverage` key of `--records`, counted from the
+//! change records of a range).
 //! `test_support` (test builds only) holds the knowledge-base fixtures
 //! those two modules' tests share.
 //!
@@ -43,7 +45,8 @@
 //! module and `backlog` both -- see that file's own doc for why the flat
 //! surface's `get` cannot live in either feature module. `git` is the git
 //! plumbing of a range (`rev`, `git_diff`, `commits_in`, and the other
-//! readers), and `runner` holds one module per check type behind a row
+//! readers) and the one place that starts `git`, which the review modules
+//! build their calls on too, and `runner` holds one module per check type behind a row
 //! builder (`runner::run`, which `audit` calls for each entry with a
 //! check). `check_commit` reuses `runner`'s `CommitsCheck` and `git`'s
 //! `rev` and `commits_in` for its per-commit evaluation and range reading
@@ -72,7 +75,9 @@
 //! subprocesses that decide whether a candidate resolves to a commit
 //! reachable from the check's own `--base`), reusing `git`'s own
 //! `git_diff`/`range` rather than a second diff invocation
-//! (`durable_sha.rs`'s own module doc has the full account; HR-120).
+//! (`durable_sha.rs`'s own module doc has the full account; HR-120). It is
+//! also the one place that looks for the default branch, and gives
+//! `houserules ci` its name (`default_branch_name`).
 //!
 //! No command in this binary ever constructs or strictly parses a
 //! schema-exact deliverable: `validate_deliverable` validates every
@@ -82,9 +87,9 @@
 //! documents; and `audit`'s own JSON output is not itself one of the
 //! four schema-defined deliverable kinds at all (its judged rows carry
 //! `result: "open"`, a value the schema's `auditRow.result` enum forbids
-//! -- `audit.rs`'s own module doc has the full account). `check_shape.rs`'s
-//! `CheckDef` is the one model layer with a real, direct consumer
-//! (`model::Entry.check`, `runner::run`).
+//! -- `audit.rs`'s own module doc has the full account). It is the typed
+//! `published::audit_result::AuditResult`. `check_shape.rs`'s `CheckDef` is
+//! the model layer of the checks (`model::Entry.check`, `runner::run`).
 
 mod audit;
 mod budget;
@@ -96,7 +101,7 @@ mod check_shape;
 mod cost;
 mod deliverable;
 mod durable_sha;
-mod git;
+pub(crate) mod git;
 mod git_paths;
 mod glob;
 mod ignored;
@@ -106,6 +111,7 @@ mod model;
 mod proposals;
 mod read;
 mod render;
+mod review_coverage;
 mod runner;
 mod stats;
 #[cfg(test)]
@@ -113,12 +119,14 @@ mod test_support;
 mod trailers;
 mod validate_deliverable;
 
-pub(crate) use audit::cmd_audit;
+pub(crate) use audit::{audit_result, cmd_audit};
 pub(crate) use check::{cmd_check_knowledge, skipped_path_line, tracked_tree_files, validate};
 pub(crate) use check_commit::cmd_check_commit;
 pub(crate) use check_packs::{imports_agents_md, pin_mismatch_line};
+pub(crate) use durable_sha::default_branch_name;
 pub(crate) use git_paths::{
     InstallPrefix, ListingFailure, listed_by_name, submodule_paths, tracked_files,
+    tracked_from_top_level,
 };
 pub(crate) use glob::compile;
 pub(crate) use ignored::ignored_among;

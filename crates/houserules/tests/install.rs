@@ -87,9 +87,6 @@ const TRACKER_FILES: &[&str] = &[
     "backlog/schema.json",
 ];
 
-/// The CI workflow, the one D3 file that only a GitHub-hosted target gets.
-const GITHUB_HOSTED_SEED_ONCE: &[&str] = &[".github/workflows/knowledge.yml"];
-
 /// The `KIT_OWNED` files that only the Claude renderer needs --
 /// `install/mod.rs`'s own `CLAUDE_FILES`. `init` leaves them out without
 /// `--target claude`.
@@ -138,6 +135,10 @@ fn seeded_once() -> impl Iterator<Item = &'static &'static str> {
 /// The line `init` prints when the Claude renderer is off.
 const ENABLE_CLAUDE_LINE: &str =
     "for Claude Code: run houserules init --target claude in the install root";
+
+/// The line `init` prints on a repository with no `origin`: it writes no CI
+/// file, and no host is detected (spec 10.7).
+const NO_CI_FILE_LINE: &str = "init: houserules wrote no CI file; to run the gates and the review layer in your pipeline, run houserules ci print --host github or gitlab";
 
 /// `env!("CARGO_PKG_VERSION")` at THIS test binary's own compile time --
 /// the same value `install::kit_version` bakes in for the binary under
@@ -281,21 +282,12 @@ fn files_takes_no_dir_flag() {
 }
 
 /// The lines `init` prints after the kit-owned and seed-once files and the
-/// packs, on a repository with no `origin`: the `.gitignore` of the step, the
-/// skipped workflow, then (when `claude`) the settings file, then the render
-/// lines: the block of the AGENTS.md renderer, and with `claude` the files of
-/// the Claude renderer. The `knowledge-base` pack alone gives no directory
-/// block.
+/// packs: the `.gitignore` of the step, then (when `claude`) the settings file,
+/// then the render lines: the block of the AGENTS.md renderer, and with `claude`
+/// the files of the Claude renderer. The `knowledge-base` pack alone gives no
+/// directory block.
 fn expected_tail_lines(claude: bool) -> Vec<String> {
-    // `scratch_git_repo` configures no `origin` remote, so the
-    // GitHub-hosted-only file is skipped, not written -- a fresh scratch
-    // repository is never GitHub-hosted.
     let mut lines = vec!["wrote .gitignore".to_string()];
-    lines.extend(GITHUB_HOSTED_SEED_ONCE.iter().map(|file| {
-        format!(
-            "skipped {file} (origin is not GitHub-hosted; see the migrating-knowledge skill to add your own CI gate)"
-        )
-    }));
     if claude {
         lines.push("wrote .claude/settings.json".to_string());
     }
@@ -341,6 +333,7 @@ fn init_into_a_fresh_repo_writes_every_kit_owned_and_seed_once_file_then_renders
     expected_lines.extend(expected_tail_lines(false));
     expected_lines.push(format!("houserules: initialized {}", dir.path().display()));
     expected_lines.push(ENABLE_CLAUDE_LINE.to_string());
+    expected_lines.push(NO_CI_FILE_LINE.to_string());
     expected_lines.push("next: houserules check-knowledge && houserules check-backlog".to_string());
     let actual_lines: Vec<&str> = stdout.lines().collect();
     assert_eq!(actual_lines, expected_lines);
@@ -351,12 +344,10 @@ fn init_into_a_fresh_repo_writes_every_kit_owned_and_seed_once_file_then_renders
     for file in CLAUDE_FILES.iter().chain(TOPIC_FILES).chain(TRACKER_FILES) {
         assert!(!dir.path().join(file).exists(), "{file} was written");
     }
-    for file in GITHUB_HOSTED_SEED_ONCE {
-        assert!(
-            !dir.path().join(file).exists(),
-            "{file} was written into a non-GitHub-hosted target"
-        );
-    }
+    assert!(
+        !dir.path().join(".github").exists(),
+        "init writes no CI file"
+    );
     assert!(
         !dir.path().join(".claude/settings.json").exists(),
         "the hook entry needs the Claude renderer"
@@ -390,6 +381,7 @@ fn init_target_claude_into_a_fresh_repo_writes_every_kit_owned_and_seed_once_fil
     );
     expected_lines.extend(expected_tail_lines(true));
     expected_lines.push(format!("houserules: initialized {}", dir.path().display()));
+    expected_lines.push(NO_CI_FILE_LINE.to_string());
     expected_lines.push("next: houserules check-knowledge && houserules check-backlog".to_string());
     let actual_lines: Vec<&str> = stdout.lines().collect();
     assert_eq!(actual_lines, expected_lines);
@@ -618,9 +610,8 @@ fn init_stamps_the_marker_with_the_kit_version_and_the_default_id_prefix() {
 /// install's own content trivially matches the payload it was just written
 /// from) and for the two schemas that are D3 files, `knowledge/schema.json` and
 /// `.claude/schemas/deliverables.json`, and for no knowledge entry: the kit's
-/// rules come as packs, whose pins replace the per-entry baselines. The seeded
-/// workflow is baselined too, but only when `init` writes it, which needs a
-/// GitHub-hosted origin.
+/// rules come as packs, whose pins replace the per-entry baselines. `init`
+/// seeds no CI workflow, so no workflow is baselined.
 fn assert_baselines_are_the_paths_init_wrote(marker: &serde_json::Value) {
     let baselines = marker["baselines"]
         .as_object()
@@ -1155,16 +1146,10 @@ fn a_second_init_keeps_every_file_that_exists_a_changed_kit_owned_file_included(
             "a second init names the pack copy {pack} in:\n{stdout}"
         );
     }
-    // No `origin` remote is configured, so both the first and second
-    // `init` skip the GitHub-hosted-only file the same way.
-    for file in GITHUB_HOSTED_SEED_ONCE {
-        assert!(
-            stdout.contains(&format!(
-                "skipped {file} (origin is not GitHub-hosted; see the migrating-knowledge skill to add your own CI gate)\n"
-            )),
-            "expected `skipped {file}` in:\n{stdout}"
-        );
-    }
+    assert!(
+        stdout.contains(&format!("{NO_CI_FILE_LINE}\n")),
+        "expected the no-CI-file line in:\n{stdout}"
+    );
     for file in KIT_OWNED {
         assert!(
             stdout.contains(&format!("kept {file}\n")),

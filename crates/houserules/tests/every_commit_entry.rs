@@ -16,11 +16,10 @@ use std::fs;
 use std::path::Path;
 
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 use tracker_support::{
-    assert_output, commit_all, edit_marker, git, read_json, run, run_ok, scratch_git_repo, stderr,
-    stdout, write_json,
+    assert_output, commit_all, edit_marker, git, read_json, run, run_ok, scratch_git_repo,
+    sha256_hex, stderr, stdout, write_json,
 };
 use tree_snapshot::{assert_same_tree, snapshot};
 
@@ -158,10 +157,7 @@ fn as_a_batch_33_install_holds_it(dir: &Path) {
     write_json(dir, "knowledge/packs/process.json", &copy);
     let mut canonical = copy.clone();
     canonical.sort_all_objects();
-    let sha: String = Sha256::digest(serde_json::to_vec(&canonical).expect("serialize"))
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
+    let sha = sha256_hex(&serde_json::to_vec(&canonical).expect("serialize"));
     edit_marker(dir, |marker| {
         let pin = marker
             .get_mut("packs")

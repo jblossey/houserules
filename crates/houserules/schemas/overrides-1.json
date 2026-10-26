@@ -257,6 +257,9 @@
                 },
                 "covers_ids": {
                   "type": "boolean"
+                },
+                "covers": {
+                  "type": "boolean"
                 }
               }
             }

@@ -26,6 +26,19 @@ pub(crate) enum Glob {
     Many(Vec<String>),
 }
 
+impl Glob {
+    /// Every pattern of the glob, in the order of the entry.
+    fn patterns(&self) -> Vec<String> {
+        match self {
+            Glob::One(pattern) => vec![pattern.clone()],
+            Glob::Many(patterns) => patterns.clone(),
+        }
+    }
+}
+
+/// The `files` of a `runner` check that names none: every file.
+pub(crate) const ALL_FILES: &str = "**";
+
 /// A knowledge entry's `check.type` -- which deterministic check
 /// `runner::run` runs, and which of `CheckDef`'s other fields it reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,6 +138,40 @@ pub(crate) struct CheckDef {
     /// The `covers_ids` option of a `report-field` check.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub covers_ids: Option<bool>,
+    /// Whether the check counts as coverage: a changed file that a covering
+    /// check read is covered (batch 37, spec 4.4). Absent reads as `false`.
+    /// A `commits` and a `report-field` check read no file, so
+    /// `check-knowledge` refuses the key on them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub covers: Option<bool>,
+}
+
+impl CheckDef {
+    /// The globs of the files that the check reads, when it declares
+    /// `covers: true`; empty for any other check. A `grep-absent`,
+    /// `diff-append-only`, `durable-sha`, or `runner` check reads its `files`
+    /// (a `runner` check with no `files` reads every file); a `co-change`
+    /// check reads its `if` and `then` files; a `commits` or `report-field`
+    /// check reads no file (spec 4.4).
+    pub(crate) fn covered_globs(&self) -> Vec<String> {
+        if self.covers != Some(true) {
+            return Vec::new();
+        }
+        let patterns = |glob: &Option<Glob>| glob.as_ref().map(Glob::patterns).unwrap_or_default();
+        match self.kind {
+            CheckType::GrepAbsent | CheckType::DiffAppendOnly | CheckType::DurableSha => {
+                patterns(&self.files)
+            }
+            CheckType::Runner if self.files.is_none() => vec![ALL_FILES.to_string()],
+            CheckType::Runner => patterns(&self.files),
+            CheckType::CoChange => {
+                let mut globs = patterns(&self.if_changed);
+                globs.extend(patterns(&self.then));
+                globs
+            }
+            CheckType::Commits | CheckType::ReportField => Vec::new(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -152,7 +199,7 @@ mod tests {
     /// `pattern`, `flags`, `scope`, `subject`, `body_absent`,
     /// `body_line_max`, `require_trailer`, `exempt_authors`,
     /// `exempt_subjects`, `if`, `then`, `per_commit`, `field`, `tool`,
-    /// `non_empty`, `covers_ids`, plus `type`/`level`).
+    /// `non_empty`, `covers_ids`, `covers`, plus `type`/`level`).
     fn full_sample() -> Value {
         json!({
             "type": "report-field",
@@ -174,6 +221,7 @@ mod tests {
             "tool": "semgrep",
             "non_empty": true,
             "covers_ids": true,
+            "covers": true,
         })
     }
 
@@ -234,5 +282,72 @@ mod tests {
             parsed.files,
             Some(super::Glob::One("knowledge/**".to_string()))
         );
+    }
+
+    /// The check that `value` describes.
+    fn check(value: Value) -> CheckDef {
+        serde_json::from_value(value).expect("a check")
+    }
+
+    #[test]
+    fn a_check_that_does_not_declare_covers_reads_no_file_for_coverage() {
+        for covers in [json!({}), json!({"covers": false})] {
+            let mut value = json!({"type": "grep-absent", "level": "fail", "files": "src/**"});
+            value
+                .as_object_mut()
+                .expect("object")
+                .extend(covers.as_object().expect("object").clone());
+
+            assert_eq!(check(value).covered_globs(), Vec::<String>::new());
+        }
+    }
+
+    #[test]
+    fn the_files_of_a_covering_check_are_the_files_it_reads() {
+        for kind in ["grep-absent", "diff-append-only", "durable-sha"] {
+            let one =
+                check(json!({"type": kind, "level": "fail", "files": "src/**", "covers": true}));
+            let many = check(json!({
+                "type": kind, "level": "warn", "files": ["a/**", "b/*.rs"], "covers": true
+            }));
+
+            assert_eq!(one.covered_globs(), ["src/**"], "{kind}");
+            assert_eq!(many.covered_globs(), ["a/**", "b/*.rs"], "{kind}");
+        }
+    }
+
+    #[test]
+    fn a_covering_co_change_check_reads_its_if_and_then_files() {
+        let covering = check(json!({
+            "type": "co-change", "level": "fail", "if": "src/lib.rs",
+            "then": ["tests/a.rs", "tests/b.rs"], "covers": true
+        }));
+
+        assert_eq!(
+            covering.covered_globs(),
+            ["src/lib.rs", "tests/a.rs", "tests/b.rs"]
+        );
+    }
+
+    #[test]
+    fn a_covering_runner_check_with_no_files_reads_every_file() {
+        let every = check(json!({"type": "runner", "level": "fail", "tool": "t", "covers": true}));
+        let some = check(json!({
+            "type": "runner", "level": "fail", "tool": "t", "files": "**/*.rs", "covers": true
+        }));
+
+        assert_eq!(every.covered_globs(), ["**"]);
+        assert_eq!(some.covered_globs(), ["**/*.rs"]);
+    }
+
+    #[test]
+    fn a_commits_or_report_field_check_reads_no_file_whatever_it_declares() {
+        let commits = check(json!({"type": "commits", "level": "fail", "covers": true}));
+        let report = check(json!({
+            "type": "report-field", "level": "fail", "if": "**", "field": "f", "covers": true
+        }));
+
+        assert_eq!(commits.covered_globs(), Vec::<String>::new());
+        assert_eq!(report.covered_globs(), Vec::<String>::new());
     }
 }

@@ -253,6 +253,18 @@ const ROOT_RESOLVING_COMMANDS: &[&[&str]] = &[
     &["check-report-claims", "r.json"],
     &["report-facts", "r.json", "--base", "HEAD"],
     &["archive"],
+    &["route", "--base", "HEAD"],
+    &["evidence", "--base", "HEAD"],
+    &[
+        "bundle", "check", "--body", "b.md", "--base", "HEAD", "--head", "HEAD",
+    ],
+    &["ci", "print", "--host", "github"],
+    &["ci", "write", "--host", "github", "--sha", "x"],
+    &["record", "write", "--base", "HEAD", "--head", "HEAD"],
+    &["record", "show", "HEAD"],
+    &["record", "list"],
+    &["record", "audit", "HEAD", "--verdict", "pass", "--by", "x"],
+    &["stats", "--records", "HEAD"],
     &["pack", "list"],
     &["pack", "add", "x"],
     &["pack", "remove", "x"],
@@ -263,6 +275,11 @@ const ROOT_RESOLVING_COMMANDS: &[&[&str]] = &[
 /// repository, `capture` reads no install and takes no `--dir`, `init` and
 /// `update` resolve `--dir` like Node's `path.resolve` and never an enclosing
 /// repository (`install/mod.rs`'s own module doc), and `help` is clap's own.
+/// `bundle` is not in this list: `bundle check` resolves its root and has its
+/// entry above, and `bundle write` takes no `--dir` (spec 7.2), so it has no
+/// entry in `ROOT_RESOLVING_COMMANDS`. `ci` is not in it either: `ci print` and
+/// `ci write` both resolve their root and have their entries above, and so do
+/// `record write`, `record show`, `record list`, and `record audit`.
 const NOT_ROOT_RESOLVING: &[&str] = &["files", "capture", "init", "update", "help"];
 
 /// `ROOT_RESOLVING_COMMANDS` names every subcommand `--help` lists except

@@ -7,7 +7,13 @@
 //! This module reads the files and keeps the four original keys
 //! (`violations`, `unused_ids`, `audits`, `reviews`) and the `sanctioned`
 //! list. `cost.rs` renders the `workspaces`, `models`, and `cost` keys;
-//! `proposals.rs` renders `rules`, `packs`, and `proposals`.
+//! `proposals.rs` renders `rules`, `packs`, and `proposals`;
+//! `review_coverage.rs` renders the `review_coverage` key of `--records`.
+//!
+//! A ledger line is a reversal when it starts with `Reversal:` after optional
+//! spaces and an optional list marker. `stats` warns on stderr about each other
+//! line that holds `Reversal:` (spec 11.6): the count of a workspace stays the
+//! number of reversals.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
@@ -25,6 +31,7 @@ use super::deliverable::{
 };
 use super::model::{Base, load_base};
 use super::proposals;
+use super::review_coverage::review_coverage;
 
 /// Records that task `task` triggered (or violated) rule `id`,
 /// deduplicating repeats.
@@ -190,6 +197,9 @@ struct Tally {
     audit_files: usize,
     audit_tasks: HashSet<String>,
     review_files: usize,
+    /// The lines for stderr, in the order of the workspaces and of the ledger
+    /// lines (see [`count_reversals`]).
+    warnings: Vec<String>,
 }
 
 /// Reads the deliverables of one workspace into a `Workspace`, feeding
@@ -556,13 +566,36 @@ fn is_reversal(line: &str) -> bool {
     line.starts_with("Reversal:")
 }
 
-/// Counts the reversals that the `progress.md` of the workspace `dir` records.
-/// A workspace with no such file has none; a file that cannot be read as text
-/// is a named error with the operating system's own text.
-fn count_reversals(dir: &Path) -> Result<usize, String> {
+/// The text after `<ledger>:<line>: ` of the warning for a ledger line that
+/// holds `Reversal:` and is no reversal (spec 11.6).
+const EMBEDDED_REVERSAL: &str =
+    "a Reversal: inside a longer entry; stats counts only a line that starts with it";
+
+/// Whether `line` holds `Reversal:` and is no reversal: the word sits inside a
+/// longer entry, and the count leaves the line out.
+fn embeds_a_reversal(line: &str) -> bool {
+    !is_reversal(line) && line.contains("Reversal:")
+}
+
+/// Counts the reversals that the `progress.md` of the workspace `dir` records,
+/// and adds to `warnings` one line for each ledger line that embeds a reversal:
+/// `<ledger>:<line>: ` and [`EMBEDDED_REVERSAL`], with the line number counted
+/// from 1. A workspace with no such file has none; a file that cannot be read as
+/// text is a named error with the operating system's own text.
+fn count_reversals(dir: &Path, warnings: &mut Vec<String>) -> Result<usize, String> {
     let path = dir.join(PROGRESS_FILE);
     match fs::read_to_string(&path) {
-        Ok(text) => Ok(text.lines().filter(|line| is_reversal(line)).count()),
+        Ok(text) => {
+            warnings.extend(
+                text.lines()
+                    .enumerate()
+                    .filter(|(_, line)| embeds_a_reversal(line))
+                    .map(|(index, _)| {
+                        format!("{}:{}: {EMBEDDED_REVERSAL}", path.display(), index + 1)
+                    }),
+            );
+            Ok(text.lines().filter(|line| is_reversal(line)).count())
+        }
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(0),
         Err(error) => Err(format!("{}: {error}", path.display())),
     }
@@ -594,7 +627,7 @@ fn read_workspace(
     read_branch_review(&reader, &mut workspace)?;
     read_spec_reviews(&reader, &files.spec_reviews, &mut workspace)?;
     read_reports(&reader, &files.reports, tally, &mut workspace)?;
-    workspace.reversals = count_reversals(source.given)?;
+    workspace.reversals = count_reversals(source.given, &mut tally.warnings)?;
     workspace.sum_models();
     Ok(workspace)
 }
@@ -644,7 +677,14 @@ fn sanctioned_json(workspaces: &[Workspace]) -> Vec<Value> {
 /// `sanctioned` count, and in neither `violations` nor the rule's `fails`. It
 /// fires the rule for every proposal all the same, as a fail did before the
 /// sanction existed.
-pub(super) fn stats(dirs: &[PathBuf], base: &Base, window: Option<usize>) -> Result<Value, String> {
+///
+/// The warnings are the lines that the command prints on stderr: one for each
+/// ledger line that embeds a `Reversal:` (see [`count_reversals`]).
+pub(super) fn stats(
+    dirs: &[PathBuf],
+    base: &Base,
+    window: Option<usize>,
+) -> Result<Outcome, String> {
     let sources = resolve_sources(dirs, window)?;
     let prefix_tasks = sources.len() > 1;
     let mut tally = Tally::default();
@@ -666,7 +706,7 @@ pub(super) fn stats(dirs: &[PathBuf], base: &Base, window: Option<usize>) -> Res
         .collect();
     let rows = proposals::rule_rows(&workspaces, base);
 
-    Ok(json!({
+    let value = json!({
         "violations": violations_json,
         "unused_ids": unused_ids_json,
         "audits": {"files": tally.audit_files, "tasks": tally.audit_tasks.len()},
@@ -678,7 +718,21 @@ pub(super) fn stats(dirs: &[PathBuf], base: &Base, window: Option<usize>) -> Res
         "rules": proposals::rules_json(&rows),
         "packs": proposals::packs_json(base, &rows, &tally.violations),
         "proposals": proposals::proposals(&rows),
-    }))
+    });
+    Ok(Outcome {
+        value,
+        warnings: tally.warnings,
+    })
+}
+
+/// What `stats` aggregated: the JSON result for stdout and the warnings for
+/// stderr.
+#[derive(Debug)]
+pub(super) struct Outcome {
+    /// The aggregated keys.
+    pub(super) value: Value,
+    /// The warning lines, in the order of the workspaces.
+    pub(super) warnings: Vec<String>,
 }
 
 /// Runs the `stats` subcommand: refuses a `window` of 0, resolves `root`
@@ -686,11 +740,16 @@ pub(super) fn stats(dirs: &[PathBuf], base: &Base, window: Option<usize>) -> Res
 /// before it reads any workspace -- so a repository whose knowledge base
 /// fails to load fails `stats` too, not only `audit` -- then runs `stats`
 /// over the `window` most recent of `workspaces`, or all of them with no
-/// window, and prints its JSON result.
+/// window, prints its warnings on stderr, and prints its JSON result.
+///
+/// With `records`, the result also holds the key `review_coverage` for the
+/// change records whose key is in that range (spec 8.3). With no workspace, it
+/// holds that key alone, and the command reads no knowledge base: it reads git.
 pub(crate) fn cmd_stats(
     dir: Option<PathBuf>,
     workspaces: Vec<PathBuf>,
     window: Option<usize>,
+    records: Option<String>,
 ) -> ExitCode {
     if window == Some(0) {
         eprintln!("--window must be 1 or more");
@@ -700,23 +759,38 @@ pub(crate) fn cmd_stats(
         Ok(root) => root,
         Err(code) => return code,
     };
-    let base = match load_base(&root) {
-        Ok(base) => base,
-        Err(error) => {
-            eprintln!("{error}");
-            return ExitCode::from(2);
+    let (mut value, warnings) = if workspaces.is_empty() {
+        (json!({}), Vec::new())
+    } else {
+        let base = match load_base(&root) {
+            Ok(base) => base,
+            Err(error) => {
+                eprintln!("{error}");
+                return ExitCode::from(2);
+            }
+        };
+        match stats(&workspaces, &base, window) {
+            Ok(outcome) => (outcome.value, outcome.warnings),
+            Err(error) => {
+                eprintln!("{error}");
+                return ExitCode::from(2);
+            }
         }
     };
-    match stats(&workspaces, &base, window) {
-        Ok(value) => {
-            print!("{}", emit(&value));
-            ExitCode::SUCCESS
-        }
-        Err(error) => {
-            eprintln!("{error}");
-            ExitCode::from(2)
+    if let Some(range) = records {
+        match review_coverage(&root, &range) {
+            Ok(coverage) => value["review_coverage"] = coverage,
+            Err(error) => {
+                eprintln!("{error}");
+                return ExitCode::from(2);
+            }
         }
     }
+    for warning in warnings {
+        eprintln!("{warning}");
+    }
+    print!("{}", emit(&value));
+    ExitCode::SUCCESS
 }
 
 #[cfg(test)]
@@ -742,7 +816,7 @@ mod tests {
     fn run_with(entries: &[Value], dirs: &[&Path]) -> Value {
         let (_guard, base) = base_with(entries);
         let dirs: Vec<PathBuf> = dirs.iter().map(|dir| dir.to_path_buf()).collect();
-        stats(&dirs, &base, None).unwrap()
+        stats(&dirs, &base, None).unwrap().value
     }
 
     fn run(dirs: &[&Path]) -> Value {
@@ -1745,7 +1819,9 @@ mod tests {
             &[],
         );
 
-        let value = stats(std::slice::from_ref(&dir), &base, None).unwrap();
+        let value = stats(std::slice::from_ref(&dir), &base, None)
+            .unwrap()
+            .value;
 
         let sources: Vec<(&str, &str)> = value["rules"]
             .as_array()
@@ -1917,6 +1993,59 @@ mod tests {
         ] {
             assert!(!is_reversal(line), "{line:?}");
         }
+    }
+
+    /// A line embeds a reversal when it holds `Reversal:` and is no reversal:
+    /// the word inside a longer entry, in any position but the counted start.
+    #[test]
+    fn embeds_a_reversal_reads_a_line_that_holds_the_word_and_does_not_count() {
+        for line in [
+            "the ledger has no Reversal: line",
+            "Task 4 had a Reversal: after other text",
+            "- a list item that mentions a Reversal: in its middle",
+            "-Reversal: a",
+            "-- Reversal: a",
+            "x Reversal:",
+        ] {
+            assert!(embeds_a_reversal(line), "{line}");
+        }
+        for line in [
+            "",
+            "Reversal: a",
+            "- Reversal: a",
+            "  * Reversal: a, and Reversal: b",
+            "reversal: a",
+            "Reversal a",
+            "the word reversal alone",
+        ] {
+            assert!(!embeds_a_reversal(line), "{line:?}");
+        }
+    }
+
+    /// `stats` warns once for each embedded line of a ledger, with the line
+    /// number counted from 1, and the count of the workspace stays.
+    #[test]
+    fn stats_warns_for_each_embedded_reversal_and_keeps_the_count() {
+        let scratch = tempfile::tempdir().unwrap();
+        let dir = workspace_dir(scratch.path(), "2026-10-01-batch-1");
+        fs::write(
+            dir.join(PROGRESS_FILE),
+            "Reversal: a\nsee Reversal: b\n\n- Reversal: c\nand Reversal: d\n",
+        )
+        .unwrap();
+        let (_guard, base) = empty_base();
+
+        let outcome = stats(std::slice::from_ref(&dir), &base, None).unwrap();
+
+        assert_eq!(outcome.value["workspaces"][0]["reversals"], json!(2));
+        let ledger = dir.join(PROGRESS_FILE);
+        assert_eq!(
+            outcome.warnings,
+            [
+                format!("{}:2: {EMBEDDED_REVERSAL}", ledger.display()),
+                format!("{}:5: {EMBEDDED_REVERSAL}", ledger.display()),
+            ]
+        );
     }
 
     /// The reference of a sanction is the text between the last

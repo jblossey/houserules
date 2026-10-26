@@ -3,8 +3,7 @@
 //! range (`run`); `check-commit` answers it for one commit at a time
 //! (`CoChangeCheck`).
 
-use serde_json::Value;
-
+use crate::published::audit_result::AuditRow;
 use crate::rules::check_shape::{CheckDef, CheckLevel};
 
 use super::{AuditContext, RowBuilder, filter_matching, glob_list, match_any};
@@ -81,7 +80,7 @@ pub(super) fn run(
     check: &CheckDef,
     ctx: &AuditContext,
     rows: &RowBuilder,
-) -> Result<Value, String> {
+) -> Result<AuditRow, String> {
     let trigger = filter_matching(ctx.changed, &check.if_changed)?;
     if trigger.is_empty() {
         return Ok(rows.pass("not triggered".to_string()));

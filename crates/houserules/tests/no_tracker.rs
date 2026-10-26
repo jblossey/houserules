@@ -257,19 +257,19 @@ fn backlog_id_pattern(dir: &std::path::Path) -> String {
 
 /// Asserts that `init --tracker` printed the `wrote` line of the deliverables
 /// schema once: the schema is written once, with the `backlogId` pattern of
-/// the tracker that the same command installs. The CI workflow of a
-/// GitHub-hosted repository is written once too.
+/// the tracker that the same command installs. The command writes no CI
+/// workflow (spec 10.7).
 fn assert_written_once(lines: &str) {
-    for file in [
-        ".claude/schemas/deliverables.json",
-        ".github/workflows/knowledge.yml",
-    ] {
-        assert_eq!(
-            count_lines(lines, &format!("wrote {file}")),
-            1,
-            "the `wrote {file}` line, once, in {lines}"
-        );
-    }
+    let file = ".claude/schemas/deliverables.json";
+    assert_eq!(
+        count_lines(lines, &format!("wrote {file}")),
+        1,
+        "the `wrote {file}` line, once, in {lines}"
+    );
+    assert!(
+        !lines.contains(".github/workflows/"),
+        "a CI workflow in {lines}"
+    );
 }
 
 /// Spec 3.3 and 3.9: `init --tracker json` writes the deliverables schema
@@ -302,11 +302,10 @@ fn init_tracker_json_writes_the_schema_once_with_the_pattern_of_the_adapter() {
 
 /// Spec 3.3 and 3.9: `init --tracker github` takes the repository from
 /// `--repo`, else from the `origin` remote; it writes the `tracker` key with
-/// the repository, the `backlogId` pattern of the adapter (`#<n>`), and the
-/// seeded CI workflow, and it writes no `backlog/` file. A second run
-/// changes nothing.
+/// the repository and the `backlogId` pattern of the adapter (`#<n>`), and it
+/// writes no CI workflow and no `backlog/` file. A second run changes nothing.
 #[test]
-fn init_tracker_github_writes_the_pattern_and_the_ci_workflow() {
+fn init_tracker_github_writes_the_pattern_and_no_ci_workflow() {
     let remote = scratch_git_repo();
     git(
         remote.path(),
@@ -317,7 +316,6 @@ fn init_tracker_github_writes_the_pattern_and_the_ci_workflow() {
     let lines = stdout(&output);
     for expected in [
         "wrote .claude/schemas/deliverables.json",
-        "wrote .github/workflows/knowledge.yml",
         "tracker: github (acme/widgets)",
     ] {
         assert!(
@@ -332,12 +330,7 @@ fn init_tracker_github_writes_the_pattern_and_the_ci_workflow() {
         json!({"adapter": "github", "repo": "acme/widgets"})
     );
     assert_eq!(backlog_id_pattern(remote.path()), "^#[0-9]+$");
-    assert!(
-        remote
-            .path()
-            .join(".github/workflows/knowledge.yml")
-            .is_file()
-    );
+    assert!(!remote.path().join(".github").exists());
     assert!(!remote.path().join("backlog").exists());
     let before = snapshot(remote.path());
     let again = run(remote.path(), &["init", "--tracker", "github"]);
@@ -407,13 +400,12 @@ fn init_beads(dir: &std::path::Path, home: &std::path::Path) -> std::process::Ou
 }
 
 /// Spec 3.3 and 3.9: `init --tracker beads` reads the issue prefix from `bd`
-/// and writes the `tracker` key, the `backlogId` pattern of that prefix, and
-/// the seeded CI workflow of a GitHub-hosted repository. It writes no
-/// `backlog/` file. A second run changes nothing of what the kit writes. The
-/// prefix has a hyphen, which the pattern keeps. This test needs the `bd` that
-/// `mise.toml` pins and fails without it.
+/// and writes the `tracker` key and the `backlogId` pattern of that prefix. It
+/// writes no CI workflow and no `backlog/` file. A second run changes nothing
+/// of what the kit writes. The prefix has a hyphen, which the pattern keeps.
+/// This test needs the `bd` that `mise.toml` pins and fails without it.
 #[test]
-fn init_tracker_beads_writes_the_pattern_and_the_ci_workflow() {
+fn init_tracker_beads_writes_the_pattern_and_no_ci_workflow() {
     let dir = scratch_git_repo();
     let home = dir.path().join(".git/bd-home");
     let mut bd = Command::new(std::env::var_os("HOUSERULES_BD").unwrap_or_else(|| "bd".into()));
@@ -442,11 +434,7 @@ fn init_tracker_beads_writes_the_pattern_and_the_ci_workflow() {
     let output = init_beads(dir.path(), &home);
     assert_eq!(output.status.code(), Some(0), "stderr: {}", stderr(&output));
     let lines = stdout(&output);
-    for expected in [
-        "wrote .claude/schemas/deliverables.json",
-        "wrote .github/workflows/knowledge.yml",
-        "tracker: beads",
-    ] {
+    for expected in ["wrote .claude/schemas/deliverables.json", "tracker: beads"] {
         assert!(
             lines.lines().any(|line| line == expected),
             "no {expected:?} in {lines}"
@@ -459,7 +447,7 @@ fn init_tracker_beads_writes_the_pattern_and_the_ci_workflow() {
         backlog_id_pattern(dir.path()),
         "^my-proj-[0-9a-z]+(\\.[0-9]+)*$"
     );
-    assert!(dir.path().join(".github/workflows/knowledge.yml").is_file());
+    assert!(!dir.path().join(".github").exists());
     assert!(!dir.path().join("backlog").exists());
 
     let kit_files = |dir: &std::path::Path| {

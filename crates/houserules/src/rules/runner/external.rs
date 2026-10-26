@@ -19,21 +19,17 @@ use std::io;
 use std::path::{self, Path, PathBuf};
 use std::process::{Command, Output};
 
-use serde_json::{Value, json};
-
 use crate::install::marker::Marker;
 use crate::install::marker::runners::{Parser, RunnerDef};
-use crate::rules::check_shape::{CheckDef, Glob, Scope};
+use crate::published::audit_result::{AuditRow, Finding};
+use crate::rules::check_shape::{ALL_FILES, CheckDef, Glob, Scope};
 use crate::rules::git::{rev, worktree_changes};
 
-use super::sarif::{self, Fault, Finding};
+use super::sarif::{self, Fault};
 use super::{AuditContext, RowBuilder, filter_matching};
 
 /// The most triggering files that one call of a `changed` tool takes.
 const FILES_PER_CALL: usize = 200;
-
-/// The `files` of a check that names none.
-const ALL_FILES: &str = "**";
 
 /// A fault that stops the audit before it prints a row: the one stderr line
 /// that names it.
@@ -52,12 +48,12 @@ pub(super) fn run(
     check: &CheckDef,
     ctx: &AuditContext,
     rows: &RowBuilder,
-) -> Result<Value, String> {
+) -> Result<AuditRow, String> {
     judge(check, ctx, rows).map_err(|SetupError(line)| line)
 }
 
 /// [`run`] with its fault typed.
-fn judge(check: &CheckDef, ctx: &AuditContext, rows: &RowBuilder) -> Result<Value, SetupError> {
+fn judge(check: &CheckDef, ctx: &AuditContext, rows: &RowBuilder) -> Result<AuditRow, SetupError> {
     let files_glob = check
         .files
         .clone()
@@ -209,7 +205,11 @@ fn ensure_head_is_checked_out(
 
 /// Judges a `sarif` tool: every call prints a SARIF document, and the results
 /// that count are the findings of the row, in call order.
-fn judge_sarif(tool: &Tool, batches: &[&[String]], rows: &RowBuilder) -> Result<Value, SetupError> {
+fn judge_sarif(
+    tool: &Tool,
+    batches: &[&[String]],
+    rows: &RowBuilder,
+) -> Result<AuditRow, SetupError> {
     let mut findings: Vec<Finding> = Vec::new();
     for files in batches {
         let output = tool.call(files)?;
@@ -217,11 +217,12 @@ fn judge_sarif(tool: &Tool, batches: &[&[String]], rows: &RowBuilder) -> Result<
             .map_err(|fault| SetupError(fault_line(tool.name, &fault)))?;
         findings.extend(sarif::findings(&log, tool.root));
     }
-    let row = match findings.split_first() {
+    let mut row = match findings.split_first() {
         None => rows.pass(format!("no findings in {}", call_count(batches.len()))),
         Some((first, rest)) => rows.violate(evidence(first, rest.len())),
     };
-    Ok(rows.with(row, "findings", json!(findings)))
+    row.findings = Some(findings);
+    Ok(row)
 }
 
 /// Judges an `exit-code` tool: the check holds when every call exits 0.
@@ -229,7 +230,7 @@ fn judge_exit_code(
     tool: &Tool,
     batches: &[&[String]],
     rows: &RowBuilder,
-) -> Result<Value, SetupError> {
+) -> Result<AuditRow, SetupError> {
     for files in batches {
         let output = tool.call(files)?;
         if !output.status.success() {

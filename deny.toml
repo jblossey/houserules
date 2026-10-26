@@ -15,13 +15,23 @@ ignore = []
 # risk tier as the Unlicense entry already below). MPL-2.0 (HR-134, batch 27
 # T3) came in with `dirs`: `option-ext`, an unconditional `dirs-sys`
 # dependency (no target gate in dirs-sys's own Cargo.toml) that compiles on
-# all three of this project's shipped targets (`cargo tree --locked -e normal
-# --target <t> -i option-ext` for x86_64-unknown-linux-musl,
-# x86_64-pc-windows-msvc, and aarch64-apple-darwin each show option-ext ->
-# dirs-sys -> dirs -> houserules); its one use site is dirs-sys's non-Apple
-# unix (Linux) xdg_user_dirs path. OSI-approved, FSF Free/Libre, and a
-# file-level (not whole-project) copyleft, so combining it changes no term of
-# this crate's own MIT license.
+# all five of this project's shipped targets, the `targets` of
+# dist-workspace.toml: aarch64-apple-darwin, aarch64-unknown-linux-musl,
+# x86_64-apple-darwin, x86_64-unknown-linux-musl, and x86_64-pc-windows-msvc
+# (`cargo tree --locked -e normal --target <t> -i option-ext` for each shows
+# option-ext -> dirs-sys -> dirs -> houserules); its one use site is
+# dirs-sys's non-Apple unix (Linux) xdg_user_dirs path. OSI-approved, FSF
+# Free/Libre, and a file-level (not whole-project) copyleft, so combining it
+# changes no term of this crate's own MIT license. Zlib (design.md 252) is for
+# `foldhash`, the default hasher of `hashbrown`. Two crates enable it:
+# `hashlink`, a dependency of `saphyr` (a normal dependency that reads the
+# seeded workflow files), and `referencing`, a dependency of `jsonschema` (a
+# dev-dependency of the tests that validate the published schemas).
+# `cargo tree --locked -e normal --target <t> -i foldhash` for each of the five
+# shipped targets above shows foldhash -> hashbrown -> hashlink -> saphyr ->
+# houserules, so every shipped target compiles it. Zlib is OSI-approved, FSF
+# Free/Libre, and permissive: it asks only that a changed source copy is
+# marked, so it changes no term of this crate's own MIT license.
 allow = [
     "MIT",
     "Apache-2.0",
@@ -32,6 +42,7 @@ allow = [
     "MIT-0",
     "CDLA-Permissive-2.0",
     "MPL-2.0",
+    "Zlib",
 ]
 confidence-threshold = 0.8
 

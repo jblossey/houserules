@@ -257,7 +257,7 @@ mod tests {
         write_json(
             &root.join(".houserules.json"),
             &json!({
-                "schema": "houserules/install@2.2.0",
+                "schema": "houserules/install@2.3.0",
                 "packs": {"demo": {
                     "version": "1.0.0", "source": "kit", "sha256": "0", "addedAreas": []
                 }},

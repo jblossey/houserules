@@ -1,6 +1,6 @@
 {
   "name": "process",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "schema": "houserules/pack@1.2.0",
   "topics": {
     "process": {
@@ -423,7 +423,7 @@
       "kind": "rule",
       "area": "process",
       "standing": true,
-      "summary": "Verify a change live (run the app, service, or tool for real; capture evidence) before any PR, merge, or deploy spend.",
+      "summary": "Verify a change live (run the app, service, or tool for real; capture evidence) before any pull or merge request, merge, or deploy spend.",
       "body": [
         "CI and deploy runs cost money and time; a live run catches what unit tests cannot. Record the project's live-run recipe as a `procedure` entry."
       ],
@@ -587,6 +587,34 @@
         "by": "review",
         "ref": "branch review retrospective"
       }
+    },
+    {
+      "id": "process.evidence-before-review",
+      "kind": "rule",
+      "area": "process",
+      "standing": false,
+      "summary": "A pull or merge request carries an evidence bundle before review: purpose, work items, tier, criterion, and each run at its head; bundle check enforces it.",
+      "body": [
+        "Write the bundle with `houserules bundle write` from the captures of the final gate run at the head of the branch, and put it in the description of the pull or merge request. The command copies the header of each capture whole, so no header passes through a model.",
+        "A project wires `houserules bundle check` into its pipeline with `houserules ci print`, which prints the lines for GitHub or GitLab. `houserules ci print --template` prints the section for a request template. The check fails a missing part, a work item or an intent that does not resolve, a run at another commit, a dirty or failed run, and a diff above the budget of its tier.",
+        "A diff above the budget of its risk tier needs a `Budget reason:` line in the bundle. `review.bundle.budgets` in `.houserules.json` sets the budgets. Without it, the check looks at no size.",
+        "`review.bundle.exemptAuthors` and `review.bundle.exemptBranches` name the authors and the branches that the check skips, for example a dependency bot or a release tool.",
+        "The entry has no `check`. The gate is the `bundle check` step of the pipeline."
+      ],
+      "tags": [
+        "review",
+        "evidence",
+        "bundle"
+      ],
+      "source": {
+        "date": "2026-10-26",
+        "by": "docs",
+        "ref": "per-change review layer"
+      },
+      "see": [
+        "process.evidence-outlives-the-session",
+        "process.claims-match-artifacts"
+      ]
     },
     {
       "id": "process.evidence-outlives-the-session",
@@ -872,7 +900,7 @@
         "The tier sets the pipeline's depth. Light: one task; docs, comments, config values, or a dependency bump only; no executable behavior change; no task is critical. The work item's body is the spec, and the project's owner or decider still approves it. The pipeline is an author of the change, one task review, and the live run. It has no plan document and no branch review.",
         "Standard: every change that is not light. The pipeline is a short spec with the decision gate, a plan, an author of the change, one task review, at most one re-review, and the live run. A branch review runs only for a batch of two or more tasks.",
         "A critical task is a task whose change alters the commands, flags, or output of a command-line interface, a schema, authentication or security code, or the data that an installed product keeps on disk. It runs inside the standard tier with its own evidence: the plan writes the spec's cases for the task as tests before any code; the author of the change commits them first with one recorded run that shows them failing at the base commit, then makes them pass; the evidence is that run and the whole suite passing at the head (`process.tdd`).",
-        "A critical task gets one task review and never a re-review. The person who runs the work checks each fix by re-running the reviewer's own reproduction and records the check (`process.fix-round-verification-record`). A Critical or Important finding goes to a fresh author of the change; a Minor finding is fixed directly.",
+        "A critical task gets one task review. The person who runs the work checks each fix by re-running the reviewer's own reproduction and records the check (`process.fix-round-verification-record`). A Critical or Important finding goes to a fresh author of the change; a Minor finding is fixed directly. A fix round that fixes a Critical or Important finding, or that changes files beyond the files its findings name, then gets one review of its fix diff. That review files only new breakage. Only a new Critical or Important finding of it opens a further round, which closes by the check of the person who runs the work; no second fix-diff review runs.",
         "A lighter tier drops only what its pipeline names: the light tier drops the plan document and the branch review, and the standard tier drops the branch review for a one-task batch. Every tier keeps item selection, the live run, the finish, and rollout and acceptance.",
         "One tier covers the batch: the highest tier that any of its changes needs. A critical task follows its own evidence rule inside the tier of the batch.",
         "The plan records the tier and the criterion that selected it. For a light change, the task brief records them. The task review checks the tier, and a wrong tier is a finding.",
@@ -884,9 +912,9 @@
         "review"
       ],
       "source": {
-        "date": "2026-10-09",
+        "date": "2026-10-25",
         "by": "user",
-        "ref": "owner ruling, batch 31"
+        "ref": "design.md 260"
       },
       "see": [
         "process.bounded-review-loop",
@@ -929,7 +957,7 @@
       "body": [
         "A fix round that holds only Minor fixes closes with a verification note (`process.fix-round-verification-record`), never with a re-review. The person who runs the work runs the check that each Minor finding names and cites its result in the note.",
         "A re-review reads the fix diff and the original findings only. It files new findings at their impact (`process.severity-by-impact`). Only a new Critical or Important finding opens a further round. A new Minor finding joins a Minor-only round.",
-        "Re-reviews per task: light 0, standard 1. A critical task gets no re-review (`process.risk-tiers`). A branch-review fix wave has the same cap as the batch's tier.",
+        "Re-reviews per task: light 0, standard 1. A critical task gets no re-review of its original findings; it gets one fix-diff review after a fix round that fixes a Critical or Important finding or changes files beyond its findings' files (`process.risk-tiers`). A branch-review fix wave has the same cap as the batch's tier.",
         "At the cap, the open non-critical findings become one work item with the reason (a deferral under `process.no-tech-debt`). An open Critical finding goes to the project's owner or decider.",
         "A light task with an Important or Critical finding moves up to the standard tier and gets its one re-review."
       ],
@@ -939,9 +967,9 @@
         "loop"
       ],
       "source": {
-        "date": "2026-10-09",
+        "date": "2026-10-25",
         "by": "user",
-        "ref": "owner ruling, batch 31"
+        "ref": "design.md 260"
       },
       "see": [
         "process.severity-by-impact",
@@ -1080,7 +1108,7 @@
       "standing": false,
       "summary": "Record every decision that the owner or a reviewer overturns as a `Reversal:` line in the record of the work; count the lines at the retrospective.",
       "body": [
-        "Write each reversal as its own list item of the record that starts with `Reversal:` and names the decision that was overturned; `houserules stats` counts only a line that starts with `Reversal:`, and the branch reviewer of the reference workflow also counts a `Reversal:` inside a longer entry.",
+        "Write each reversal as its own list item of the record that starts with `Reversal:` and names the decision that was overturned; `houserules stats` counts a reversal that starts with `Reversal:` after optional spaces and an optional list marker, and the branch reviewer of the reference workflow also counts a `Reversal:` inside a longer entry.",
         "The retrospective counts the reversals beside the rule violations."
       ],
       "tags": [

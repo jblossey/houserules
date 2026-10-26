@@ -1,0 +1,25 @@
+#!/bin/sh
+# A git that lets a second writer win a race in the tests of the review units
+# (ci_units.rs). It runs the real git ($REAL_GIT) for every call. Before the
+# first `push` it runs the script $RACE_SCRIPT once, so that the push of the
+# unit finds the remote ref moved: the second writer's push comes first.
+set -u
+subcommand=
+skip=0
+for argument in "$@"; do
+  if [ "$skip" -eq 1 ]; then
+    skip=0
+    continue
+  fi
+  if [ "$argument" = -c ]; then
+    skip=1
+    continue
+  fi
+  subcommand=$argument
+  break
+done
+if [ "$subcommand" = push ] && [ ! -e "$RACE_FLAG" ]; then
+  : > "$RACE_FLAG"
+  sh "$RACE_SCRIPT"
+fi
+exec "$REAL_GIT" "$@"

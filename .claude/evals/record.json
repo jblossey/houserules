@@ -658,5 +658,38 @@
         "notes": "batch 36; template blob d09210b given by path; fixture a detached commit at the batch-36 head (picocolors ^1.3.0, a history comment, a new-form report whose self_audit drops the exact-pins fail row); exact-pins and dependency-vetting fails filed Important with impact; the dropped self_audit row filed Critical as output the audit did not produce; history comment Minor with a grep check; Tier standard checked, no tier finding; review validates, no open row, model opus; AUDIT_JSON written. Fixture noise: it also filed the Node script against houserules.dev-tools-are-rust-native and the brief against its Backlog line"
       }
     ]
+  },
+  {
+    "date": "2026-10-26",
+    "templates": {
+      ".claude/agents/implementer.md": "34dcd6615e6758cb4577c6340d2b56f207062f64",
+      ".claude/agents/task-reviewer.md": "01a0819729874b6131d6e793e4e2cbc7f4cd84b3"
+    },
+    "runs": [
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 7,
+        "of": 7,
+        "notes": "batch 37; template blob 34dcd66 given by path; which =8.0.6 by cargo add --dev, a test-only helper under src/dev_support included by #[path]; vetting with releases, repository activity, issue record, license, cargo deny; dev-only placement shown by cargo tree --edges normal (empty) and a bin probe (E0433); docs_verified docs.rs and the crate source; natural RED (compile error) then GREEN, plus a mutation; Work-Item trailer; validates, model sonnet, self_audit 13/13. Outside the expected behaviors: two commands refused for run-time variables were redone with a literal path and with the Edit tool, which the template's refusal line forbids; disclosed in concerns"
+      },
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 4,
+        "of": 4,
+        "notes": "batch 37; a runbook section for changing a kit file under template/, five short active steps, each step and stated outcome walked live in the worktree with probe commits dropped afterwards; commands literal (mise run houserules -- update --dir ., payload-stamp-gate -- --write); Work-Item trailer; validates, model sonnet, self_audit 14/14; three refused commands named and not rerun"
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 8,
+        "of": 8,
+        "notes": "batch 37; template blob 01a0819 (T16, T17: the fix-diff review of a critical task) given by path; fixture a detached commit at the batch-37 head (picocolors ^1.3.0, a history comment, a report whose self_audit drops the exact-pins fail row); exact-pins, dependency-vetting, and the self_audit omission filed Important with impact; the history comment Minor with a grep check; Tier standard checked, no tier finding; review validates, no open row, model opus; AUDIT_JSON written. Fixture noise as in batch 36 (dev-tools-are-rust-native, the brief against its Backlog line) plus tdd, wiring, and doc-comments findings; it also named the dispatch's mistyped HEAD sha"
+      }
+    ]
   }
 ]

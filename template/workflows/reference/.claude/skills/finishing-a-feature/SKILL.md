@@ -109,15 +109,45 @@ and lint first.
    resolve the install root of the hook, and when the parent of the hook
    directory holds no `.houserules.json`.
 
-5. **Push and open a PR.**
+5. **Write the evidence bundle, push, and open the pull or merge request.**
+   Run the final gate set once at the head, each gate through `houserules
+   capture`. Then write the bundle with `houserules bundle write`. It copies
+   the header line of each capture whole, so no header passes through a model.
+   The bundle holds:
+   - the intent (`--intent <source>:<ref>`) or the purpose (`--purpose`), from
+     the spec;
+   - the work items of the batch, one `--work-item <id>` for each;
+   - the tier and the criterion, from the plan (`--tier`, `--criterion`);
+   - the captures of the final gate run at the head, one `--capture <file>` for
+     each.
    ```sh
+   houserules bundle write --intent file:docs/plans/<plan>.md \
+     --work-item <id> --tier <tier> --criterion "<criterion>" \
+     --capture <workspace>/<gate>.txt --out <workspace>/bundle.md
    git push -f -u origin <branch>
-   gh pr create --fill
    ```
+   Open the request with the CLI of the host, and give it the bundle as its
+   description. On GitHub:
+   ```sh
+   gh pr create --title "<title>" --body-file <workspace>/bundle.md
+   ```
+   On GitLab:
+   ```sh
+   glab mr create --title "<title>" --description-file <workspace>/bundle.md
+   ```
+   When the request template of the project holds other sections, add them to
+   the file first. A project that runs `houserules bundle check` in its CI fails
+   a request without a bundle. To see the same lines before you open the
+   request, run `houserules bundle check --body <workspace>/bundle.md --base
+   <merge base> --head HEAD`.
 
-6. **Wait for CI.**
+6. **Wait for CI.** On GitHub:
    ```sh
    gh pr checks --watch
+   ```
+   On GitLab:
+   ```sh
+   glab ci status --live
    ```
    All checks must pass before continuing.
 
@@ -129,7 +159,7 @@ and lint first.
    git push origin main
    ```
    A project that has ruled a different merge discipline (a merge commit,
-   a squash) follows that ruling instead. GitHub marks the PR merged once
+   a squash) follows that ruling instead. The host marks the request merged once
    the commits reach main.
 
 8. **After merging a release-please PR, or any merge that changes the

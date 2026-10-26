@@ -78,3 +78,61 @@ pub fn omits(surface: &str, text: &str, statements: &[&str]) {
         found.join("\n")
     );
 }
+
+/// The info string and the body of each fenced block of the section `heading`
+/// (the text after `## `) of `markdown`, in order.
+#[cfg(unix)]
+pub fn fenced_blocks_of(markdown: &str, heading: &str) -> Vec<(String, String)> {
+    let mut blocks = Vec::new();
+    let mut in_section = false;
+    let mut open: Option<(String, Vec<&str>)> = None;
+    for line in markdown.lines() {
+        if let Some((info, body)) = open.as_mut() {
+            if line.starts_with("```") {
+                blocks.push((info.clone(), body.join("\n")));
+                open = None;
+            } else {
+                body.push(line);
+            }
+        } else if let Some(title) = line.strip_prefix("## ") {
+            in_section = title == heading;
+        } else if in_section && let Some(info) = line.strip_prefix("```") {
+            open = Some((info.to_string(), Vec::new()));
+        }
+    }
+    blocks
+}
+
+/// `sh -c` on `script` in `dir`, with the binary under test first on `PATH`,
+/// a git identity, the default git configuration and the C locale, and the
+/// standard error on the standard output. Returns the exit code and what the script printed.
+#[cfg(unix)]
+pub fn run_block(dir: &Path, script: &str) -> (i32, String) {
+    let binary = Path::new(env!("CARGO_BIN_EXE_houserules"));
+    let path = format!(
+        "{}:{}",
+        binary
+            .parent()
+            .expect("the binary has a directory")
+            .display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let output = crate::tracker_support::with_default_git(
+        Command::new("sh")
+            .arg("-c")
+            .arg(format!("exec 2>&1\n{script}"))
+            .current_dir(dir)
+            .env("PATH", path)
+            .env("HOUSERULES_SKIP_SELF_UPDATE", "1")
+            .env("GIT_AUTHOR_NAME", "t")
+            .env("GIT_AUTHOR_EMAIL", "t@t.t")
+            .env("GIT_COMMITTER_NAME", "t")
+            .env("GIT_COMMITTER_EMAIL", "t@t.t"),
+    )
+    .output()
+    .expect("run sh");
+    (
+        output.status.code().expect("sh exits with a code"),
+        String::from_utf8(output.stdout).expect("UTF-8 output"),
+    )
+}

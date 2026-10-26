@@ -6,9 +6,9 @@
 //!   `update` overwrites each file that the project has not changed.
 //! - [`SEED_ONCE`]: project data that `init` seeds once and `update` never
 //!   overwrites.
-//! - [`D3_FILES`]: files that `init` seeds once and `update` keeps at the
-//!   content of the kit through a baseline, unless the project changed or
-//!   owns them.
+//! - [`D3_FILES`]: files that `update` keeps at the content of the kit through
+//!   a baseline, unless the project changed or owns them; `init` seeds each but
+//!   the CI workflow once.
 //! - [`TRACKER_DATA`] and [`TRACKER_SCHEMA`]: the files of the JSON tracker,
 //!   which only `init --tracker json` writes and `update` restores where the
 //!   install has that tracker.
@@ -101,21 +101,15 @@ pub(super) const DELIVERABLES_FILE: &str = ".claude/schemas/deliverables.json";
 /// The one list of areas, which the project owns.
 pub(super) const AREAS_FILE: &str = "knowledge/areas.json";
 
-/// The D3 files: `init` seeds each once, and `update` then keeps it at the
-/// content of the kit through a baseline, unless the project changed it or
-/// owns it (`sync`'s own module doc has the account).
+/// The D3 files: `init` seeds the schemas once, and `update` then keeps each
+/// D3 file at the content of the kit through a baseline, unless the project
+/// changed it or owns it (`sync`'s own module doc has the account).
 ///
-/// The CI workflow is the one D3 file that only a GitHub-hosted target gets:
-/// the gate itself assumes a GitHub Actions runner and a GitHub PR event, so
-/// writing it into a project hosted elsewhere would ship a workflow file
-/// nothing ever runs. `seed` (`init`) writes it when the origin is GitHub
-/// hosted (`origin_is_github_hosted`), keeps a file that exists and reports
-/// it, and skips the write with a line that says why for any other origin.
-/// `update` backfills a still-absent workflow the same way, but only once the
-/// origin has become GitHub-hosted; skipping it for another origin stays
-/// silent there, matching `update`'s own convention of reporting only what it
-/// changes. A project not on GitHub gets its own CI gate from the
-/// `migrating-knowledge` skill's own instruction instead.
+/// The CI workflow is a D3 file, but `init` seeds no CI workflow (spec 10.7):
+/// `houserules ci` prints or writes the CI wiring. `update` keeps an existing
+/// seeded workflow current through its baseline, as for any D3 file, unless the
+/// project changed it (a hand step then) or owns it. A workflow that the
+/// project deleted stays absent: `update` writes none.
 pub(super) const D3_FILES: &[&str] = &[SCHEMA_FILE, DELIVERABLES_FILE, ci_workflow::TEMPLATE_PATH];
 
 /// Seed files that carry the backlog id prefix; `--id-prefix` rewrites

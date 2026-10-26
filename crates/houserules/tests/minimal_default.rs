@@ -16,10 +16,10 @@ use tracker_support::{
 };
 use tree_snapshot::{assert_same_tree, snapshot};
 
-/// The files of a plain `init` on a repository with no GitHub origin, as
-/// spec 4.6 lists them: the marker, the knowledge schema and areas, the one
-/// pack, the two core skills and the step script, the `.gitignore` line, the
-/// deliverables schema, `AGENTS.md`, `CLAUDE.md`, and `docs/README.md`.
+/// The files of a plain `init`, as spec 4.6 lists them: the marker, the
+/// knowledge schema and areas, the one pack, the two core skills and the step
+/// script, the `.gitignore` line, the deliverables schema, `AGENTS.md`,
+/// `CLAUDE.md`, and `docs/README.md`.
 const MINIMAL_FILES: [&str; 12] = [
     ".claude/schemas/deliverables.json",
     ".claude/skills/houserules-step/SKILL.md",
@@ -65,9 +65,10 @@ fn a_plain_init_writes_exactly_the_files_of_the_minimal_default() {
     assert_eq!(files_of(dir.path()), MINIMAL_FILES);
 }
 
-/// Spec 4.6: on a target with a GitHub origin, the CI workflow joins the list.
+/// Spec 10.7: on a target with a GitHub origin, a plain `init` writes the same
+/// files, and no CI workflow.
 #[test]
-fn a_plain_init_on_a_github_hosted_origin_also_writes_the_ci_workflow() {
+fn a_plain_init_on_a_github_hosted_origin_writes_the_same_files_and_no_ci_workflow() {
     let dir = scratch_git_repo();
     git(
         dir.path(),
@@ -79,10 +80,7 @@ fn a_plain_init_on_a_github_hosted_origin_also_writes_the_ci_workflow() {
         ],
     );
     run_ok(dir.path(), &["init"]);
-    let mut expected: Vec<String> = MINIMAL_FILES.iter().map(|file| file.to_string()).collect();
-    expected.push(".github/workflows/knowledge.yml".to_string());
-    expected.sort();
-    assert_eq!(files_of(dir.path()), expected);
+    assert_eq!(files_of(dir.path()), MINIMAL_FILES);
 }
 
 /// Spec 4.6: the only pack that a plain `init` installs is `knowledge-base`,

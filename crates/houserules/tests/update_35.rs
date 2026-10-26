@@ -5,7 +5,9 @@
 //! workflow with its hand step; `init` with no tracker flag seeds a lost
 //! deliverables schema with the pattern of the installed tracker (HR-220).
 //! Each case runs the compiled binary against a scratch install that
-//! `houserules init` made.
+//! `houserules init` made. `init` seeds no workflow now (spec 10.7), so a case
+//! about the seeded workflow starts from the one that an earlier release
+//! seeded (`seed_workflow`).
 
 mod locked_file;
 mod tracker_support;
@@ -19,7 +21,8 @@ use serde_json::json;
 use tempfile::TempDir;
 use tracker_support::{
     assert_actionlint_passes, assert_output, commit_all, count_lines, edit_marker, git, houserules,
-    quoted, read_json, repo_root, run, run_ok, scratch_git_repo, sha256_hex, stderr, stdout,
+    quoted, read_json, repo_root, run, run_ok, scratch_git_repo, seed_workflow, sha256_hex, stderr,
+    stdout,
 };
 use tree_snapshot::{assert_same_tree, snapshot};
 
@@ -46,8 +49,8 @@ fn install() -> TempDir {
     dir
 }
 
-/// A scratch repository with a GitHub `origin`, so that `init` writes the CI
-/// workflow.
+/// A scratch repository with a GitHub `origin`, where the GitHub tracker reads
+/// its repository.
 fn repository() -> TempDir {
     let dir = scratch_git_repo();
     git(
@@ -445,6 +448,7 @@ fn install_workflow_as_unmodified(dir: &Path, old: &str) {
 fn update_rewrites_an_unmodified_seeded_workflow_with_the_ref() {
     let dir = repository();
     run_ok(dir.path(), &["init"]);
+    seed_workflow(dir.path(), dir.path());
     let template = fs::read_to_string(repo_root().join("template").join(WORKFLOW))
         .expect("read the template workflow");
     install_workflow_as_unmodified(dir.path(), &without_the_ref(&text(dir.path(), WORKFLOW)));
@@ -517,6 +521,7 @@ fn update_keeps_a_modified_seeded_workflow_and_prints_its_hand_step() {
     ] {
         let dir = repository();
         run_ok(dir.path(), &["init"]);
+        seed_workflow(dir.path(), dir.path());
         let mut changed = without_the_ref(&text(dir.path(), WORKFLOW));
         changed.push_str("# our own step\n");
         fs::write(dir.path().join(WORKFLOW), &changed).expect("change the workflow");
@@ -544,7 +549,10 @@ fn update_keeps_a_modified_seeded_workflow_and_prints_its_hand_step() {
         }
         assert_eq!(text(dir.path(), WORKFLOW), changed, "{tracker:?}");
 
-        changed.push_str(&format!("# {REF_INPUT}\n"));
+        let changed = changed.replace(
+            "        with:\n",
+            &format!("        with:\n          {REF_INPUT}\n"),
+        );
         fs::write(dir.path().join(WORKFLOW), &changed).expect("add the input");
         let output = update_without_bd(dir.path());
         assert!(
@@ -555,19 +563,25 @@ fn update_keeps_a_modified_seeded_workflow_and_prints_its_hand_step() {
     }
 }
 
-/// Spec 3.2 and case 2: `init` writes the `ref` input under the `with:` of the
-/// checkout in the top-level form, the form of the GitHub tracker, and the
-/// subdirectory form, and `actionlint` passes on each file. The Beads form is
-/// the case of `ci_workflow`'s own test.
+/// Spec 3.2 and case 2: the seeded workflow carries the `ref` input under the
+/// `with:` of the checkout in the top-level form, the form of the GitHub
+/// tracker, and the subdirectory form, and `actionlint` passes on each file. The
+/// Beads form is the case of `ci_workflow`'s own test.
 #[test]
 fn every_seeded_workflow_form_carries_the_ref_and_passes_actionlint() {
     let plain = repository();
     run_ok(plain.path(), &["init"]);
+    seed_workflow(plain.path(), plain.path());
     let github = repository();
+    run_ok(github.path(), &["init"]);
+    seed_workflow(github.path(), github.path());
     run_ok(github.path(), &["init", "--tracker", "github"]);
     let nested = repository();
-    fs::create_dir(nested.path().join("sub")).expect("create sub/");
-    run_ok(&nested.path().join("sub"), &["init", "--tracker", "github"]);
+    let sub = nested.path().join("sub");
+    fs::create_dir(&sub).expect("create sub/");
+    run_ok(&sub, &["init"]);
+    seed_workflow(nested.path(), &sub);
+    run_ok(&sub, &["init", "--tracker", "github"]);
 
     for (dir, file) in [
         (plain.path(), WORKFLOW),

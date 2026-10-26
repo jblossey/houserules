@@ -1,0 +1,75 @@
+#!/bin/sh
+# A stand-in for the gh CLI in the tests of the review units (ci_units.rs).
+#
+# It knows `gh api <endpoint>` only. Every call adds one line to $STUB_LOG:
+# the arguments, separated by a space. A call answers from the file
+# $STUB_DIR/replies/<method>_<endpoint> (every character outside A-Z, a-z, and
+# 0-9 becomes an underscore, and the query is left out), or with [] for a read
+# and {} for a write when no such file exists. A file $STUB_DIR/fail/<name> makes
+# that call fail. A file $STUB_DIR/refuse-writes makes every call but a read
+# fail, as a read-only token does. --jq filters the reply through jq, and --input
+# copies the body to $STUB_DIR/input-<number of the call>.
+set -u
+touch "$STUB_LOG"
+count=$(wc -l < "$STUB_LOG")
+count=$((count + 1))
+printf '%s\n' "$*" >> "$STUB_LOG"
+if [ "${1:-}" != api ]; then
+  echo "stub gh: only 'gh api' is stubbed" >&2
+  exit 2
+fi
+shift
+method=GET
+filter=
+input=
+endpoint=
+while [ $# -gt 0 ]; do
+  case $1 in
+    --method | -X)
+      method=$2
+      shift 2
+      ;;
+    --jq | -q)
+      filter=$2
+      shift 2
+      ;;
+    --input)
+      input=$2
+      shift 2
+      ;;
+    -f | -F | --field | --raw-field | --header | -H)
+      shift 2
+      ;;
+    -*)
+      shift
+      ;;
+    *)
+      endpoint=$1
+      shift
+      ;;
+  esac
+done
+name=$(printf '%s_%s' "$method" "${endpoint%%\?*}" | tr -c 'A-Za-z0-9' '_')
+if [ "$method" != GET ] && [ -e "$STUB_DIR/refuse-writes" ]; then
+  echo "gh: Resource not accessible by integration (HTTP 403)" >&2
+  exit 1
+fi
+if [ -e "$STUB_DIR/fail/$name" ]; then
+  echo "gh: the stub fails $name" >&2
+  exit 1
+fi
+if [ -n "$input" ]; then
+  cp "$input" "$STUB_DIR/input-$count"
+fi
+if [ -f "$STUB_DIR/replies/$name" ]; then
+  reply=$(cat "$STUB_DIR/replies/$name")
+elif [ "$method" = GET ]; then
+  reply='[]'
+else
+  reply='{}'
+fi
+if [ -n "$filter" ]; then
+  printf '%s\n' "$reply" | jq -r "$filter"
+else
+  printf '%s\n' "$reply"
+fi

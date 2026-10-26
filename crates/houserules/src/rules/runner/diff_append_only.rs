@@ -1,8 +1,7 @@
 //! The `diff-append-only` check: the files of `files` may gain lines but
 //! lose none.
 
-use serde_json::Value;
-
+use crate::published::audit_result::AuditRow;
 use crate::rules::check_shape::CheckDef;
 
 use super::{AuditContext, RowBuilder, filter_matching};
@@ -13,7 +12,7 @@ pub(super) fn run(
     check: &CheckDef,
     ctx: &AuditContext,
     rows: &RowBuilder,
-) -> Result<Value, String> {
+) -> Result<AuditRow, String> {
     let files = filter_matching(ctx.changed, &check.files)?;
     if files.is_empty() {
         return Ok(rows.pass("not triggered".to_string()));

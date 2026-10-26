@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "results": {
+    "changes": [
+      { "name": "add-rate-limit", "valid": true, "warnings": [] }
+    ]
+  },
+  "summary": { "total": 1, "valid": 1, "invalid": 0 }
+}

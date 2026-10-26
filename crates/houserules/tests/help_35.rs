@@ -12,6 +12,7 @@
 //! sentence of a command's description, so no pin ends on it.
 
 mod help_support;
+mod tracker_support;
 
 use help_support::{folded, help_of, omits, read, states};
 
@@ -243,8 +244,8 @@ fn update_help_names_the_restamp_and_the_kept_keys() {
         "update --help",
         &help_of("update"),
         &[
-            "It restamps the install schema `houserules/install@2.1.0` to `houserules/install@2.2.0` and prints `wrote .houserules.json (houserules/install@2.2.0)` once; a second run prints no such line",
-            "The keys `runners` and `workspaces` of `.houserules.json` keep their values",
+            "It restamps the install schema `houserules/install@2.2.0` to `houserules/install@2.3.0` and prints `wrote .houserules.json (houserules/install@2.3.0)` once; a second run prints no such line",
+            "The keys `runners`, `workspaces`, and `review` of `.houserules.json` keep their values",
         ],
     );
 }
@@ -323,7 +324,7 @@ fn readme_states_the_runners_the_ignore_line_and_the_reference_counts() {
             "An `exit-code` tool passes when every call exits 0 (`exited 0 in 1 call`). Otherwise the row fails with the evidence of the failing call: the first non-blank line of its stderr, trimmed; `exited <n>` when stderr holds no text; or `ended by a signal` when a signal ended the tool",
             "The tool reads the working tree, so a triggered runner check needs the tree at `--head` checked out",
             "`audit` stops with exit 2, one line on stderr, and no rows when a triggered check cannot run",
-            "It installs no tool: add the install step of your tools to your own CI",
+            "The jobs install no tool: pass the install step of your tools to the `setup` input of the unit, or add it to your own CI",
             "| `audit` | Builds a git range's rule package and runs every deterministic check, the tool of each `runner` check included,",
         ],
     );
@@ -422,7 +423,7 @@ fn the_upgrade_guide_names_what_update_does_to_each_state_of_gitignore() {
         "docs/upgrading-to-2.md",
         &folded(&read("docs/upgrading-to-2.md")),
         &[
-            "It also brings `.gitignore` to hold the line `.houserules/`, which keeps the batch workspaces out of git too",
+            "`update` brings `.gitignore` to hold the line `.houserules/`, which keeps the batch workspaces out of git too",
             "A `.houserules/step/` line becomes `.houserules/` in its place, and `update` prints `merged .gitignore (.houserules/step/ replaced by .houserules/)`",
             "A file that holds neither line gets `.houserules/` at its end, and `update` prints `merged .gitignore (.houserules/ added)`",
             "A file that is absent is written with the line, and `update` prints `wrote .gitignore`",

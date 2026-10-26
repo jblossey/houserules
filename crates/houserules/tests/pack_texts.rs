@@ -612,7 +612,7 @@ fn no_pack_entry_names_a_file_or_role_that_a_minimal_install_lacks() {
         findings.len(),
         findings.join("\n")
     );
-    assert_eq!(scanned_entries, 67, "the kit carries 67 entries");
+    assert_eq!(scanned_entries, 68, "the kit carries 68 entries");
 }
 
 #[test]
@@ -893,7 +893,7 @@ fn the_tiers_are_light_and_standard_and_a_critical_task_has_its_evidence() {
         "no task is critical",
         "A critical task is a task whose change alters the commands, flags, or output of a command-line interface, a schema, authentication or security code, or the data that an installed product keeps on disk.",
         "one recorded run that shows them failing at the base commit",
-        "never a re-review",
+        "then gets one review of its fix diff",
     ] {
         assert!(text.contains(needle), "process.risk-tiers lacks {needle:?}");
     }
@@ -1166,8 +1166,8 @@ fn section(text: &str, heading: &str) -> (usize, usize) {
 const MOVE_SECTION: &str = "## Set up a tracker and move `backlog/` data";
 
 /// The heading of the section of the migrating-knowledge skill that lists the
-/// steps of the seeded CI workflow, which runs `check-backlog` on every
-/// install.
+/// steps of the CI gate that `houserules ci` wires, which runs `check-backlog`
+/// on every install.
 const CI_SECTION: &str = "## Generate your own CI gate";
 
 /// A reading of the rewrite rule for the core texts: a hit of `classes` on a
@@ -1209,7 +1209,7 @@ impl CoreReading {
 
 /// The readings of the core-text scan. The scan fails when a reading excuses
 /// no hit, so a row cannot outlive the text it excuses.
-const CORE_READINGS: [CoreReading; 9] = [
+const CORE_READINGS: [CoreReading; 10] = [
     CoreReading {
         paths: &["backlog/"],
         section: "",
@@ -1237,6 +1237,13 @@ const CORE_READINGS: [CoreReading; 9] = [
         line: "\"backlog\"",
         classes: &["tracker-subject"],
         reason: "`backlog` is a field of the report format, which is core (design.md 5.124)",
+    },
+    CoreReading {
+        paths: &[".claude/schemas/deliverables.json"],
+        section: "",
+        line: "The id of the filed deferral that holds this finding",
+        classes: &["deferral"],
+        reason: "the description of `issue.backlog` says to set the field only for a finding that the fix round defers, so a reader who defers nothing leaves it unset; the field is core (design.md 5.124)",
     },
     CoreReading {
         paths: &[".claude/skills/houserules-step/SKILL.md"],
@@ -1278,7 +1285,7 @@ const CORE_READINGS: [CoreReading; 9] = [
         section: CI_SECTION,
         line: "",
         classes: &["tracker-subject", "backlog-commands"],
-        reason: "the section lists the steps of the seeded CI workflow, whose `check-backlog` step runs on every install",
+        reason: "the section lists the steps of the CI gate that `houserules ci` wires, whose `check-backlog` step runs on every install",
     },
 ];
 
