@@ -6,8 +6,9 @@
 //! batch are in `workflow_texts.rs`. A phrase is compared on the text with every
 //! run of white space collapsed to one space.
 
-use std::fs;
-use std::path::{Path, PathBuf};
+mod tracker_support;
+
+use tracker_support::{flat, repo_root, text_below};
 
 /// The agent template, relative to the package and to the installed tree.
 const BRANCH_REVIEWER: &str = ".claude/agents/branch-reviewer.md";
@@ -43,24 +44,6 @@ const WARN_SENTENCES: [&str; 3] = [
     "For each other ledger line that holds `Reversal:`, `stats` prints one warn line on stderr: `<ledger>:<line>: a Reversal: inside a longer entry; stats counts only a line that starts with it`.",
     "You count each such line and `stats` does not; name these lines beside the two counts.",
 ];
-
-/// This checkout's repository root.
-fn repo_root() -> PathBuf {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    root.canonicalize()
-        .unwrap_or_else(|error| panic!("canonicalize {}: {error}", root.display()))
-}
-
-/// The text of the file `relative` (`/`-separated) below `base`.
-fn text_below(base: PathBuf, relative: &str) -> String {
-    let path = relative.split('/').fold(base, |path, part| path.join(part));
-    fs::read_to_string(&path).unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
-}
-
-/// `text` with every run of white space collapsed to one space.
-fn flat(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
-}
 
 /// The paragraphs of `text` (the Markdown file holds one line for each), flat.
 fn paragraphs(text: &str) -> Vec<String> {

@@ -87,9 +87,9 @@ body:
     attributes:
       label: Surface impact
       description: >-
-        houserules 1.x freezes its CLI commands, their flags, and its schema files. Adding,
-        removing, or renaming a command or flag, or changing a schema constraint, needs a major
-        version. The maintainer decides. Choose "Not sure" if you do not know.
+        A breaking change to a CLI command, a flag, or a schema constraint needs a major
+        version, and the maintainer rules on it before it merges. Choose "Not sure" if you do
+        not know.
       options:
         - Not sure
         - No command, flag, or schema change

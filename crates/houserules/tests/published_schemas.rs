@@ -24,7 +24,7 @@ use schema_support::{
 };
 use tracker_support::{
     commit_all, copy_dir, edit_marker, git, houserules, repo_root, run, run_ok, scratch_git_repo,
-    stderr, stdout, write_json,
+    sha256_hex, stderr, stdout, write_json,
 };
 
 /// A path that the knowledge base of this repository resolves to an area.
@@ -479,7 +479,9 @@ fn every_committed_schema_has_its_id_its_meta_schema_and_its_schema_const() {
         "audit-result/1.0.0.json",
         "capture/1.0.0.json",
         "change-record/1.0.0.json",
+        "change-record/1.1.0.json",
         "evidence/1.0.0.json",
+        "evidence/1.1.0.json",
         "route/1.0.0.json",
         "rule-package/1.0.0.json",
     ] {
@@ -561,7 +563,7 @@ fn the_committed_schemas_describe_serialization() {
         ]),
         "a reason prints a null value and a null threshold when the rule has none"
     );
-    let evidence = read_json(&schemas_dir().join("evidence/1.0.0.json"));
+    let evidence = read_json(&schemas_dir().join("evidence/1.1.0.json"));
     assert_eq!(
         evidence["required"],
         json!([
@@ -584,6 +586,15 @@ fn the_committed_schemas_describe_serialization() {
         ]),
         "the evidence document always prints these keys; merge_base is null for a range from the empty tree"
     );
+    assert!(
+        evidence["properties"].get("sessions").is_some(),
+        "the document holds `sessions`, and the schema does not require it: a new required key is a major version"
+    );
+    assert_eq!(
+        evidence["$defs"]["Session"]["required"],
+        json!(["commit", "trailer", "value"]),
+        "a session names its commit, the key of its trailer, and the value"
+    );
     assert_eq!(
         evidence["$defs"]["Rules"]["required"],
         json!(["merge_base_hash", "head_hash", "packs"])
@@ -598,7 +609,7 @@ fn the_committed_schemas_describe_serialization() {
         json!(["path", "old_path", "kind", "ranges"]),
         "the empty key belongs to the kind empty alone"
     );
-    let record = read_json(&schemas_dir().join("change-record/1.0.0.json"));
+    let record = read_json(&schemas_dir().join("change-record/1.1.0.json"));
     assert_eq!(
         record["required"],
         json!([
@@ -739,7 +750,7 @@ fn the_schema_names_the_evidence_that_a_judged_row_prints() {
 /// read and stay unknown.
 #[test]
 fn the_change_record_schema_gives_reviewers_pending_both_meanings() {
-    let schema = read_json(&schemas_dir().join("change-record/1.0.0.json"));
+    let schema = read_json(&schemas_dir().join("change-record/1.1.0.json"));
     assert_eq!(
         schema["properties"]["reviewers_pending"]["description"],
         json!(
@@ -789,6 +800,58 @@ fn a_published_description_holds_no_line_wrap() {
         wrapped,
         Vec::<String>::new(),
         "each description holds paragraphs of one line"
+    );
+}
+
+/// Batch 38, case 6: version 1.1.0 of the evidence and the change record adds
+/// `sessions` and leaves the 1.0.0 files as batch 37 published them. The rows of
+/// the two 1.0.0 files hold the digests of that release, so a change of either
+/// file, or of its row, fails here.
+#[test]
+fn the_1_0_0_files_of_the_evidence_and_the_record_keep_their_rows() {
+    for (file, digest) in [
+        (
+            "change-record/1.0.0.json",
+            "125d390e48ebbdfc6c94f7e4cc5127204b1e3e0d39e83ae4df0b82587799e8e5",
+        ),
+        (
+            "evidence/1.0.0.json",
+            "9eef7491f3c0e7ade625d707fe3376d2f182547dfb5c44019841969f9cf26d0d",
+        ),
+    ] {
+        let manifest = read_json(&schemas_dir().join("published.json"));
+        let row = manifest["files"]
+            .as_array()
+            .expect("rows")
+            .iter()
+            .find(|row| row["path"] == file)
+            .unwrap_or_else(|| panic!("no row for {file}"));
+        assert_eq!(row["sha256"], json!(digest), "{file}: its row");
+        let bytes = fs::read(schemas_dir().join(file)).expect("read the schema");
+        assert_eq!(sha256_hex(&bytes), digest, "{file}: its bytes");
+    }
+}
+
+/// The 1.1.0 record schema lists `links.sessions` and does not require it, so
+/// that the added key is a minor version; it leaves `sessions_more` to a cut, and
+/// keeps `sessions` out of the evidence of the record (spec 5.4).
+#[test]
+fn the_record_schema_1_1_0_holds_the_sessions_in_links_only() {
+    let record = read_json(&schemas_dir().join("change-record/1.1.0.json"));
+    assert_eq!(record["$defs"]["Links"]["required"], json!(["work_items"]));
+    assert_eq!(
+        keys(&record["$defs"]["Links"]["properties"]),
+        ["work_items", "work_items_more", "sessions", "sessions_more"]
+    );
+    assert!(
+        record["$defs"]["RecordEvidence"]["properties"]
+            .get("sessions")
+            .is_none(),
+        "the evidence of a record leaves the sessions out"
+    );
+    assert_eq!(
+        record["$defs"]["RecordEvidence"]["properties"]["schema"]["description"],
+        json!("The schema id of the evidence document, `houserules/evidence@1.1.0`.")
     );
 }
 

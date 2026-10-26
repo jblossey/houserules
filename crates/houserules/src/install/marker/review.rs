@@ -6,7 +6,7 @@
 //! into a [`ReviewConfig`], or gives one line for each fault, which
 //! `check-knowledge` prints. A line names the marker and the key at fault. The
 //! faults come in the order of the sections of the key (`diffExclude`, `route`,
-//! `bundle`, `intent`, `ci`, `record`), not in the order of the file. Inside
+//! `bundle`, `intent`, `sessions`, `ci`, `record`), not in the order of the file. Inside
 //! `route` they come in this order: `default`, `warn`, each area in the order
 //! of the file, `paths`, the scores, `sampleRate`, and the line that
 //! `sampleRate` is needed. A key that the key list of spec 6.1 does not name is
@@ -34,7 +34,7 @@ use crate::rules::compile;
 
 /// The intent sources that `review.intent.sources` may name: the adapters of
 /// this binary (spec 4.9).
-pub(crate) const ADAPTERS: &[&str] = &["work-item", "file"];
+pub(crate) const ADAPTERS: &[&str] = &["work-item", "file", "openspec"];
 
 /// An intent adapter: one entry of [`ADAPTERS`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,17 +43,20 @@ pub(crate) enum Adapter {
     WorkItem,
     /// Files of the tree at the head.
     File,
+    /// The changes of an OpenSpec root in the tree at the head.
+    OpenSpec,
 }
 
 impl Adapter {
     /// Every adapter, in the order of [`ADAPTERS`].
-    pub(crate) const ALL: [Adapter; 2] = [Adapter::WorkItem, Adapter::File];
+    pub(crate) const ALL: [Adapter; 3] = [Adapter::WorkItem, Adapter::File, Adapter::OpenSpec];
 
     /// The name that config, the bundle, and the packet use for the adapter.
     pub(crate) fn name(self) -> &'static str {
         match self {
             Adapter::WorkItem => "work-item",
             Adapter::File => "file",
+            Adapter::OpenSpec => "openspec",
         }
     }
 
@@ -74,6 +77,10 @@ pub(crate) fn no_intent_source(source: &str) -> String {
         ADAPTERS.join(", ")
     )
 }
+
+/// The trailer key of the sessions while `review.sessions.trailers` is not set
+/// (batch 38, spec 5.1): the tool Entire links a commit to a session with it.
+pub(crate) const DEFAULT_SESSION_TRAILER: &str = "Entire-Checkpoint";
 
 /// The first line of a file that `houserules ci write` created (spec 10.3).
 /// The change analysis and `update` find the files of `ci write` by it.
@@ -107,6 +114,8 @@ pub(crate) struct ReviewConfig {
     pub(crate) bundle: BundleConfig,
     /// The intent sources and files (`review.intent`).
     pub(crate) intent: IntentConfig,
+    /// The trailers that name a session (`review.sessions`).
+    pub(crate) sessions: SessionsConfig,
     /// The size budget of a change record in bytes (`review.record.maxBytes`).
     pub(crate) max_bytes: u64,
 }
@@ -118,7 +127,26 @@ impl Default for ReviewConfig {
             route: RouteConfig::default(),
             bundle: BundleConfig::default(),
             intent: IntentConfig::default(),
+            sessions: SessionsConfig::default(),
             max_bytes: DEFAULT_MAX_BYTES,
+        }
+    }
+}
+
+/// The `review.sessions` settings (batch 38, spec 5.1 and 5.7).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SessionsConfig {
+    /// The keys of the trailers whose value is a session reference, each once,
+    /// as the first spelling of the list; a key matches without regard to its
+    /// case. [`DEFAULT_SESSION_TRAILER`] while the key is not set; the project's
+    /// empty list stays empty.
+    pub(crate) trailers: Vec<String>,
+}
+
+impl Default for SessionsConfig {
+    fn default() -> Self {
+        Self {
+            trailers: vec![DEFAULT_SESSION_TRAILER.to_string()],
         }
     }
 }
@@ -362,6 +390,9 @@ impl Reader<'_> {
         if let Some(intent) = self.section("review.intent", review.get("intent")) {
             config.intent = self.intent(intent);
         }
+        if let Some(sessions) = self.section("review.sessions", review.get("sessions")) {
+            config.sessions = self.sessions(sessions);
+        }
         if let Some(ci) = self.section("review.ci", review.get("ci")) {
             // The change analysis reads `review.ci.files` from the marker at each
             // commit; this call only reports the fault.
@@ -540,6 +571,24 @@ impl Reader<'_> {
         config
     }
 
+    /// The `review.sessions` settings. `trailers` must be an array of trailer keys
+    /// (letters, digits, and `-`); any other value is one line, whatever the
+    /// number of its faults. A key that the list repeats in another case reads
+    /// once, as its first spelling.
+    fn sessions(&mut self, sessions: &Map<String, Value>) -> SessionsConfig {
+        let mut config = SessionsConfig::default();
+        if let Some(value) = sessions.get("trailers") {
+            match trailer_keys(value) {
+                Some(keys) => config.trailers = keys,
+                None => self.fault(
+                    "review.sessions.trailers",
+                    "must be an array of trailer keys (letters, digits, and -)",
+                ),
+            }
+        }
+        config
+    }
+
     /// `review.record.maxBytes`: an integer of at least [`MIN_MAX_BYTES`].
     fn max_bytes(&mut self, value: Option<&Value>) -> u64 {
         match value {
@@ -685,6 +734,28 @@ impl Reader<'_> {
             }
         }
     }
+}
+
+/// The trailer keys of `value`, each once, or `None` when `value` is no array of
+/// keys. A key is a non-empty string of ASCII letters, digits, and `-`, the
+/// characters that git reads in a trailer key; the list keeps the first spelling
+/// of a key that it repeats in another case.
+fn trailer_keys(value: &Value) -> Option<Vec<String>> {
+    let mut keys: Vec<String> = Vec::new();
+    for item in value.as_array()? {
+        let key = item.as_str()?;
+        if key.is_empty()
+            || !key
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        {
+            return None;
+        }
+        if !keys.iter().any(|known| known.eq_ignore_ascii_case(key)) {
+            keys.push(key.to_string());
+        }
+    }
+    Some(keys)
 }
 
 #[cfg(test)]
@@ -857,7 +928,7 @@ mod tests {
                 ".houserules.json: review.route.default must be \"owner-review\" or \"senior-review\"",
                 ".houserules.json: review.route.sampleRate must be a number from 0 to 1",
                 ".houserules.json: review.bundle.budgets.light must be a non-negative integer",
-                ".houserules.json: review.intent.sources[0] \"nope\" is no intent source; use one of: work-item, file",
+                ".houserules.json: review.intent.sources[0] \"nope\" is no intent source; use one of: work-item, file, openspec",
                 ".houserules.json: review.ci.files must be an array of strings",
                 ".houserules.json: review.record.maxBytes must be an integer of at least 8192",
             ]
@@ -1022,11 +1093,25 @@ mod tests {
         assert!(marker.review_in_areas(&["tools"]).is_err());
     }
 
-    /// The intent sources that the lint accepts are the two adapters of the
-    /// batch, in the order of the config example.
+    /// The intent sources that the lint accepts are the three adapters, in the
+    /// order of the config example and then of the `openspec` adapter (spec
+    /// 3.6).
     #[test]
-    fn the_adapters_are_work_item_and_file() {
-        assert_eq!(ADAPTERS, ["work-item", "file"]);
+    fn the_adapters_are_work_item_file_and_openspec() {
+        assert_eq!(ADAPTERS, ["work-item", "file", "openspec"]);
+    }
+
+    /// `openspec` is a source that the lint accepts, once, at the place of its
+    /// first mention.
+    #[test]
+    fn openspec_is_an_adapter_that_the_lint_accepts() {
+        let config = marker(json!({"review": {"intent": {
+            "sources": ["openspec", "file", "openspec"],
+        }}}))
+        .review()
+        .expect("sound");
+
+        assert_eq!(config.intent.adapters(), [Adapter::OpenSpec, Adapter::File]);
     }
 
     /// A source that the list names twice is one adapter, at the place of its
@@ -1146,5 +1231,86 @@ mod tests {
         let keys: Vec<&String> = placed.map.keys().collect();
         assert_eq!(keys, ["reviewLayerOffered", "version"]);
         assert_eq!(placed.map["reviewLayerOffered"], json!(true));
+    }
+
+    /// Batch 38, spec 5.7: `review.sessions.trailers` lists the keys of the trailers
+    /// that name a session. Without the key the list is `Entire-Checkpoint`; `[]` is
+    /// the project's choice of no key; a key that the list repeats in another case
+    /// reads once, as its first spelling.
+    #[test]
+    fn the_session_trailers_default_to_entire_checkpoint_and_the_list_replaces_them() {
+        let read = |sessions: Value| {
+            marker(json!({"review": {"sessions": sessions}}))
+                .review()
+                .expect("sound")
+                .sessions
+                .trailers
+        };
+        let default = strings(&["Entire-Checkpoint"]);
+        assert_eq!(
+            marker(json!({"idPrefix": "WI"}))
+                .review()
+                .expect("defaults")
+                .sessions
+                .trailers,
+            default
+        );
+        assert_eq!(
+            marker(json!({"review": {}}))
+                .review()
+                .expect("sound")
+                .sessions
+                .trailers,
+            default
+        );
+        assert_eq!(read(json!({})), default);
+        assert_eq!(read(json!({"trailers": []})), Vec::<String>::new());
+        assert_eq!(
+            read(json!({"trailers": ["Session-Id", "Co-Thread"]})),
+            strings(&["Session-Id", "Co-Thread"])
+        );
+        assert_eq!(
+            read(json!({"trailers": ["Session-Id", "session-id", "SESSION-ID", "X-1"]})),
+            strings(&["Session-Id", "X-1"])
+        );
+    }
+
+    /// A list of session trailers with a fault is one line, whatever the number of
+    /// its faults, and a `sessions` value that is no object is one line of its own.
+    #[test]
+    fn a_session_trailer_list_with_a_fault_is_one_line() {
+        let line = ".houserules.json: review.sessions.trailers must be an array of trailer keys (letters, digits, and -)".to_string();
+        for trailers in [
+            json!("Session-Id"),
+            json!(5),
+            json!(null),
+            json!({"a": 1}),
+            json!(["Session-Id", 1]),
+            json!([""]),
+            json!(["a b"]),
+            json!(["a:b"]),
+            json!(["Session_Id"]),
+            json!(["caf\u{e9}"]),
+            json!(["a b", "c:d"]),
+        ] {
+            assert_eq!(
+                marker(json!({"review": {"sessions": {"trailers": trailers}}}))
+                    .review()
+                    .err(),
+                Some(vec![line.clone()]),
+                "{trailers}"
+            );
+        }
+        for sessions in [json!([]), json!("trailers"), json!(null)] {
+            assert_eq!(
+                marker(json!({"review": {"sessions": sessions}}))
+                    .review()
+                    .err(),
+                Some(vec![
+                    ".houserules.json: review.sessions must be an object".to_string()
+                ]),
+                "{sessions}"
+            );
+        }
     }
 }

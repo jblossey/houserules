@@ -7,6 +7,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::rules::git;
+
 /// Where a directory sits in its git repository.
 #[derive(Debug)]
 pub(crate) struct GitLocation {
@@ -97,16 +99,14 @@ impl fmt::Display for LocateError {
 /// directory may sit inside a repository, so that line stays git's own.
 const GIT_NO_REPOSITORY_FOUND: &str = "fatal: not a git repository (or any";
 
-/// `git rev-parse --show-toplevel --show-prefix` run in `dir`, with
-/// `LC_ALL=C`: without it git translates its messages
-/// (`LC_ALL=de_DE.UTF-8` prints `Schwerwiegend: Kein Git-Repository ...`),
-/// and the check against `GIT_NO_REPOSITORY_FOUND` reads English text.
+/// `git rev-parse --show-toplevel --show-prefix` run in `dir`, from the
+/// command of the git runner, which sets `LC_ALL=C`: without it git translates
+/// its messages (`LC_ALL=de_DE.UTF-8` prints `Schwerwiegend: Kein
+/// Git-Repository ...`), and the check against `GIT_NO_REPOSITORY_FOUND` reads
+/// English text.
 fn git_rev_parse_location(dir: &Path) -> Command {
-    let mut command = Command::new("git");
-    command
-        .args(["rev-parse", "--show-toplevel", "--show-prefix"])
-        .current_dir(dir)
-        .env("LC_ALL", "C");
+    let mut command = git::command(dir);
+    command.args(["rev-parse", "--show-toplevel", "--show-prefix"]);
     command
 }
 
@@ -151,9 +151,8 @@ mod tests {
     /// A fresh scratch directory with `git init` already run.
     fn scratch_git_repo() -> tempfile::TempDir {
         let dir = tempfile::tempdir().expect("tempdir");
-        let status = Command::new("git")
+        let status = git::command(dir.path())
             .args(["init", "-q"])
-            .current_dir(dir.path())
             .status()
             .expect("run git init");
         assert!(status.success(), "git init failed");
@@ -179,9 +178,8 @@ mod tests {
     #[test]
     fn git_location_in_keeps_the_git_line_for_another_git_failure() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let status = Command::new("git")
+        let status = git::command(dir.path())
             .args(["init", "-q", "--bare"])
-            .current_dir(dir.path())
             .status()
             .expect("run git init --bare");
         assert!(status.success(), "git init --bare failed");
@@ -207,6 +205,24 @@ mod tests {
                 Some(std::ffi::OsStr::new("C"))
             ))
         );
+    }
+
+    /// The resolution starts from the command of the git runner, which reads the
+    /// objects as committed (`GIT_NO_REPLACE_OBJECTS`) and runs in the directory.
+    #[test]
+    fn git_rev_parse_location_starts_from_the_command_of_the_git_runner() {
+        let command = git_rev_parse_location(Path::new("."));
+        let replace = command
+            .get_envs()
+            .find(|(key, _)| *key == std::ffi::OsStr::new("GIT_NO_REPLACE_OBJECTS"));
+        assert_eq!(
+            replace,
+            Some((
+                std::ffi::OsStr::new("GIT_NO_REPLACE_OBJECTS"),
+                Some(std::ffi::OsStr::new("1"))
+            ))
+        );
+        assert_eq!(command.get_current_dir(), Some(Path::new(".")));
     }
 
     /// Inside a repository the top level and the directory's own path

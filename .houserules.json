@@ -4,8 +4,8 @@
   "baselines": {
     "tools/claude-session-start.sh": "9a35725d9b0a90f851bb7974b57f9d94769a78f7d544c472bcd216cc5d408f7d",
     ".githooks/commit-msg": "32b161b8b965d50eee8aad833fad1387a74a72be6ad008fff6a3c3eae0dc9739",
-    ".claude/skills/migrating-knowledge/SKILL.md": "f0aaf7c0c4cd7e19e0666ef983a214498db73bfca6a687d53c53f0e4f0f2c2c5",
-    "knowledge/schema.json": "f3dcdc8d64631e6f4efc2b7ee236315fdde2c313e93ea537ed7f8c89a6c1e605",
+    ".claude/skills/migrating-knowledge/SKILL.md": "832995026fbbc09cee4926417309e3fb676d306855e0320f88b666cbde5a02a7",
+    "knowledge/schema.json": "b5d7882eb8b31f4c409221a82ade89eb29ff31d7cbee4ebbb62383bdaf4fac75",
     ".claude/skills/houserules-step/SKILL.md": "b6115464930bf3bf9b191bdd82806a622c2bbe3368a99ae81fe3dbd45d451df2",
     "tools/houserules-step.sh": "4ef925ee22cea10899c98358bfbcaa84c64f68c8ae61a25a8e503d144eae94a5",
     ".claude/schemas/deliverables.json": "3171ffaac4ba1081ae72044bae5b64830ee0ca026b4fc4bc1275df9f3cd13f90",
@@ -25,15 +25,15 @@
       "addedAreas": []
     },
     "process": {
-      "version": "2.1.0",
+      "version": "2.1.1",
       "source": "kit",
-      "sha256": "0484ed819ac249ea82a727021c7cce540d0beccde5f9b2eb82c90918db0a1735",
+      "sha256": "c207b1a729a974c294ec6f6d10a0a630ba0979f34e9498251f9593daa10fb7a5",
       "addedAreas": []
     },
     "quality": {
-      "version": "1.0.2",
+      "version": "1.0.3",
       "source": "kit",
-      "sha256": "acc2b51463fb65122f5c7d4bae520db0e79255fae282e48e83f23f05b17f1ec6",
+      "sha256": "2eb25b6f2ad6e916795987ee0ef9661b4150a1a6d6b445b051feeb480077f4a3",
       "addedAreas": []
     },
     "security-hygiene": {
@@ -52,7 +52,7 @@
   "renderers": [
     "claude"
   ],
-  "schema": "houserules/install@2.3.0",
+  "schema": "houserules/install@2.4.0",
   "tracker": {
     "adapter": "json"
   },
@@ -64,16 +64,16 @@
     "version": "1.4.0",
     "files": {
       ".claude/agents/branch-reviewer.md": "13da26c23be8f2eaff4c6e238bd79218cf22a53430c6b35137c889b010dec7ae",
-      ".claude/agents/implementer.md": "ae01e32b174a267131280c0c87259489ffa0eff129a4e08802f05fc9a6133a8a",
+      ".claude/agents/implementer.md": "9b9da53a6e0d482bc5634503bd2a28b9e53bc049319686a86edd5012393c92d9",
       ".claude/agents/spec-reviewer.md": "b3da2127a5443906885967bedaec9c7b06c9df5556033d09dfa32df1c8064cbb",
-      ".claude/agents/task-reviewer.md": "70616e1cefeb114780d2714636689fa1f2985c792debcb064a69c55ac892e067",
+      ".claude/agents/task-reviewer.md": "0800d037fe304a45d533943cfcb91dc25fe5595eab8d90bdd3cff30e477118f5",
       ".claude/evals/dependency-add.json": "892b7749151278e0c3ab6b75eafdb98b8b811abe48777d4df0bc3b083a2d9af5",
       ".claude/evals/docs-edit.json": "8be43f8c174b5ec65a95b6e1c84133521fed6a077fbae5516729f7e9e1c1f2f3",
       ".claude/evals/seeded-violations.json": "22f0f76c0f8bb18a1fcc5e2354bfeaab39aa52137d7e86e3c46019a16dbc61a7",
       ".claude/skills/designing/SKILL.md": "aa70308e0e9d58e94c688e257c5bd7f405b67afedef90b21909ab633e96cd2a5",
       ".claude/skills/finishing-a-feature/SKILL.md": "301fa2343725f7910efcc7184e71c2cce24c3dbe182234201969684580a83d55",
-      ".claude/skills/orchestrating/SKILL.md": "02869f51c033924931ca458fb3b53bdca0ddb7246c4e9d279e9af882917a402c",
-      ".claude/skills/planning/SKILL.md": "8acab72b9077e8e5697851351f6a830f7673d36cb8c96eaae1d518f3ab14eaf2",
+      ".claude/skills/orchestrating/SKILL.md": "ebb3c9f51384582b4688180e1b507af56e96bb91ef6b434791d0be9fea39d674",
+      ".claude/skills/planning/SKILL.md": "27b70d6a314e7629ce40e2aec69bd39dc94820d810981d344abab17d3657952b",
       "tools/reference-session-start.sh": "55993fb855bfd1117362b5eb60db6c6638176ea84dc69e48422ca7e29992b574"
     },
     "models": {

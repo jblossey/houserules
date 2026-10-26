@@ -3,7 +3,7 @@
 //! [`build`] turns the facts of a range into the [`Evidence`] document: the
 //! uncovered surface, the intents, the rows of the audit sorted into the lists
 //! that a reviewer reads (failed, warned, proven, judged, skipped), the size,
-//! the work items, and the route. [`markdown`] prints the packet from the
+//! the work items, the sessions, and the route. [`markdown`] prints the packet from the
 //! document, for a comment on a pull or merge request. The document holds every
 //! item whole; the packet is cut to [`PACKET_LIMIT`] characters in the order of
 //! spec 5.8, and each cut list ends with the count of the items it leaves out.
@@ -27,9 +27,11 @@ use serde_json::Value;
 use super::change::{self, Analysis, AuditSource, Coverage};
 use super::git;
 use super::intent::{self, IntentRef};
+use super::links;
 use super::route;
 use super::rules_hash;
-use super::text::{code_span, fenced};
+use super::text::{code_span, fenced, token_or_code_span};
+use super::validation;
 use crate::emit::emit;
 use crate::install::marker::review::{Adapter, no_intent_source};
 use crate::install::marker::{self, Marker};
@@ -37,7 +39,7 @@ use crate::published;
 use crate::published::audit_result::{AuditResult, AuditRow, RowMode, RowResult};
 use crate::published::change::{ChangeKind, EmptyChange, LineRange, UncoveredPath};
 use crate::published::evidence::{
-    Diff, Evidence, JudgedRow, PackPin, RuleRow, Rules, Uncovered, Verdict,
+    Diff, Evidence, JudgedRow, PackPin, RuleRow, Rules, Session, Uncovered, Verdict,
 };
 use crate::published::intent::Intent;
 use crate::published::route::RouteDocument;
@@ -55,6 +57,14 @@ pub(super) const WORK_ITEM_LIMIT: usize = 100;
 /// The work items that the packet keeps when the cut reaches the list (spec
 /// 5.8).
 const WORK_ITEMS_KEPT: usize = 50;
+
+/// The most sessions that the `Sessions:` line lists (batch 38, spec 5.3). The
+/// line is bounded, so it stays out of the cut order of spec 5.8.
+const SESSIONS_LISTED: usize = 20;
+
+/// The most characters of the value of a session in the packet (batch 38, spec
+/// 5.3).
+const SESSION_VALUE_LIMIT: usize = 100;
 
 /// The most characters of an intent's why once the cut reaches the intent
 /// blocks (spec 5.8).
@@ -89,9 +99,15 @@ pub(crate) struct EvidenceArgs {
     #[arg(long, value_name = "FILE")]
     pub(crate) review: Option<PathBuf>,
     /// The intent to add, written `<source>:<ref>` as the `Intent:` line of an
-    /// evidence bundle writes it. The source is `work-item` or `file`.
+    /// evidence bundle writes it. The source is `work-item`, `file`, or `openspec`.
     #[arg(long, value_name = "SOURCE:REF")]
     pub(crate) intent: Option<String>,
+    /// The capture file of an `openspec validate --json` run, written by `houserules capture`
+    /// at `--head` in a clean work tree. Each `openspec` intent takes the validation of its
+    /// change from it. A capture that cannot be used prints one line on stderr and leaves
+    /// every validation `null`.
+    #[arg(long, value_name = "FILE")]
+    pub(crate) validation: Option<PathBuf>,
     /// An external score from 0 to 1 for the route. It needs
     /// `review.route.ownerScore` or `review.route.seniorScore`.
     #[arg(long, value_name = "SCORE", allow_negative_numbers = true)]
@@ -99,7 +115,7 @@ pub(crate) struct EvidenceArgs {
     /// Writes the packet to this file in place of stdout.
     #[arg(long, value_name = "FILE")]
     pub(crate) out: Option<PathBuf>,
-    /// Also writes the evidence document `houserules/evidence@1.0.0` to this
+    /// Also writes the evidence document `houserules/evidence@1.1.0` to this
     /// file.
     #[arg(long, value_name = "FILE")]
     pub(crate) json: Option<PathBuf>,
@@ -110,21 +126,31 @@ pub(crate) struct EvidenceArgs {
     pub(crate) dir: Option<PathBuf>,
 }
 
+/// Where a change came from: the intents that say what it was meant to do and the
+/// sessions of the agent tools that wrote it. [`build`] copies both into the
+/// document.
+pub(crate) struct Provenance {
+    /// The intents of the change, in the order of spec 5.8.
+    pub(crate) intents: Vec<Intent>,
+    /// The sessions that the commits of the range cite, in commit order.
+    pub(crate) sessions: Vec<Session>,
+}
+
 /// The evidence document of the range of `analysis` (spec 5.9).
 ///
 /// The rows of `audit` go into the lists by mode and result, each list sorted
 /// by id: a deterministic row with the result `fail`, `warn`, `pass`, or
 /// `skipped` goes into `failed`, `warned`, `proven`, or `skipped`; a judged row
 /// goes into `judged` with the verdict of the first row of `review`
-/// (`rule_adherence`) that holds its id. `intents` are the intents in the order
-/// of spec 5.8, `packs` the packs that the marker pins at the head, and `route`
-/// the decision for the same range.
+/// (`rule_adherence`) that holds its id. `provenance` holds the intents in the
+/// order of spec 5.8 and the sessions, `packs` are the packs that the marker pins
+/// at the head, and `route` is the decision for the same range.
 pub(crate) fn build(
     analysis: &Analysis,
     coverage: &Coverage,
     audit: &AuditResult,
     review: Option<&Value>,
-    intents: Vec<Intent>,
+    provenance: Provenance,
     packs: Vec<PackPin>,
     route: RouteDocument,
 ) -> Evidence {
@@ -162,7 +188,7 @@ pub(crate) fn build(
         base: analysis.base.clone(),
         head: analysis.head.clone(),
         merge_base: analysis.merge_base.clone(),
-        intent: intents,
+        intent: provenance.intents,
         rules: Rules {
             merge_base_hash: analysis.rules.merge_base_hash.clone(),
             head_hash: analysis.rules.head_hash.clone(),
@@ -187,6 +213,7 @@ pub(crate) fn build(
         judged,
         skipped,
         work_items,
+        sessions: provenance.sessions,
         route,
     }
 }
@@ -320,6 +347,37 @@ pub(super) fn packet_line(path: &UncoveredPath) -> String {
         },
         ChangeKind::Submodule => "submodule".to_string(),
     }
+}
+
+/// The `Sessions:` line (batch 38, spec 5.3): `sessions` as `<sha7> <key>:
+/// <value>`, each value cut to [`SESSION_VALUE_LIMIT`] characters and in a code
+/// span, joined by `, `. A sha and a key print as they are, and in a code span
+/// when a note gave them with a character outside letters, digits, and `-`
+/// ([`token_or_code_span`]). The line lists at most [`SESSIONS_LISTED`] sessions and
+/// ends with `... and <k> more`, where `k` counts the sessions that it leaves out
+/// and the `more` that a cut of the record already left out. A line with no
+/// session is `Sessions: none`.
+pub(super) fn sessions_line(sessions: &[Session], more: u64) -> String {
+    let left_out = more + sessions.len().saturating_sub(SESSIONS_LISTED) as u64;
+    if sessions.is_empty() && left_out == 0 {
+        return "Sessions: none".to_string();
+    }
+    let mut parts: Vec<String> = sessions
+        .iter()
+        .take(SESSIONS_LISTED)
+        .map(|session| {
+            format!(
+                "{} {}: {}",
+                token_or_code_span(git::short(&session.commit)),
+                token_or_code_span(&session.trailer),
+                code_span(first_chars(&session.value, SESSION_VALUE_LIMIT))
+            )
+        })
+        .collect();
+    if left_out > 0 {
+        parts.push(format!("... and {left_out} more"));
+    }
+    format!("Sessions: {}", parts.join(", "))
 }
 
 /// The item of a rule row: its id and its evidence, cut and in code spans.
@@ -639,6 +697,7 @@ impl<'a> Packet<'a> {
             ));
         }
         text.push_str(&format!("\n{}\n", self.work_items_line(keep.work_items)));
+        text.push_str(&format!("{}\n", sessions_line(&document.sessions, 0)));
         text.push_str(&format!(
             "\n### Route\n\n{}\n",
             document.route.route.as_str()
@@ -782,8 +841,11 @@ pub(crate) fn cmd_evidence(args: EvidenceArgs) -> ExitCode {
         Err(code) => return code,
     };
     match run(&root, &args) {
-        Ok(text) => {
-            print!("{text}");
+        Ok(printed) => {
+            print!("{}", printed.stdout);
+            if let Some(line) = printed.notice {
+                eprintln!("{line}");
+            }
             ExitCode::SUCCESS
         }
         Err(lines) => {
@@ -795,9 +857,17 @@ pub(crate) fn cmd_evidence(args: EvidenceArgs) -> ExitCode {
     }
 }
 
-/// The text that `evidence` prints on stdout, after it wrote `--json` and
-/// `--out`. It is empty when `--out` names a file.
-fn run(root: &Path, args: &EvidenceArgs) -> Result<String, Vec<String>> {
+/// What a run of `evidence` that succeeded prints.
+struct Printed {
+    /// The text for stdout: the packet, empty when `--out` names a file.
+    stdout: String,
+    /// The line of `--validation` for stderr, when the capture was refused.
+    notice: Option<String>,
+}
+
+/// The text that `evidence` prints, after it wrote `--json` and `--out`. A failure after the
+/// capture was read has the line of a refused capture before its own lines.
+fn run(root: &Path, args: &EvidenceArgs) -> Result<Printed, Vec<String>> {
     let one = |line: String| vec![line];
     let score = args.score.map(score_in_range).transpose().map_err(one)?;
     let review = args
@@ -827,21 +897,47 @@ fn run(root: &Path, args: &EvidenceArgs) -> Result<String, Vec<String>> {
     let coverage = change::coverage(&analysis, &result, &base);
     let decision =
         route::decide(&analysis, Some((&result, &coverage)), &config.route, score).map_err(one)?;
-    let intents = intent::resolve(root, &analysis, &config.intent, named.as_ref()).map_err(one)?;
+    let linked = links::read(
+        root,
+        &analysis.base,
+        &analysis.head,
+        &config.sessions.trailers,
+    )
+    .map_err(one)?;
+    let mut intents =
+        intent::resolve(root, &analysis, &config.intent, &linked.names(named)).map_err(one)?;
+    let notice = validation::fill(
+        "evidence",
+        args.validation.as_deref(),
+        &analysis.head,
+        &mut intents,
+    );
     let document = build(
         &analysis,
         &coverage,
         &result,
         review.as_ref(),
-        intents,
+        Provenance {
+            intents,
+            sessions: linked.sessions,
+        },
         packs,
         decision,
     );
+    match write_outputs(args, &document) {
+        Ok(stdout) => Ok(Printed { stdout, notice }),
+        Err(lines) => Err(notice.into_iter().chain(lines).collect()),
+    }
+}
+
+/// Writes `--json` and `--out` for `document` and gives the text for stdout: the packet, or
+/// nothing when `--out` names a file. The `Err` is the line of the write that failed.
+fn write_outputs(args: &EvidenceArgs, document: &Evidence) -> Result<String, Vec<String>> {
     if let Some(file) = &args.json {
-        let text = emit(&serde_json::to_value(&document).expect("an evidence document serializes"));
+        let text = emit(&serde_json::to_value(document).expect("an evidence document serializes"));
         fs::write(file, text).map_err(|error| vec![format!("{}: {error}", file.display())])?;
     }
-    let packet = markdown(&document, &document.install);
+    let packet = markdown(document, &document.install);
     match &args.out {
         Some(file) => {
             fs::write(file, packet)
@@ -917,7 +1013,7 @@ mod tests {
     /// A document of a top-level install with no list entry.
     fn doc() -> Evidence {
         Evidence {
-            schema: "houserules/evidence@1.0.0".to_string(),
+            schema: "houserules/evidence@1.1.0".to_string(),
             install: ".".to_string(),
             base: "1".repeat(40),
             head: "2".repeat(40),
@@ -947,6 +1043,7 @@ mod tests {
             judged: Vec::new(),
             skipped: Vec::new(),
             work_items: Vec::new(),
+            sessions: Vec::new(),
             route: route_document(Vec::new()),
         }
     }
@@ -985,6 +1082,20 @@ mod tests {
             validation: None,
             artifacts: Vec::new(),
             unresolved: None,
+        }
+    }
+
+    /// The provenance of `intents` and `sessions`.
+    fn provenance(intents: Vec<Intent>, sessions: Vec<Session>) -> Provenance {
+        Provenance { intents, sessions }
+    }
+
+    /// A session of the commit that starts with `commit`.
+    fn session(commit: &str, trailer: &str, value: &str) -> Session {
+        Session {
+            commit: commit.repeat(40),
+            trailer: trailer.to_string(),
+            value: value.to_string(),
         }
     }
 
@@ -1122,7 +1233,7 @@ mod tests {
             &coverage(&analysis),
             &result,
             None,
-            Vec::new(),
+            provenance(Vec::new(), Vec::new()),
             Vec::new(),
             route_document(Vec::new()),
         );
@@ -1153,23 +1264,25 @@ mod tests {
             sha256: "d".repeat(64),
         }];
         let intent = vec![titled("work-item", "HR-1", Some("A title"))];
+        let sessions = vec![session("c", "Entire-Checkpoint", "cp-1")];
 
         let built = build(
             &analysis,
             &coverage(&analysis),
             &audit(Vec::new()),
             None,
-            intent.clone(),
+            provenance(intent.clone(), sessions.clone()),
             packs.clone(),
             route_document(Vec::new()),
         );
 
-        assert_eq!(built.schema, "houserules/evidence@1.0.0");
+        assert_eq!(built.schema, "houserules/evidence@1.1.0");
         assert_eq!(built.install, "sub");
         assert_eq!(built.base, "b".repeat(40));
         assert_eq!(built.head, "h".repeat(40));
         assert_eq!(built.merge_base, Some("m".repeat(40)));
         assert_eq!(built.intent, intent);
+        assert_eq!(built.sessions, sessions);
         assert_eq!(built.rules.merge_base_hash, Some("a".repeat(64)));
         assert_eq!(built.rules.head_hash, "c".repeat(64));
         assert_eq!(built.rules.packs, packs);
@@ -1234,7 +1347,7 @@ mod tests {
             &coverage(&analysis),
             &result,
             Some(&review),
-            Vec::new(),
+            provenance(Vec::new(), Vec::new()),
             Vec::new(),
             route_document(Vec::new()),
         );
@@ -1559,7 +1672,8 @@ mod tests {
             [
                 "",
                 "Diff: +10 -4 lines in 3 files",
-                "Work items: `HR-1`, `` A `b` ``"
+                "Work items: `HR-1`, `` A `b` ``",
+                "Sessions: none"
             ]
         );
         assert_eq!(
@@ -2104,8 +2218,45 @@ mod tests {
                 "judged",
                 "skipped",
                 "work_items",
+                "sessions",
                 "route"
             ]
+        );
+    }
+
+    #[test]
+    fn the_sessions_line_lists_20_sessions_cuts_each_value_and_counts_the_rest() {
+        let many: Vec<Session> = (0..23)
+            .map(|number| session("a", "Entire-Checkpoint", &format!("cp-{number}")))
+            .collect();
+
+        assert_eq!(sessions_line(&[], 0), "Sessions: none");
+        assert_eq!(
+            sessions_line(&many[..2], 0),
+            "Sessions: aaaaaaa Entire-Checkpoint: `cp-0`, aaaaaaa Entire-Checkpoint: `cp-1`"
+        );
+        let listed = sessions_line(&many, 0);
+        assert!(listed.ends_with(", ... and 3 more"), "{listed}");
+        assert_eq!(listed.matches("Entire-Checkpoint").count(), 20);
+        assert!(
+            sessions_line(&many[..20], 4).ends_with(", ... and 4 more"),
+            "a record that a cut shortened adds its own count"
+        );
+        assert!(
+            sessions_line(&many, 4).ends_with(", ... and 7 more"),
+            "the sessions past 20 and the sessions that a cut left out"
+        );
+        let long = session("b", "Session-Id", &"v".repeat(150));
+        assert_eq!(
+            sessions_line(&[long], 0),
+            format!("Sessions: bbbbbbb Session-Id: `{}`", "v".repeat(100)),
+            "a value is cut to 100 characters"
+        );
+        let hostile = session("c", "Session-Id", "a``b\nc");
+        assert_eq!(
+            sessions_line(&[hostile], 0),
+            "Sessions: ccccccc Session-Id: ```\"a``b\\nc\"```",
+            "a value with a control character prints as a JSON string in a span"
         );
     }
 }

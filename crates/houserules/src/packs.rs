@@ -30,8 +30,9 @@ pub(crate) const PACK_SCHEMA_MAJOR: u64 = 1;
 /// `require_trailer`, `exempt_authors`, and `exempt_subjects` fields of a
 /// `commits` check. Minor 2 names the `runner` check type and the `tool`,
 /// `non_empty`, and `covers_ids` fields of a check. Minor 3 names the
-/// `covers` field of a check.
-const PACK_SCHEMA_MINOR: u64 = 3;
+/// `covers` field of a check. Minor 4 names the `intent-required` and
+/// `intent-resolves` check types and the `sources` field of a check.
+const PACK_SCHEMA_MINOR: u64 = 4;
 
 /// The text that a pack's `schema` id starts with.
 const PACK_SCHEMA_PREFIX: &str = "houserules/pack@";
@@ -473,13 +474,13 @@ mod tests {
         ),
         (
             "process",
-            "2.1.0",
-            "0484ed819ac249ea82a727021c7cce540d0beccde5f9b2eb82c90918db0a1735",
+            "2.1.1",
+            "c207b1a729a974c294ec6f6d10a0a630ba0979f34e9498251f9593daa10fb7a5",
         ),
         (
             "quality",
-            "1.0.2",
-            "acc2b51463fb65122f5c7d4bae520db0e79255fae282e48e83f23f05b17f1ec6",
+            "1.0.3",
+            "2eb25b6f2ad6e916795987ee0ef9661b4150a1a6d6b445b051feeb480077f4a3",
         ),
         (
             "security-hygiene",
@@ -1054,8 +1055,8 @@ mod tests {
     }
 
     #[test]
-    fn the_embedded_pack_schema_names_minor_3_and_holds_the_check_of_the_knowledge_schema() {
-        assert_eq!(PACK_SCHEMA_MINOR, 3);
+    fn the_embedded_pack_schema_names_minor_4_and_holds_the_check_of_the_knowledge_schema() {
+        assert_eq!(PACK_SCHEMA_MINOR, 4);
         let pack: Value = serde_json::from_str(PACK_SCHEMA).expect("the embedded schema is JSON");
         let knowledge: Value =
             serde_json::from_str(include_str!("../../../template/knowledge/schema.json"))

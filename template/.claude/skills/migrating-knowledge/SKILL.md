@@ -50,8 +50,11 @@ If instead you have your own `CLAUDE.md` with real content and no
 `AGENTS.md`, `init` (a first-time install) or `update` (an install seeded
 before this release) seeds a fresh, generic `AGENTS.md` that knows
 nothing about your existing rules and leaves your `CLAUDE.md` exactly as
-it is (also seed-once) -- see README's `Updating` section for the exact
-`wrote AGENTS.md` line that names this state. Move your `CLAUDE.md`
+it is (also seed-once). `check-knowledge` then fails with `CLAUDE.md: the
+standing rules do not reach Claude Code; add @AGENTS.md to CLAUDE.md`, the
+line that names this state; the section "standing-rules.md is gone" of
+`docs/upgrading-to-2.md` in the houserules repository
+(github.com/jblossey/houserules) explains it. Move your `CLAUDE.md`
 content into `AGENTS.md` yourself, the same way the rest of this skill
 migrates any other source, then replace `CLAUDE.md` with a single
 `@AGENTS.md` line.
@@ -118,8 +121,8 @@ its own `history` entry when it is long enough to want one.
   checkable. It needs `type` and `level` (`fail` or `warn`); see
   `$defs.check.type` in `knowledge/schema.json` for the current list of
   types (`grep-absent`, `commits`, `co-change`, `diff-append-only`,
-  `report-field`, `durable-sha`, `runner`). Most migrated rules stay
-  text-only.
+  `report-field`, `durable-sha`, `runner`, `intent-required`,
+  `intent-resolves`). Most migrated rules stay text-only.
 - State only what the source states (`knowledge-base.state-only-the-source`).
   A paragraph that hints at a rule without stating it is not yet an entry —
   ask, or leave it for the next pass.
@@ -292,8 +295,12 @@ no check with `covers: true` read. It lists the intent, the failed, warned,
 proven, and judged rules, the size of the diff, and the route. With `--audit
 <file>`, the result of `audit --json` for the same range, it runs no second
 audit. With `--json <file>` it also writes the document
-`houserules/evidence@1.0.0`. It exits 0 whatever the audit finds. The jobs of the
-unit post the packet as the one comment of the install.
+`houserules/evidence@1.1.0`. With `--validation <file>`, a capture of
+`openspec validate --json` that `houserules capture` wrote at `--head` in a clean
+work tree, each `openspec` intent shows the result of that run. A capture that
+the command cannot use prints one line on stderr and changes nothing else. It
+exits 0 whatever the audit finds. The jobs of the unit post the packet as the one
+comment of the install.
 
 ### The route
 
@@ -324,15 +331,82 @@ install below the top level of the repository). Only the jobs of the unit push
 the ref. A clone does not fetch it:
 `git fetch origin refs/notes/houserules:refs/notes/houserules`. Then
 `houserules record show <sha>` prints the record and checks its rule hashes
-against git.
+against git. `record write` takes the same `--validation <file>` as `evidence`.
 
 ### The intent of a change
 
 The intent of a change is what it was meant to do. `review.intent.sources` lists
-the adapters to run, `work-item` and `file`. `review.intent.files` lists the
-globs of the files that the `file` adapter reads, for example
-`docs/plans/*.md`. The `Intent: <source>:<ref>` line of the bundle names one
-intent directly.
+the adapters to run: `work-item` (the default), `file`, or `openspec`.
+`review.intent.files` lists the globs of the files that the `file` adapter reads,
+for example `docs/plans/*.md`. The `Intent: <source>:<ref>` line of the bundle
+names one intent directly. A commit names one with the trailer
+`Intent: <source>:<ref>`, for example `Intent: openspec:<id>` for an OpenSpec
+change. A trailer never stops a command. A trailer whose key
+`review.sessions.trailers` lists (default `Entire-Checkpoint`) refers to a
+session of an agent tool, and the packet prints it in its `Sessions:` line.
+
+A project that plans with OpenSpec adds `openspec` to `review.intent.sources`, so
+that the packet finds a change by the paths that the range changes. It writes
+the result of `openspec validate --all --json` with `houserules capture` and
+passes the capture with `--validation <file>` to `evidence` and to `record write`.
+The page `docs/openspec.md` of the houserules repository
+(github.com/jblossey/houserules) holds the details, the hookup for the guidance
+of OpenSpec, and the warning for a project that runs OpenSpec beside the
+reference workflow.
+
+### The checks of intent
+
+Two check types judge the links of a change. No pack of the kit uses either one:
+a project opts in with an entry of its own. `intent-required` fails a change that
+touches a path that `if` matches and names no intent: no `Intent:` trailer of
+`sources` (`file` and `openspec`, both by default) resolves, and the range
+changes no file of a change that those adapters find. A commit whose subject
+matches a regex of `exempt_subjects` contributes no path: exempt a dependency
+bump and a release commit. `intent-resolves` fails for each `Intent:` trailer of
+the range whose intent resolves neither at the head nor at the merge base.
+
+```json
+{
+  "id": "project.changes-name-their-spec",
+  "kind": "rule",
+  "area": "global",
+  "standing": true,
+  "summary": "A change to src names its OpenSpec change in an Intent: trailer.",
+  "body": [
+    "A change that touches src/ is planned in an OpenSpec change.",
+    "Name it with the trailer Intent: openspec:<id>, or change its folder in the same range."
+  ],
+  "tags": ["openspec"],
+  "source": { "date": "2026-10-26", "by": "docs" },
+  "check": {
+    "type": "intent-required",
+    "level": "fail",
+    "if": ["src/**"],
+    "sources": ["openspec"],
+    "exempt_subjects": ["^chore\\(deps\\)", "^chore\\(main\\): release"]
+  }
+}
+```
+
+```json
+{
+  "id": "project.intents-resolve",
+  "kind": "rule",
+  "area": "global",
+  "standing": true,
+  "summary": "Each Intent: trailer names a spec that exists.",
+  "body": [
+    "A trailer that names a change or a file that the tree does not hold is a typo or a deleted spec."
+  ],
+  "tags": ["openspec"],
+  "source": { "date": "2026-10-26", "by": "docs" },
+  "check": { "type": "intent-resolves", "level": "fail" }
+}
+```
+
+A knowledge schema that the project changed or owns lacks both types: add them to
+the `type` enum of `$defs.check` and add the property `sources` there (see the
+upgrade guide of the houserules repository).
 
 ### The GitLab token
 
@@ -393,6 +467,8 @@ above. houserules ships no number. Write the answers to the `review` key of
   tool;
 - the intent sources and files (`review.intent.sources` and
   `review.intent.files`);
+- the trailer keys that refer to a session of an agent tool
+  (`review.sessions.trailers`);
 - which checks declare `covers: true`. A check is coverage only when its entry
   declares it, and no entry of the kit does. A change that no covering check
   reads lists every changed line as uncovered.

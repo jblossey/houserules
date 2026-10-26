@@ -1,6 +1,7 @@
 //! The record jobs of both units, run for real in a repository with a stub `houserules`, and the notes ref of an install.
 
 use super::*;
+use crate::validation_support::{clean_capture, document_of, item};
 
 /// What a run of a `record` job left: the output of the script, the calls of
 /// the stub `houserules`, the sandbox, the folder of the record files, the key
@@ -91,6 +92,17 @@ fn stub_github_host(
 /// commit is `key` and whose first commit is `first`, for a push whose commit
 /// before is `before` (`FIRST` stands for the first commit).
 fn run_github_record(sandbox: Sandbox, first: String, key: String, before: &str) -> RecordRun {
+    run_github_record_with(sandbox, first, key, before, &[])
+}
+
+/// Like [`run_github_record`], with the environment variables `extra` added to the job.
+fn run_github_record_with(
+    sandbox: Sandbox,
+    first: String,
+    key: String,
+    before: &str,
+    extra: &[(&str, &str)],
+) -> RecordRun {
     let unit = github();
     let server = format!("file://{}", text(&sandbox.path().join("remote")));
     let output_file = text(&sandbox.temp().join("github_output"));
@@ -99,20 +111,18 @@ fn run_github_record(sandbox: Sandbox, first: String, key: String, before: &str)
     } else {
         before
     };
-    let env = env_of(
-        &unit,
-        "record",
-        &[
-            ("GH_TOKEN", "ghs_read"),
-            ("GITHUB_SERVER_URL", server.as_str()),
-            ("GITHUB_REPOSITORY", "acme/widgets"),
-            ("GITHUB_SHA", key.as_str()),
-            ("HOUSERULES_DIR", "."),
-            ("HOUSERULES_KEY", "root"),
-            ("HOUSERULES_BEFORE", before),
-            ("GITHUB_OUTPUT", output_file.as_str()),
-        ],
-    );
+    let mut pairs = vec![
+        ("GH_TOKEN", "ghs_read"),
+        ("GITHUB_SERVER_URL", server.as_str()),
+        ("GITHUB_REPOSITORY", "acme/widgets"),
+        ("GITHUB_SHA", key.as_str()),
+        ("HOUSERULES_DIR", "."),
+        ("HOUSERULES_KEY", "root"),
+        ("HOUSERULES_BEFORE", before),
+        ("GITHUB_OUTPUT", output_file.as_str()),
+    ];
+    pairs.extend_from_slice(extra);
+    let env = env_of(&unit, "record", &pairs);
     let output = sandbox.run_bash(&unit.step_script("record", "Write the record"), env);
     let log = houserules_log(&sandbox);
     let folder = sandbox.temp().join("houserules-record-root");
@@ -417,27 +427,36 @@ fn stub_gitlab_host(sandbox: &Sandbox, key: &str, listing: Option<Value>) {
 /// `key` and whose first commit is `first`, for a push whose commit before is
 /// `before` (`FIRST` stands for the first commit).
 fn run_gitlab_record(sandbox: Sandbox, first: String, key: String, before: &str) -> RecordRun {
+    run_gitlab_record_with(sandbox, first, key, before, &[])
+}
+
+/// Like [`run_gitlab_record`], with the environment variables `extra` added to the job.
+fn run_gitlab_record_with(
+    sandbox: Sandbox,
+    first: String,
+    key: String,
+    before: &str,
+    extra: &[(&str, &str)],
+) -> RecordRun {
     let unit = gitlab("root");
     let before = if before == "FIRST" {
         first.as_str()
     } else {
         before
     };
-    let env = env_of(
-        &unit,
-        "record",
-        &[
-            ("HOUSERULES_DIR", "."),
-            ("HOUSERULES_SOURCE", "none"),
-            ("HOUSERULES_TRACKER", ""),
-            ("HOUSERULES_SETUP", ""),
-            ("CI_API_V4_URL", "https://gitlab.example/api/v4"),
-            ("CI_PROJECT_ID", "5"),
-            ("CI_JOB_TOKEN", "job-token"),
-            ("CI_COMMIT_SHA", key.as_str()),
-            ("CI_COMMIT_BEFORE_SHA", before),
-        ],
-    );
+    let mut pairs = vec![
+        ("HOUSERULES_DIR", "."),
+        ("HOUSERULES_SOURCE", "none"),
+        ("HOUSERULES_TRACKER", ""),
+        ("HOUSERULES_SETUP", ""),
+        ("CI_API_V4_URL", "https://gitlab.example/api/v4"),
+        ("CI_PROJECT_ID", "5"),
+        ("CI_JOB_TOKEN", "job-token"),
+        ("CI_COMMIT_SHA", key.as_str()),
+        ("CI_COMMIT_BEFORE_SHA", before),
+    ];
+    pairs.extend_from_slice(extra);
+    let env = env_of(&unit, "record", &pairs);
     let output = sandbox.run_sh(&unit.job_script("record"), env);
     let log = houserules_log(&sandbox);
     let folder = sandbox.work().join("houserules-record-root");
@@ -995,4 +1014,214 @@ fn two_installs_of_one_repository_get_distinct_notes_refs() {
     seen.sort();
     seen.dedup();
     assert_eq!(seen.len(), 3, "three installs, three refs: {seen:?}");
+}
+
+/// Spec 4.3 (batch 38): the `Write the record` step of the GitHub unit passes
+/// `--validation <dir>/<input>` to `record write`, after `--audit`, when the input is set and
+/// the file exists; a set input whose file does not exist prints one notice and passes no
+/// flag; an empty input does neither.
+#[test]
+fn the_github_record_job_passes_the_validation_capture_that_exists() {
+    for case in validation_cases() {
+        let (sandbox, first, key) = record_sandbox(false);
+        stub_github_host(
+            &sandbox,
+            &key,
+            pulls_of(&key),
+            &reviews_of_request_12(),
+            &[],
+        );
+        if let Some(left) = &case.left {
+            leave(&sandbox.work(), left);
+        }
+
+        let run = run_github_record_with(
+            sandbox,
+            first,
+            key,
+            "FIRST",
+            &[
+                ("HOUSERULES_DIR", case.dir),
+                ("HOUSERULES_VALIDATION", case.input),
+            ],
+        );
+
+        let name = format!("{:?} {:?}", case.dir, case.input);
+        assert_eq!(
+            run.output.status.code(),
+            Some(0),
+            "{name}: {}{}",
+            stdout(&run.output),
+            stderr(&run.output)
+        );
+        let flag = case
+            .passed
+            .map_or(String::new(), |path| format!(" --validation {path}"));
+        let call = record_write_call(&run);
+        let prefix = format!(
+            "record write --base {} --head {} --key {} --host github --out {} --dir {} --audit {}{flag} ",
+            run.first,
+            run.key,
+            run.key,
+            text(&run.folder.join("record.json")),
+            case.dir,
+            text(&run.folder.join("audit.json"))
+        );
+        assert!(call.starts_with(&prefix), "{name}: {call}");
+        let masked = stdout(&run.output);
+        let printed: Vec<&str> = masked
+            .lines()
+            .filter(|line| !line.starts_with("::add-mask::"))
+            .collect();
+        let notice = case
+            .notice
+            .map(|path| format!("::notice::{}", validation_notice(path)));
+        assert_eq!(
+            printed,
+            notice.iter().map(String::as_str).collect::<Vec<_>>(),
+            "{name}"
+        );
+    }
+}
+
+/// Spec 4.3 (batch 38): the script of the GitLab `record` job passes the capture under the same
+/// rule, with the notice of an absent file printed once.
+#[test]
+fn the_gitlab_record_job_passes_the_validation_capture_that_exists() {
+    for case in validation_cases() {
+        let (sandbox, first, key) = record_sandbox(true);
+        stub_gitlab_host(&sandbox, &key, merged_listing(&key));
+        if let Some(left) = &case.left {
+            leave(&sandbox.work(), left);
+        }
+
+        let run = run_gitlab_record_with(
+            sandbox,
+            first,
+            key,
+            "FIRST",
+            &[
+                ("HOUSERULES_DIR", case.dir),
+                ("HOUSERULES_VALIDATION", case.input),
+            ],
+        );
+
+        let name = format!("{:?} {:?}", case.dir, case.input);
+        assert_eq!(
+            run.output.status.code(),
+            Some(0),
+            "{name}: {}{}",
+            stdout(&run.output),
+            stderr(&run.output)
+        );
+        let flag = case
+            .passed
+            .map_or(String::new(), |path| format!(" --validation {path}"));
+        let call = record_write_call(&run);
+        let prefix = format!(
+            "record write --base {} --head {} --key {} --host gitlab --out houserules-record-root/record.json --dir {} --audit houserules-record-root/audit.json{flag} ",
+            run.first, run.key, run.key, case.dir
+        );
+        assert!(call.starts_with(&prefix), "{name}: {call}");
+        let printed = case.notice.map_or(String::new(), |path| {
+            format!("{}\n", validation_notice(path))
+        });
+        assert_eq!(stdout(&run.output), printed, "{name}");
+    }
+}
+
+/// Commits an install that plans with the OpenSpec change `add-x` on top of the repository in
+/// `directory`, pushes it to `origin`, and returns the new commit. The marker lists the
+/// `openspec` adapter, so the change is the intent of the push.
+fn commit_install_with_change(directory: &Path) -> String {
+    let files = [
+        (
+            ".houserules.json",
+            "{\"schema\":\"houserules/install@2.4.0\",\"idPrefix\":\"WI\",\"review\":{\"intent\":{\"sources\":[\"openspec\"]}}}\n",
+        ),
+        ("knowledge/schema.json", "{}\n"),
+        ("knowledge/areas.json", "{\"global\":{\"paths\":[]}}\n"),
+        ("knowledge/team.json", "{\"entries\":[]}\n"),
+        (
+            "openspec/changes/add-x/proposal.md",
+            "# Add x\n\n## Why\n\nBecause x.\n",
+        ),
+    ];
+    for (path, content) in files {
+        let target = directory.join(path);
+        fs::create_dir_all(target.parent().expect("a parent")).expect("create the folders");
+        fs::write(target, content).expect("write an install file");
+    }
+    git(directory, &["add", "."]);
+    git(directory, &["commit", "-q", "-m", "feat: add the change"]);
+    git(directory, &["push", "-q", "origin", "HEAD:refs/heads/main"]);
+    git(directory, &["rev-parse", "HEAD"]).trim().to_string()
+}
+
+/// The resolution end to end (`process.wiring-checks-run-the-resolution`): the argument that the
+/// GitLab `record` job builds from the `validation` input is the one that `record write` of this
+/// tree reads. The capture of the key commit is in the work tree, the job passes it, and the
+/// note that the job wrote holds the validation of the change; with a capture of another
+/// head, the same job writes the note with `validation: null`.
+#[test]
+fn the_validation_argument_of_the_gitlab_record_job_is_the_one_that_record_write_reads() {
+    let run_with = |capture_of: &dyn Fn(&str) -> String| {
+        let (sandbox, first, _) = record_sandbox(true);
+        sandbox.install_program("houserules", &forwarding_houserules());
+        let key = commit_install_with_change(&sandbox.work());
+        fs::write(sandbox.work().join("validation.json"), capture_of(&key))
+            .expect("write the capture");
+        stub_gitlab_host(&sandbox, &key, merged_listing(&key));
+        run_gitlab_record_with(
+            sandbox,
+            first,
+            key,
+            "FIRST",
+            &[("HOUSERULES_VALIDATION", "validation.json")],
+        )
+    };
+    let document = document_of(&[item("add-x", "change", false, &["ERROR", "WARNING"])]);
+
+    let used = run_with(&|key| clean_capture(key, &document));
+    let refused = run_with(&|_| clean_capture(&"9".repeat(40), &document));
+
+    for run in [&used, &refused] {
+        assert_eq!(
+            run.output.status.code(),
+            Some(0),
+            "{}{}",
+            stdout(&run.output),
+            stderr(&run.output)
+        );
+        assert!(
+            record_write_call(run).contains(" --validation ./validation.json "),
+            "{}",
+            record_write_call(run)
+        );
+    }
+    assert_eq!(
+        written_note(&used)["intent"][0]["validation"],
+        json!({"tool": "openspec", "ok": false, "summary": "2 issues"})
+    );
+    assert_eq!(
+        written_note(&refused)["intent"][0]["validation"],
+        Value::Null
+    );
+    let refusal = format!(
+        "record: --validation ./validation.json: ran at 9999999, not at {}",
+        &refused.key[..7]
+    );
+    let lines = stderr(&refused.output);
+    assert_eq!(
+        lines
+            .lines()
+            .filter(|line| line.starts_with("record: --validation"))
+            .collect::<Vec<_>>(),
+        [refusal.as_str()]
+    );
+    assert!(
+        !stderr(&used.output).contains("--validation"),
+        "{}",
+        stderr(&used.output)
+    );
 }

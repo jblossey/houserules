@@ -36,6 +36,10 @@ on:
         description: A shell command that runs before the audit in the gates and record jobs, for example a build of the project tools.
         type: string
         default: ''
+      validation:
+        description: The path, relative to the install, of a capture of openspec validate --json that the setup command writes with houserules capture. When the file exists, evidence and record write read it. Empty passes no capture.
+        type: string
+        default: ''
       install:
         description: release installs the version input; none expects the setup command to put houserules on the PATH.
         type: string
@@ -165,6 +169,19 @@ env:
         }
       ' "$1"
     }
+    hr_validation_file() {
+      [ -n "${HOUSERULES_VALIDATION:-}" ] || return 0
+      printf '%s/%s' "${HOUSERULES_DIR%/}" "$HOUSERULES_VALIDATION"
+    }
+    hr_validation_exists() {
+      hr_candidate=$(hr_validation_file)
+      [ -n "$hr_candidate" ] || return 1
+      if [ -f "$hr_candidate" ]; then
+        return 0
+      fi
+      hr_notice "houserules: the validation input names $hr_candidate, which does not exist, so this run passes no validation capture"
+      return 1
+    }
     hr_notes_ref() {
       hr_dir=${1#./}
       hr_dir=${hr_dir%/}
@@ -223,6 +240,7 @@ jobs:
       GH_TOKEN: ${{ inputs.tracker == 'github' && github.token || '' }}
       HOUSERULES_DIR: ${{ inputs.dir }}
       HOUSERULES_KEY: ${{ inputs.key }}
+      HOUSERULES_VALIDATION: ${{ inputs.validation }}
       HOUSERULES_BASE: ${{ github.event.pull_request.base.sha }}
       HOUSERULES_HEAD: ${{ github.event.pull_request.head.sha }}
       HOUSERULES_AUTHOR: ${{ github.event.pull_request.user.login }}
@@ -307,6 +325,9 @@ jobs:
           args=(--base "$HOUSERULES_BASE" --head "$HOUSERULES_HEAD" --dir "$HOUSERULES_DIR")
           if [ -s "$out/audit.json" ]; then
             args+=(--audit "$out/audit.json")
+          fi
+          if hr_validation_exists; then
+            args+=(--validation "$(hr_validation_file)")
           fi
           intent=$(hr_intent "$out/description.md")
           if [ -n "$intent" ]; then
@@ -544,6 +565,7 @@ jobs:
       GH_TOKEN: ${{ inputs.tracker == 'github' && github.token || '' }}
       HOUSERULES_DIR: ${{ inputs.dir }}
       HOUSERULES_KEY: ${{ inputs.key }}
+      HOUSERULES_VALIDATION: ${{ inputs.validation }}
       HOUSERULES_BEFORE: ${{ github.event.before }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -623,6 +645,9 @@ jobs:
             if [ -s "$out/audit.json" ]; then
               args+=(--audit "$out/audit.json")
             fi
+          fi
+          if hr_validation_exists; then
+            args+=(--validation "$(hr_validation_file)")
           fi
           pr=
           unknown=

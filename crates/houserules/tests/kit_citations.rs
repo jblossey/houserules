@@ -25,7 +25,7 @@ use serde_json::{Value, json};
 
 mod tracker_support;
 
-use tracker_support::sha256_hex;
+use tracker_support::{pack_pin, sha256_hex};
 
 /// The entry every case below deletes. Two kit-owned files cite it:
 /// `branch-reviewer.md` and the `orchestrating` skill.
@@ -652,14 +652,6 @@ fn retiring_an_uncited_kit_entry_with_an_override_ends_green() {
         "update reports the retired entry"
     );
     assert_eq!(run(dir.path(), "check-knowledge").status.code(), Some(0));
-}
-
-/// The `sha256` pin of a pack copy, as `pack add` writes it: the SHA-256 of
-/// the compact JSON of the parsed copy with every object's keys sorted.
-fn pack_pin(copy: &Value) -> String {
-    let mut canonical = copy.clone();
-    canonical.sort_all_objects();
-    sha256_hex(&serde_json::to_vec(&canonical).expect("serialize"))
 }
 
 /// The kit's `process` pack, as `template/packs/process.json` ships it.

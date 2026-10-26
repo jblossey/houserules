@@ -120,8 +120,8 @@ pub(crate) struct WriteArgs {
     /// names an intent whose adapter gives a why.
     #[arg(long, value_name = "TEXT")]
     pub(crate) purpose: Option<String>,
-    /// The intent to name, written `<source>:<ref>`. The source is `work-item`
-    /// or `file`. The command reads it in the install of the current
+    /// The intent to name, written `<source>:<ref>`. The source is `work-item`,
+    /// `file`, or `openspec`. The command reads it in the install of the current
     /// directory, at `HEAD`.
     #[arg(long, value_name = "SOURCE:REF")]
     pub(crate) intent: Option<String>,
@@ -410,15 +410,20 @@ pub(crate) fn parse(section: &str) -> Bundle {
 /// work items, so no other intent is read. A failure that is not the named
 /// intent's own is the `Err` with its line.
 fn resolve_one(root: &Path, analysis: &Analysis, named: &IntentRef) -> Result<Intent, String> {
-    intent::resolve(root, analysis, &IntentConfig::default(), Some(named))?
-        .into_iter()
-        .find(|found| found.source == named.source && found.reference == named.reference)
-        .ok_or_else(|| {
-            format!(
-                "no entry for the intent {}:{}",
-                named.source, named.reference
-            )
-        })
+    intent::resolve(
+        root,
+        analysis,
+        &IntentConfig::default(),
+        std::slice::from_ref(named),
+    )?
+    .into_iter()
+    .find(|found| found.source == named.source && found.reference == named.reference)
+    .ok_or_else(|| {
+        format!(
+            "no entry for the intent {}:{}",
+            named.source, named.reference
+        )
+    })
 }
 
 // ---- bundle write -------------------------------------------------------------------

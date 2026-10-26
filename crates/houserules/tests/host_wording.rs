@@ -7,8 +7,9 @@
 //! The scope is derived, not listed (`quality.gates-derive-their-scope`): every
 //! file that git tracks below `template/` (the files `init` and `update` write
 //! into a project, the packs and the skills among them) and below `ci/` (the
-//! published GitLab unit), the README, the upgrade guide, and the help of the
-//! binary: `houserules --help` and the help of every subcommand, found by
+//! published GitLab unit), the README, the upgrade guide, each page under
+//! `docs/` that the Documentation section of the README links, and the help of
+//! the binary: `houserules --help` and the help of every subcommand, found by
 //! reading the `Commands:` block of each help text down the tree. A file that
 //! cannot be read is a named failure, never a skip.
 //!
@@ -25,6 +26,7 @@
 //!   (`pull_request`) hold an underscore, so the pattern for the two words never
 //!   reaches them; [`github_names_hold_an_underscore`] pins it.
 
+mod docs_support;
 mod help_support;
 mod tracker_support;
 
@@ -147,6 +149,25 @@ fn read_text(relative: &str) -> Text {
     }
 }
 
+/// The pages under `docs/` that the Documentation section of the README links,
+/// in the order of the section, as paths relative to the repository root. A
+/// section that links no such page is a failure of the gate.
+fn documentation_pages() -> Vec<String> {
+    let readme = fs::read_to_string(repo_file("README.md"))
+        .unwrap_or_else(|error| panic!("README.md: {error}"));
+    let section = docs_support::section(&readme, "## Documentation");
+    let link = Regex::new(r"\]\((docs/[^)#\s]+\.md)\)").expect("the pattern compiles");
+    let pages: Vec<String> = link
+        .find_iter(&section)
+        .map(|hit| section[hit.group(1).expect("a page")].to_string())
+        .collect();
+    assert!(
+        !pages.is_empty(),
+        "the Documentation section of README.md links no page under docs/"
+    );
+    pages
+}
+
 /// What `houserules <args>` prints on stdout. The command exits 0.
 fn printed(args: &[&str]) -> String {
     let output = Command::new(env!("CARGO_BIN_EXE_houserules"))
@@ -190,7 +211,16 @@ fn corpus() -> Vec<Text> {
         .flat_map(|prefix| tracked(prefix))
         .map(|file| read_text(&file))
         .collect();
-    for file in ["README.md", "docs/upgrading-to-2.md"] {
+    let mut files = vec![
+        "README.md".to_string(),
+        "docs/upgrading-to-2.md".to_string(),
+    ];
+    for page in documentation_pages() {
+        if !files.contains(&page) {
+            files.push(page);
+        }
+    }
+    for file in &files {
         assert!(
             !tracked(file).is_empty(),
             "{file} is no tracked file of the gate's scope"
@@ -321,10 +351,11 @@ fn the_failure_message_names_both_forms_that_the_gate_reads() {
     }
 }
 
-/// The scope comes from git and from the help tree: every tracked file below
-/// `template/` and below `ci/` is read, the README and the upgrade guide are
-/// read, and the help of the root, of every top-level command, and of the
-/// subcommands of the review layer is read.
+/// The scope comes from git, from the README, and from the help tree: every
+/// tracked file below `template/` and below `ci/` is read, the README, the
+/// upgrade guide, and each page that the Documentation section of the README
+/// links are read, and the help of the root, of every top-level command, and of
+/// the subcommands of the review layer is read.
 #[test]
 fn the_scope_is_derived_from_the_tracked_files_and_from_the_help_tree() {
     let texts = corpus();
@@ -341,6 +372,9 @@ fn the_scope_is_derived_from_the_tracked_files_and_from_the_help_tree() {
     );
     for file in ["README.md", "docs/upgrading-to-2.md"] {
         assert!(names.contains(&file), "{file} is out of scope");
+    }
+    for page in documentation_pages() {
+        assert!(names.contains(&page.as_str()), "{page} is out of scope");
     }
     assert!(names.contains(&"houserules --help"));
     for command in [

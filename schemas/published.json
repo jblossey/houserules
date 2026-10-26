@@ -13,8 +13,16 @@
       "sha256": "125d390e48ebbdfc6c94f7e4cc5127204b1e3e0d39e83ae4df0b82587799e8e5"
     },
     {
+      "path": "change-record/1.1.0.json",
+      "sha256": "2610a313df72d7e7e139dd88f74e44f6e50c1c4e7750a59b5162ab23fadf29e5"
+    },
+    {
       "path": "evidence/1.0.0.json",
       "sha256": "9eef7491f3c0e7ade625d707fe3376d2f182547dfb5c44019841969f9cf26d0d"
+    },
+    {
+      "path": "evidence/1.1.0.json",
+      "sha256": "f75aca0c5fbf50c1b3712caf96a0740f9d67e6fb67deab7ad7c1289b58e7793d"
     },
     {
       "path": "route/1.0.0.json",

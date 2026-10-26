@@ -17,6 +17,14 @@ use tracker_support::{
     stderr, stdout, write_json,
 };
 
+/// The file of the spec of batch 38, below `docs/specs/`.
+const SPEC_FILE: &str = "2026-10-25-batch-38-openspec-and-release.md";
+
+/// What follows the file name in the line of a `review.sessions.trailers` that is no list of
+/// trailer keys (spec 5.7).
+const SESSION_TRAILERS_FAULT: &str =
+    "review.sessions.trailers must be an array of trailer keys (letters, digits, and -)";
+
 /// The three route values of the `review.route` keys, as the lines name them.
 const ROUTES: &str = r#""auto-merge-eligible", "owner-review", or "senior-review""#;
 
@@ -650,10 +658,54 @@ fn an_intent_source_that_is_no_adapter_is_one_line() {
     assert_fails_with(
         dir.path(),
         &[marker_line(
-            "review.intent.sources[1] \"spec-kit\" is no intent source; use one of: work-item, file",
+            "review.intent.sources[1] \"spec-kit\" is no intent source; use one of: work-item, file, openspec",
         )],
         "an unknown source",
     );
+}
+
+/// Batch 38, spec 5.7: `review.sessions.trailers` is an array of trailer keys
+/// (letters, digits, and `-`). A value with a fault is the one line of the spec, a
+/// `sessions` value that is no object is one line of its own, and a sound list
+/// passes.
+#[test]
+fn a_session_trailer_list_with_a_fault_is_one_line() {
+    let dir = install();
+    let list_line = marker_line(SESSION_TRAILERS_FAULT);
+    for trailers in [
+        json!("Session-Id"),
+        json!(["Session-Id", 1]),
+        json!([""]),
+        json!(["a b", "c:d"]),
+    ] {
+        set_review(dir.path(), json!({"sessions": {"trailers": trailers}}));
+        assert_fails_with(
+            dir.path(),
+            std::slice::from_ref(&list_line),
+            &trailers.to_string(),
+        );
+    }
+    set_review(dir.path(), json!({"sessions": []}));
+    assert_fails_with(
+        dir.path(),
+        &[marker_line("review.sessions must be an object")],
+        "a sessions value that is no object",
+    );
+    for trailers in [json!([]), json!(["Entire-Checkpoint", "Session-Id"])] {
+        set_review(dir.path(), json!({"sessions": {"trailers": trailers}}));
+        assert_passes(dir.path(), &trailers.to_string());
+    }
+}
+
+/// The line of this file that the spec of batch 38 gives as a literal is in the spec
+/// (`quality.user-facing-text-is-contract`).
+#[test]
+fn the_spec_lines_of_these_tests_are_in_the_spec() {
+    let spec = fs::read_to_string(repo_root().join("docs").join("specs").join(SPEC_FILE))
+        .expect("read the spec");
+    let line = marker_line(SESSION_TRAILERS_FAULT);
+
+    assert!(spec.contains(&format!("`{line}`")), "{line}");
 }
 
 /// Case 7: a `maxBytes` below 8,192 is one line, and 8,192 passes.
@@ -782,7 +834,7 @@ fn several_faults_give_one_line_each_in_the_order_of_the_sections() {
             marker_line(&format!("review.route.default must be {FALLBACK_ROUTES}")),
             marker_line("review.bundle.budgets.light must be a non-negative integer"),
             marker_line(
-                "review.intent.sources[0] \"nope\" is no intent source; use one of: work-item, file",
+                "review.intent.sources[0] \"nope\" is no intent source; use one of: work-item, file, openspec",
             ),
             marker_line("review.record.maxBytes must be an integer of at least 8192"),
         ],

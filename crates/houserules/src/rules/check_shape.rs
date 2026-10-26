@@ -53,6 +53,12 @@ pub(crate) enum CheckType {
     /// An external tool that the project defines in `.houserules.json`
     /// `runners`; `CheckDef::tool` names its key.
     Runner,
+    /// A change to the paths of `if` needs an intent: an `Intent:` trailer or a
+    /// changed OpenSpec change or plan file (batch 38, spec 5.5).
+    IntentRequired,
+    /// Each `Intent:` trailer of the range resolves at the head or at the merge
+    /// base (batch 38, spec 5.5).
+    IntentResolves,
 }
 
 /// A knowledge entry's `check.level`: whether a `fail` result blocks an
@@ -144,6 +150,10 @@ pub(crate) struct CheckDef {
     /// `check-knowledge` refuses the key on them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub covers: Option<bool>,
+    /// An `intent-required` check's adapters: `file`, `openspec`, or both.
+    /// Absent, and an empty list, read as both.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sources: Option<Vec<String>>,
 }
 
 impl CheckDef {
@@ -151,8 +161,9 @@ impl CheckDef {
     /// `covers: true`; empty for any other check. A `grep-absent`,
     /// `diff-append-only`, `durable-sha`, or `runner` check reads its `files`
     /// (a `runner` check with no `files` reads every file); a `co-change`
-    /// check reads its `if` and `then` files; a `commits` or `report-field`
-    /// check reads no file (spec 4.4).
+    /// check reads its `if` and `then` files; a `commits`, `report-field`,
+    /// `intent-required`, or `intent-resolves` check reads no file (spec 4.4
+    /// and batch-38 spec 5.5).
     pub(crate) fn covered_globs(&self) -> Vec<String> {
         if self.covers != Some(true) {
             return Vec::new();
@@ -169,7 +180,10 @@ impl CheckDef {
                 globs.extend(patterns(&self.then));
                 globs
             }
-            CheckType::Commits | CheckType::ReportField => Vec::new(),
+            CheckType::Commits
+            | CheckType::ReportField
+            | CheckType::IntentRequired
+            | CheckType::IntentResolves => Vec::new(),
         }
     }
 }
@@ -199,7 +213,7 @@ mod tests {
     /// `pattern`, `flags`, `scope`, `subject`, `body_absent`,
     /// `body_line_max`, `require_trailer`, `exempt_authors`,
     /// `exempt_subjects`, `if`, `then`, `per_commit`, `field`, `tool`,
-    /// `non_empty`, `covers_ids`, `covers`, plus `type`/`level`).
+    /// `non_empty`, `covers_ids`, `covers`, `sources`, plus `type`/`level`).
     fn full_sample() -> Value {
         json!({
             "type": "report-field",
@@ -222,6 +236,7 @@ mod tests {
             "non_empty": true,
             "covers_ids": true,
             "covers": true,
+            "sources": ["file", "openspec"],
         })
     }
 
@@ -243,6 +258,8 @@ mod tests {
                 CheckType::ReportField,
                 CheckType::DurableSha,
                 CheckType::Runner,
+                CheckType::IntentRequired,
+                CheckType::IntentResolves,
             ],
         );
     }
@@ -341,13 +358,19 @@ mod tests {
     }
 
     #[test]
-    fn a_commits_or_report_field_check_reads_no_file_whatever_it_declares() {
+    fn a_check_that_reads_no_file_reads_none_whatever_it_declares() {
         let commits = check(json!({"type": "commits", "level": "fail", "covers": true}));
         let report = check(json!({
             "type": "report-field", "level": "fail", "if": "**", "field": "f", "covers": true
         }));
+        let required = check(json!({
+            "type": "intent-required", "level": "fail", "if": "src/**", "covers": true
+        }));
+        let resolves = check(json!({"type": "intent-resolves", "level": "fail", "covers": true}));
 
         assert_eq!(commits.covered_globs(), Vec::<String>::new());
         assert_eq!(report.covered_globs(), Vec::<String>::new());
+        assert_eq!(required.covered_globs(), Vec::<String>::new());
+        assert_eq!(resolves.covered_globs(), Vec::<String>::new());
     }
 }

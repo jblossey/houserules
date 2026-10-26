@@ -1,8 +1,9 @@
 //! `stats` by model (spec 4.5, case 17): the `models` key, its `pre-2.0` row
 //! for a deliverable with no `model`, the spec reviews that `stats` reads as
 //! reviews, the remedy that names every file `stats` reads, and the sample
-//! `models` block of README (HR-165 (1)). Each case runs the compiled binary
-//! over a workspace that the test writes.
+//! `models` block of the process-cost page, `docs/process-cost.md` (HR-165
+//! (1)). Each case runs the compiled binary over a workspace that the test
+//! writes.
 
 mod tracker_support;
 
@@ -494,7 +495,7 @@ fn the_remedy_is_the_same_for_every_unreadable_file() {
     }
 }
 
-/// The workspace of README's sample `models` row: one task review that a model
+/// The workspace of the process-cost page's sample `models` row: one task review that a model
 /// wrote, with an important finding on code and a minor one on prose.
 fn models_sample_workspace() -> TempDir {
     let workspace = tempfile::tempdir().expect("tempdir");
@@ -509,11 +510,11 @@ fn models_sample_workspace() -> TempDir {
     workspace
 }
 
-/// The rule of README's sample `proposals` row. The kit's process pack ships
+/// The rule of the process-cost page's sample `proposals` row. The kit's process pack ships
 /// it.
 const PROPOSED_RULE: &str = "process.claims-match-artifacts";
 
-/// The workspace of README's sample `proposals` row: one task review with four
+/// The workspace of the process-cost page's sample `proposals` row: one task review with four
 /// minor findings on prose, each of which cites `PROPOSED_RULE`.
 fn proposals_sample_workspace() -> TempDir {
     let workspace = tempfile::tempdir().expect("tempdir");
@@ -535,36 +536,44 @@ fn proposals_sample_workspace() -> TempDir {
     workspace
 }
 
-/// Asserts that README holds `slice` as a fenced JSON block, byte for byte.
-fn assert_readme_holds(slice: &Value) {
+/// The page that holds the sample rows of `stats`.
+const PROCESS_COST_PAGE: [&str; 2] = ["docs", "process-cost.md"];
+
+/// Asserts that the process-cost page holds `slice` as a fenced JSON block,
+/// byte for byte.
+fn assert_page_holds(slice: &Value) {
     let slice = serde_json::to_string_pretty(slice).expect("serialize the slice");
     let expected = format!("```json\n{slice}\n```\n");
-    let readme = fs::read_to_string(repo_root().join("README.md"))
-        .expect("read README.md")
+    let path = PROCESS_COST_PAGE
+        .iter()
+        .fold(repo_root(), |path, part| path.join(part));
+    let page = fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
         .replace("\r\n", "\n");
     assert!(
-        readme.contains(&expected),
-        "README.md holds no block equal to the generated slice:\n{expected}"
+        page.contains(&expected),
+        "{} holds no block equal to the generated slice:\n{expected}",
+        PROCESS_COST_PAGE.join("/")
     );
 }
 
-/// HR-165 (1): README's sample `models` row is the frozen slice of what
-/// `stats` prints for the workspace of `models_sample_workspace`, byte for
-/// byte.
+/// HR-165 (1): the process-cost page's sample `models` row is the frozen
+/// slice of what `stats` prints for the workspace of `models_sample_workspace`,
+/// byte for byte.
 #[test]
-fn the_readme_stats_slice_equals_the_generated_slice() {
+fn the_process_cost_page_stats_slice_equals_the_generated_slice() {
     let install = install_without_backlog();
     let workspace = models_sample_workspace();
     let value = stats(install.path(), workspace.path());
-    assert_readme_holds(&value["models"][0]);
+    assert_page_holds(&value["models"][0]);
 }
 
-/// HR-165 (1): README's sample `proposals` row is the frozen slice of what
-/// `stats` prints for the workspace of `proposals_sample_workspace`, byte for
-/// byte. The slice is the `narrow` row. The standing budget of the kit's own
+/// HR-165 (1): the process-cost page's sample `proposals` row is the frozen
+/// slice of what `stats` prints for the workspace of
+/// `proposals_sample_workspace`, byte for byte. The slice is the `narrow` row. The standing budget of the kit's own
 /// rules adds a `budget` row that the sample leaves out.
 #[test]
-fn the_readme_proposals_slice_equals_the_generated_slice() {
+fn the_process_cost_page_proposals_slice_equals_the_generated_slice() {
     let install = install_with_the_process_pack_and_no_tracker();
     let workspace = proposals_sample_workspace();
     let value = stats(install.path(), workspace.path());
@@ -575,5 +584,5 @@ fn the_readme_proposals_slice_equals_the_generated_slice() {
         .iter()
         .find(|row| row["action"] == json!("narrow") && row["id"] == json!(PROPOSED_RULE))
         .unwrap_or_else(|| panic!("no narrow proposal for {PROPOSED_RULE}: {rows:?}"));
-    assert_readme_holds(narrow);
+    assert_page_holds(narrow);
 }

@@ -1,5 +1,5 @@
 //! `init` writes the 2.0 install (batch 33, spec sections 3, 7, and 9; batch 34,
-//! spec 4.6): the marker `houserules/install@2.3.0`, the `knowledge-base` pack
+//! spec 4.6): the marker `houserules/install@2.4.0`, the `knowledge-base` pack
 //! with its pin, no other pack, no topic file, and the Claude Code files only
 //! with `--target claude`.
 //! Each case runs the compiled binary against a scratch git repository.
@@ -194,7 +194,7 @@ fn init_writes_the_2_0_marker() {
             "baselines"
         ]
     );
-    assert_eq!(marker["schema"], json!("houserules/install@2.3.0"));
+    assert_eq!(marker["schema"], json!("houserules/install@2.4.0"));
     assert_eq!(marker["version"], json!(env!("CARGO_PKG_VERSION")));
     assert_eq!(marker["idPrefix"], json!("WI"));
     assert_eq!(marker["renderers"], json!([]));
@@ -885,36 +885,39 @@ fn init_names_a_kit_owned_file_that_cannot_be_read_and_leaves_it_alone() {
     );
 }
 
-/// A `defaultBranch` that is no string is one named line and changes nothing,
-/// for `init` and for `update`: the key is one that `audit` reads, and the
-/// marker has one reader.
+/// A `defaultBranch` that is no string, or the empty string (HR-251), is one named
+/// line and changes nothing, for `init` and for `update`: the key is one that
+/// `audit` reads, and the marker has one reader. The remedy is the project's: it
+/// names a branch or removes the key, and no command does it.
 #[test]
-fn init_and_update_name_a_default_branch_that_is_no_string_and_change_nothing() {
+fn init_and_update_name_a_default_branch_that_is_no_name_and_change_nothing() {
     for command in ["init", "update"] {
-        let dir = scratch_git_repo();
-        init_lines(dir.path(), &[]);
-        let mut stamp = marker(dir.path());
-        stamp["defaultBranch"] = json!(5);
-        write_marker(dir.path(), &stamp);
-        let before = snapshot(dir.path());
+        for value in [json!(5), json!("")] {
+            let dir = scratch_git_repo();
+            init_lines(dir.path(), &[]);
+            let mut stamp = marker(dir.path());
+            stamp["defaultBranch"] = value.clone();
+            write_marker(dir.path(), &stamp);
+            let before = snapshot(dir.path());
 
-        let output = houserules()
-            .args([command, "--dir"])
-            .arg(dir.path())
-            .output()
-            .expect("run the command");
+            let output = houserules()
+                .args([command, "--dir"])
+                .arg(dir.path())
+                .output()
+                .expect("run the command");
 
-        assert_eq!(output.status.code(), Some(2), "{command}");
-        assert_eq!(output.stdout, b"", "{command}");
-        assert_eq!(
-            String::from_utf8(output.stderr).expect("utf8 stderr"),
-            format!(
-                "{}: defaultBranch must be a string\n",
-                dir.path().join(".houserules.json").display()
-            ),
-            "{command}"
-        );
-        assert_same_tree(&before, &snapshot(dir.path()), command);
+            assert_eq!(output.status.code(), Some(2), "{command} {value}");
+            assert_eq!(output.stdout, b"", "{command} {value}");
+            assert_eq!(
+                String::from_utf8(output.stderr).expect("utf8 stderr"),
+                format!(
+                    "{}: defaultBranch must be a non-empty string\n",
+                    dir.path().join(".houserules.json").display()
+                ),
+                "{command} {value}"
+            );
+            assert_same_tree(&before, &snapshot(dir.path()), command);
+        }
     }
 }
 

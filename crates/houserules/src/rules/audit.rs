@@ -268,7 +268,7 @@ fn audit_range(base: &Base, opts: AuditOptions, base_sha: String) -> Result<Audi
     }
 
     let ctx = AuditContext::new(
-        root,
+        base,
         &prefix,
         base_sha.clone(),
         head_sha.clone(),
@@ -712,11 +712,11 @@ fn judge_references(tracker: &Lookup, outcome: &mut AuditOutcome) -> trailers::V
 mod tests {
     use std::collections::BTreeMap;
     use std::path::Path;
-    use std::process::Command;
 
     use serde_json::json;
 
     use super::*;
+    use crate::rules::git::command as git_command;
     use crate::rules::model::load_base;
 
     /// The result of `outcome` as the JSON document that `audit` prints, which
@@ -728,11 +728,7 @@ mod tests {
     // ---- fixture builders ----
 
     fn git(root: &Path, args: &[&str]) -> String {
-        let output = Command::new("git")
-            .args(args)
-            .current_dir(root)
-            .output()
-            .expect("run git");
+        let output = git_command(root).args(args).output().expect("run git");
         assert!(
             output.status.success(),
             "git {args:?} failed: {}",

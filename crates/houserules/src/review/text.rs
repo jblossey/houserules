@@ -7,8 +7,14 @@
 //! fence, and a `<!--` or a heading inside it never changes the layout of the
 //! comment around it (spec 4.8). No control character reaches the output
 //! raw: a code span holds a value with one as a JSON string, and a fenced
-//! block writes it as a `\u` escape. A caller that must keep the line count of
-//! a block exactly builds the block from [`escaped_line`] and [`fence_of`].
+//! block writes it as a `\u` escape. A code span holds a value that starts
+//! with a double quote as a JSON string too, so a printed value starts with a
+//! double quote exactly when it is a JSON string, and the text that spells the
+//! JSON form of an escape byte never prints like the byte. A caller that must
+//! keep the line count of a block exactly builds the block from
+//! [`escaped_line`] and [`fence_of`]. A caller that prints a value inside a
+//! line of its own text builds the value with [`plain_or_json_string`], the
+//! text of a code span.
 
 /// The length of the longest run of backticks in `value`; 0 when it holds none.
 fn longest_backtick_run(value: &str) -> usize {
@@ -39,6 +45,24 @@ pub(crate) fn json_string(value: &str) -> String {
         .collect()
 }
 
+/// `value` as a JSON string ([`json_string`]) when it holds a control
+/// character or starts with a double quote, and as it is otherwise: the text
+/// that [`code_span`] puts inside its span. A line of a caller's own text that
+/// holds a value prints it so.
+///
+/// A printed value starts with a double quote exactly when it is a JSON string,
+/// so the two forms never meet: the escape byte of `x<ESC>y` prints as
+/// `"x\u001by"`, the value `"x\u001by"` prints as `"\"x\\u001by\""`, and the
+/// text `x\u001by` prints as it is. A double quote after the first character
+/// stays as it is.
+pub(crate) fn plain_or_json_string(value: &str) -> String {
+    if value.starts_with('"') || value.chars().any(char::is_control) {
+        json_string(value)
+    } else {
+        value.to_string()
+    }
+}
+
 /// The fence of a block that holds `value`: one backtick longer than the
 /// longest backtick run of the value, and at least three backticks long.
 pub(crate) fn fence_of(value: &str) -> String {
@@ -61,17 +85,15 @@ pub(crate) fn escaped_line(line: &str) -> String {
 }
 
 /// `value` as a Markdown code span on one line. A value with a control
-/// character prints as a JSON string inside the span. The fence is one
+/// character, or one that starts with a double quote, prints as a JSON string
+/// inside the span ([`plain_or_json_string`]), so the text inside the span
+/// starts with a double quote exactly when it is a JSON string. The fence is one
 /// backtick longer than the longest backtick run of the printed text. A text
 /// that starts or ends with a backtick, or that starts and ends with a space,
 /// gets one space of padding on each side, so that the span shows the text
 /// whole. An empty value prints as a span of one space.
 pub(crate) fn code_span(value: &str) -> String {
-    let content = if value.chars().any(char::is_control) {
-        json_string(value)
-    } else {
-        value.to_string()
-    };
+    let content = plain_or_json_string(value);
     let fence = "`".repeat(longest_backtick_run(&content) + 1);
     if content.is_empty() {
         return format!("{fence} {fence}");
@@ -85,6 +107,19 @@ pub(crate) fn code_span(value: &str) -> String {
         format!("{fence} {content} {fence}")
     } else {
         format!("{fence}{content}{fence}")
+    }
+}
+
+/// `value` as it is when it holds only ASCII letters, digits, and `-`, as a short
+/// sha and a trailer key do, and as a code span for any other text. A token of
+/// that alphabet holds no character that Markdown reads, so a sound value keeps
+/// its plain form, and a value that came from a note and holds a line end or
+/// markup stays inside a span.
+pub(crate) fn token_or_code_span(value: &str) -> String {
+    if !value.is_empty() && value.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        value.to_string()
+    } else {
+        code_span(value)
     }
 }
 
@@ -116,6 +151,84 @@ pub(crate) fn fenced(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_token_prints_as_it_is_and_any_other_text_in_a_code_span() {
+        assert_eq!(token_or_code_span("3f9dc04"), "3f9dc04");
+        assert_eq!(token_or_code_span("Entire-Checkpoint"), "Entire-Checkpoint");
+        assert_eq!(token_or_code_span("<b>x</b"), "`<b>x</b`");
+        assert_eq!(token_or_code_span("a b"), "`a b`");
+        assert_eq!(
+            token_or_code_span("Evil\n## Injected"),
+            "`\"Evil\\n## Injected\"`"
+        );
+        assert_eq!(token_or_code_span(""), "` `");
+    }
+
+    #[test]
+    fn a_plain_value_prints_as_it_is_and_one_with_a_control_character_as_a_json_string() {
+        assert_eq!(plain_or_json_string("file:a.md"), "file:a.md");
+        assert_eq!(plain_or_json_string("x\\u001by"), "x\\u001by");
+        assert_eq!(plain_or_json_string("x\u{1b}y"), "\"x\\u001by\"");
+        assert_eq!(
+            plain_or_json_string("a\u{7f}\u{9b}b\tc"),
+            "\"a\\u007f\\u009bb\\tc\""
+        );
+        assert_eq!(plain_or_json_string(""), "");
+    }
+
+    #[test]
+    fn a_value_that_starts_with_a_quote_prints_as_a_json_string() {
+        assert_eq!(plain_or_json_string(r#""x\u001by""#), r#""\"x\\u001by\"""#);
+        assert_eq!(plain_or_json_string("\""), r#""\"""#);
+        assert_eq!(plain_or_json_string("\"a\" b"), r#""\"a\" b""#);
+        assert_ne!(
+            plain_or_json_string(r#""x\u001by""#),
+            plain_or_json_string("x\u{1b}y")
+        );
+    }
+
+    #[test]
+    fn a_value_with_a_quote_after_its_start_prints_as_it_is() {
+        assert_eq!(plain_or_json_string("say \"hi\""), "say \"hi\"");
+        assert_eq!(plain_or_json_string("x\""), "x\"");
+        assert_eq!(plain_or_json_string(" \"x\""), " \"x\"");
+        assert_eq!(plain_or_json_string("\\\"x"), "\\\"x");
+    }
+
+    #[test]
+    fn a_printed_value_starts_with_a_quote_exactly_when_it_is_a_json_string() {
+        for value in [
+            "",
+            "plain",
+            "x\u{1b}y",
+            r#""x\u001by""#,
+            "\"",
+            "a\"b",
+            "\"\u{1b}\"",
+            " \"",
+            "\u{7f}",
+        ] {
+            let printed = plain_or_json_string(value);
+
+            let decoded = if printed.starts_with('"') {
+                serde_json::from_str::<String>(&printed).expect("a JSON string")
+            } else {
+                printed
+            };
+            assert_eq!(decoded, value, "{value:?}");
+        }
+    }
+
+    #[test]
+    fn a_value_that_starts_with_a_quote_prints_in_a_span_as_a_json_string() {
+        assert_eq!(
+            code_span(r#""x\u001by""#),
+            format!("`{}`", r#""\"x\\u001by\"""#)
+        );
+        assert_ne!(code_span(r#""x\u001by""#), code_span("x\u{1b}y"));
+        assert_eq!(code_span("\"a`b"), "``\"\\\"a`b\"``");
+    }
 
     #[test]
     fn a_plain_value_prints_in_one_backtick() {

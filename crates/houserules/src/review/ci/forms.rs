@@ -313,7 +313,7 @@ fn line_index(lines: &[&str], what: &str, matches: impl Fn(&str) -> bool) -> usi
 /// The inline form for GitHub: the workflow of the unit from its `name` on, triggered by the
 /// requests and the pushes to the default branch `branch` of the project instead of a call, with
 /// every input bound for the install. The install of the form is the `release` of this binary, with
-/// no setup command.
+/// no setup command and no validation capture.
 pub(super) fn github_inline(wiring: &Wiring<'_>, unit: &str, branch: &str) -> String {
     let lines: Vec<&str> = unit.lines().collect();
     let name = line_index(&lines, "name", |line| line.starts_with("name:"));
@@ -336,7 +336,7 @@ pub(super) fn github_inline(wiring: &Wiring<'_>, unit: &str, branch: &str) -> St
             "key" => wiring.key.to_string(),
             "version" => wiring.version.to_string(),
             "install" | "floor-install" => "release".to_string(),
-            "setup" => String::new(),
+            "setup" | "validation" => String::new(),
             "tracker" => wiring.tracker.unwrap_or_default().to_string(),
             other => panic!("the unit reads the input {other}, which ci does not bind"),
         }
@@ -376,7 +376,7 @@ pub(super) fn gitlab_inline(wiring: &Wiring<'_>, unit: &str) -> String {
             "dir" => wiring.path.to_string(),
             "key" => wiring.key.to_string(),
             "install" | "floor-install" => "release".to_string(),
-            "setup" => String::new(),
+            "setup" | "validation" => String::new(),
             "tracker" => wiring.tracker.unwrap_or_default().to_string(),
             "token-environment" => format!("houserules-{}", wiring.key),
             "image" | "stage" => spec_default(spec, name),

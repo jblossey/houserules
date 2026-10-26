@@ -4,8 +4,8 @@
 //!
 //! A renderer plans its [`Output`]s from the merged base: [`agents_md`] is
 //! always on and owns one marked block of each `AGENTS.md` it writes to (the
-//! root block also names the session commands of the installed tracker and the
-//! pointer of the installed workflow);
+//! root block also names the split with OpenSpec, the session commands of the
+//! installed tracker, and the pointer of the installed workflow);
 //! [`claude`] is on when `renderers` in `.houserules.json` lists `claude` (or
 //! the key is absent) and owns the area files `.claude/rules/<area>.md` and
 //! the `project-knowledge` skill whole. [`apply`] writes the plan, or with
@@ -14,7 +14,13 @@
 //!
 //! `location` is the git resolution that the commands which load a base share
 //! (`render`, `check-knowledge`, and the check of the installed tracker).
-//! `block` holds the marker scan.
+//! `block` holds the marker scan. `openspec` reads the OpenSpec root of an
+//! install: the root block carries a section for it while the root has a
+//! planning shape (a folder `openspec/specs/` or `openspec/changes/` with no
+//! store metadata, found in the paths that git tracks, else in the work tree),
+//! and `init --workflow` and `check-knowledge` print a warning for an install
+//! that runs the reference workflow beside an OpenSpec root (a planning shape
+//! or a store pointer).
 //!
 //! `render_and_report` is `cmd_render`'s own non-`--check` body,
 //! extracted so `install::cmd_init` can render a freshly-seeded target
@@ -29,6 +35,7 @@ mod agents_md;
 mod block;
 mod claude;
 mod location;
+mod openspec;
 
 use std::collections::HashSet;
 use std::fmt;
@@ -44,6 +51,7 @@ use super::model::{Base, Entry, load_base};
 
 pub(crate) use location::{GitLocation, git_location_from_cwd};
 pub(super) use location::{LocateError, git_location_in};
+pub(crate) use openspec::two_workflows_line;
 
 /// Header stamped on every file `render` writes, so an editor knows not to hand-edit it.
 pub(crate) const GENERATED: &str = "Generated from knowledge/ by houserules render. Do not edit.";
@@ -381,7 +389,7 @@ fn apply(root: &Path, outputs: &[Output], check: bool) -> Result<Vec<Change>, Re
                 if let Some(parent) = abs.parent() {
                     fs::create_dir_all(parent).map_err(|error| RenderError::io(&path, &error))?;
                 }
-                fs::write(&abs, content.as_bytes())
+                crate::written::write(&abs, content.as_bytes())
                     .map_err(|error| RenderError::io(&path, &error))?;
             }
             Action::Remove { path } => match fs::remove_file(root.join(&path)) {

@@ -13,7 +13,7 @@ use serde_json::{Value, json};
 
 mod tracker_support;
 
-use tracker_support::sha256_hex;
+use tracker_support::{pack_pin, sha256_hex};
 
 /// The kit pack that every case installs.
 const PACK: &str = "quality";
@@ -50,14 +50,6 @@ fn write_json(path: &Path, value: &Value) {
         serde_json::to_string_pretty(value).expect("serialize JSON"),
     )
     .expect("write JSON file");
-}
-
-/// The `sha256` pin of a pack copy, as `pack add` writes it: the SHA-256 of
-/// the compact JSON of the parsed copy with every object's keys sorted.
-fn pack_pin(copy: &Value) -> String {
-    let mut canonical = copy.clone();
-    canonical.sort_all_objects();
-    sha256_hex(&serde_json::to_vec(&canonical).expect("serialize"))
 }
 
 /// Moves the `version` and the `sha256` of the pin of `<PACK>` in
@@ -297,4 +289,15 @@ fn an_absent_claude_md_passes() {
     let dir = pack_repo();
     fs::remove_file(dir.path().join("CLAUDE.md")).expect("remove CLAUDE.md");
     assert_passes(dir.path());
+}
+
+/// The shared `pack_pin` hashes the compact form of a copy with every
+/// object's keys sorted, so a copy with unsorted keys gets the sorted pin.
+#[test]
+fn the_shared_pack_pin_hashes_the_sorted_compact_form() {
+    let copy = json!({"version": "1.0.0", "entries": [{"summary": "s", "id": "x"}]});
+    assert_eq!(
+        pack_pin(&copy),
+        sha256_hex(br#"{"entries":[{"id":"x","summary":"s"}],"version":"1.0.0"}"#)
+    );
 }

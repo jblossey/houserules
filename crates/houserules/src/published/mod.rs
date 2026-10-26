@@ -8,8 +8,9 @@
 //! package has no library target) and generates the schema of each document
 //! from the type that serializes it.
 
-use schemars::JsonSchema;
+use schemars::{JsonSchema, Schema};
 use serde::Serialize;
+use serde_json::Value;
 
 pub(crate) mod audit_result;
 pub(crate) mod capture;
@@ -37,6 +38,16 @@ pub(crate) fn id<T: Published>() -> String {
     format!("houserules/{}@{}", T::NAME, T::VERSION)
 }
 
+/// A schema transform that removes `sessions` from the `required` list of an object
+/// schema and leaves it in `properties`. Version 1.1.0 of the evidence and of the
+/// change record adds the key, and a new required key is a major version, so the
+/// schema does not require a key that the documents always print.
+pub(crate) fn leave_sessions_optional(schema: &mut Schema) {
+    if let Some(Value::Array(required)) = schema.get_mut("required") {
+        required.retain(|name| name != "sessions");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -55,7 +66,8 @@ mod tests {
         assert_eq!(id::<route::RouteDocument>(), "houserules/route@1.0.0");
         assert_eq!(
             id::<change_record::ChangeRecord>(),
-            "houserules/change-record@1.0.0"
+            "houserules/change-record@1.1.0"
         );
+        assert_eq!(id::<evidence::Evidence>(), "houserules/evidence@1.1.0");
     }
 }

@@ -1,9 +1,10 @@
 //! The help texts and the documents that state the runner, workspaces, and
 //! audit behavior (spec 12): the
 //! `--help` of `audit`, `check-knowledge`, `check-report-claims`, `init`, and
-//! `update`, and the documents that state the same behavior (README, the
-//! upgrade guide, the docs README of the template, and the migrating-knowledge
-//! skill). `stats --help` is pinned in `stats_35.rs`.
+//! `update`, and the documents that state the same behavior (the README and
+//! its reference pages under `docs/`, the upgrade guide, the docs README of the
+//! template, and the migrating-knowledge skill). `stats --help` is pinned in
+//! `stats_35.rs`.
 //!
 //! Every statement is compared on the text with each run of white space
 //! folded to one space, because clap and the Markdown files wrap their lines.
@@ -11,13 +12,14 @@
 //! one run shows the whole gap. Clap drops the period that ends the last
 //! sentence of a command's description, so no pin ends on it.
 
+mod docs_support;
 mod help_support;
 mod tracker_support;
 
 use help_support::{folded, help_of, omits, read, states};
 
 /// The sentence on the reference counts of the audit JSON (spec 8.5). The help
-/// of `audit`, README, and the upgrade guide say the same.
+/// of `audit`, the trackers page, and the upgrade guide say the same.
 const REFERENCE_COUNTS: &str = "`references.failures` lists each failure line, `references.checked` counts the references that the tracker judged, `references.passed` counts those among them that passed, `references.skipped` counts those that the audit did not judge (no tracker, a tracker that cannot be reached, or a tracker that answered with an error), and `summary.reference_fail` counts the failures";
 
 /// The count that the audit JSON no longer holds. The text is built from two
@@ -244,7 +246,7 @@ fn update_help_names_the_restamp_and_the_kept_keys() {
         "update --help",
         &help_of("update"),
         &[
-            "It restamps the install schema `houserules/install@2.2.0` to `houserules/install@2.3.0` and prints `wrote .houserules.json (houserules/install@2.3.0)` once; a second run prints no such line",
+            "It restamps the install schema `houserules/install@2.2.0` or `houserules/install@2.3.0` to `houserules/install@2.4.0` and prints `wrote .houserules.json (houserules/install@2.4.0)` once; a second run prints no such line",
             "The keys `runners`, `workspaces`, and `review` of `.houserules.json` keep their values",
         ],
     );
@@ -301,36 +303,61 @@ fn init_help_names_the_tracker_pattern_it_keeps() {
     );
 }
 
-// ---- README ---------------------------------------------------------------------------
+// ---- README and its reference pages ---------------------------------------------------
 
-/// The CLI table, the runner section, the ignore line, and the reference
-/// counts (spec 12).
+/// The runners page, the ignore line of the evidence page, the reference counts
+/// of the trackers page, and the row of `audit` in the CLI reference (spec 12).
+/// The README links the runners page.
 #[test]
-fn readme_states_the_runners_the_ignore_line_and_the_reference_counts() {
-    let raw = read("README.md");
-    let readme = folded(&raw);
-    assert!(
-        raw.lines().any(|line| line == "## Runners"),
-        "README has no section `## Runners`"
+fn the_reference_pages_state_the_runners_the_ignore_line_and_the_reference_counts() {
+    let runners = read("docs/runners.md");
+    assert_eq!(
+        runners.lines().next(),
+        Some("# Runners"),
+        "docs/runners.md starts with no `# Runners`"
     );
     states(
         "README.md",
-        &readme,
+        &folded(&read("README.md")),
+        &["[Runners](docs/runners.md)"],
+    );
+    states(
+        "docs/runners.md",
+        &folded(&runners),
         &[
-            "- [Runners](#runners)",
-            REFERENCE_COUNTS,
-            "`.houserules/` holds the scratch output of the step and, by default, the batch workspaces, and `init` adds it to `.gitignore`",
             "A runner check runs an external tool over a change and fails the audit on what the tool reports. Your project defines the tool; the kit ships none",
             "An `exit-code` tool passes when every call exits 0 (`exited 0 in 1 call`). Otherwise the row fails with the evidence of the failing call: the first non-blank line of its stderr, trimmed; `exited <n>` when stderr holds no text; or `ended by a signal` when a signal ended the tool",
             "The tool reads the working tree, so a triggered runner check needs the tree at `--head` checked out",
             "`audit` stops with exit 2, one line on stderr, and no rows when a triggered check cannot run",
             "The jobs install no tool: pass the install step of your tools to the `setup` input of the unit, or add it to your own CI",
+        ],
+    );
+    let trackers = folded(&read("docs/trackers.md"));
+    states("docs/trackers.md", &trackers, &[REFERENCE_COUNTS]);
+    let evidence = folded(&read("docs/evidence.md"));
+    states(
+        "docs/evidence.md",
+        &evidence,
+        &[
+            "`.houserules/` holds the scratch output of the step and, by default, the batch workspaces, and `init` adds it to `.gitignore`",
+        ],
+    );
+    states(
+        "docs/cli.md",
+        &folded(&read("docs/cli.md")),
+        &[
             "| `audit` | Builds a git range's rule package and runs every deterministic check, the tool of each `runner` check included,",
         ],
     );
+    let all = docs_support::REFERENCE_PAGES
+        .iter()
+        .map(|path| folded(&read(path)))
+        .fold(folded(&read("README.md")), |all, text| {
+            format!("{all} {text}")
+        });
     omits(
-        "README.md",
-        &readme,
+        "README.md and its reference pages",
+        &all,
         &[
             OLD_REFERENCE_COUNT,
             "`.houserules/step/` holds scratch output",
@@ -338,13 +365,14 @@ fn readme_states_the_runners_the_ignore_line_and_the_reference_counts() {
     );
 }
 
-/// "Measure process cost": the window, the new `rules` keys, the `sanctioned`
-/// list, and `reversals` (spec 4, 6, and 9 (8)).
+/// The process-cost page: the window, the new `rules` keys, the `sanctioned`
+/// list, and `reversals`; and the row of `stats` in the CLI reference (spec 4,
+/// 6, and 9 (8)).
 #[test]
-fn readme_states_the_stats_window_and_the_new_keys() {
+fn the_process_cost_page_states_the_stats_window_and_the_new_keys() {
     states(
-        "README.md",
-        &folded(&read("README.md")),
+        "docs/process-cost.md",
+        &folded(&read("docs/process-cost.md")),
         &[
             "houserules stats --window 5 .houserules/work/*/",
             "`--window <n>` reads only the `n` most recent workspaces",
@@ -353,6 +381,12 @@ fn readme_states_the_stats_window_and_the_new_keys() {
             "`cost` is the sum, over the reviews that judged the rule, of each review's share of its bytes (`null` for a rule with no judged rows)",
             "`sanctioned`: one row for each fail that a sanction accepts, with the rule `id`, the `workspace`, the `task`, and the `ref` of the sanction",
             "`reversals` counts the `Reversal:` lines of the `progress.md` of the workspace: a line counts when it starts with `Reversal:`, after optional spaces and an optional list marker with its space (`- `, `* `, or `+ `)",
+        ],
+    );
+    states(
+        "docs/cli.md",
+        &folded(&read("docs/cli.md")),
+        &[
             "| `stats <workspace>...` | Aggregates rule violations, sanctioned fails, process cost, and knowledge-base proposals across one or more workspaces; `--window <n>` reads the `n` most recent |",
         ],
     );
@@ -466,5 +500,62 @@ fn the_migrating_knowledge_skill_teaches_runners() {
             "Pin an exact version of the tool in the `install` line and in your CI",
             "Check out the head of the pull or merge request, not a merge commit, before the audit when the project uses `runner` checks",
         ],
+    );
+}
+
+/// The migrating-knowledge skill names the line that `check-knowledge` prints in the state that
+/// `init` leaves in a project with a `CLAUDE.md` of its own and no `AGENTS.md`: a seeded
+/// `AGENTS.md` and the project's `CLAUDE.md`, which does not import it. The skill names the page
+/// that explains the line, and no section of the README.
+#[test]
+fn the_migrating_knowledge_skill_names_the_line_of_its_claude_md_state() {
+    let dir = tracker_support::scratch_git_repo();
+    let own = "# Our rules\n\nIndent with tabs.\n";
+    std::fs::write(dir.path().join("CLAUDE.md"), own).expect("write CLAUDE.md");
+    tracker_support::run_ok(dir.path(), &["init"]);
+    assert!(
+        dir.path().join("AGENTS.md").is_file(),
+        "init seeds AGENTS.md"
+    );
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("CLAUDE.md")).expect("read CLAUDE.md"),
+        own,
+        "init keeps the CLAUDE.md of the project"
+    );
+    tracker_support::git(dir.path(), &["add", "-A"]);
+    let checked = tracker_support::run(dir.path(), &["check-knowledge"]);
+    assert_eq!(checked.status.code(), Some(1), "check-knowledge fails");
+    let stderr = String::from_utf8(checked.stderr).expect("UTF-8 stderr");
+    let line = stderr
+        .lines()
+        .find(|line| line.starts_with("CLAUDE.md: "))
+        .unwrap_or_else(|| panic!("check-knowledge names no CLAUDE.md line:\n{stderr}"));
+
+    let skill = folded(&read(
+        "template/.claude/skills/migrating-knowledge/SKILL.md",
+    ));
+    states(
+        "migrating-knowledge skill",
+        &skill,
+        &[
+            &format!("`check-knowledge` then fails with `{line}`"),
+            "the section \"standing-rules.md is gone\" of `docs/upgrading-to-2.md` in the houserules repository (github.com/jblossey/houserules) explains it",
+        ],
+    );
+    omits(
+        "migrating-knowledge skill",
+        &skill,
+        &["README's `Updating` section", "`wrote AGENTS.md` line"],
+    );
+    assert!(
+        read("docs/upgrading-to-2.md")
+            .lines()
+            .any(|text| text == "### standing-rules.md is gone"),
+        "docs/upgrading-to-2.md has the section that the skill names"
+    );
+    states(
+        "docs/upgrading-to-2.md",
+        &folded(&read("docs/upgrading-to-2.md")),
+        &[&format!("`check-knowledge` fails: `{line}`")],
     );
 }

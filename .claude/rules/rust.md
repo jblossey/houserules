@@ -17,7 +17,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 - [houserules.pinned-git-text-runs-hermetic] A test that pins text git prints runs git with LC_ALL=C, no injected configuration, and an explicit core.abbrev; the host locale and config change the text.
 - [houserules.platform-gated-tests] Gate platform-specific code with #[cfg]: a std::os::unix or std::os::windows use compiles only on that platform; CI builds all targets on three OSes.
 - [houserules.pnpm-only] Use cargo for every package operation in this repository (`cargo add <crate>@=<version>`); pnpm, npm, and npx left the toolchain at batch 20 T3.
-- [houserules.task-gates-mirror-ci] A task-end gate run includes every check CI runs on push or pull request; a local gate list that omits a CI check is stale.
+- [houserules.task-gates-mirror-ci] A task's gate list holds every check CI runs; the task runs each but the full suite and the autocrlf suite, which the controller runs at integration.
 - [quality.exclusive-pins-are-mutation-proven] A test that pins 'this and nothing else' on a contract surface compares the whole structure and proves each forbidden shape with a mutation.
 - [quality.gates-derive-their-scope] A permanent gate derives its scope (tracked files minus declared, reasoned exclusions) and fails loudly on unreadable input; a hand-typed list is ungated.
 - [quality.lint-the-token-not-the-document] A lint whose subject is a delimited token matches the token and its delimiters with one pattern; it pairs no delimiters and models no document around it.

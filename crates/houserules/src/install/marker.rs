@@ -170,18 +170,29 @@ pub(crate) struct Marker {
 /// The install schema id that `init` stamps and the 1.x conversion writes:
 /// 2.1.0 adds the `tracker`, `workflow`, and `optInOffered` keys to the
 /// marker (batch 34, spec 3.7), 2.2.0 adds the `runners` and `workspaces`
-/// keys (batch 35, spec 10), and 2.3.0 adds the `review` and
-/// `reviewLayerOffered` keys (batch 37, spec 6.1 and 10.7).
-pub(super) const INSTALL_SCHEMA: &str = "houserules/install@2.3.0";
+/// keys (batch 35, spec 10), 2.3.0 adds the `review` and
+/// `reviewLayerOffered` keys (batch 37, spec 6.1 and 10.7), and 2.4.0 adds
+/// `review.sessions.trailers` and the intent source `openspec`, and refuses
+/// an empty `defaultBranch` (batch 38, spec 5.7 and 14).
+pub(super) const INSTALL_SCHEMA: &str = "houserules/install@2.4.0";
 
 /// The folder, relative to the install root, that holds the batch workspaces
 /// while the marker sets no `workspaces` key (batch 35, spec 7). The ignore
 /// line `.houserules/` covers it.
 pub(crate) const DEFAULT_WORKSPACES: &str = ".houserules/work";
 
-/// The install schema id that [`Marker::restamp_install_schema`] replaces
-/// with [`INSTALL_SCHEMA`].
-const PREVIOUS_INSTALL_SCHEMA: &str = "houserules/install@2.2.0";
+/// The install schema ids that [`Marker::restamp_install_schema`] replaces
+/// with [`INSTALL_SCHEMA`]: each later schema adds optional keys, so the marker
+/// of a project that last ran `update` with an earlier build reads as it is.
+/// The restamp changes the stamp and no other key. The readers of this build
+/// check each key whatever the stamp says, so a hand-written value that an
+/// earlier build accepted can be refused after the restamp. For example,
+/// [`Marker::validate`] (run by [`Marker::read_or_default`] and
+/// [`Marker::read_or_default_for_gate`]) refuses an empty `defaultBranch`,
+/// [`read_default_branch_for_gate`] refuses it for `audit`, and
+/// [`Marker::review`] refuses a `review.sessions` of another shape.
+const PREVIOUS_INSTALL_SCHEMAS: [&str; 2] =
+    ["houserules/install@2.2.0", "houserules/install@2.3.0"];
 
 /// The text that an install schema id starts with.
 const INSTALL_SCHEMA_PREFIX: &str = "houserules/install@";
@@ -259,7 +270,8 @@ impl Marker {
     /// `version` is not a non-empty string (a JSON `null` included, since
     /// `null` is a present value), its `overrides`, `ownedPaths`, or
     /// `renderers` is not an array of strings, its `baselines` is not an
-    /// object of strings, its `schema` or `defaultBranch` is not a string, or
+    /// object of strings, its `schema` is not a string, its `defaultBranch` is
+    /// not a non-empty string, or
     /// its `reviewLayerOffered` is not a boolean.
     /// An adopter-hand-edited field never vanishes into a silent default. Only a
     /// file that is not there is absent: a file whose existence cannot be told
@@ -354,8 +366,8 @@ impl Marker {
         {
             return Err(format!("{file}: schema must be a string"));
         }
-        if !self.has_default_branch_shape() {
-            return Err(format!("{file}: defaultBranch must be a string"));
+        if !self.has_default_branch_name() {
+            return Err(format!("{file}: defaultBranch must be a non-empty string"));
         }
         for key in ["ownedPaths", "renderers", "optInOffered"] {
             if let Some(list) = self.map.get(key)
@@ -611,16 +623,19 @@ impl Marker {
     }
 
     /// `true` when the marker has no `defaultBranch` key or the key holds a
-    /// string.
-    fn has_default_branch_shape(&self) -> bool {
-        self.map.get("defaultBranch").is_none_or(Value::is_string)
+    /// non-empty string: an empty name names no branch, so a trigger on it
+    /// never fires (HR-251).
+    fn has_default_branch_name(&self) -> bool {
+        self.map
+            .get("defaultBranch")
+            .is_none_or(|name| name.as_str().is_some_and(|name| !name.is_empty()))
     }
 
     /// The `defaultBranch`: the branch that the durable-sha check judges
     /// reachability against, and on which the CI wiring of `houserules ci`
     /// triggers. [`Marker::validate`] and [`read_default_branch_for_gate`]
-    /// have rejected a value that is no string, so an absent key is the only
-    /// other case.
+    /// have rejected a value that is no non-empty string, so an absent key is
+    /// the only other case.
     pub(crate) fn default_branch(&self) -> Option<&str> {
         self.map.get("defaultBranch").and_then(Value::as_str)
     }
@@ -660,13 +675,16 @@ impl Marker {
         self.map.insert("schema".to_string(), json!(INSTALL_SCHEMA));
     }
 
-    /// Restamps the install schema `houserules/install@2.2.0` to the id that
-    /// this binary writes, in the place of the key. Returns `true` when it
-    /// changed the key, and `false` for a marker that has another schema or
-    /// none, so a second call changes nothing.
+    /// Restamps the install schemas `houserules/install@2.2.0` and
+    /// `houserules/install@2.3.0` to the id that this binary writes, in the place
+    /// of the key. Returns `true` when it changed the key, and `false` for a
+    /// marker that has another schema or none, so a second call changes nothing.
     pub(crate) fn restamp_install_schema(&mut self) -> bool {
-        let previous =
-            self.map.get("schema").and_then(Value::as_str) == Some(PREVIOUS_INSTALL_SCHEMA);
+        let previous = self
+            .map
+            .get("schema")
+            .and_then(Value::as_str)
+            .is_some_and(|schema| PREVIOUS_INSTALL_SCHEMAS.contains(&schema));
         if previous {
             self.stamp_schema();
         }
@@ -893,8 +911,8 @@ pub(crate) enum DefaultBranchFault {
     InvalidJson(String),
     /// The file holds JSON that is no object.
     NotAnObject,
-    /// `defaultBranch` holds a value that is no string.
-    NotAString,
+    /// `defaultBranch` holds a value that is no non-empty string.
+    NotABranchName,
 }
 
 /// The `defaultBranch` of the install at `root`, as a gate reads it. `None`
@@ -920,8 +938,8 @@ pub(crate) fn read_default_branch_for_gate(
         map,
         fresh: false,
     };
-    if !marker.has_default_branch_shape() {
-        return Err(DefaultBranchFault::NotAString);
+    if !marker.has_default_branch_name() {
+        return Err(DefaultBranchFault::NotABranchName);
     }
     Ok(marker.default_branch().map(str::to_string))
 }
@@ -1516,13 +1534,15 @@ mod tests {
         assert!(!is_id_prefix("A-B"));
     }
 
-    /// `defaultBranch` is a string: a command refuses another shape with one
-    /// line that names the file by its path.
+    /// `defaultBranch` is a non-empty string, as `version` is: a command refuses
+    /// another shape, the empty string included (HR-251), with one line that names
+    /// the file by its path.
     #[test]
-    fn a_default_branch_that_is_no_string_is_one_named_line() {
+    fn a_default_branch_that_is_no_name_is_one_named_line() {
         let dir = tempfile::tempdir().expect("tempdir");
         let at = dir.path().join(INSTALL_MARKER).display().to_string();
         for value in [
+            json!(""),
             json!(5),
             json!(["main"]),
             json!(null),
@@ -1537,7 +1557,7 @@ mod tests {
 
             assert_eq!(
                 Marker::read_or_default(dir.path(), "WI").err(),
-                Some(format!("{at}: defaultBranch must be a string")),
+                Some(format!("{at}: defaultBranch must be a non-empty string")),
                 "{value}"
             );
         }
@@ -1560,11 +1580,11 @@ mod tests {
             read_default_branch_for_gate(dir.path()),
             Ok(Some("trunk".to_string()))
         );
-        for value in ["5", "[\"main\"]", "null", "true", "{}"] {
+        for value in ["\"\"", "5", "[\"main\"]", "null", "true", "{}"] {
             write(&format!("{{\"defaultBranch\": {value}}}\n"));
             assert_eq!(
                 read_default_branch_for_gate(dir.path()),
-                Err(DefaultBranchFault::NotAString),
+                Err(DefaultBranchFault::NotABranchName),
                 "{value}"
             );
         }
@@ -1697,25 +1717,29 @@ mod tests {
         }
     }
 
-    /// The restamp changes the schema `houserules/install@2.2.0` to the id that
-    /// this binary writes, in the place of the key, and nothing else: a second
-    /// call, another schema, and a marker with no schema change nothing.
+    /// The restamp changes the schema `houserules/install@2.2.0` and
+    /// `houserules/install@2.3.0` to the id that this binary writes, in the place
+    /// of the key, and nothing else: a second call, another schema, and a marker
+    /// with no schema change nothing.
     #[test]
-    fn restamp_install_schema_changes_only_the_previous_schema_once() {
+    fn restamp_install_schema_changes_only_the_previous_schemas_once() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let mut marker = marker_in(
-            dir.path(),
-            &json!({"idPrefix": "WI", "schema": "houserules/install@2.2.0", "version": "1.4.0"}),
-        );
+        for previous in ["houserules/install@2.2.0", "houserules/install@2.3.0"] {
+            let mut marker = marker_in(
+                dir.path(),
+                &json!({"idPrefix": "WI", "schema": previous, "version": "1.4.0"}),
+            );
 
-        assert!(marker.restamp_install_schema());
-        assert_eq!(
-            marker.map.get("schema"),
-            Some(&json!("houserules/install@2.3.0"))
-        );
-        let keys: Vec<&String> = marker.map.keys().collect();
-        assert_eq!(keys, ["idPrefix", "schema", "version"]);
-        assert!(!marker.restamp_install_schema());
+            assert!(marker.restamp_install_schema(), "{previous}");
+            assert_eq!(
+                marker.map.get("schema"),
+                Some(&json!("houserules/install@2.4.0")),
+                "{previous}"
+            );
+            let keys: Vec<&String> = marker.map.keys().collect();
+            assert_eq!(keys, ["idPrefix", "schema", "version"], "{previous}");
+            assert!(!marker.restamp_install_schema(), "{previous}");
+        }
 
         for schema in [
             json!("houserules/install@2.0.0"),

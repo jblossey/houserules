@@ -1,0 +1,27 @@
+The files under corpus/ and outputs/ come from OpenSpec, Copyright (c) 2024 OpenSpec Contributors,
+MIT License (LICENSE.openspec).
+
+Source: https://github.com/Fission-AI/OpenSpec, tag v1.15.0, commit 8e0288df12d401b0e183e2f47254d22528c1dffb.
+
+corpus/openspec/ holds ten of the changes of that tag's openspec/ folder, copied byte for byte:
+- active: add-amp-support, add-status-next-step, add-qa-smoke-harness,
+  add-skill-cli-auto-approval, schema-alias-support;
+- archived (openspec/changes/archive/): 2025-08-19-adopt-delta-based-changes,
+  2025-10-14-add-codex-slash-command-support, 2025-09-29-add-agents-md-config,
+  2025-09-29-update-agent-instructions, 2026-02-17-add-verify-skill;
+- openspec/config.yaml of that tag.
+
+outputs/ holds what the released OpenSpec 1.15.0 binary printed for the five active changes of
+corpus/openspec/ (`openspec list --json` for the whole 30 active changes of the tag, and
+`openspec show <id> --json --type change` for each of the five), saved without change.
+
+expected.json holds the title, why, task counts, and requirement counts that the rules of batch-38
+spec section 3 give for the ten changes, active and archived. For the five active changes the test
+also checks the title, task counts, and requirement counts against outputs/. OpenSpec prints no why,
+and its `validate --archived` prints no counts, so a script written with those rules produced the
+values; the same script gives, for the 30 active changes of the tag, every title, task count, and
+requirement count that outputs/ shows.
+
+edges/ holds the fixtures of the edge cases of spec 3, written for the tests of houserules (they are
+no OpenSpec file): the layouts that OpenSpec 1.15.0's binary ran in a scratch project, and the layouts
+that only houserules defines. The test file openspec_intent.rs names the value that each change gives.

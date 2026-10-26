@@ -16,14 +16,14 @@
 
 use std::io::Write;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use serde_json::Value;
 
 use crate::tracker::{Lookup, NoTracker, Resolution, Tracker, TrackerError};
 
 use super::deliverable::array_field;
-use super::git::Commit;
+use super::git::{Commit, command};
 
 /// The trailer key of a work item that a commit delivers.
 const WORK_ITEM: &str = "Work-Item";
@@ -34,21 +34,32 @@ const DEFERRED: &str = "Deferred";
 /// The trailers of `message`, each as `(key, value)` in the order of the
 /// message: git's `interpret-trailers --parse` run in `root`. The separator is
 /// `:` whatever the repository's `trailer.separators` says, so a trailer reads
-/// as `Key: value` on every install (spec 3.7). A value has its surrounding
-/// whitespace trimmed, and a folded value arrives as one line. A message with
-/// no trailer block has none. A `git` that cannot run or fails, and a line of
+/// as `Key: value` on every install (spec 3.7). The comment character is `#`
+/// whatever the repository's `core.commentChar` and `core.commentString` say,
+/// so a trailer whose key starts with the character that a repository sets
+/// (`Intent:` under `core.commentChar = I`) is still a trailer; a `-c
+/// core.commentChar=#` on the command line also overrides `core.commentString`
+/// (measured at git 2.56.0). A value has its surrounding whitespace trimmed, and
+/// a folded value arrives as one line. A message with no trailer block has none.
+/// One input stays that no option turns off: a key that `trailer.<alias>.key`
+/// configures, in the repository or in a file of the user. A block of lines
+/// that are not all trailers is a trailer block when it holds a configured key
+/// and at least a quarter of its lines are trailers (measured at git 2.56.0:
+/// with `trailer.wi.key=Work-Item`, a `Work-Item: HR-1` line before three prose
+/// lines is a trailer block). A `git` that cannot run or fails, and a line of
 /// its output that holds no `:`, is a named `Err`
 /// (`houserules.crash-paths-are-named`).
-pub(super) fn parse(root: &Path, message: &str) -> Result<Vec<(String, String)>, String> {
-    let mut child = Command::new("git")
+pub(crate) fn parse(root: &Path, message: &str) -> Result<Vec<(String, String)>, String> {
+    let mut child = command(root)
         .args([
             "-c",
             "trailer.separators=:",
+            "-c",
+            "core.commentChar=#",
             "interpret-trailers",
             "--parse",
             "--no-divider",
         ])
-        .current_dir(root)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -89,7 +100,7 @@ fn read_trailer_lines(output: &str) -> Result<Vec<(String, String)>, String> {
 
 /// `true` when the trailer key `key` is `wanted`. Git's trailer rules take a
 /// key without regard to its case.
-pub(super) fn is_key(key: &str, wanted: &str) -> bool {
+pub(crate) fn is_key(key: &str, wanted: &str) -> bool {
     key.eq_ignore_ascii_case(wanted)
 }
 
@@ -360,6 +371,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::rules::git::command as git_command;
     use crate::tracker::{DeferRequest, Deferral, ListOpts, Resolved};
 
     /// What a `Recorder` answers for an id of a shape that it claims.
@@ -566,16 +578,21 @@ mod tests {
         );
     }
 
-    /// A scratch repository whose `trailer.separators` is `separators`.
-    fn repository_with_trailer_separators(separators: &str) -> tempfile::TempDir {
+    /// A scratch repository with each `(key, value)` of `settings` in its
+    /// configuration.
+    fn repository_with_settings(settings: &[(&str, &str)]) -> tempfile::TempDir {
         let repository = tempfile::tempdir().expect("tempdir");
-        for args in [
-            vec!["init", "-q"],
-            vec!["config", "trailer.separators", separators],
-        ] {
-            let status = Command::new("git")
+        let mut commands = vec![vec!["init".to_string(), "-q".to_string()]];
+        commands.extend(settings.iter().map(|(key, value)| {
+            vec![
+                "config".to_string(),
+                (*key).to_string(),
+                (*value).to_string(),
+            ]
+        }));
+        for args in commands {
+            let status = git_command(repository.path())
                 .args(&args)
-                .current_dir(repository.path())
                 .status()
                 .expect("run git");
             assert!(status.success(), "git {args:?} failed");
@@ -590,7 +607,7 @@ mod tests {
     /// git's default.
     #[test]
     fn a_repository_trailer_separators_does_not_change_what_reads_as_a_trailer() {
-        let repository = repository_with_trailer_separators("#:");
+        let repository = repository_with_settings(&[("trailer.separators", "#:")]);
         let read = |message: &str| parse(repository.path(), message).expect("git parses");
         assert_eq!(
             read("subject\n\nWork-Item: WI-099\nSigned-off-by: A <a@b.c>\n"),
@@ -603,6 +620,37 @@ mod tests {
             read("subject\n\nWork-Item# WI-099\n"),
             Vec::<(String, String)>::new()
         );
+    }
+
+    /// A repository that sets `core.commentChar` or `core.commentString` to a
+    /// letter does not turn a trailer whose key starts with it into a comment:
+    /// git drops such a line from the trailer block unless the call pins the
+    /// comment character. The settings are the ones that change the text that
+    /// `interpret-trailers` prints (`houserules.parsed-git-text-pins-every-setting`).
+    #[test]
+    fn a_repository_comment_character_does_not_drop_a_trailer() {
+        let message =
+            "subject\n\nIntent: openspec:add-x\nEntire-Checkpoint: cp-1\nWork-Item: HR-1\n";
+        let expected = [
+            ("Intent".to_string(), "openspec:add-x".to_string()),
+            ("Entire-Checkpoint".to_string(), "cp-1".to_string()),
+            ("Work-Item".to_string(), "HR-1".to_string()),
+        ];
+        for settings in [
+            vec![("core.commentChar", "I")],
+            vec![("core.commentChar", "E")],
+            vec![("core.commentChar", "W")],
+            vec![("core.commentString", "Intent")],
+            vec![("core.commentString", "Work")],
+        ] {
+            let repository = repository_with_settings(&settings);
+
+            assert_eq!(
+                parse(repository.path(), message).expect("git parses"),
+                expected,
+                "{settings:?}"
+            );
+        }
     }
 
     /// A line of the output of git that has no `:` is a named error, never a

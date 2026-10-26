@@ -27,6 +27,7 @@ use crate::review::bundle::Bundle;
 use crate::review::change::Analysis;
 use crate::review::evidence::{
     COVERAGE_LINE, WORK_ITEM_LIMIT, first_chars, intent_block, judged_line, packet_line, rule_line,
+    sessions_line,
 };
 use crate::review::route::lines_of;
 use crate::review::text::{code_span, fenced};
@@ -163,6 +164,8 @@ pub(super) fn build(facts: &Facts) -> ChangeRecord {
         links: Some(Links {
             work_items,
             work_items_more: None,
+            sessions: evidence.sessions.clone(),
+            sessions_more: None,
         }),
         post_merge_audit: None,
         truncated: Vec::new(),
@@ -546,6 +549,12 @@ fn packet_sections(record: &ChangeRecord, evidence: &RecordEvidence) -> String {
         None => (&evidence.work_items, evidence.work_items_more),
     };
     text.push_str(&format!("\n{}\n", work_items_line(ids, more)));
+    if let Some(links) = &record.links {
+        text.push_str(&format!(
+            "{}\n",
+            sessions_line(&links.sessions, links.sessions_more.unwrap_or(0))
+        ));
+    }
     text
 }
 
@@ -713,7 +722,7 @@ mod tests {
         let text = String::from_utf8(bytes(&parsed(&full(2)))).expect("UTF-8");
 
         assert!(
-            text.starts_with(r#"{"schema":"houserules/change-record@1.0.0","install":".","key":"#),
+            text.starts_with(r#"{"schema":"houserules/change-record@1.1.0","install":".","key":"#),
             "{text}"
         );
     }
@@ -766,6 +775,7 @@ mod tests {
              \n\
              Diff: +6 -0 lines in 2 files\n\
              Work items: `WI-1`, `WI-2`\n\
+             Sessions: none\n\
              \n\
              ### Route\n\
              \n\
@@ -1256,14 +1266,14 @@ mod tests {
     }
 
     #[test]
-    fn the_schema_id_of_the_record_is_houserules_change_record_1_0_0() {
+    fn the_schema_id_of_the_record_is_houserules_change_record_1_1_0() {
         assert_eq!(
             crate::published::id::<ChangeRecord>(),
-            "houserules/change-record@1.0.0"
+            "houserules/change-record@1.1.0"
         );
         assert_eq!(
             json_of(&parsed(&full(0)))["schema"],
-            json!("houserules/change-record@1.0.0")
+            json!("houserules/change-record@1.1.0")
         );
     }
 
@@ -1271,7 +1281,7 @@ mod tests {
     fn a_document_that_is_no_record_does_not_read() {
         for value in [
             json!({}),
-            json!({"schema": "houserules/change-record@1.0.0"}),
+            json!({"schema": "houserules/change-record@1.1.0"}),
             json!([]),
             json!("a record"),
         ] {
@@ -1280,5 +1290,45 @@ mod tests {
                 "{value}"
             );
         }
+    }
+
+    /// A record that holds sessions prints them after the work items, 20 at most and
+    /// the count of the rest (the cut of the budget included); a record whose
+    /// `links` has no `sessions` key, as a record of schema 1.0.0, reads as none.
+    #[test]
+    fn the_summary_prints_the_sessions_of_the_record() {
+        let session = |number: u32| json!({"commit": KEY, "trailer": "Entire-Checkpoint", "value": format!("cp-{number}")});
+        let mut value = full(2);
+        value["links"]["sessions"] = json!([session(1), session(2)]);
+        value["links"]["sessions_more"] = json!(3);
+        let line = summary(&value)
+            .lines()
+            .find(|line| line.starts_with("Sessions: "))
+            .expect("a sessions line")
+            .to_string();
+        assert_eq!(
+            line,
+            "Sessions: 4444444 Entire-Checkpoint: `cp-1`, 4444444 Entire-Checkpoint: `cp-2`, ... and 3 more"
+        );
+
+        value["links"]["sessions"] = json!((0..25).map(session).collect::<Vec<_>>());
+        value["links"]["sessions_more"] = json!(1);
+        let long = summary(&value)
+            .lines()
+            .find(|line| line.starts_with("Sessions: "))
+            .expect("a sessions line")
+            .to_string();
+        assert!(long.ends_with(", ... and 6 more"), "{long}");
+        assert_eq!(long.matches("Entire-Checkpoint").count(), 20);
+
+        let mut old = full(2);
+        old["links"]
+            .as_object_mut()
+            .expect("links")
+            .remove("sessions");
+        assert!(
+            summary(&old).contains("Work items: `WI-1`, `WI-2`\nSessions: none\n"),
+            "a record with no sessions key reads as none"
+        );
     }
 }

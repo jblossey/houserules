@@ -9,6 +9,13 @@ use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
 
+/// The file of the spec of batch 38, below `docs/specs/`.
+const SPEC_FILE: &str = "2026-10-25-batch-38-openspec-and-release.md";
+
+/// The line that every reader of the marker prints for an empty `defaultBranch` (spec 14 and
+/// case 13).
+const EMPTY_DEFAULT_BRANCH: &str = ".houserules.json: defaultBranch must be a non-empty string";
+
 /// A `Command` for the compiled `houserules` binary under test -- this
 /// file's own copy of `common::houserules`, for the reason
 /// `tests/check_commit.rs` gives for its own copy.
@@ -160,6 +167,65 @@ fn audit_judges_reachability_against_the_configured_branch() {
             "1 file(s) checked for in-branch sha citations (against the default branch, \
              {trunk_tip})"
         )
+    );
+}
+
+/// HR-251: an empty `defaultBranch` names no branch, and a value that is no string
+/// names none either: `audit` stops with the line of the marker (exit 2) for either,
+/// the line that every other reader of the marker prints, and no `durable-sha` line.
+#[test]
+fn audit_names_a_default_branch_that_is_no_branch_name() {
+    for value in ["\"\"", "5"] {
+        let (repo, base) = trunk_repo(&marker_with(&format!(", \"defaultBranch\": {value}")));
+
+        let output = audit(repo.path(), &base);
+
+        assert_eq!(output.status.code(), Some(2), "{value}");
+        assert_eq!(output.stdout, b"", "{value}");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.ends_with(&format!("{EMPTY_DEFAULT_BRANCH}\n")),
+            "{value}: {stderr}"
+        );
+        assert!(!stderr.contains("durable-sha"), "{value}: {stderr}");
+    }
+}
+
+/// HR-251: the commands that read the marker through its validated reader refuse an
+/// empty `defaultBranch` with the line of the marker and exit 2: `evidence` names the
+/// file as a gate does.
+#[test]
+fn evidence_refuses_an_empty_default_branch_with_the_line_of_the_marker() {
+    let (repo, base) = trunk_repo(&marker_with(", \"defaultBranch\": \"\""));
+
+    let output = houserules()
+        .args(["evidence", "--base", &base])
+        .current_dir(repo.path())
+        .output()
+        .expect("run evidence");
+
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        format!("{EMPTY_DEFAULT_BRANCH}\n")
+    );
+}
+
+/// The line of this file that the spec of batch 38 gives as a literal is in the spec
+/// (`quality.user-facing-text-is-contract`).
+#[test]
+fn the_spec_lines_of_these_tests_are_in_the_spec() {
+    let spec = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/specs")
+            .join(SPEC_FILE),
+    )
+    .expect("read the spec");
+
+    assert!(
+        spec.contains(&format!("`{EMPTY_DEFAULT_BRANCH}`")),
+        "{EMPTY_DEFAULT_BRANCH}"
     );
 }
 

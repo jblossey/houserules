@@ -1,16 +1,18 @@
 //! The AGENTS.md renderer: always on. In each `AGENTS.md` it writes to, it
 //! owns the block between the markers of [`block`] and nothing else.
 //!
-//! The root `AGENTS.md` holds the standing rules, a session section while the
-//! install has a tracker (the commands that open and close a session on it),
-//! a `## Reference workflow` section while the install has a workflow (the
-//! pointer that the manifest of the workflow names), and one section for each
-//! area that has globs. A section names the globs and the command
-//! `houserules for <path>`; it never carries the text of an area rule, so the
-//! block has one shape whatever renderers are enabled. An area whose globs
-//! share one directory prefix below the install root also gets that
-//! directory's `AGENTS.md` block, with the rules of the area, unless it sets
-//! `"agentsMd": false`. Areas that share a directory share one block.
+//! The root `AGENTS.md` holds the standing rules, a `## OpenSpec` section
+//! while the install's OpenSpec root has a planning shape (the split between
+//! OpenSpec and houserules, spec 6.1; the `openspec` module reads the shape),
+//! a session section while the install has a tracker (the commands that open
+//! and close a session on it), a `## Reference workflow` section while the
+//! install has a workflow (the pointer that the manifest of the workflow
+//! names), and one section for each area that has globs. A section names the
+//! globs and the command `houserules for <path>`; it never carries the text
+//! of an area rule, so the block has one shape whatever renderers are enabled.
+//! An area whose globs share one directory prefix below the install root also
+//! gets that directory's `AGENTS.md` block, with the rules of the area, unless
+//! it sets `"agentsMd": false`. Areas that share a directory share one block.
 //!
 //! The renderer removes every block it no longer writes from the `AGENTS.md`
 //! files that git lists under the install root (tracked, or untracked and not
@@ -24,6 +26,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::install::marker::RenderInputs;
+use crate::review::intent::openspec::RootKind;
 use crate::root::INSTALL_MARKER;
 use crate::tracker::{Adapter, session_commands};
 use crate::workflow::reference;
@@ -31,6 +34,7 @@ use crate::workflow::reference;
 use super::super::listed_by_name;
 use super::super::model::{AreaDef, Base};
 use super::block::{BEGIN, END, locate};
+use super::openspec::{SECTION as OPENSPEC_SECTION, root_of};
 use super::{
     Class, GENERATED, Output, RenderError, area_sections, capitalize, read_optional, standing_lines,
 };
@@ -93,6 +97,12 @@ pub(super) fn placement(def: &AreaDef) -> Placement {
     }
 }
 
+/// The OpenSpec section of the root block (spec 6.1). It starts with a blank
+/// line, so that it follows the section before it.
+fn openspec_section() -> Vec<String> {
+    vec![String::new(), OPENSPEC_SECTION.to_string()]
+}
+
 /// The session section of the root block (spec 3.10): the commands that open
 /// and close a session on the tracker `adapter`, and the advice to write the
 /// output of those commands to a file (spec 6.3). It starts with a blank line,
@@ -123,12 +133,13 @@ fn workflow_section(agents_block: &str) -> Vec<String> {
 }
 
 /// The block of the root `AGENTS.md`, and the length of its standing section.
-/// The standing rules come first. Then come the session section, when the
-/// install has a tracker, and the workflow section, when it has a workflow
-/// (`inputs` says). One section for each area that has globs names the globs
-/// and the command that prints the rules of the area; no section carries the
-/// text of a rule.
-fn root_block(base: &Base, inputs: &RenderInputs) -> (String, usize) {
+/// The standing rules come first. Then come the OpenSpec section, when
+/// `with_openspec` says that the install holds an OpenSpec root with a
+/// planning shape, the session section, when the install has a tracker, and
+/// the workflow section, when it has a workflow (`inputs` says). One section
+/// for each area that has globs names the globs and the command that prints
+/// the rules of the area; no section carries the text of a rule.
+fn root_block(base: &Base, inputs: &RenderInputs, with_openspec: bool) -> (String, usize) {
     let mut standing = vec!["## Standing rules".to_string(), String::new()];
     let rules = standing_lines(base);
     if rules.is_empty() {
@@ -139,6 +150,9 @@ fn root_block(base: &Base, inputs: &RenderInputs) -> (String, usize) {
     let standing_len = standing.len();
     let mut lines = vec![BEGIN.to_string(), GENERATED.to_string(), String::new()];
     lines.extend(standing);
+    if with_openspec {
+        lines.extend(openspec_section());
+    }
     if let Some(adapter) = inputs.adapter {
         lines.extend(session_section(adapter));
     }
@@ -305,9 +319,11 @@ fn holds_block(root: &Path, path: &str) -> Result<bool, RenderError> {
 
 /// The outputs of the AGENTS.md renderer: the block of the root `AGENTS.md`,
 /// the block of each directory that gets one, and the removal of every block
-/// that the renderer no longer writes.
+/// that the renderer no longer writes. The root block holds the OpenSpec
+/// section while the install holds an OpenSpec root with a planning shape.
 pub(super) fn plan(base: &Base, inputs: &RenderInputs) -> Result<Vec<Output>, RenderError> {
-    let (text, standing_lines) = root_block(base, inputs);
+    let with_openspec = root_of(&base.root)? == RootKind::Planning;
+    let (text, standing_lines) = root_block(base, inputs, with_openspec);
     let mut outputs = vec![Output::Block {
         path: AGENTS_MD.to_string(),
         block: text,
@@ -478,7 +494,7 @@ mod tests {
                 adapter: Some(adapter),
                 ..bare()
             };
-            let (text, standing) = root_block(&base, &inputs);
+            let (text, standing) = root_block(&base, &inputs, false);
             let section = format!(
                 "## Standing rules\n\n- [process.sequential] Run agents sequentially.\n- [process.ask] Ask when unsure.\n\n## Session\n\n- Start: run `{start}`.\n- End: run `{end}`.\n{advice}\n\n## Area rules\n"
             );
@@ -491,13 +507,40 @@ mod tests {
             workflow: true,
             ..bare()
         };
-        let (text, _) = root_block(&base, &inputs);
+        let (text, _) = root_block(&base, &inputs, false);
         let pointer = reference().agents_block;
         assert!(
             text.contains(&format!(
                 "{advice}\n\n## Reference workflow\n\n{pointer}\n\n## Area rules\n"
             )),
             "{text}"
+        );
+    }
+
+    /// The OpenSpec section follows the standing rules directly and comes before
+    /// the session and workflow sections; the standing section keeps its length.
+    #[test]
+    fn the_openspec_section_follows_the_standing_rules_and_keeps_their_length() {
+        let base = fixture_base();
+        let inputs = RenderInputs {
+            adapter: Some(Adapter::Json),
+            workflow: true,
+            ..bare()
+        };
+
+        let (with, standing_with) = root_block(&base, &inputs, true);
+        let (without, standing_without) = root_block(&base, &inputs, false);
+
+        assert_eq!(standing_with, standing_without);
+        assert!(
+            with.contains(&format!(
+                "- [process.ask] Ask when unsure.\n\n{OPENSPEC_SECTION}\n\n## Session\n"
+            )),
+            "{with}"
+        );
+        assert_eq!(
+            with.replace(&format!("\n\n{OPENSPEC_SECTION}"), ""),
+            without
         );
     }
 
@@ -508,7 +551,7 @@ mod tests {
     fn the_root_block_holds_the_standing_rules_and_a_section_for_each_area_with_globs() {
         let base = fixture_base();
 
-        let (text, standing) = root_block(&base, &bare());
+        let (text, standing) = root_block(&base, &bare(), false);
 
         assert_eq!(
             text,
@@ -527,7 +570,7 @@ mod tests {
         base.entries.retain(|_, entry| !entry.standing);
         base.areas.retain(|(_, def)| def.paths.is_empty());
 
-        let (text, standing) = root_block(&base, &bare());
+        let (text, standing) = root_block(&base, &bare(), false);
 
         assert_eq!(
             text,

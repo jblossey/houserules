@@ -20,6 +20,6 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 ## Gotchas
 
-- [houserules.diff-tree-prints-nothing-for-a-merge] git diff-tree -r prints no paths for a merge commit unless -m, -c, or --first-parent is given; a path filter over commits must read every parent diff.
+- [houserules.diff-tree-prints-nothing-for-a-merge] git diff-tree -r prints no paths for a merge commit unless -m or --diff-merges=<format> is given; a path filter over commits must read every parent diff.
 
 Detail: houserules get <id>

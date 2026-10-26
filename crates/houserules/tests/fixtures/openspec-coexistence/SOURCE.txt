@@ -1,0 +1,8 @@
+The files under files/ are what the released OpenSpec 1.15.0 binary wrote into a scratch repository
+with `openspec init --tools claude,codex`, copied byte for byte. They come from OpenSpec, Copyright
+(c) 2024 OpenSpec Contributors, MIT License (LICENSE.openspec).
+
+Source: https://github.com/Fission-AI/OpenSpec, tag v1.15.0, commit 8e0288df12d401b0e183e2f47254d22528c1dffb.
+
+SHA256SUMS lists the SHA-256 digest of each file, in the form `sha256sum` prints from inside files/.
+The test file openspec_coexistence.rs checks the files against it. No test runs OpenSpec.

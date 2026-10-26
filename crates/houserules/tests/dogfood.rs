@@ -364,7 +364,7 @@ fn houserules_json_stamps_the_installed_version_and_the_hr_id_prefix() {
     assert_eq!(stamp["idPrefix"], serde_json::json!("HR"));
     assert_eq!(
         stamp["schema"],
-        serde_json::json!("houserules/install@2.3.0")
+        serde_json::json!("houserules/install@2.4.0")
     );
     assert!(stamp["baselines"].is_object(), "got {stamp}");
     assert!(stamp.get("overrides").is_none(), "got {stamp}");

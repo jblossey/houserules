@@ -22,6 +22,7 @@
 //! same pattern `backlog_parity.rs`'s own such tests use.
 
 mod common;
+mod tracker_support;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -29,6 +30,7 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 
 use common::{FrozenWorktree, houserules, repo_root};
+use tracker_support::{assert_no_line_ending_warning_under_autocrlf, with_default_git};
 
 /// One reviewed `{command, cwd, stdout, stderr, exit}` golden capture,
 /// read directly from its file rather than hand-copied.
@@ -1036,7 +1038,8 @@ fn audit_reports_a_usage_error_not_a_stack_trace_when_base_and_head_share_no_mer
     let root = dir.path();
     common::copy_dir_recursive(&repo_root().join("tests/fixtures/mini"), root);
     let git = |args: &[&str]| {
-        let status = std::process::Command::new("git")
+        let mut command = std::process::Command::new("git");
+        let status = with_default_git(&mut command)
             .args(args)
             .current_dir(root)
             .status()
@@ -1570,7 +1573,8 @@ fn forwards_workspace_from_the_cli_to_audit() {
     fs::write(&knowledge_path, serde_json::to_string(&knowledge).unwrap()).unwrap();
 
     let git = |args: &[&str]| {
-        let status = std::process::Command::new("git")
+        let mut command = std::process::Command::new("git");
+        let status = with_default_git(&mut command)
             .args(args)
             .current_dir(root)
             .status()
@@ -1671,4 +1675,14 @@ fn reports_a_usage_error_from_the_cli_when_report_and_workspace_are_both_given()
         output.stderr,
         b"audit takes --report or --workspace, not both\n"
     );
+}
+
+/// The fixtures of the two tests that stage a copy of `tests/fixtures/mini` print no line-ending
+/// warning under the autocrlf suite, which injects `core.autocrlf=true`.
+#[test]
+fn staging_the_mini_fixture_prints_no_line_ending_warning_under_autocrlf() {
+    assert_no_line_ending_warning_under_autocrlf(&[
+        "audit_reports_a_usage_error_not_a_stack_trace_when_base_and_head_share_no_merge_base",
+        "forwards_workspace_from_the_cli_to_audit",
+    ]);
 }

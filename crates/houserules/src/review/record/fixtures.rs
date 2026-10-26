@@ -58,7 +58,7 @@ pub(super) fn full(paths: usize) -> Value {
         .collect();
     let listed: Vec<&String> = names.iter().take(20).collect();
     json!({
-        "schema": "houserules/change-record@1.0.0",
+        "schema": "houserules/change-record@1.1.0",
         "install": ".",
         "key": KEY,
         "base": BASE,
@@ -106,7 +106,7 @@ pub(super) fn full(paths: usize) -> Value {
             "artifacts": ["docs/plans/a.md", "docs/plans/b.md"],
         }],
         "evidence": {
-            "schema": "houserules/evidence@1.0.0",
+            "schema": "houserules/evidence@1.1.0",
             "install": ".",
             "base": BASE,
             "head": KEY,
@@ -170,7 +170,7 @@ pub(super) fn full(paths: usize) -> Value {
         },
         "reviewers": ["amy", "bob"],
         "reviewers_pending": false,
-        "links": {"work_items": ["WI-1", "WI-2"]},
+        "links": {"work_items": ["WI-1", "WI-2"], "sessions": []},
         "post_merge_audit": null,
         "truncated": [],
     })
@@ -180,7 +180,7 @@ pub(super) fn full(paths: usize) -> Value {
 /// step 8): the minimal form of a range of the one commit `key`.
 pub(super) fn minimal(key: &str) -> Value {
     json!({
-        "schema": "houserules/change-record@1.0.0",
+        "schema": "houserules/change-record@1.1.0",
         "install": ".",
         "key": key,
         "base": BASE,

@@ -1,8 +1,8 @@
-//! The install schema `houserules/install@2.3.0`, the step of `update` that
-//! restamps a 2.2.0 marker (batch 37, spec 6.1; case 9), and the keys
-//! `runners` and `workspaces`, whose values every command that writes the
-//! marker keeps (batch 35, spec 10). Each case runs the compiled binary against
-//! a scratch install that `houserules init` made.
+//! The install schema `houserules/install@2.4.0`, the step of `update` that
+//! restamps a 2.2.0 or a 2.3.0 marker (batch 37, spec 6.1; batch 38, spec 5.7
+//! and case 6), and the keys `runners` and `workspaces`, whose values every
+//! command that writes the marker keeps (batch 35, spec 10). Each case runs the
+//! compiled binary against a scratch install that `houserules init` made.
 
 mod locked_file;
 mod tracker_support;
@@ -15,23 +15,27 @@ use tempfile::TempDir;
 use tracker_support::{count_lines, edit_marker, read_json, run, run_ok, scratch_git_repo, stdout};
 use tree_snapshot::{assert_same_tree, snapshot};
 
-/// The install schema that the step restamps.
-const OLD_SCHEMA: &str = "houserules/install@2.2.0";
+/// The install schema of a project that last ran `update` with a build of
+/// batch 35 or 36.
+const SCHEMA_2_2_0: &str = "houserules/install@2.2.0";
+
+/// The install schema of a project that last ran `update` with a build of
+/// batch 37.
+const SCHEMA_2_3_0: &str = "houserules/install@2.3.0";
 
 /// The install schema that `update` stamps.
-const NEW_SCHEMA: &str = "houserules/install@2.3.0";
+const NEW_SCHEMA: &str = "houserules/install@2.4.0";
 
 /// The line `update` prints once for the restamp.
-const RESTAMP_LINE: &str = "wrote .houserules.json (houserules/install@2.3.0)";
+const RESTAMP_LINE: &str = "wrote .houserules.json (houserules/install@2.4.0)";
 
 /// A scratch install that `init` made, with its marker set back to the install
-/// schema 2.2.0: the install of a project that last ran `update` with a build
-/// of batch 35 or 36.
-fn install_at_2_2_0() -> TempDir {
+/// schema `schema`.
+fn install_at(schema: &str) -> TempDir {
     let dir = scratch_git_repo();
     run_ok(dir.path(), &["init"]);
     edit_marker(dir.path(), |marker| {
-        marker.insert("schema".to_string(), json!(OLD_SCHEMA));
+        marker.insert("schema".to_string(), json!(schema));
     });
     dir
 }
@@ -60,22 +64,34 @@ fn project_keys() -> (Value, Value) {
     )
 }
 
-/// Case 9: `update` restamps a 2.2.0 marker to 2.3.0 and prints the line once;
-/// the `schema` key keeps its place; a second `update` prints no marker line
-/// and changes nothing.
+/// Case 6: `update` restamps a 2.2.0 and a 2.3.0 marker to 2.4.0 and prints the
+/// line once; the `schema` key keeps its place; a second `update` prints no
+/// marker line and changes nothing.
 #[test]
-fn update_restamps_2_2_0_to_2_3_0_once() {
-    let dir = install_at_2_2_0();
+fn update_restamps_2_2_0_and_2_3_0_to_2_4_0_once() {
+    for old in [SCHEMA_2_2_0, SCHEMA_2_3_0] {
+        assert_restamps_once(old);
+    }
+}
+
+/// `update` restamps the marker of the install schema `old` to 2.4.0, once.
+fn assert_restamps_once(old: &str) {
+    let dir = install_at(old);
     let keys = marker_keys(dir.path());
 
     let first = run_ok(dir.path(), &["update"]);
 
-    assert_eq!(count_lines(&stdout(&first), RESTAMP_LINE), 1, "{first:?}");
+    assert_eq!(
+        count_lines(&stdout(&first), RESTAMP_LINE),
+        1,
+        "{old}: {first:?}"
+    );
     assert_eq!(
         read_json(dir.path(), ".houserules.json")["schema"],
-        json!(NEW_SCHEMA)
+        json!(NEW_SCHEMA),
+        "{old}"
     );
-    assert_eq!(marker_keys(dir.path()), keys);
+    assert_eq!(marker_keys(dir.path()), keys, "{old}");
 
     let after_first = snapshot(dir.path());
     let second = run_ok(dir.path(), &["update"]);
@@ -84,17 +100,21 @@ fn update_restamps_2_2_0_to_2_3_0_once() {
         !stdout(&second)
             .lines()
             .any(|line| line.starts_with("wrote .houserules.json")),
-        "{second:?}"
+        "{old}: {second:?}"
     );
     assert_same_tree(&after_first, &snapshot(dir.path()), "the second update");
 }
 
-/// A marker that already holds 2.3.0 gets no line: the step tests its own
-/// state.
+/// `init` stamps 2.4.0, and a marker that already holds 2.4.0 gets no line: the
+/// step tests its own state.
 #[test]
-fn update_prints_no_restamp_line_for_a_marker_at_2_3_0() {
+fn init_stamps_2_4_0_and_update_prints_no_restamp_line_for_it() {
     let dir = scratch_git_repo();
     run_ok(dir.path(), &["init"]);
+    assert_eq!(
+        read_json(dir.path(), ".houserules.json")["schema"],
+        json!(NEW_SCHEMA)
+    );
 
     let output = run_ok(dir.path(), &["update"]);
 
@@ -102,34 +122,45 @@ fn update_prints_no_restamp_line_for_a_marker_at_2_3_0() {
 }
 
 /// `houserules.migrations-finish-after-a-stop`: the write of the marker stops
-/// the run, so the marker keeps 2.2.0 and the run prints no restamp line; the
-/// next `update` restamps and leaves the tree of a run that no fault stopped.
+/// the run, so the marker keeps its old schema and the run prints no restamp
+/// line; the next `update` restamps and leaves the tree of a run that no fault
+/// stopped. It holds for a 2.2.0 and for a 2.3.0 marker.
 #[test]
 fn an_update_that_stops_at_the_marker_finishes_the_restamp_at_the_next_update() {
-    let control = install_at_2_2_0();
-    run_ok(control.path(), &["update"]);
+    for old in [SCHEMA_2_2_0, SCHEMA_2_3_0] {
+        let control = install_at(old);
+        run_ok(control.path(), &["update"]);
 
-    let dir = install_at_2_2_0();
-    let Some(lock) = locked_file::lock(&dir.path().join(".houserules.json")) else {
-        return;
-    };
-    let failed = run(dir.path(), &["update"]);
-    drop(lock);
-    assert_eq!(failed.status.code(), Some(2), "{failed:?}");
-    assert_eq!(count_lines(&stdout(&failed), RESTAMP_LINE), 0, "{failed:?}");
-    assert_eq!(
-        read_json(dir.path(), ".houserules.json")["schema"],
-        json!(OLD_SCHEMA)
-    );
+        let dir = install_at(old);
+        let Some(lock) = locked_file::lock(&dir.path().join(".houserules.json")) else {
+            return;
+        };
+        let failed = run(dir.path(), &["update"]);
+        drop(lock);
+        assert_eq!(failed.status.code(), Some(2), "{old}: {failed:?}");
+        assert_eq!(
+            count_lines(&stdout(&failed), RESTAMP_LINE),
+            0,
+            "{old}: {failed:?}"
+        );
+        assert_eq!(
+            read_json(dir.path(), ".houserules.json")["schema"],
+            json!(old)
+        );
 
-    let rerun = run_ok(dir.path(), &["update"]);
+        let rerun = run_ok(dir.path(), &["update"]);
 
-    assert_eq!(count_lines(&stdout(&rerun), RESTAMP_LINE), 1, "{rerun:?}");
-    assert_same_tree(
-        &snapshot(control.path()),
-        &snapshot(dir.path()),
-        "the update that stopped at the marker",
-    );
+        assert_eq!(
+            count_lines(&stdout(&rerun), RESTAMP_LINE),
+            1,
+            "{old}: {rerun:?}"
+        );
+        assert_same_tree(
+            &snapshot(control.path()),
+            &snapshot(dir.path()),
+            "the update that stopped at the marker",
+        );
+    }
 }
 
 /// Pin of unchanged behavior: the marker is a map, so `init`, `init --workflow`,

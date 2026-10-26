@@ -830,6 +830,74 @@ fn check_commit_from_reads_every_parent_diff_of_a_merge() {
     }
 }
 
+/// Commits a gitlink at `gitlink` (a path under the install) that records the
+/// commit id of `id` repeated, together with a file outside the install, with
+/// `message`. Gives the sha of the commit.
+fn commit_gitlink_and_outside_file(root: &Path, gitlink: &str, id: char, message: &str) -> String {
+    let entry = format!("160000,{},{gitlink}", id.to_string().repeat(40));
+    git(root, &["update-index", "--add", "--cacheinfo", &entry]);
+    fs::create_dir_all(root.join(gitlink)).expect("create the folder of the submodule");
+    write_file(root, "other/x.txt", &format!("{message}\n"));
+    commit_all(root, message)
+}
+
+/// A gitlink is a changed path whatever the repository says about ignoring
+/// submodules: a commit that changes a gitlink under the install and a file
+/// outside it is checked, not skipped, though `submodule.<name>.ignore` in
+/// the configuration and `ignore = all` in `.gitmodules` both hide the
+/// gitlink from `git diff-tree`.
+#[test]
+fn check_commit_from_does_not_skip_a_commit_that_changes_a_gitlink_under_the_install() {
+    for install in INSTALL_FOLDERS {
+        let (repo, base) = repo_with_install(install, &[conventional_commits_rule()], &[]);
+        let root = repo.path();
+        let gitlink = format!("{install}/mod");
+        write_file(
+            root,
+            ".gitmodules",
+            &format!("[submodule \"mod\"]\n\tpath = {gitlink}\n\turl = ./nowhere\n"),
+        );
+        commit_all(root, "chore: the submodule entry");
+        git(root, &["config", "submodule.mod.ignore", "all"]);
+        commit_gitlink_and_outside_file(root, &gitlink, '1', "bad config subject");
+
+        let run = check_commit_from(&root.join(install), &base);
+
+        assert_eq!(run.code, Some(1), "{install}, config: {}", run.stderr);
+        assert_eq!(run.stdout, skipped_line(1, install), "{install}, config");
+        assert_eq!(
+            run.stderr,
+            subject_finding("bad config subject"),
+            "{install}, config"
+        );
+
+        git(root, &["config", "--unset", "submodule.mod.ignore"]);
+        write_file(
+            root,
+            ".gitmodules",
+            &format!(
+                "[submodule \"mod\"]\n\tpath = {gitlink}\n\turl = ./nowhere\n\tignore = all\n"
+            ),
+        );
+        let ignoring = commit_all(root, "chore: ignore the submodule");
+        commit_gitlink_and_outside_file(root, &gitlink, '2', "bad gitmodules subject");
+
+        let run = check_commit_from(&root.join(install), &ignoring);
+
+        assert_eq!(run.code, Some(1), "{install}, .gitmodules: {}", run.stderr);
+        assert_eq!(
+            run.stdout,
+            skipped_line(0, install),
+            "{install}, .gitmodules"
+        );
+        assert_eq!(
+            run.stderr,
+            subject_finding("bad gitmodules subject"),
+            "{install}, .gitmodules"
+        );
+    }
+}
+
 /// An explicit `--dir` outside any repository is one named line that does
 /// not tell the user to pass `--dir`: the user already did.
 #[test]

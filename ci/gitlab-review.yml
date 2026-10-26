@@ -24,6 +24,9 @@ spec:
     setup:
       description: A shell command that runs before the audit in the gates and record jobs, for example a build of the project tools.
       default: ''
+    validation:
+      description: The path, relative to the install, of a capture of openspec validate --json that the setup command writes with houserules capture. When the file exists, evidence and record write read it. Empty passes no capture.
+      default: ''
     install:
       description: release installs the release of this file; none expects the setup command to put houserules on the PATH.
       default: release
@@ -171,6 +174,19 @@ spec:
             }
           ' "$1"
         }
+        hr_validation_file() {
+          [ -n "${HOUSERULES_VALIDATION:-}" ] || return 0
+          printf '%s/%s' "${HOUSERULES_DIR%/}" "$HOUSERULES_VALIDATION"
+        }
+        hr_validation_exists() {
+          hr_candidate=$(hr_validation_file)
+          [ -n "$hr_candidate" ] || return 1
+          if [ -f "$hr_candidate" ]; then
+            return 0
+          fi
+          hr_notice "houserules: the validation input names $hr_candidate, which does not exist, so this run passes no validation capture"
+          return 1
+        }
         hr_notes_ref() {
           hr_dir=${1#./}
           hr_dir=${hr_dir%/}
@@ -228,6 +244,9 @@ houserules-$[[ inputs.key ]]-gates:
     HOUSERULES_SETUP:
       value: $[[ inputs.setup ]]
       expand: false
+    HOUSERULES_VALIDATION:
+      value: $[[ inputs.validation ]]
+      expand: false
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -280,11 +299,15 @@ houserules-$[[ inputs.key ]]-gates:
         if [ -s "$out/audit.json" ]; then
           set -- "$@" --audit "$out/audit.json"
         fi
+        validation=
+        if hr_validation_exists; then
+          validation=$(hr_validation_file)
+        fi
         intent=$(hr_intent "$out/description.md")
         if [ -n "$intent" ]; then
-          houserules evidence "$@" --intent="$intent" --out "$out/evidence.md" --json "$out/evidence.json" || houserules evidence "$@" --out "$out/evidence.md" --json "$out/evidence.json" || status=1
+          houserules evidence "$@" ${validation:+--validation "$validation"} --intent="$intent" --out "$out/evidence.md" --json "$out/evidence.json" || houserules evidence "$@" ${validation:+--validation "$validation"} --out "$out/evidence.md" --json "$out/evidence.json" || status=1
         else
-          houserules evidence "$@" --out "$out/evidence.md" --json "$out/evidence.json" || status=1
+          houserules evidence "$@" ${validation:+--validation "$validation"} --out "$out/evidence.md" --json "$out/evidence.json" || status=1
         fi
         houserules route "$@" --json "$out/route.json" || status=1
       fi
@@ -517,6 +540,9 @@ houserules-$[[ inputs.key ]]-record:
     HOUSERULES_SETUP:
       value: $[[ inputs.setup ]]
       expand: false
+    HOUSERULES_VALIDATION:
+      value: $[[ inputs.validation ]]
+      expand: false
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
@@ -567,6 +593,9 @@ houserules-$[[ inputs.key ]]-record:
         if [ -s "$out/audit.json" ]; then
           set -- "$@" --audit "$out/audit.json"
         fi
+      fi
+      if hr_validation_exists; then
+        set -- "$@" --validation "$(hr_validation_file)"
       fi
       iid=
       listed=

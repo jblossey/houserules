@@ -1,0 +1,97 @@
+{
+  "id": "add-qa-smoke-harness",
+  "title": "add-qa-smoke-harness",
+  "deltaCount": 2,
+  "deltas": [
+    {
+      "spec": "developer-qa-workflow",
+      "operation": "ADDED",
+      "description": "Add requirement: The repository SHALL provide Makefile targets as the primary developer entrypoint for CLI QA flows.",
+      "requirement": {
+        "name": "Makefile QA Entry Point",
+        "text": "The repository SHALL provide Makefile targets as the primary developer entrypoint for CLI QA flows.",
+        "scenarios": [
+          {
+            "name": "Default QA target runs smoke suite",
+            "rawText": "- **WHEN** a developer runs `make qa`\n- **THEN** the command SHALL execute the non-interactive smoke suite\n- **AND** exit with status code 0 only when all smoke scenarios pass"
+          },
+          {
+            "name": "Smoke suite target is directly invokable",
+            "rawText": "- **WHEN** a developer runs `make qa-smoke`\n- **THEN** the command SHALL execute the same smoke suite used by `make qa`\n- **AND** return a non-zero exit code on assertion failure"
+          },
+          {
+            "name": "Interactive checklist target exists",
+            "rawText": "- **WHEN** a developer runs `make qa-interactive`\n- **THEN** the command SHALL provide the manual interactive verification checklist\n- **AND** SHALL NOT run interactive prompt automation by default"
+          }
+        ]
+      },
+      "requirements": [
+        {
+          "name": "Makefile QA Entry Point",
+          "text": "The repository SHALL provide Makefile targets as the primary developer entrypoint for CLI QA flows.",
+          "scenarios": [
+            {
+              "name": "Default QA target runs smoke suite",
+              "rawText": "- **WHEN** a developer runs `make qa`\n- **THEN** the command SHALL execute the non-interactive smoke suite\n- **AND** exit with status code 0 only when all smoke scenarios pass"
+            },
+            {
+              "name": "Smoke suite target is directly invokable",
+              "rawText": "- **WHEN** a developer runs `make qa-smoke`\n- **THEN** the command SHALL execute the same smoke suite used by `make qa`\n- **AND** return a non-zero exit code on assertion failure"
+            },
+            {
+              "name": "Interactive checklist target exists",
+              "rawText": "- **WHEN** a developer runs `make qa-interactive`\n- **THEN** the command SHALL provide the manual interactive verification checklist\n- **AND** SHALL NOT run interactive prompt automation by default"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "spec": "developer-qa-workflow",
+      "operation": "ADDED",
+      "description": "Add requirement: The smoke suite SHALL run CLI scenarios in isolated sandboxes so tests are repeatable and do not depend on machine-global state.",
+      "requirement": {
+        "name": "Sandboxed Smoke Scenario Runner",
+        "text": "The smoke suite SHALL run CLI scenarios in isolated sandboxes so tests are repeatable and do not depend on machine-global state.",
+        "scenarios": [
+          {
+            "name": "Scenario execution is environment-isolated",
+            "rawText": "- **WHEN** a smoke scenario runs\n- **THEN** it SHALL use temporary values for `HOME`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, and `CODEX_HOME`\n- **AND** global config from the host machine SHALL NOT affect scenario outcomes"
+          },
+          {
+            "name": "Scenario artifacts are captured for review",
+            "rawText": "- **WHEN** a smoke scenario completes\n- **THEN** the runner SHALL capture command output and exit status\n- **AND** SHALL capture enough filesystem state to inspect before/after behavior"
+          },
+          {
+            "name": "High-risk workflow coverage exists",
+            "rawText": "- **WHEN** the smoke suite executes\n- **THEN** it SHALL include scenarios covering profile/delivery behavior and migration-sensitive flows\n- **AND** include at least:\n  - non-interactive tool detection\n  - migration when profile is unset\n  - delivery cleanup (`both -> skills`, `both -> commands`)\n  - commands-only update detection"
+          }
+        ]
+      },
+      "requirements": [
+        {
+          "name": "Sandboxed Smoke Scenario Runner",
+          "text": "The smoke suite SHALL run CLI scenarios in isolated sandboxes so tests are repeatable and do not depend on machine-global state.",
+          "scenarios": [
+            {
+              "name": "Scenario execution is environment-isolated",
+              "rawText": "- **WHEN** a smoke scenario runs\n- **THEN** it SHALL use temporary values for `HOME`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, and `CODEX_HOME`\n- **AND** global config from the host machine SHALL NOT affect scenario outcomes"
+            },
+            {
+              "name": "Scenario artifacts are captured for review",
+              "rawText": "- **WHEN** a smoke scenario completes\n- **THEN** the runner SHALL capture command output and exit status\n- **AND** SHALL capture enough filesystem state to inspect before/after behavior"
+            },
+            {
+              "name": "High-risk workflow coverage exists",
+              "rawText": "- **WHEN** the smoke suite executes\n- **THEN** it SHALL include scenarios covering profile/delivery behavior and migration-sensitive flows\n- **AND** include at least:\n  - non-interactive tool detection\n  - migration when profile is unset\n  - delivery cleanup (`both -> skills`, `both -> commands`)\n  - commands-only update detection"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "root": {
+    "path": "/home/jblossey/.cache/hr-b38/parity",
+    "source": "nearest"
+  }
+}

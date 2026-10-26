@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use serde_json::{Value, json};
-use tracker_support::sha256_hex;
+use tracker_support::{kit_content_at, pack_pin, repo_root, sha256_hex};
 
 /// A `Command` for the compiled `houserules` binary under test, with the
 /// self-update phase of `update` switched off.
@@ -97,14 +97,6 @@ fn write_json(dir: &Path, relative: &str, value: &Value) {
     .expect("write a JSON file");
 }
 
-/// The `sha256` pin of a pack copy, as the binary computes it: the SHA-256 of
-/// the compact JSON of the parsed copy with every object's keys sorted.
-fn pin_of(copy: &Value) -> String {
-    let mut canonical = copy.clone();
-    canonical.sort_all_objects();
-    sha256_hex(&serde_json::to_vec(&canonical).expect("serialize"))
-}
-
 /// The kit pack `name` as the binary carries it.
 fn kit_pack(name: &str) -> Value {
     serde_json::from_str(
@@ -137,7 +129,7 @@ fn make_older(dir: &Path, name: &str, added_areas: Option<Value>, edit: impl FnO
     write_json(dir, &relative, &copy);
     let mut marker = read_json(dir, ".houserules.json");
     marker["packs"][name]["version"] = json!("0.9.0");
-    marker["packs"][name]["sha256"] = json!(pin_of(&copy));
+    marker["packs"][name]["sha256"] = json!(pack_pin(&copy));
     if let Some(areas) = added_areas {
         marker["packs"][name]["addedAreas"] = areas;
     }
@@ -208,7 +200,7 @@ fn update_moves_an_older_kit_pack_to_the_version_of_the_binary() {
     assert_eq!(read_json(dir.path(), "knowledge/packs/process.json"), kit);
     let marker = read_json(dir.path(), ".houserules.json");
     assert_eq!(marker["packs"]["process"]["version"], kit["version"]);
-    assert_eq!(marker["packs"]["process"]["sha256"], json!(pin_of(&kit)));
+    assert_eq!(marker["packs"]["process"]["sha256"], json!(pack_pin(&kit)));
     assert_eq!(marker["packs"]["process"]["source"], json!("kit"));
     assert_eq!(run(dir.path(), &["check-knowledge"]).status.code(), Some(0));
 }
@@ -264,7 +256,7 @@ fn an_older_quality_that_declared_legacy_and_not_tools(dir: &Path) {
     }
     write_json(dir, "knowledge/packs/quality.json", &copy);
     let mut marker = read_json(dir, ".houserules.json");
-    marker["packs"]["quality"]["sha256"] = json!(pin_of(&copy));
+    marker["packs"]["quality"]["sha256"] = json!(pack_pin(&copy));
     write_json(dir, ".houserules.json", &marker);
 }
 
@@ -600,4 +592,106 @@ fn an_upstream_pack_with_the_name_of_a_kit_pack_is_not_moved() {
         &tree_snapshot::snapshot(dir.path()),
         "update over an upstream pack with a kit name",
     );
+}
+
+/// The commit of main that holds the 2.0.0-pre kit before the faster loop of
+/// batch 38 (spec 19; the merge of batch 37). An install of that kit holds the
+/// pack copies and the workflow files of `template/` at this commit.
+const KIT_BEFORE_THE_FASTER_LOOP: &str = "b9dd0d0ee4ca5af67d60eb5d4fafbeedc4506ac5";
+
+/// The files of the reference workflow that the faster loop changes, as the
+/// install holds them.
+const FASTER_LOOP_FILES: [&str; 4] = [
+    ".claude/agents/implementer.md",
+    ".claude/agents/task-reviewer.md",
+    ".claude/skills/orchestrating/SKILL.md",
+    ".claude/skills/planning/SKILL.md",
+];
+
+/// An install of the 2.0.0-pre kit before the faster loop: the reference
+/// workflow with the process and quality packs, and each pack copy and each
+/// changed workflow file as `template/` held it then, with the pins of the
+/// marker at those bytes.
+fn install_before_the_faster_loop() -> tempfile::TempDir {
+    let dir = install();
+    lines_of(dir.path(), &["init", "--workflow", "reference"]);
+    let template_then = |relative: &str| {
+        kit_content_at(KIT_BEFORE_THE_FASTER_LOOP, relative).unwrap_or_else(|| {
+            panic!(
+                "template/{relative} is not at {KIT_BEFORE_THE_FASTER_LOOP}: the case needs the history of main"
+            )
+        })
+    };
+    let mut marker = read_json(dir.path(), ".houserules.json");
+    for name in ["process", "quality"] {
+        let old: Value = serde_json::from_slice(&template_then(&format!("packs/{name}.json")))
+            .expect("the old pack is JSON");
+        write_json(dir.path(), &format!("knowledge/packs/{name}.json"), &old);
+        marker["packs"][name]["version"] = old["version"].clone();
+        marker["packs"][name]["sha256"] = json!(pack_pin(&old));
+    }
+    for file in FASTER_LOOP_FILES {
+        let old = template_then(&format!("workflows/reference/{file}"));
+        fs::write(path_of(dir.path(), file), &old).expect("write an old workflow file");
+        marker["workflow"]["files"][file] = json!(sha256_hex(&old));
+    }
+    write_json(dir.path(), ".houserules.json", &marker);
+    dir
+}
+
+/// Spec 19.9 and case 14: `update` on an install of the 2.0.0-pre kit before the
+/// faster loop moves the process and quality packs to the versions of the binary,
+/// prints each move, writes the four changed workflow files and pins them at the
+/// new bytes, and leaves an install that passes `check-knowledge`. A second
+/// `update` prints no change.
+#[test]
+fn update_on_the_kit_before_the_faster_loop_moves_both_packs_and_writes_the_new_texts() {
+    let dir = install_before_the_faster_loop();
+    let old_versions: Vec<(String, String)> = ["process", "quality"]
+        .iter()
+        .map(|name| {
+            (
+                (*name).to_string(),
+                read_json(dir.path(), &format!("knowledge/packs/{name}.json"))["version"]
+                    .as_str()
+                    .expect("a version")
+                    .to_string(),
+            )
+        })
+        .collect();
+
+    let lines = lines_of(dir.path(), &["update"]);
+
+    for (name, old) in &old_versions {
+        let new = kit_pack(name)["version"]
+            .as_str()
+            .expect("a version")
+            .to_string();
+        assert_ne!(old, &new, "the {name} pack moved");
+        assert!(
+            lines.contains(&format!("moved pack {name} from {old} to {new}")),
+            "{lines:?}"
+        );
+        assert_eq!(
+            read_json(dir.path(), &format!("knowledge/packs/{name}.json")),
+            kit_pack(name)
+        );
+    }
+    let marker = read_json(dir.path(), ".houserules.json");
+    for file in FASTER_LOOP_FILES {
+        let new = fs::read(repo_root().join("template/workflows/reference").join(file))
+            .expect("read the template file");
+        assert!(lines.contains(&format!("wrote {file}")), "{lines:?}");
+        assert_eq!(
+            fs::read(path_of(dir.path(), file)).expect("read the installed file"),
+            new,
+            "{file}"
+        );
+        assert_eq!(marker["workflow"]["files"][file], json!(sha256_hex(&new)));
+    }
+    assert_eq!(run(dir.path(), &["check-knowledge"]).status.code(), Some(0));
+
+    let second = lines_of(dir.path(), &["update"]);
+
+    assert_eq!(change_lines(&second), Vec::<&String>::new(), "{second:?}");
 }

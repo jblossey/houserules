@@ -2,11 +2,14 @@
 //! repositories and copies of directories, command runners and output
 //! assertions, the install shapes the tracker cases start from, the
 //! environment of a hermetic `bd`, the locale and git configuration of the
-//! caller kept out of a command, the exact lines of spec sections 3.3, 3.4,
-//! 3.8, and 3.10, the lowercase hex SHA-256 digest, and the two forms of a
-//! path that the binary prints: canonical, and quoted for a POSIX shell. A test
-//! file that needs them declares this module, as `install_shape/mod.rs` is
-//! shared.
+//! caller kept out of a command, the run of tests again in a child process and
+//! the autocrlf pin that uses it, the exact lines of spec sections 3.3, 3.4,
+//! 3.8, and 3.10, the section of batch 38's spec 6.1, the lowercase hex
+//! SHA-256 digest, the pin of a pack copy, the two forms of a path that the
+//! binary prints (canonical, and quoted for a POSIX shell), and the readers of
+//! the kit texts: the text of a file below a directory, the text with its white
+//! space collapsed, and the bytes of a template file at a git reference. A test
+//! file that needs them declares this module, as `install_shape/mod.rs` is shared.
 
 #![allow(dead_code)]
 
@@ -38,6 +41,13 @@ pub const JSON_UNREACHABLE: &str =
 /// The refusal of `pack add process` with no tracker (spec 3.10).
 pub const PACK_NEEDS_TRACKER: &str =
     "pack process needs a tracker; run houserules init --tracker json|github|beads";
+
+/// The `## OpenSpec` section of spec 6.1 of batch 38, byte for byte: `render` writes it into the root
+/// block of an install whose tree tracks an OpenSpec root with a planning shape.
+/// `tests/openspec_coexistence.rs` shows that the spec holds it.
+pub const OPENSPEC_SECTION: &str = "## OpenSpec
+
+This project plans its changes with OpenSpec: a change's proposal, specs, design, and tasks live in `openspec/changes/<id>/`. Write a design decision into the change's `design.md`, not into a separate spec. houserules supplies the rules and the checks of each change: run `houserules for <path>` before you change a file, and `houserules audit --base <the base branch>` before you archive a change.";
 
 /// A `Command` for the compiled `houserules` binary under test. This file
 /// keeps the helper beside its callers, as every `tests/*.rs` file does.
@@ -71,11 +81,83 @@ pub fn with_default_git(command: &mut Command) -> &mut Command {
         .env("GIT_CONFIG_GLOBAL", "/dev/null")
 }
 
+/// Runs the tests `names` of the calling test binary again, as one child process, and returns the
+/// finished child. `configure` shapes the child's environment: a test cannot change its own
+/// environment, so a test of an environment variable reads the result of a child. The child runs
+/// with `--no-capture`, so what a test prints reaches the output.
+pub fn rerun_tests(names: &[&str], configure: impl FnOnce(&mut Command)) -> Output {
+    let exe = std::env::current_exe().expect("the path of the test binary");
+    let mut command = Command::new(exe);
+    command.arg("--exact").args(names).arg("--no-capture");
+    configure(&mut command);
+    command.output().expect("run the test binary again")
+}
+
+/// What `output` printed: its stdout, then its stderr, as text.
+pub fn printed(output: &Output) -> String {
+    format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    )
+}
+
+/// The warning that git prints when it stages a file of LF lines under `core.autocrlf=true`.
+const LINE_ENDING_WARNING: &str = "LF will be replaced by CRLF";
+
+/// Requires that the tests `names` of the calling test binary pass in a child process under the
+/// configuration of the autocrlf suite (`core.autocrlf=true`, injected through
+/// `GIT_CONFIG_COUNT`) and that no git child of a fixture prints the line-ending warning. The child
+/// gets the locale and the configuration files of [`with_default_git`], so the host cannot change
+/// the text of the warning. The child must run every test: a name that matches none fails.
+pub fn assert_no_line_ending_warning_under_autocrlf(names: &[&str]) {
+    let output = rerun_tests(names, |command| {
+        with_default_git(command)
+            .env("GIT_CONFIG_COUNT", "1")
+            .env("GIT_CONFIG_KEY_0", "core.autocrlf")
+            .env("GIT_CONFIG_VALUE_0", "true");
+    });
+    let text = printed(&output);
+    assert!(
+        output.status.success(),
+        "{names:?} failed under core.autocrlf=true: {text}"
+    );
+    assert!(
+        text.contains(&format!("test result: ok. {} passed", names.len())),
+        "the child ran every test: {text}"
+    );
+    assert!(!text.contains(LINE_ENDING_WARNING), "{text}");
+}
+
 /// This checkout's repository root.
 pub fn repo_root() -> PathBuf {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     root.canonicalize()
         .unwrap_or_else(|error| panic!("canonicalize {}: {error}", root.display()))
+}
+
+/// The text of the file `relative` (`/`-separated) below `base`.
+pub fn text_below(base: PathBuf, relative: &str) -> String {
+    let path = relative.split('/').fold(base, |path, part| path.join(part));
+    fs::read_to_string(&path).unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
+}
+
+/// `text` with every run of white space collapsed to one space.
+pub fn flat(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// The bytes of `template/<path>` at the git reference `reference` of this
+/// repository, or `None` when the path does not exist there. The bytes are the
+/// blob that `git show` prints for a plain blob, which no filter changes.
+pub fn kit_content_at(reference: &str, path: &str) -> Option<Vec<u8>> {
+    let output = Command::new("git")
+        .arg("show")
+        .arg(format!("{reference}:template/{path}"))
+        .current_dir(repo_root())
+        .output()
+        .expect("run git show");
+    output.status.success().then_some(output.stdout)
 }
 
 /// Runs `git <args>` in `dir` with a fixed identity and no signing, and
@@ -129,6 +211,14 @@ pub fn sha256_hex(content: &[u8]) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
+}
+
+/// The `sha256` pin of a pack copy: the SHA-256 of the compact JSON of the
+/// copy with every object's keys sorted, as the binary computes it.
+pub fn pack_pin(copy: &Value) -> String {
+    let mut canonical = copy.clone();
+    canonical.sort_all_objects();
+    sha256_hex(&serde_json::to_vec(&canonical).expect("serialize"))
 }
 
 /// `path` canonical, in the form houserules prints it: on Windows without the

@@ -98,14 +98,14 @@ fn init_tracker_json_writes_the_five_data_files_the_schema_and_the_pattern() {
 }
 
 /// Spec 3.3 and 3.7: the marker holds the tracker key, written last, and
-/// the install schema that `init` stamps is `houserules/install@2.3.0`.
+/// the install schema that `init` stamps is `houserules/install@2.4.0`.
 #[test]
-fn init_tracker_json_stamps_the_tracker_key_and_the_install_schema_2_3_0() {
+fn init_tracker_json_stamps_the_tracker_key_and_the_install_schema_2_4_0() {
     let dir = scratch_git_repo();
     run_ok(dir.path(), &["init", "--tracker", "json"]);
     let marker = read_json(dir.path(), ".houserules.json");
     assert_eq!(marker["tracker"], json!({"adapter": "json"}));
-    assert_eq!(marker["schema"], json!("houserules/install@2.3.0"));
+    assert_eq!(marker["schema"], json!("houserules/install@2.4.0"));
     let keys: Vec<&String> = marker.as_object().expect("an object").keys().collect();
     assert_eq!(keys.last().map(|key| key.as_str()), Some("tracker"));
 }

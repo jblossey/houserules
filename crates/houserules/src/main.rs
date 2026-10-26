@@ -98,6 +98,7 @@ mod shell;
 mod tracker;
 mod update_check;
 mod workflow;
+mod written;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -787,8 +788,9 @@ enum Command {
     /// absent (`wrote .gitignore`), and prints no line for a `.gitignore` that
     /// holds `.houserules/` already. A `.gitignore` that `ownedPaths` lists
     /// stays as found. It restamps the install schema
-    /// `houserules/install@2.2.0` to `houserules/install@2.3.0` and prints
-    /// `wrote .houserules.json (houserules/install@2.3.0)` once; a second run
+    /// `houserules/install@2.2.0` or `houserules/install@2.3.0` to
+    /// `houserules/install@2.4.0` and prints
+    /// `wrote .houserules.json (houserules/install@2.4.0)` once; a second run
     /// prints no such line. The keys `runners`, `workspaces`, and `review` of
     /// `.houserules.json` keep their values. It deletes any retired kit file
     /// still present, prints each hand step that the project has left (`hand
@@ -1009,19 +1011,27 @@ enum Command {
     /// warned, proven, and judged rules, the size of the diff with the work
     /// items, and the route. It prints the packet as Markdown on stdout, for a
     /// comment on a pull or merge request, or writes it to `--out`. `--json`
-    /// also writes the document `houserules/evidence@1.0.0`. The audit rows come
+    /// also writes the document `houserules/evidence@1.1.0`. The audit rows come
     /// from `--audit`, else from an audit that the command runs in process.
     /// `--review` names a review deliverable: a judged rule then shows the
     /// verdict of that review. `--intent <source>:<ref>` adds an intent to the
-    /// packet, as the `Intent:` line of an evidence bundle writes it. A packet
-    /// over 60,000 characters is cut, and each cut list ends with the count of
-    /// the items that it leaves out. The packet is the same for the same range
-    /// and the same rules. It exits 0 whatever the audit finds. It exits 2 for a
-    /// setup error, for example: a ref that is no commit, an `--audit` file of
-    /// another range or that is no audit result, a `--review` file that is no
-    /// review deliverable, an `--intent` whose source is no adapter, a `--score`
-    /// outside 0 to 1, a git older than 2.41, or an `--out` or `--json` file that
-    /// cannot be written.
+    /// packet, as the `Intent:` line of an evidence bundle writes it. An
+    /// `Intent: <source>:<ref>` trailer of a commit of the range adds one too,
+    /// and a trailer with a key of `review.sessions.trailers` (default
+    /// `Entire-Checkpoint`) fills the `Sessions:` line; a trailer never makes
+    /// the command fail. `--validation <file>` names a capture of `openspec
+    /// validate --json` that `houserules capture` wrote at `--head` in a clean
+    /// work tree. Each `openspec` intent then shows the validation of its
+    /// change. A capture that cannot be used prints one line on stderr and
+    /// leaves every validation `null`; the exit stays as without the flag. A
+    /// packet over 60,000 characters is cut, and each cut list ends with the
+    /// count of the items that it leaves out. The packet is
+    /// the same for the same range and the same rules. It exits 0 whatever the
+    /// audit finds. It exits 2 for a setup error, for example: a ref that is
+    /// no commit, an `--audit` file of another range or that is no audit
+    /// result, a `--review` file that is no review deliverable, an `--intent`
+    /// whose source is no adapter, a `--score` outside 0 to 1, a git older
+    /// than 2.41, or an `--out` or `--json` file that cannot be written.
     Evidence(review::evidence::EvidenceArgs),
     /// Writes and checks the evidence bundle of a pull or merge request. The
     /// bundle is a section of the description of the request: the purpose or an

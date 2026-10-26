@@ -121,7 +121,9 @@
             "diff-append-only",
             "report-field",
             "durable-sha",
-            "runner"
+            "runner",
+            "intent-required",
+            "intent-resolves"
           ]
         },
         "level": {
@@ -203,6 +205,14 @@
         },
         "covers": {
           "type": "boolean"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
         }
       }
     },

@@ -20,7 +20,7 @@ use super::check_shape::{CheckDef, CheckLevel, CheckType, Glob};
 use super::git::{Commit, commits_in, removed_lines, show_file, tree_files};
 use super::git_paths::InstallPrefix;
 use super::glob::glob_match;
-use super::model::Entry;
+use super::model::{Base, Entry};
 use crate::published::audit_result::{AuditRow, RowLevel, RowMode, RowResult};
 
 mod co_change;
@@ -29,6 +29,7 @@ mod diff_append_only;
 mod durable_sha;
 mod external;
 mod grep_absent;
+mod intent;
 mod report_field;
 mod sarif;
 
@@ -61,7 +62,10 @@ fn match_any(path: &str, glob: &Option<Glob>) -> Result<bool, String> {
 
 /// `paths` filtered to those matching any glob in `glob`, propagating a
 /// malformed glob as an error instead of panicking.
-fn filter_matching(paths: &[String], glob: &Option<Glob>) -> Result<Vec<String>, String> {
+pub(in crate::rules) fn filter_matching(
+    paths: &[String],
+    glob: &Option<Glob>,
+) -> Result<Vec<String>, String> {
     let mut matched = Vec::new();
     for path in paths {
         if match_any(path, glob)? {
@@ -76,7 +80,7 @@ fn filter_matching(paths: &[String], glob: &Option<Glob>) -> Result<Vec<String>,
 /// so a stateful match-position flag has no place here. `regress::Regex`
 /// carries no such state itself, but the flags are still stripped before
 /// compiling for a consistent, documented contract.
-fn compile_check_regex(pattern: &str, flags: &str) -> Result<Regex, String> {
+pub(in crate::rules) fn compile_check_regex(pattern: &str, flags: &str) -> Result<Regex, String> {
     let stripped: String = flags.chars().filter(|c| *c != 'g' && *c != 'y').collect();
     Regex::with_flags(pattern, stripped.as_str()).map_err(|error| error.to_string())
 }
@@ -90,6 +94,7 @@ fn compile_check_regex(pattern: &str, flags: &str) -> Result<Regex, String> {
 /// filled `self_audit` (`note_self_audit_row`), for the comparison that
 /// `compare_self_audit` makes.
 pub(super) struct AuditContext<'a> {
+    knowledge: &'a Base,
     root: &'a Path,
     prefix: &'a InstallPrefix,
     base_sha: String,
@@ -105,13 +110,13 @@ pub(super) struct AuditContext<'a> {
 }
 
 impl<'a> AuditContext<'a> {
-    /// The context of the range `base_sha..head_sha` in `root`, whose
-    /// changed files are `changed`. `ids` are the ids of `--ids`. `report` is
-    /// the single report of a `--report` run and `reports` the reports of a
-    /// `--workspace` run.
+    /// The context of the range `base_sha..head_sha` in the install of
+    /// `knowledge`, whose changed files are `changed`. `ids` are the ids of
+    /// `--ids`. `report` is the single report of a `--report` run and
+    /// `reports` the reports of a `--workspace` run.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn new(
-        root: &'a Path,
+        knowledge: &'a Base,
         prefix: &'a InstallPrefix,
         base_sha: String,
         head_sha: String,
@@ -121,7 +126,8 @@ impl<'a> AuditContext<'a> {
         reports: Option<&'a [(String, Value)]>,
     ) -> Self {
         Self {
-            root,
+            knowledge,
+            root: &knowledge.root,
             prefix,
             base_sha,
             head_sha,
@@ -246,5 +252,7 @@ pub(super) fn run(entry: &Entry, check: &CheckDef, ctx: &AuditContext) -> Result
         CheckType::ReportField => report_field::run(check, ctx, &rows),
         CheckType::DurableSha => durable_sha::run(check, ctx, &rows),
         CheckType::Runner => external::run(check, ctx, &rows),
+        CheckType::IntentRequired => intent::run_required(check, ctx, &rows),
+        CheckType::IntentResolves => intent::run_resolves(ctx, &rows),
     }
 }

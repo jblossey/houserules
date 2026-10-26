@@ -1,20 +1,23 @@
 //! The help texts and the documents that state the evidence behavior of batch
 //! 36 (spec 7, 8.2, 8.3, and 11; case 8, and the part of case 10 that rests on
 //! the texts): the `--help` of `update`, `validate`, and `check-knowledge`, the
-//! README, and the upgrade guide. `capture --help`, `report-facts --help`, and
-//! `check-report-claims --help` are pinned with their commands, and the hand
-//! steps of the CI workflow in the unit tests of `main.rs`.
+//! README with its reference pages, and the upgrade guide. `capture --help`,
+//! `report-facts --help`, and `check-report-claims --help` are pinned with
+//! their commands, and the hand steps of the CI workflow in the unit tests of
+//! `main.rs`.
 //!
 //! The file also holds the reds of an upgrade that the texts tell the way out
 //! of (spec 12): an install whose `process` pack copy is one patch version
 //! behind, and an install whose implementer template `update` keeps. The
-//! `sh` blocks of the README evidence section run in a fresh install, and the
+//! `sh` blocks of the evidence section of `docs/evidence.md` run in a fresh
+//! install, and the
 //! texts that state what `update` prints for a kept schema follow the code.
 //!
 //! A test whose doc comment calls it a pin asserts behavior that the code held
 //! before this change. Every statement is compared on folded text, as in
 //! `help_35.rs`.
 
+mod docs_support;
 mod help_support;
 mod tracker_support;
 
@@ -26,7 +29,7 @@ use help_support::{folded, help_of, help_of_args, omits, read, states};
 use serde_json::{Value, json};
 use tempfile::TempDir;
 use tracker_support::{edit_marker, git, read_json, repo_root, run_ok, scratch_git_repo, stdout};
-use tracker_support::{sha256_hex, write_json};
+use tracker_support::{pack_pin, write_json};
 
 /// The commit on main that holds the kit of batch 35: the last kit before the
 /// report form of batch 36.
@@ -151,24 +154,43 @@ fn check_knowledge_help_names_the_regex_test_of_pack_copies_and_overrides() {
     );
 }
 
-// ---- README ---------------------------------------------------------------------------
+// ---- README and its reference pages ---------------------------------------------------
 
-/// The evidence section: value, a runnable command with its output, the report
-/// fragment, and what each command checks.
+/// The page of the evidence section, which the README links.
+const EVIDENCE_PAGE: &str = "docs/evidence.md";
+
+/// The README and each page that holds reference text that left it, folded
+/// and joined: the text in which a stale statement must not come back.
+fn readme_and_its_pages() -> String {
+    docs_support::REFERENCE_PAGES
+        .iter()
+        .map(|path| folded(&read(path)))
+        .fold(folded(&read("README.md")), |all, text| {
+            format!("{all} {text}")
+        })
+}
+
+/// The evidence section of its page: value, a runnable command with its
+/// output, the report fragment, and what each command checks. The README links
+/// the page.
 #[test]
-fn readme_has_an_evidence_section_with_its_runnable_usage() {
-    let raw = read("README.md");
+fn the_evidence_page_has_an_evidence_section_with_its_runnable_usage() {
+    let raw = read(EVIDENCE_PAGE);
     assert!(
         raw.lines().any(|line| line == "## Evidence"),
-        "README has no section `## Evidence`"
+        "{EVIDENCE_PAGE} has no section `## Evidence`"
     );
     states(
         "README.md",
+        &folded(&read("README.md")),
+        &["[The houserules step and evidence](docs/evidence.md)"],
+    );
+    states(
+        EVIDENCE_PAGE,
         &folded(&raw),
         &[
-            "- [The houserules step](#the-houserules-step) - [Evidence](#evidence) - [Runners](#runners)",
             "A task report cites its evidence instead of holding it.",
-            "The commands below continue the [quick start](#quick-start): a repository where `houserules init` ran and one commit holds its files.",
+            "The commands below start from a fresh install: a repository where `houserules init` ran and one commit holds its files.",
             "houserules capture --out .houserules/work/demo/files.txt -- ls src",
             ".houserules/work/demo/files.txt: exit 0",
             "`capture` runs the command with no shell, in the current directory, with stdin closed. It exits with the exit code of the command, so a failing test run still fails a gate chain. The directory of `--out` must exist.",
@@ -183,16 +205,16 @@ fn readme_has_an_evidence_section_with_its_runnable_usage() {
         ],
     );
     omits(
-        "README.md",
-        &folded(&raw),
+        "README.md and its reference pages",
+        &readme_and_its_pages(),
         &["when an `excerpt` is not part of its capture"],
     );
 }
 
 /// `output` with its first SHA-256 digest named `<hash of the file>` and its
-/// second `<hash in the report>`, the words that the README gives the two
-/// digests of a changed capture: the digests change with each capture, because
-/// the header holds the times.
+/// second `<hash in the report>`, the words that the evidence page gives the
+/// two digests of a changed capture: the digests change with each capture,
+/// because the header holds the times.
 #[cfg(unix)]
 fn naming_the_digests(output: &str) -> String {
     let mut names = ["<hash of the file>", "<hash in the report>"].into_iter();
@@ -211,17 +233,17 @@ fn naming_the_digests(output: &str) -> String {
         .join(" ")
 }
 
-/// Every `sh` block of the evidence section runs as printed, top to bottom, in
-/// a fresh install (the state of the quick start: `init`, then one commit), and
-/// prints the `text` block that follows it. The first two blocks exit 0. The
-/// last block shows a finding of `check-report-claims`, which exits 1.
+/// Every `sh` block of the evidence section of its page runs as printed, top
+/// to bottom, in a fresh install (`init`, then one commit), and prints the
+/// `text` block that follows it. The first two blocks exit 0. The last block
+/// shows a finding of `check-report-claims`, which exits 1.
 #[cfg(unix)]
 #[test]
-fn the_readme_evidence_blocks_run_as_printed_in_a_fresh_install() {
+fn the_evidence_page_blocks_run_as_printed_in_a_fresh_install() {
     let dir = scratch_git_repo();
     run_ok(dir.path(), &["init"]);
     tracker_support::commit_all(dir.path(), "chore: install houserules knowledge setup");
-    let blocks = fenced_blocks_of(&read("README.md"), "Evidence");
+    let blocks = fenced_blocks_of(&read(EVIDENCE_PAGE), "Evidence");
 
     let mut exits = Vec::new();
     for (at, (info, script)) in blocks.iter().enumerate() {
@@ -244,22 +266,22 @@ fn the_readme_evidence_blocks_run_as_printed_in_a_fresh_install() {
     assert_eq!(exits, [0, 0, 1], "the exit codes of the three sh blocks");
 }
 
-/// The step section names the facts and the output files of the report step
-/// (`tools/houserules-step.sh after <base> <report>`).
+/// The step section of the evidence page names the facts and the output files
+/// of the report step (`tools/houserules-step.sh after <base> <report>`).
 #[test]
-fn readme_states_what_the_step_script_does_with_a_report() {
-    let readme = folded(&read("README.md"));
+fn the_evidence_page_states_what_the_step_script_does_with_a_report() {
+    let page = folded(&read(EVIDENCE_PAGE));
     states(
-        "README.md",
-        &readme,
+        EVIDENCE_PAGE,
+        &page,
         &[
             "`after <base>` runs `houserules audit --base <base>` and writes the result to `.houserules/step/audit.json`. With a report as the second argument, the audit runs with `--report`, and the script then runs `houserules report-facts` and `houserules validate` and writes `.houserules/step/report-facts.txt` and `.houserules/step/validate.json`.",
             "# the audit since main, the report's facts, and the report check",
         ],
     );
     omits(
-        "README.md",
-        &readme,
+        "README.md and its reference pages",
+        &readme_and_its_pages(),
         &[
             "it also runs `houserules validate` and writes `.houserules/step/validate.json`",
             "# the audit since main, and the report check",
@@ -267,14 +289,14 @@ fn readme_states_what_the_step_script_does_with_a_report() {
     );
 }
 
-/// The CLI table lists `capture` and `report-facts`, and states what `validate`
-/// and `check-report-claims` check now.
+/// The CLI reference lists `capture` and `report-facts`, and states what
+/// `validate` and `check-report-claims` check now.
 #[test]
-fn readme_cli_table_lists_the_evidence_commands_and_the_changed_rows() {
-    let readme = folded(&read("README.md"));
+fn the_cli_reference_lists_the_evidence_commands_and_the_changed_rows() {
+    let reference = folded(&read("docs/cli.md"));
     states(
-        "README.md",
-        &readme,
+        "docs/cli.md",
+        &reference,
         &[
             "Working with evidence:",
             "| `capture --out <file> -- <command>...` | Runs a command and writes its output to the file under a header (the command, the directory, the times, the exit status, `HEAD`, and a dirty flag); it exits with the exit code of the command |",
@@ -284,8 +306,8 @@ fn readme_cli_table_lists_the_evidence_commands_and_the_changed_rows() {
         ],
     );
     omits(
-        "README.md",
-        &readme,
+        "README.md and its reference pages",
+        &readme_and_its_pages(),
         &[
             "| `validate` | Validates deliverable JSON files against the schema, which requires a `model` field |",
             "Cross-checks a report's claims against the artifacts it cites",
@@ -372,14 +394,6 @@ fn process_pack_of_batch_35() -> Value {
     serde_json::from_str(&text).expect("parse the process pack of batch 35")
 }
 
-/// The `sha256` pin of a pack copy, as the binary computes it: the SHA-256 of
-/// the compact JSON of the parsed copy with every object's keys sorted.
-fn pin_of(copy: &Value) -> String {
-    let mut canonical = copy.clone();
-    canonical.sort_all_objects();
-    sha256_hex(&serde_json::to_vec(&canonical).expect("serialize"))
-}
-
 /// An install whose `process` pack is the copy of batch 35, at its pin, as
 /// `update` of a batch-35 install finds it.
 fn install_with_the_process_pack_of_batch_35() -> TempDir {
@@ -394,7 +408,7 @@ fn install_with_the_process_pack_of_batch_35() -> TempDir {
             .and_then(|packs| packs.get_mut("process"))
             .expect("the process pin");
         pin["version"] = old["version"].clone();
-        pin["sha256"] = json!(pin_of(&old));
+        pin["sha256"] = json!(pack_pin(&old));
     });
     dir
 }

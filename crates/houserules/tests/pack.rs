@@ -15,7 +15,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde_json::{Value, json};
 use tempfile::TempDir;
-use tracker_support::{repo_root, sha256_hex};
+use tracker_support::{pack_pin, repo_root};
 
 /// A `Command` for the compiled `houserules` binary under test.
 /// `HOUSERULES_SKIP_SELF_UPDATE` keeps `update`'s self-update phase from
@@ -58,14 +58,6 @@ fn emit_form(value: &Value) -> String {
         "{}\n",
         serde_json::to_string_pretty(value).expect("serialize")
     )
-}
-
-/// The SHA-256 of a pack's canonical serialization (spec L3): compact JSON
-/// of the parsed value with every object's keys sorted.
-fn canonical_sha(value: &Value) -> String {
-    let mut canonical = value.clone();
-    canonical.sort_all_objects();
-    sha256_hex(&serde_json::to_vec(&canonical).expect("serialize"))
 }
 
 /// One schema-valid entry in the `global` area.
@@ -246,7 +238,7 @@ impl Project {
         marker["packs"][name] = json!({
             "version": copy["version"],
             "source": source,
-            "sha256": canonical_sha(copy),
+            "sha256": pack_pin(copy),
             "addedAreas": added_areas,
         });
         self.write_json(".houserules.json", &marker);
@@ -611,7 +603,7 @@ fn add_copies_a_kit_pack_pins_it_and_keeps_the_other_marker_keys_in_order() {
                 "quality": {
                     "version": version,
                     "source": "kit",
-                    "sha256": canonical_sha(&kit),
+                    "sha256": pack_pin(&kit),
                     "addedAreas": ["process", "tools"],
                 },
             },
@@ -764,7 +756,7 @@ fn add_copies_a_vendored_file_in_emit_form_and_records_a_root_relative_source() 
         json!({"team": {
             "version": "1.0.0",
             "source": "file:vendor/team.json",
-            "sha256": canonical_sha(&pack),
+            "sha256": pack_pin(&pack),
             "addedAreas": [],
         }})
     );
@@ -880,7 +872,7 @@ fn add_fetches_a_pack_from_a_tag_and_pins_its_commit() {
         json!({"team": {
             "version": "1.0.0",
             "source": source,
-            "sha256": canonical_sha(&pack),
+            "sha256": pack_pin(&pack),
             "addedAreas": [],
             "commit": commit,
         }})
@@ -1257,7 +1249,7 @@ fn remove_takes_out_only_the_areas_that_spec_six_allows() {
         json!({"beta": {
             "version": "1.0.0",
             "source": "file:vendor/beta.json",
-            "sha256": canonical_sha(&beta),
+            "sha256": pack_pin(&beta),
             "addedAreas": ["c"],
         }})
     );
@@ -1340,7 +1332,7 @@ fn upgrade_moves_a_git_pack_to_a_new_tag_and_refuses_while_an_override_names_a_d
         json!({"team": {
             "version": "2.0.0",
             "source": host.source("v2", "packs/team.json"),
-            "sha256": canonical_sha(&second),
+            "sha256": pack_pin(&second),
             "addedAreas": ["extra2"],
             "commit": second_commit,
         }})
@@ -1390,7 +1382,7 @@ fn upgrade_recopies_a_file_pack_from_its_recorded_path() {
         json!({"team": {
             "version": "1.1.0",
             "source": "file:vendor/team.json",
-            "sha256": canonical_sha(&second),
+            "sha256": pack_pin(&second),
             "addedAreas": [],
         }})
     );

@@ -1,6 +1,6 @@
 {
   "name": "quality",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "schema": "houserules/pack@1.0.0",
   "topics": {
     "quality": {
@@ -35,7 +35,8 @@
         "One responsibility per file and per function. Each unit boundary is one a reader can understand without its internals.",
         "A dedicated compliance pass over the existing codebase is its own piece of planned work; new code complies immediately.",
         "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test; an auto-restore setting covers only spies, so a mock created in a module-mock factory gets its own explicit afterEach reset.",
-        "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided."
+        "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided.",
+        "A struct whose fields a reader fills names, in its doc comment, the production reader of each field, so a field that no reader fills shows."
       ],
       "tags": [
         "quality"

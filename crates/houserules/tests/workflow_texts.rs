@@ -33,9 +33,11 @@
 //! the file: the seed rule of the evidence bundle and the fix-diff review of
 //! a critical task in the process pack, the bundle step of the finishing and
 //! orchestrating skills, the parts of the review layer in the
-//! migrating-knowledge skill and the upgrade guide, and what the README, the
-//! guide, and the knowledge base say about the CI files that `init` writes.
+//! migrating-knowledge skill and the upgrade guide, and what the README with
+//! its review-layer page, the guide, and the knowledge base say about the CI
+//! files that `init` writes.
 
+mod docs_support;
 mod guard_lists;
 mod help_support;
 mod tracker_support;
@@ -48,6 +50,7 @@ use guard_lists::{FULL_TIER, PLUGIN_SKILLS, VENDOR_MODELS};
 use help_support::{omits, states};
 use regress::Regex;
 use serde_json::{Value, json};
+use tracker_support::{flat, repo_root};
 
 const IMPLEMENTER: &str = ".claude/agents/implementer.md";
 const TASK_REVIEWER: &str = ".claude/agents/task-reviewer.md";
@@ -95,13 +98,6 @@ const DESIGN_PHASE: [&str; 4] = [
 const LOST_READ: &str =
     "`<<` marker or a \"more items\" note as a lost read and read the source file";
 
-/// This checkout's repository root.
-fn repo_root() -> PathBuf {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    root.canonicalize()
-        .unwrap_or_else(|error| panic!("canonicalize {}: {error}", root.display()))
-}
-
 /// The directory of the reference workflow in the source tree.
 fn package_dir() -> PathBuf {
     repo_root().join("template/workflows/reference")
@@ -147,11 +143,6 @@ fn package_texts() -> Vec<(String, String)> {
             (file, text)
         })
         .collect()
-}
-
-/// `text` with every run of white space collapsed to one space.
-fn flat(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// Asserts that the package file `file` holds every phrase of `phrases`.
@@ -1703,11 +1694,11 @@ const UPGRADE_GUIDE: &str = "docs/upgrading-to-2.md";
 /// The knowledge schema caps a summary at 160 characters.
 const SEED_RULE_SUMMARY: &str = "A pull or merge request carries an evidence bundle before review: purpose, work items, tier, criterion, and each run at its head; bundle check enforces it.";
 
-/// The body of `process.risk-tiers` as `knowledge/overrides.json` holds it (ruling 261).
+/// The body of `process.risk-tiers` as the process pack holds it (ruling 261 and the task-11 ruling Q1).
 const RISK_TIERS_BODY: [&str; 8] = [
     "The tier sets the pipeline's depth. Light: one task; docs, comments, config values, or a dependency bump only; no executable behavior change; no task is critical. The work item's body is the spec, and the project's owner or decider still approves it. The pipeline is an author of the change, one task review, and the live run. It has no plan document and no branch review.",
     "Standard: every change that is not light. The pipeline is a short spec with the decision gate, a plan, an author of the change, one task review, at most one re-review, and the live run. A branch review runs only for a batch of two or more tasks.",
-    "A critical task is a task whose change alters the commands, flags, or output of a command-line interface, a schema, authentication or security code, or the data that an installed product keeps on disk. It runs inside the standard tier with its own evidence: the plan writes the spec's cases for the task as tests before any code; the author of the change commits them first with one recorded run that shows them failing at the base commit, then makes them pass; the evidence is that run and the whole suite passing at the head (`process.tdd`).",
+    "A critical task is a task whose change alters the commands, flags, or output of a command-line interface, a schema, authentication or security code, or the data that an installed product keeps on disk. It runs inside the standard tier with its own evidence: the plan writes the spec's cases for the task as tests before any code; the author of the change commits them first with one recorded run that shows them failing at the base commit, then makes them pass; the evidence is that run and the whole suite passing at the head (`process.tdd`). The whole-suite half is the integration run of the person who runs the work. For a task that runs in the shared checkout, that run is the one at the close of the task.",
     "A critical task gets one task review. The person who runs the work checks each fix by re-running the reviewer's own reproduction and records the check (`process.fix-round-verification-record`). A Critical or Important finding goes to a fresh author of the change; a Minor finding is fixed directly. A fix round that fixes a Critical or Important finding, or that changes files beyond the files its findings name, then gets one review of its fix diff. That review files only new breakage. Only a new Critical or Important finding of it opens a further round, which closes by the check of the person who runs the work; no second fix-diff review runs.",
     "A lighter tier drops only what its pipeline names: the light tier drops the plan document and the branch review, and the standard tier drops the branch review for a one-task batch. Every tier keeps item selection, the live run, the finish, and rollout and acceptance.",
     "One tier covers the batch: the highest tier that any of its changes needs. A critical task follows its own evidence rule inside the tier of the batch.",
@@ -1715,19 +1706,20 @@ const RISK_TIERS_BODY: [&str; 8] = [
     "A tier moves up during a batch, never down. `process.bounded-review-loop` states the one automatic move.",
 ];
 
-/// The `source` of `process.risk-tiers` as `knowledge/overrides.json` holds it (ruling 261).
+/// The `source` of `process.risk-tiers` as the process pack holds it (ruling 261).
 const RISK_TIERS_SOURCE: (&str, &str, &str) = ("2026-10-25", "user", "design.md 260");
 
-/// The body of `process.bounded-review-loop` as `knowledge/overrides.json` holds it (ruling 261).
-const BOUNDED_REVIEW_LOOP_BODY: [&str; 5] = [
+/// The body of `process.bounded-review-loop` as the process pack holds it (rulings 261 and 281).
+const BOUNDED_REVIEW_LOOP_BODY: [&str; 6] = [
     "A fix round that holds only Minor fixes closes with a verification note (`process.fix-round-verification-record`), never with a re-review. The person who runs the work runs the check that each Minor finding names and cites its result in the note.",
     "A re-review reads the fix diff and the original findings only. It files new findings at their impact (`process.severity-by-impact`). Only a new Critical or Important finding opens a further round. A new Minor finding joins a Minor-only round.",
     "Re-reviews per task: light 0, standard 1. A critical task gets no re-review of its original findings; it gets one fix-diff review after a fix round that fixes a Critical or Important finding or changes files beyond its findings' files (`process.risk-tiers`). A branch-review fix wave has the same cap as the batch's tier.",
+    "While a fix-diff review or a re-review runs, the person who runs the work may integrate the fix and run the integration gates. When the review files a new Critical or Important finding, the person who runs the work undoes the integration (the batch branch returns to the commit before it) and the task opens its next round.",
     "At the cap, the open non-critical findings become one work item with the reason (a deferral under `process.no-tech-debt`). An open Critical finding goes to the project's owner or decider.",
     "A light task with an Important or Critical finding moves up to the standard tier and gets its one re-review.",
 ];
 
-/// The `source` of `process.bounded-review-loop` as `knowledge/overrides.json` holds it (ruling 261).
+/// The `source` of `process.bounded-review-loop` as the process pack holds it (ruling 261).
 const BOUNDED_REVIEW_LOOP_SOURCE: (&str, &str, &str) = ("2026-10-25", "user", "design.md 260");
 
 /// The longest summary that the knowledge schema allows.
@@ -1813,12 +1805,15 @@ fn the_process_pack_ships_the_fix_diff_review_of_ruling_260() {
     }
 }
 
-/// Case 9: the process pack moves one minor version for the added entry and the
-/// two changed bodies, and the writing-style pack one patch version for the
-/// changed wording of the README funnel entry.
+/// Case 9 and case 14: the process pack moved one minor version for the added
+/// entry and the two changed bodies, and then one patch version for the faster
+/// loop (spec 19.9: a wording change); the quality pack moves one patch version
+/// for the sentence of 19.8; the writing-style pack moved one patch version for
+/// the changed wording of the README funnel entry.
 #[test]
 fn the_kit_packs_moved_by_the_class_of_their_change() {
-    assert_eq!(kit_pack("process")["version"], "2.1.0");
+    assert_eq!(kit_pack("process")["version"], "2.1.1");
+    assert_eq!(kit_pack("quality")["version"], "1.0.3");
     assert_eq!(kit_pack("writing-style")["version"], "1.0.2");
 }
 
@@ -2295,20 +2290,32 @@ fn the_upgrade_guide_states_what_init_and_update_write_now() {
     );
 }
 
-/// The README: the review-layer section, its table-of-contents entry, the rows
-/// of the keys and schema ids, and the statements about `init` that spec 10.7
-/// makes true.
+/// The page of the review layer, which the README links.
+const REVIEW_LAYER_PAGE: &str = "docs/review-layer.md";
+
+/// The review-layer page, its link in the README, the rows of the keys and
+/// schema ids, the rows of the CLI reference, and the statements about `init`
+/// that spec 10.7 makes true.
 #[test]
-fn the_readme_has_the_review_layer_section_and_the_rows_of_its_keys() {
-    let raw = help_support::read("README.md");
-    assert!(raw.lines().any(|line| line == "## The review layer"));
-    let readme = help_support::folded(&raw);
+fn the_review_layer_page_holds_the_section_and_the_rows_of_its_keys() {
+    let raw = help_support::read(REVIEW_LAYER_PAGE);
+    assert_eq!(raw.lines().next(), Some("# The review layer"));
+    let page = help_support::folded(&raw);
+    let readme = help_support::folded(&help_support::read("README.md"));
+    let reference = help_support::folded(&help_support::read("docs/cli.md"));
     states(
         "README.md",
         &readme,
         &[
-            "- [Runners](#runners) - [The review layer](#the-review-layer) - [Ownership model](#ownership-model)",
-            "The commands below continue the [quick start](#quick-start): a repository where `houserules init` ran and one commit holds its files.",
+            "[The review layer](docs/review-layer.md)",
+            "You can contribute a change: [CONTRIBUTING.md](CONTRIBUTING.md) explains the setup, the commit rules, and the gates that each change must pass.",
+        ],
+    );
+    states(
+        REVIEW_LAYER_PAGE,
+        &page,
+        &[
+            "The commands below start from a fresh install: a repository where `houserules init` ran and one commit holds its files.",
             "houserules route --base HEAD~1",
             "| `review` |",
             "| `covers` |",
@@ -2316,18 +2323,27 @@ fn the_readme_has_the_review_layer_section_and_the_rows_of_its_keys() {
             "| `houserules/overrides@1.2.0` |",
             "`init` writes no CI file.",
             "`houserules ci print --host github`",
+        ],
+    );
+    states(
+        "docs/cli.md",
+        &reference,
+        &[
             "| `evidence` |",
             "| `route` |",
             "| `bundle <write\\|check>` |",
             "| `record <write\\|show\\|list\\|audit>` |",
             "| `ci <print\\|write>` |",
             "`stats --records <range>`",
-            "Contributions are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) covers the development workflow, the batch process, and the gates a change must pass.",
         ],
     );
+    let all = docs_support::REFERENCE_PAGES
+        .iter()
+        .map(|path| help_support::folded(&help_support::read(path)))
+        .fold(readme.clone(), |all, text| format!("{all} {text}"));
     omits(
-        "README.md",
-        &readme,
+        "README.md and its reference pages",
+        &all,
         &[
             "and a CI workflow on a GitHub-hosted origin",
             "The CI workflow is written only when your `origin` resolves to GitHub",
@@ -2343,69 +2359,32 @@ fn the_readme_has_the_review_layer_section_and_the_rows_of_its_keys() {
     );
 }
 
-/// Spec 21.10 and `quality.gates-derive-their-scope`: the CLI table of the
-/// README holds a row for every command that `houserules --help` lists, and the
-/// list comes from the binary, not from this file.
-#[test]
-fn the_readme_cli_table_has_a_row_for_every_command_of_the_help() {
-    let help = String::from_utf8(
-        houserules()
-            .arg("--help")
-            .output()
-            .expect("run --help")
-            .stdout,
-    )
-    .expect("UTF-8 help");
-    let commands: Vec<&str> = help
-        .lines()
-        .skip_while(|line| *line != "Commands:")
-        .skip(1)
-        .take_while(|line| !line.is_empty())
-        .filter_map(|line| line.split_whitespace().next())
-        .filter(|name| *name != "help")
-        .collect();
-    assert!(commands.len() > 20, "{commands:?}");
-    let readme = help_support::read("README.md");
-    let reference = readme
-        .split("## CLI reference")
-        .nth(1)
-        .and_then(|rest| rest.split("\n## ").next())
-        .expect("the README holds a CLI reference");
-    let missing: Vec<&str> = commands
-        .iter()
-        .copied()
-        .filter(|command| {
-            !reference.lines().any(|line| {
-                line.strip_prefix(&format!("| `{command}"))
-                    .is_some_and(|rest| rest.starts_with([' ', '`']))
-            })
-        })
-        .collect();
-    assert!(
-        missing.is_empty(),
-        "the CLI table of the README has no row for: {missing:?}"
-    );
-}
-
-/// The `sh` block of the README review-layer section runs as printed in a fresh
-/// install (the state of the quick start: `init`, then one commit) and prints
-/// the `text` block that follows it.
+/// The `sh` blocks of the section `# The review layer` of its page run as
+/// printed, one after the other, in a fresh install (`init`, then one commit),
+/// and each prints the `text` block that follows it, with `<version>` in place
+/// of the version of the binary.
 #[cfg(unix)]
 #[test]
-fn the_readme_review_layer_block_runs_as_printed_in_a_fresh_install() {
+fn the_review_layer_page_block_runs_as_printed_in_a_fresh_install() {
     let dir = tracker_support::scratch_git_repo();
+    // The page shows `branches: ["main"]`; git's default branch name is the host's setting.
+    tracker_support::git(dir.path(), &["symbolic-ref", "HEAD", "refs/heads/main"]);
     tracker_support::run_ok(dir.path(), &["init"]);
     tracker_support::commit_all(dir.path(), "chore: install houserules knowledge setup");
-    let blocks =
-        help_support::fenced_blocks_of(&help_support::read("README.md"), "The review layer");
+    let blocks = docs_support::blocks(&docs_support::section(
+        &help_support::read(REVIEW_LAYER_PAGE),
+        "# The review layer",
+    ));
     let mut ran = 0;
-    for (at, (info, script)) in blocks.iter().enumerate() {
-        if info != "sh" {
+    for (at, block) in blocks.iter().enumerate() {
+        if block.info != "sh" {
             continue;
         }
+        let script = &block.body;
         let (code, printed) = help_support::run_block(dir.path(), script);
+        let printed = printed.replace(env!("CARGO_PKG_VERSION"), "<version>");
         let shown = match blocks.get(at + 1) {
-            Some((next, text)) if next == "text" => text.as_str(),
+            Some(next) if next.info == "text" => next.body.as_str(),
             _ => "",
         };
         assert_eq!(code, 0, "the block exits 0:\n{script}\n{printed}");
@@ -2416,7 +2395,7 @@ fn the_readme_review_layer_block_runs_as_printed_in_a_fresh_install() {
         );
         ran += 1;
     }
-    assert_eq!(ran, 1, "the review-layer section holds one sh block");
+    assert_eq!(ran, 2, "the review-layer section holds two sh blocks");
 }
 
 /// The seeded-repository live proof (`houserules.seeded-repo-live-proof`): a

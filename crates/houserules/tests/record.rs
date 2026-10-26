@@ -12,8 +12,10 @@
 
 mod ci_support;
 mod help_support;
+mod note_support;
 mod schema_support;
 mod tracker_support;
+mod validation_support;
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -28,9 +30,13 @@ use tracker_support::{
     assert_output, commit_all, copy_dir, edit_marker, git, houserules, repo_root, scratch_git_repo,
     sha256_hex, stderr, stdout,
 };
+use validation_support::{
+    arg, clean_capture, document_of, item, openspec_review, refused_captures, validation,
+    validations,
+};
 
 /// The schema file of the change record, relative to the repository root.
-const RECORD_SCHEMA: &str = "schemas/change-record/1.0.0.json";
+const RECORD_SCHEMA: &str = "schemas/change-record/1.1.0.json";
 
 /// The name of git's empty tree for a repository that hashes with SHA-1.
 const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
@@ -300,7 +306,14 @@ impl Install {
     /// Writes the record of the range `base` to `head`, keyed by `head`, and
     /// requires exit 0 and no output.
     fn write_record(&self, base: &str, head: &str) {
-        let output = self.record_write(&["--base", base, "--head", head]);
+        self.write_record_with(base, head, &[]);
+    }
+
+    /// Like [`Install::write_record`], with the flags `extra`.
+    fn write_record_with(&self, base: &str, head: &str, extra: &[&str]) {
+        let mut args = vec!["--base", base, "--head", head];
+        args.extend(extra);
+        let output = self.record_write(&args);
         assert_output(&output, 0, "", "");
     }
 
@@ -642,7 +655,7 @@ fn a_record_names_its_range_its_commits_its_writer_and_its_rule_hashes() {
     install.write_record(&base, &head);
 
     let record = install.note(&head);
-    assert_eq!(record["schema"], json!("houserules/change-record@1.0.0"));
+    assert_eq!(record["schema"], json!("houserules/change-record@1.1.0"));
     assert_eq!(record["install"], json!("."));
     assert_eq!(record["key"], json!(head));
     assert_eq!(record["base"], json!(base));
@@ -668,7 +681,7 @@ fn a_record_names_its_range_its_commits_its_writer_and_its_rule_hashes() {
     assert_eq!(record["bundle"], Value::Null);
     assert_eq!(record["reviewers"], json!([]));
     assert_eq!(record["reviewers_pending"], json!(false));
-    assert_eq!(record["links"], json!({"work_items": []}));
+    assert_eq!(record["links"], json!({"work_items": [], "sessions": []}));
     assert_eq!(record["post_merge_audit"], Value::Null);
     assert_eq!(record["truncated"], json!([]));
 }
@@ -692,7 +705,9 @@ fn the_record_keeps_the_evidence_document_of_the_range() {
     let rules = object.remove("rules").expect("rules");
     let intent = object.remove("intent").expect("intent");
     let route = object.remove("route").expect("route");
+    let sessions = object.remove("sessions").expect("sessions");
     assert_eq!(record["evidence"], evidence);
+    assert_eq!(record["links"]["sessions"], sessions);
     assert_eq!(record["route"], route);
     assert_eq!(record["intent"], intent);
     assert_eq!(record["rules"]["head_hash"], rules["head_hash"]);
@@ -1564,6 +1579,327 @@ fn a_key_that_holds_a_record_of_another_range_exits_1() {
     assert!(!target.exists(), "--out writes nothing");
 }
 
+// ---- trailers: intents and sessions (batch 38, spec 5.1 to 5.4; case 4) ---------------------
+
+/// The value of the session trailer in the cases below: the form of a checkpoint
+/// of the Entire tool.
+const CHECKPOINT: &str = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+
+/// The keys of the object `value`, in order.
+fn keys(value: &Value) -> Vec<String> {
+    value
+        .as_object()
+        .expect("a JSON object")
+        .keys()
+        .cloned()
+        .collect()
+}
+
+/// The sessions of the record are the sessions of the packet: `links` holds
+/// `sessions` after `work_items`, and the `evidence` of the record leaves `sessions`
+/// out, as it leaves out `intent` (spec 5.4). The record is of schema 1.1.0, and so is
+/// the evidence document that it keeps.
+#[test]
+fn the_record_keeps_the_sessions_in_links_and_not_in_its_evidence() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    install.append("docs/guide.md", 1);
+    let first = install.commit(&format!("docs: edit\n\nEntire-Checkpoint: {CHECKPOINT}"));
+    install.append("docs/guide.md", 1);
+    let head = install.commit("docs: edit again\n\nEntire-Checkpoint: cp-2");
+
+    install.write_record(&base, &head);
+
+    let record = install.note(&head);
+    let evidence = install.evidence_json(&base, &head, &[]);
+    assert_eq!(record["schema"], json!("houserules/change-record@1.1.0"));
+    assert_eq!(
+        record["evidence"]["schema"],
+        json!("houserules/evidence@1.1.0")
+    );
+    assert_eq!(
+        record["links"],
+        json!({
+            "work_items": [],
+            "sessions": [
+                {"commit": first, "trailer": "Entire-Checkpoint", "value": CHECKPOINT},
+                {"commit": head, "trailer": "Entire-Checkpoint", "value": "cp-2"},
+            ],
+        })
+    );
+    assert_eq!(record["links"]["sessions"], evidence["sessions"]);
+    assert_eq!(keys(&record["links"]), ["work_items", "sessions"]);
+    assert!(record["evidence"].get("sessions").is_none());
+    assert_valid(&record, RECORD_SCHEMA);
+}
+
+/// Version 1.1.0 adds `links.sessions` as an optional key: the schema does not
+/// require it, because a new required key is a major version. `record write`
+/// prints the key always, and the same record without it stays valid.
+#[test]
+fn the_record_schema_1_1_0_does_not_require_the_sessions_key() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    install.append("docs/guide.md", 1);
+    let head = install.commit("docs: edit the guide");
+    install.write_record(&base, &head);
+    let mut record = install.note(&head);
+    assert!(
+        record["links"].get("sessions").is_some(),
+        "the command writes it"
+    );
+
+    record["links"]
+        .as_object_mut()
+        .expect("an object")
+        .remove("sessions");
+
+    assert_valid(&record, RECORD_SCHEMA);
+}
+
+/// The trailer intents join the record's intents as they join the packet's, a
+/// malformed value and an unknown source included, and the command exits 0 for
+/// them: a commit's text never makes `record write` exit 2 (spec 5.2).
+#[test]
+fn the_intent_trailers_of_the_range_are_the_intents_of_the_record() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    install.write("docs/plans/plan.md", "# The plan\n\nWhy.\n\n- [ ] one\n");
+    let head = install.commit(
+        "docs: add a plan\n\nIntent: file:docs/plans/plan.md\nIntent: oops\nIntent: jira:ABC-1",
+    );
+
+    install.write_record(&base, &head);
+
+    let record = install.note(&head);
+    let evidence = install.evidence_json(&base, &head, &[]);
+    assert_eq!(record["intent"], evidence["intent"]);
+    let found: Vec<(&str, &str)> = record["intent"]
+        .as_array()
+        .expect("the intents")
+        .iter()
+        .map(|intent| {
+            (
+                intent["source"].as_str().expect("a source"),
+                intent["ref"].as_str().expect("a ref"),
+            )
+        })
+        .collect();
+    assert_eq!(
+        found,
+        [
+            ("file", "docs/plans/plan.md"),
+            ("", "oops"),
+            ("jira", "ABC-1")
+        ]
+    );
+    assert_eq!(
+        record["intent"][1]["unresolved"],
+        json!("an intent is written <source>:<ref>")
+    );
+    assert_valid(&record, RECORD_SCHEMA);
+}
+
+/// `--intent` keeps its precedence over the `Intent:` line of the bundle, and the
+/// trailers add their intents to either: each `<source>:<ref>` counts once.
+#[test]
+fn the_flag_the_bundle_line_and_the_trailers_name_each_intent_once() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    for name in ["a", "b", "c"] {
+        install.write(
+            &format!("docs/plans/{name}.md"),
+            &format!("# Plan {name}\n\nWhy {name}.\n"),
+        );
+    }
+    let head = install.commit(
+        "docs: add the plans\n\nIntent: file:docs/plans/c.md\nIntent: file:docs/plans/a.md",
+    );
+    let target = install.scratch_file("description.md");
+    fs::write(
+        &target,
+        description(
+            &["Intent: file:docs/plans/b.md", "Work items: WI-1"],
+            &header_line(&head),
+        ),
+    )
+    .expect("write");
+
+    install.write_record_with(
+        &base,
+        &head,
+        &[
+            "--intent",
+            "file:docs/plans/a.md",
+            "--bundle",
+            target.to_str().expect("UTF-8"),
+        ],
+    );
+
+    let refs: Vec<String> = install.note(&head)["intent"]
+        .as_array()
+        .expect("the intents")
+        .iter()
+        .map(|intent| intent["ref"].as_str().expect("a ref").to_string())
+        .collect();
+    assert_eq!(
+        refs,
+        ["docs/plans/a.md", "docs/plans/c.md"],
+        "the flag wins over the bundle line, the trailer adds c, and a counts once"
+    );
+}
+
+/// A record over the budget cuts `links.sessions` to its first 20 in step 7 of
+/// spec 8.4 and counts the rest in `sessions_more`; `truncated` names `links`.
+#[test]
+fn a_record_over_the_budget_cuts_the_sessions_to_20_and_counts_the_rest() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    for number in 0..20 {
+        install.commit(&format!("docs: {number}\n\nEntire-Checkpoint: cp-{number}"));
+    }
+    install.append("docs/guide.md", 1);
+    let head = install.commit("docs: 20\n\nEntire-Checkpoint: cp-20");
+    let target = install.scratch_file("description.md");
+    fs::write(
+        &target,
+        description(
+            &[
+                &format!("Purpose: {}", "x".repeat(100_000)),
+                "Work items: WI-1",
+                "Risk tier: standard",
+                "Criterion: a docs change",
+            ],
+            &header_line(&head),
+        ),
+    )
+    .expect("write");
+
+    install.write_record_with(&base, &head, &["--bundle", target.to_str().expect("UTF-8")]);
+
+    let record = install.note(&head);
+    assert_eq!(
+        record["links"]["sessions"].as_array().map(Vec::len),
+        Some(20)
+    );
+    assert_eq!(record["links"]["sessions"][19]["value"], json!("cp-19"));
+    assert_eq!(record["links"]["sessions_more"], json!(1));
+    let truncated: Vec<&str> = record["truncated"]
+        .as_array()
+        .expect("truncated")
+        .iter()
+        .map(|name| name.as_str().expect("a name"))
+        .collect();
+    assert!(truncated.contains(&"links"), "{truncated:?}");
+    assert_valid(&record, RECORD_SCHEMA);
+}
+
+/// The minimal record holds no `links`, so it holds no session (spec 5.4).
+#[test]
+fn the_minimal_record_holds_no_session() {
+    let install = Install::new("", &[], Some(budget(8_192)));
+    let base = install.head();
+    install.append("docs/guide.md", 1);
+    let head = install.commit(&format!(
+        "docs: edit\n\nEntire-Checkpoint: {}",
+        "c".repeat(9_000)
+    ));
+
+    install.write_record(&base, &head);
+
+    let record = install.note(&head);
+    assert_eq!(record["truncated"], json!(["all"]));
+    assert!(record.get("links").is_none());
+    assert!(!install.note_text(&head).contains("sessions"));
+    assert_valid(&record, RECORD_SCHEMA);
+}
+
+/// `record show` prints the `Sessions:` line of the packet from `links`, in the
+/// place and form of the packet, and `Sessions: none` for a record with none.
+#[test]
+fn record_show_prints_the_sessions_line() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    install.append("docs/guide.md", 1);
+    let head = install.commit(&format!("docs: edit\n\nEntire-Checkpoint: {CHECKPOINT}"));
+    install.write_record(&base, &head);
+
+    let shown = stdout(&install.record_show(&[&head]));
+
+    assert!(
+        shown.contains(&format!(
+            "Diff: +1 -0 lines in 1 files\nWork items: none\nSessions: {} Entire-Checkpoint: `{CHECKPOINT}`\n",
+            short(&head)
+        )),
+        "{shown}"
+    );
+}
+
+/// A note is data that anyone with push access to the notes ref can write. `record
+/// show` prints the commit and the key of a session of a note through `review::text`,
+/// as it prints the value: a field with a line end or a heading adds no line to the
+/// summary and prints inside code spans.
+#[test]
+fn record_show_prints_the_fields_of_a_hostile_session_inside_code_spans() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    install.append("docs/guide.md", 1);
+    let head = install.commit(&format!("docs: edit\n\nEntire-Checkpoint: {CHECKPOINT}"));
+    install.write_record(&base, &head);
+    let mut note = install.note(&head);
+    note["links"]["sessions"] = json!([{
+        "commit": "<b>x</b>\n## Injected heading",
+        "trailer": "Evil\n\n## Injected",
+        "value": "v",
+    }]);
+    install.set_note(&head, &note);
+
+    let shown = install.record_show(&[&head]);
+
+    assert_eq!(shown.status.code(), Some(0), "{}", stderr(&shown));
+    let text = stdout(&shown);
+    assert!(
+        !text.lines().any(|line| line.starts_with("## Injected")),
+        "{text}"
+    );
+    assert!(
+        text.contains("\nSessions: `<b>x</b` `\"Evil\\n\\n## Injected\"`: `v`\n"),
+        "{text}"
+    );
+}
+
+/// A note of schema 1.0.0, as the binary of batch 37 wrote it, still reads: its
+/// `links.sessions` reads as empty, `record show` prints `Sessions: none`, and
+/// `--json` prints the empty list, with the schema id that the note holds.
+#[test]
+fn a_record_of_schema_1_0_0_reads_with_no_sessions() {
+    let install = Install::new("", &[docs_read()], None);
+    let base = install.head();
+    install.append("docs/guide.md", 3);
+    let head = install.commit("docs: edit the guide");
+    let note = note_support::note_1_0_0(&base, &head, &install.rules_hash_at(&head));
+    assert!(note["links"].get("sessions").is_none());
+    install.set_note(&head, &note);
+
+    let shown = install.record_show(&[&head]);
+    let json = install.record_show(&[&head, "--json"]);
+
+    assert_eq!(shown.status.code(), Some(0), "{}", stderr(&shown));
+    assert!(
+        stdout(&shown).contains("Work items: none\nSessions: none\n"),
+        "{}",
+        stdout(&shown)
+    );
+    assert_eq!(json.status.code(), Some(0), "{}", stderr(&json));
+    let record: Value = serde_json::from_str(&stdout(&json)).expect("the record");
+    assert_eq!(
+        record["schema"],
+        json!("houserules/change-record@1.0.0"),
+        "the note keeps its own schema id"
+    );
+    assert_eq!(record["links"]["sessions"], json!([]));
+}
+
 // ---- record show -----------------------------------------------------------------------------------
 
 /// The whole Markdown summary of a record, byte for byte: the packet's sections,
@@ -1620,6 +1956,7 @@ fn record_show_prints_the_summary_of_the_record() {
              \n\
              Diff: +3 -0 lines in 1 files\n\
              Work items: none\n\
+             Sessions: none\n\
              \n\
              ### Route\n\
              \n\
@@ -2929,7 +3266,7 @@ fn an_intent_that_cannot_be_named_exits_2() {
         &unknown,
         2,
         "",
-        "record: --intent jira:ABC-1: \"jira\" is no intent source; use one of: work-item, file\n",
+        "record: --intent jira:ABC-1: \"jira\" is no intent source; use one of: work-item, file, openspec\n",
     );
 }
 
@@ -3081,6 +3418,357 @@ fn a_git_older_than_2_41_exits_2_with_its_line() {
     );
 }
 
+// ---- the validation capture (batch 38, spec 4; case 3) ---------------------------------
+
+/// An install whose base commit holds nothing of OpenSpec and whose next commit adds the
+/// active changes `ids`, each with a proposal (the title `Change <id>`) and a task list. It
+/// gives the install, the base commit, and the head. It stays in this file: it builds the
+/// `Install` type of this file.
+fn openspec_changes(ids: &[&str]) -> (Install, String, String) {
+    let install = Install::new("", &[], Some(openspec_review()));
+    let base = install.head();
+    for id in ids {
+        install.write(
+            &format!("openspec/changes/{id}/proposal.md"),
+            &format!("# Change {id}\n\n## Why\n\nBecause {id}.\n"),
+        );
+        install.write(
+            &format!("openspec/changes/{id}/tasks.md"),
+            "- [x] a\n- [ ] b\n",
+        );
+    }
+    let head = install.commit("feat: add the changes");
+    (install, base, head)
+}
+
+/// Writes `text` as the file `name` of the scratch directory and gives its path. It stays in
+/// this file: it reads the scratch directory of the `Install` type of this file.
+fn capture_file(install: &Install, name: &str, text: &str) -> PathBuf {
+    let path = install.scratch_file(name);
+    fs::write(&path, text).expect("write the capture");
+    path
+}
+
+/// The line that `record write` prints for a capture that it refuses (spec 4.1).
+fn refusal_line(path: &Path, reason: &str) -> String {
+    format!("record: --validation {}: {reason}\n", path.display())
+}
+
+/// `record write --out <name>` over the range with the flags `extra`, and the file that it
+/// wrote.
+fn write_to_file(install: &Install, base: &str, head: &str, extra: &[&str]) -> (Output, PathBuf) {
+    let target = install.scratch_file("record-out.json");
+    let mut args = vec!["--base", base, "--head", head, "--out", arg(&target)];
+    args.extend_from_slice(extra);
+    (install.record_write(&args), target)
+}
+
+/// A valid run fills the validation of the `openspec` intent of the record, as it fills the
+/// intent of the packet: the note holds `{tool, ok, summary}`, the note validates against its
+/// schema, and `record show` prints the line of the packet (spec 4.2). The command prints
+/// nothing.
+#[test]
+fn a_valid_run_fills_the_validation_of_the_intent_of_the_record() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let capture = capture_file(
+        &install,
+        "validation.json",
+        &clean_capture(
+            &head,
+            &document_of(&[item("add-x", "change", false, &["ERROR"])]),
+        ),
+    );
+
+    install.write_record_with(&base, &head, &["--validation", arg(&capture)]);
+
+    let record = install.note(&head);
+    assert_eq!(validations(&record), [validation(false, "1 issue")]);
+    assert_eq!(
+        keys(&record["intent"][0]["validation"]),
+        ["tool", "ok", "summary"]
+    );
+    assert_valid(&record, RECORD_SCHEMA);
+    let evidence = install.evidence_json(&base, &head, &["--validation", arg(&capture)]);
+    assert_eq!(record["intent"], evidence["intent"]);
+    let shown = install.record_show(&[head.as_str()]);
+    assert_eq!(shown.status.code(), Some(0), "{}", stderr(&shown));
+    assert!(
+        stdout(&shown)
+            .lines()
+            .any(|line| line == "Validation: `openspec` failed: `1 issue`"),
+        "{}",
+        stdout(&shown)
+    );
+}
+
+/// The summary counts every issue of every level (spec 4.2), and an item with no issue reads
+/// `no issues`.
+#[test]
+fn the_summary_of_the_record_counts_every_issue_of_every_level() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    for (valid, levels, summary) in [
+        (true, vec![], "no issues"),
+        (true, vec!["WARNING"], "1 issue"),
+        (false, vec!["ERROR", "WARNING"], "2 issues"),
+        (false, vec!["ERROR", "INFO", "WARNING"], "3 issues"),
+    ] {
+        let capture = capture_file(
+            &install,
+            "validation.json",
+            &clean_capture(
+                &head,
+                &document_of(&[item("add-x", "change", valid, &levels)]),
+            ),
+        );
+
+        let (output, target) =
+            write_to_file(&install, &base, &head, &["--validation", arg(&capture)]);
+
+        assert_output(&output, 0, "", "");
+        let record = schema_support::read_json(&target);
+        assert_eq!(validations(&record), [validation(valid, summary)]);
+    }
+}
+
+/// A capability that shares the id of the change is another item, and a run with no item for
+/// the change leaves `validation: null` (spec 4.2).
+#[test]
+fn the_record_takes_the_item_of_the_change_and_no_other() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let capability = item("add-x", "spec", false, &["ERROR", "ERROR"]);
+    let change = item("add-x", "change", true, &[]);
+    for (items, expected) in [
+        (
+            vec![capability.clone(), change],
+            validation(true, "no issues"),
+        ),
+        (vec![capability], Value::Null),
+        (vec![item("other", "change", true, &[])], Value::Null),
+    ] {
+        let capture = capture_file(
+            &install,
+            "validation.json",
+            &clean_capture(&head, &document_of(&items)),
+        );
+
+        let (output, target) =
+            write_to_file(&install, &base, &head, &["--validation", arg(&capture)]);
+
+        assert_output(&output, 0, "", "");
+        assert_eq!(validations(&schema_support::read_json(&target)), [expected]);
+    }
+}
+
+/// A capture that `record write` cannot use is no error (spec 4.1): it prints
+/// `record: --validation <path>: <reason>` on stderr, keeps every `validation` `null`, writes
+/// the record that the same range gives without the flag, and exits 0. Each reason is pinned
+/// whole.
+#[test]
+fn a_capture_that_cannot_be_used_prints_its_line_and_the_record_is_written() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let (output, target) = write_to_file(&install, &base, &head, &[]);
+    assert_output(&output, 0, "", "");
+    let baseline = fs::read(&target).expect("read the record");
+    let other = "9".repeat(40);
+    for refusal in validation_support::refusals(&head, &other) {
+        let path = capture_file(&install, "validation.json", &refusal.file);
+
+        let (output, target) = write_to_file(&install, &base, &head, &["--validation", arg(&path)]);
+
+        assert_eq!(
+            output.status.code(),
+            Some(0),
+            "{}: {}",
+            refusal.name,
+            stderr(&output)
+        );
+        assert_eq!(stdout(&output), "", "{}", refusal.name);
+        assert_eq!(
+            stderr(&output),
+            refusal_line(&path, &refusal.reason),
+            "{}",
+            refusal.name
+        );
+        assert_eq!(
+            fs::read(&target).expect("read the record"),
+            baseline,
+            "{}",
+            refusal.name
+        );
+    }
+}
+
+/// A capture file that the operating system cannot read gives the line with the error of the
+/// operating system, verbatim, and the record is written (spec 4.1).
+#[test]
+fn a_capture_that_cannot_be_read_prints_the_error_of_the_operating_system() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let (_, target) = write_to_file(&install, &base, &head, &[]);
+    let baseline = fs::read(&target).expect("read the record");
+    for path in [
+        install.scratch_file("missing.json"),
+        install.scratch.path().to_path_buf(),
+    ] {
+        let error = fs::read(&path).expect_err("the path cannot be read");
+
+        let (output, target) = write_to_file(&install, &base, &head, &["--validation", arg(&path)]);
+
+        assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+        assert_eq!(
+            stderr(&output),
+            refusal_line(&path, &format!("cannot be read ({error})"))
+        );
+        assert_eq!(fs::read(&target).expect("read the record"), baseline);
+    }
+}
+
+/// A capture that `record write` refuses prints its line on every path that follows, before the
+/// failure lines, and the exit stays as without the flag (spec 4.1): an `--out` into a folder
+/// that does not exist stops the run with the line of the write and the exit 2. Each reason is
+/// pinned whole.
+#[test]
+fn a_refused_capture_prints_its_line_before_the_failure_of_a_write() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let captures = refused_captures(install.scratch.path(), &head, &"9".repeat(40));
+    let target = install.scratch_file("no").join("such").join("target");
+    let error = fs::write(&target, "").expect_err("the folder does not exist");
+    let write_error = format!("{}: {error}\n", target.display());
+    let without = install.record_write(&["--base", &base, "--head", &head, "--out", arg(&target)]);
+    assert_output(&without, 2, "", &write_error);
+
+    for capture in &captures {
+        let output = install.record_write(&[
+            "--base",
+            &base,
+            "--head",
+            &head,
+            "--validation",
+            arg(&capture.path),
+            "--out",
+            arg(&target),
+        ]);
+
+        assert_eq!(
+            (output.status.code(), stdout(&output), stderr(&output)),
+            (
+                Some(2),
+                String::new(),
+                format!(
+                    "{}{write_error}",
+                    refusal_line(&capture.path, &capture.reason)
+                )
+            ),
+            "{}",
+            capture.name
+        );
+    }
+}
+
+/// A capture that `record write` refuses prints its line before the refusal of a key that holds
+/// a record of another range, and the exit stays 1 and the note stays (spec 4.1).
+#[test]
+fn a_refused_capture_prints_its_line_before_the_refusal_of_another_range() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    install.write_record(&base, &head);
+    let before = install.note_text(&head);
+    install.append("docs/guide.md", 1);
+    let later = install.commit("docs: edit the guide");
+    let other = "9".repeat(40);
+    let line = format!(
+        "record: {} already holds a record of another range\n",
+        short(&head)
+    );
+    let without = install.record_write(&["--base", &base, "--head", &later, "--key", &head]);
+    assert_output(&without, 1, "", &line);
+
+    for capture in refused_captures(install.scratch.path(), &later, &other) {
+        let output = install.record_write(&[
+            "--base",
+            &base,
+            "--head",
+            &later,
+            "--key",
+            &head,
+            "--validation",
+            arg(&capture.path),
+        ]);
+
+        assert_eq!(
+            (output.status.code(), stdout(&output), stderr(&output)),
+            (
+                Some(1),
+                String::new(),
+                format!("{}{line}", refusal_line(&capture.path, &capture.reason))
+            ),
+            "{}",
+            capture.name
+        );
+        assert_eq!(install.note_text(&head), before, "{}", capture.name);
+    }
+}
+
+/// The capture binds to the head of the record, not to the commit that is checked out: a
+/// capture of `--head` is used while a later commit is checked out, and a capture of the
+/// checked-out commit is refused (spec 4.1;
+/// `houserules.commit-bound-documents-read-the-commit`).
+#[test]
+fn the_capture_binds_to_the_head_of_the_record_and_not_to_the_checked_out_commit() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let later = install.commit("docs: later");
+    let items = document_of(&[item("add-x", "change", true, &["WARNING"])]);
+    let at_head = capture_file(&install, "at-head.json", &clean_capture(&head, &items));
+    let at_later = capture_file(&install, "at-later.json", &clean_capture(&later, &items));
+
+    let (used, target) = write_to_file(&install, &base, &head, &["--validation", arg(&at_head)]);
+    let validations_used = validations(&schema_support::read_json(&target));
+    let (refused, _) = write_to_file(&install, &base, &head, &["--validation", arg(&at_later)]);
+
+    assert_output(&used, 0, "", "");
+    assert_eq!(validations_used, [validation(true, "1 issue")]);
+    assert_eq!(refused.status.code(), Some(0), "{}", stderr(&refused));
+    assert_eq!(
+        stderr(&refused),
+        refusal_line(
+            &at_later,
+            &format!("ran at {}, not at {}", short(&later), short(&head))
+        )
+    );
+}
+
+/// A second run over the same range and the same capture writes the same bytes.
+#[test]
+fn the_same_capture_writes_the_same_record_twice() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let capture = capture_file(
+        &install,
+        "validation.json",
+        &clean_capture(
+            &head,
+            &document_of(&[item("add-x", "change", false, &["ERROR"])]),
+        ),
+    );
+
+    let (_, target) = write_to_file(&install, &base, &head, &["--validation", arg(&capture)]);
+    let first = fs::read(&target).expect("read the record");
+    let (_, target) = write_to_file(&install, &base, &head, &["--validation", arg(&capture)]);
+
+    assert_eq!(fs::read(&target).expect("read the record"), first);
+}
+
+/// The `record:` prefix of the line is in the spec (`quality.user-facing-text-is-contract`).
+#[test]
+fn the_validation_prefix_of_these_tests_is_in_the_spec() {
+    let spec = fs::read_to_string(
+        repo_root()
+            .join("docs")
+            .join("specs")
+            .join("2026-10-25-batch-38-openspec-and-release.md"),
+    )
+    .expect("read the spec");
+
+    assert!(spec.contains("(`record:` for `record write`)"));
+}
+
 // ---- the help ---------------------------------------------------------------------------------------------------------
 
 /// The sentences of the `about` of `record`.
@@ -3091,12 +3779,15 @@ const ABOUT: [&str; 3] = [
 ];
 
 /// The sentences of the `about` of `record write`.
-const WRITE_ABOUT: [&str; 15] = [
+const WRITE_ABOUT: [&str; 18] = [
     "Computes the change record of the range `--base` to `--head` and writes it as a git note on `--key` (default: `--head`) under the notes ref of the install: `refs/notes/houserules` for a top-level install, else `refs/notes/houserules-sub/<install path>`.",
     "`--out` writes the bytes of the note to a file in place of the note; only the CI units push the ref.",
     "The record holds the commits of the range, the rule hashes at the merge base and at the head, the audit rows, the intents, the evidence, the route, the sample draw, the evidence bundle in `--bundle` (the description of the request), and the reviewers.",
     "The audit rows come from `--audit`, else from an audit that the command runs in process.",
     "`--intent <source>:<ref>` names an intent, else the `Intent:` line of the bundle does.",
+    "An `Intent: <source>:<ref>` trailer of a commit of the range adds one too, and a trailer with a key of `review.sessions.trailers` (default `Entire-Checkpoint`) is a session of `links.sessions`; a trailer never makes the command fail.",
+    "`--validation <file>` names a capture of `openspec validate --json` that `houserules capture` wrote at `--head` in a clean work tree, and each `openspec` intent takes its validation from it.",
+    "A capture that cannot be used prints one line on stderr and leaves every validation `null`; the record is written, and the exit stays as without the flag.",
     "`--reviewer` names one approver; repeat the flag.",
     "`--reviewers-pending` writes no reviewers and leaves room for them.",
     "A later job may set them, or the approvers could not be read and stay unknown.",
@@ -3113,20 +3804,21 @@ const WRITE_ABOUT: [&str; 15] = [
 const SHOW_ABOUT: [&str; 6] = [
     "Prints the change record of a commit: the record that the commit keys, else the record whose range holds the commit.",
     "It prints a Markdown summary: the packet of the change, the route, the sample, the reviewers, and the post-merge audit.",
-    "`--json` prints the record document `houserules/change-record@1.0.0` in place of it.",
+    "`--json` prints the record document `houserules/change-record@1.1.0` in place of it.",
     "It reads the notes ref of the install, and recomputes the rule hashes at the merge base and at the head from git.",
     "It exits 1 for a clone with no notes ref, for a commit with no record, and for a record whose rule hash differs from git's.",
     "It exits 2 when the merge base of the record is not in the clone, and for a setup error, for example a ref that is no commit or a note that is no change record",
 ];
 
 /// The help text of each argument of `record write`.
-const WRITE_ARGUMENTS: [&str; 12] = [
+const WRITE_ARGUMENTS: [&str; 13] = [
     "The base ref of the range. The range runs from the merge base of `--base` and `--head` to `--head`. git's empty tree starts the range at the first commit",
     "The head ref of the range",
     "The commit that the note annotates; defaults to `--head`. For a squash or a rebase merge it is the last commit of the push",
     "The file that `audit --json` wrote for the same range. Its `base` and `head` must name the same commits as `--base` and `--head`. Without this flag, the command runs the audit in process",
     "The file that holds the description of the pull or merge request. The record keeps its evidence bundle. Without this flag, or with a description that has no bundle section, the record has no bundle",
-    "The intent to add, written `<source>:<ref>` as the `Intent:` line of an evidence bundle writes it. The source is `work-item` or `file`. Without this flag, the `Intent:` line of the bundle names it",
+    "The intent to add, written `<source>:<ref>` as the `Intent:` line of an evidence bundle writes it. The source is `work-item`, `file`, or `openspec`. Without this flag, the `Intent:` line of the bundle names it",
+    "The capture file of an `openspec validate --json` run, written by `houserules capture` at `--head` in a clean work tree. Each `openspec` intent takes the validation of its change from it. A capture that cannot be used prints one line on stderr and leaves every validation `null`",
     "The login of an approver; repeat the flag. The record keeps the names sorted and without repeats, the first 20 of them, each cut to 100 characters, no more names than fit 3,072 bytes of the serialized array, and the count of the names left out",
     "Writes no reviewers and marks them pending: a later job may set them, or the approvers could not be read and stay unknown. It budgets the note 4,096 bytes below `review.record.maxBytes`, the room that a later job may fill with at most 3,072 bytes of names. The minimal record takes at most the rest at every cap. It cannot be combined with `--reviewer`",
     "An external score from 0 to 1 for the route. It needs `review.route.ownerScore` or `review.route.seniorScore`",

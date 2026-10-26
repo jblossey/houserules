@@ -197,7 +197,9 @@ pub(crate) mod scratch {
     use tempfile::TempDir;
 
     /// A git repository in a temporary directory, on the branch `main`, with
-    /// its own identity. Dropping it removes the directory.
+    /// its own identity and its own `core.excludesFile` at the null device: a
+    /// repository-local value overrides the global one, so no ignore file of
+    /// the host hides a file from a test. Dropping it removes the directory.
     pub(crate) struct Repo {
         dir: TempDir,
     }
@@ -214,6 +216,7 @@ pub(crate) mod scratch {
                 ("user.email", "t@t.t"),
                 ("commit.gpgsign", "false"),
                 ("core.autocrlf", "false"),
+                ("core.excludesFile", "/dev/null"),
             ] {
                 repo.git(&["config", key, value]);
             }
@@ -271,17 +274,28 @@ pub(crate) mod scratch {
         }
     }
 
+    /// Runs the unit tests `names` of this test binary again, as one child process, and returns
+    /// the finished child. `configure` shapes the child's environment. The child runs
+    /// sequentially and with `--no-capture`, so what a test prints reaches the output.
+    fn rerun(names: &[&str], configure: impl FnOnce(&mut Command)) -> Output {
+        let exe = std::env::current_exe().expect("the path of the test binary");
+        let mut command = Command::new(exe);
+        command
+            .arg("--exact")
+            .args(names)
+            .args(["--no-capture", "--test-threads=1"]);
+        configure(&mut command);
+        command.output().expect("run the test binary again")
+    }
+
     /// Runs the unit test `name` of this test binary again, as a child process
     /// whose environment also holds `envs`, and gives what the child printed.
     /// A test cannot change its own environment (it is process-wide state), so
     /// a test of an environment variable reads the child's result.
     pub(crate) fn rerun_test(name: &str, envs: &[(&str, &str)]) -> String {
-        let exe = std::env::current_exe().expect("the path of the test binary");
-        let output = Command::new(exe)
-            .args(["--exact", name, "--nocapture", "--test-threads=1"])
-            .envs(envs.iter().copied())
-            .output()
-            .expect("run the test binary again");
+        let output = rerun(&[name], |command| {
+            command.envs(envs.iter().copied());
+        });
         assert!(
             output.status.success(),
             "{name} failed: {}{}",
@@ -291,14 +305,42 @@ pub(crate) mod scratch {
         String::from_utf8_lossy(&output.stdout).into_owned()
     }
 
-    /// Runs `git` in `dir` without the configuration of the host: the system
-    /// and global files are the null device, and the variables that inject
-    /// configuration (`GIT_CONFIG_COUNT` with its pairs, `GIT_CONFIG_PARAMETERS`)
-    /// are removed, so that a fixture is the same on every host. The commands
-    /// under test keep the environment they inherit. `envs` are the variables
-    /// the run sets, such as the dates of a commit.
-    pub(crate) fn fixture_git(dir: &Path, args: &[&str], envs: &[(&str, &str)]) -> Output {
-        let mut command = Command::new("git");
+    /// The warning that git prints when it stages a file of LF lines under `core.autocrlf=true`.
+    const LINE_ENDING_WARNING: &str = "LF will be replaced by CRLF";
+
+    /// Requires that the unit tests `names` pass in a child process under the configuration of
+    /// the autocrlf suite (`core.autocrlf=true`, injected through `GIT_CONFIG_COUNT`) and that no
+    /// git child of a fixture prints the line-ending warning. The child gets the locale and the
+    /// configuration files of [`fixture_git`], so the host cannot change the text of the warning.
+    /// The child must run every test: a name that matches none fails.
+    pub(crate) fn assert_no_line_ending_warning_under_autocrlf(names: &[&str]) {
+        let output = rerun(names, |command| {
+            with_default_git(command)
+                .env("GIT_CONFIG_COUNT", "1")
+                .env("GIT_CONFIG_KEY_0", "core.autocrlf")
+                .env("GIT_CONFIG_VALUE_0", "true");
+        });
+        let printed = format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            output.status.success(),
+            "{names:?} failed under core.autocrlf=true: {printed}"
+        );
+        assert!(
+            printed.contains(&format!("test result: ok. {} passed", names.len())),
+            "the child ran every test: {printed}"
+        );
+        assert!(!printed.contains(LINE_ENDING_WARNING), "{printed}");
+    }
+
+    /// Leaves the locale and the git configuration of the host out of `command` and the git that
+    /// it starts: `LC_ALL=C`, the system and global files at the null device, and none of the
+    /// variables that inject configuration (`GIT_CONFIG_COUNT` with its pairs, and
+    /// `GIT_CONFIG_PARAMETERS`).
+    fn with_default_git(command: &mut Command) -> &mut Command {
         for (name, _) in std::env::vars_os() {
             let injects_configuration = name.to_str().is_some_and(|name| {
                 matches!(name, "GIT_CONFIG_COUNT" | "GIT_CONFIG_PARAMETERS")
@@ -310,11 +352,19 @@ pub(crate) mod scratch {
             }
         }
         command
-            .args(args)
-            .current_dir(dir)
             .env("LC_ALL", "C")
             .env("GIT_CONFIG_SYSTEM", "/dev/null")
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
+    }
+
+    /// Runs `git` in `dir` without the configuration of the host (see [`with_default_git`]), so
+    /// that a fixture is the same on every host. The commands under test keep the environment they
+    /// inherit. `envs` are the variables the run sets, such as the dates of a commit.
+    pub(crate) fn fixture_git(dir: &Path, args: &[&str], envs: &[(&str, &str)]) -> Output {
+        let mut command = Command::new("git");
+        with_default_git(&mut command)
+            .args(args)
+            .current_dir(dir)
             .envs(envs.iter().copied())
             .output()
             .expect("run git")

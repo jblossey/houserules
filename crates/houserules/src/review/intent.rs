@@ -1,14 +1,19 @@
 //! The intent of a change and the adapters that fill it from a source, such
-//! as a work item or a file (spec 4.9).
+//! as a work item, a file, or an OpenSpec change (spec 4.9).
 //!
 //! An intent is what a change was meant to do. [`resolve`] runs the adapters
-//! that `review.intent.sources` lists, in that order, and adds the intent that
-//! a caller names with [`IntentRef`], whatever the config says. It takes the
+//! that `review.intent.sources` lists, in that order, and adds the intents that
+//! a caller names with [`IntentRef`], whatever the config says: the flag
+//! `--intent`, the `Intent:` line of a bundle, and the `Intent:` trailers of the
+//! commits of the range (`review::links`). It takes the
 //! `review.intent` settings in the checked form of [`IntentConfig`]: the
 //! adapters and the compiled globs, which only the marker reader builds, so
 //! `resolve` checks nothing and drops no setting. [`resolve_named`] resolves
 //! the named intent alone, from the install, a commit, and the name, with no
-//! change analysis. No adapter runs a tool: each reads the tracker, as `audit`
+//! change analysis; it reads the tree at the commit it is given, so a caller
+//! can resolve a name at the head and at the merge base. [`found_in`] gives the
+//! intents that the changed paths of a range name, for the adapters that the
+//! caller picks. No adapter runs a tool: each reads the tracker, as `audit`
 //! reads it, or reads files of the tree at the head of the range.
 //!
 //! - `work-item`: one intent for each work item of the range. Its `title` is
@@ -21,17 +26,26 @@
 //!   `# ` heading, its `why` the first paragraph after it (cut to 1,000
 //!   characters, the lines of the paragraph joined by line feeds), and its
 //!   `tasks` the counts of the task-list lines.
+//! - `openspec`: one intent for each OpenSpec change that a changed path names
+//!   and for the named id (the module [`openspec`] holds the rules).
 //!
 //! The intents come in adapter order, then by `ref`. An adapter that the config
-//! leaves out comes after the configured ones, in the order of `ADAPTERS`.
+//! leaves out comes after the configured ones, in the order of `ADAPTERS`, and
+//! an intent whose source is no adapter comes last, by source in byte order and
+//! then by `ref`.
 //!
 //! A named intent that does not resolve is an entry of the list, in its place
 //! by the order above: its `source` and `ref`, every other field `null`, and
 //! `unresolved`, the adapter's line (spec 4.9). A caller prints the line after
-//! the intent it names. A failure that is not the named intent's own, whichever
+//! the intent it names. A value that is no `<source>:<ref>` (a trailer is the
+//! one place that can hold one) is named by [`IntentRef::split`], whose
+//! `source` or `ref` is empty, and it is the entry with the line of a text that
+//! is no `<source>:<ref>`. A failure that is not the named intent's own, whichever
 //! adapter it comes from, is the `Err`: the line of the marker, of the
 //! tracker's command, or of git. It names what failed, and a caller reports it
 //! as its own failure.
+
+pub(crate) mod openspec;
 
 use std::path::Path;
 
@@ -78,35 +92,45 @@ impl IntentRef {
     /// Whether the source is an adapter is [`resolve`]'s question, so a caller
     /// can print an unknown source with the intent it names.
     pub(crate) fn parse(text: &str) -> Result<Self, String> {
-        let (source, reference) = text
-            .split_once(':')
-            .map(|(source, reference)| (source.trim(), reference.trim()))
-            .filter(|(source, reference)| !source.is_empty() && !reference.is_empty())
-            .ok_or_else(|| NOT_SOURCE_AND_REF.to_string())?;
-        Ok(Self {
-            source: source.to_string(),
-            reference: reference.to_string(),
-        })
+        let named = Self::split(text);
+        if named.source.is_empty() || named.reference.is_empty() {
+            return Err(NOT_SOURCE_AND_REF.to_string());
+        }
+        Ok(named)
+    }
+
+    /// Reads any text as an intent: the text up to the first colon is the
+    /// source, the rest is the ref, and white space around each is dropped. A
+    /// text with no colon has an empty source and the trimmed text as its ref. A
+    /// source or a ref that is empty marks a text that [`IntentRef::parse`]
+    /// refuses, and [`resolve`] gives such an intent the line of a text that is
+    /// no `<source>:<ref>`.
+    pub(crate) fn split(text: &str) -> Self {
+        let (source, reference) = text.split_once(':').unwrap_or(("", text));
+        Self {
+            source: source.trim().to_string(),
+            reference: reference.trim().to_string(),
+        }
     }
 }
 
 /// The intents of the range `analysis` for the install at `root`: those of
-/// each adapter that `config` lists, and `named` when it is given, whatever
-/// the config says (spec 4.9). The `config` is the one that `Marker::review`
-/// read.
+/// each adapter that `config` lists, and each of `named`, whatever the config
+/// says (spec 4.9). The `config` is the one that `Marker::review` read.
 ///
-/// They come in adapter order, then by `ref`, without duplicates: a named
-/// intent that an adapter also finds is one intent. A named intent that does
-/// not resolve is an entry of the list, in its place by that order, with the
-/// adapter's line in `unresolved` (see [`unresolved`]); it stands for what an
-/// adapter found under the same `source` and `ref`. A tracker that cannot be
-/// reached is no error: the work items get a `null` title. Every failure that
-/// is not the named intent's own is the `Err` with its line.
+/// They come in adapter order, then by `ref`, without duplicates: a `source`
+/// and `ref` that `named` repeats, or that an adapter also finds, is one
+/// intent. A named intent that does not resolve is an entry of the list, in its
+/// place by that order, with the adapter's line in `unresolved` (see
+/// [`unresolved`]); it stands for what an adapter found under the same `source`
+/// and `ref`. A tracker that cannot be reached is no error: the work items get a
+/// `null` title. Every failure that is not a named intent's own is the `Err`
+/// with its line.
 pub(crate) fn resolve(
     root: &Path,
     analysis: &Analysis,
     config: &IntentConfig,
-    named: Option<&IntentRef>,
+    named: &[IntentRef],
 ) -> Result<Vec<Intent>, String> {
     let lookup = tracker::lookup(root).map_err(|error| error.to_string());
     resolve_with(root, analysis, config, named, lookup)
@@ -118,76 +142,148 @@ fn resolve_with(
     root: &Path,
     analysis: &Analysis,
     config: &IntentConfig,
-    named: Option<&IntentRef>,
+    named: &[IntentRef],
     lookup: Result<Lookup, String>,
 ) -> Result<Vec<Intent>, String> {
     let adapters = config.adapters();
-    let files = config.file_matchers();
-
-    let mut intents = Vec::new();
-    for adapter in adapters {
-        match adapter {
-            Adapter::WorkItem => intents.extend(work_items(&lookup, &analysis.work_items)?),
-            Adapter::File => intents.extend(changed_files(root, analysis, &files)?),
+    let mut intents = found(root, analysis, config, adapters, &lookup)?;
+    for (index, name) in named.iter().enumerate() {
+        if named[..index].contains(name) {
+            continue;
         }
-    }
-    if let Some(named) = named {
-        let intent = named_intent(root, &analysis.head, named, &lookup)?;
+        let intent = named_intent(root, &analysis.head, name, &lookup)?;
         intents
             .retain(|found| found.source != intent.source || found.reference != intent.reference);
         intents.push(intent);
     }
+    ordered(&mut intents, adapters);
+    Ok(intents)
+}
 
-    let order: Vec<Adapter> = adapters
+/// The intents that the adapters `sources` find from the changed paths and the
+/// work items of `analysis`, with no named intent: those of the `work-item`
+/// adapter for the work items of the range, of the `file` adapter for the paths
+/// that `config` matches, and of the `openspec` adapter for the changes that a
+/// path names. They come in the order of `sources`, then by `ref`, without
+/// duplicates. A tracker that cannot be reached is no error: the work items get
+/// a `null` title. Every failure that is not an intent's own is the `Err` with
+/// its line.
+pub(crate) fn found_in(
+    root: &Path,
+    analysis: &Analysis,
+    config: &IntentConfig,
+    sources: &[Adapter],
+) -> Result<Vec<Intent>, String> {
+    let lookup = tracker::lookup(root).map_err(|error| error.to_string());
+    let mut intents = found(root, analysis, config, sources, &lookup)?;
+    ordered(&mut intents, sources);
+    Ok(intents)
+}
+
+/// The intents that each of `adapters` finds from `analysis`, in the order of
+/// `adapters`. The `lookup` makes no backend call, and only the `work-item`
+/// adapter reads its `Err`.
+fn found(
+    root: &Path,
+    analysis: &Analysis,
+    config: &IntentConfig,
+    adapters: &[Adapter],
+    lookup: &Result<Lookup, String>,
+) -> Result<Vec<Intent>, String> {
+    let files = config.file_matchers();
+    let mut intents = Vec::new();
+    for adapter in adapters {
+        match adapter {
+            Adapter::WorkItem => intents.extend(work_items(lookup, &analysis.work_items)?),
+            Adapter::File => intents.extend(changed_files(root, analysis, &files)?),
+            Adapter::OpenSpec => {
+                intents.extend(openspec::found(
+                    root,
+                    &analysis.head,
+                    &changed_paths(analysis),
+                )?);
+            }
+        }
+    }
+    Ok(intents)
+}
+
+/// Every path that the range of `analysis` changes, from the install root: the
+/// path of each change and the old path of a rename.
+fn changed_paths(analysis: &Analysis) -> Vec<String> {
+    analysis
+        .paths
+        .iter()
+        .flat_map(|path| std::iter::once(&path.path).chain(path.old_path.as_ref()))
+        .cloned()
+        .collect()
+}
+
+/// Sorts `intents` by adapter, then by `ref`: first the adapters of `listed`,
+/// in that order, then every other adapter, in the order of [`Adapter::ALL`].
+/// An intent of another source comes last, by source in byte order and then by
+/// `ref`. It drops the intents that repeat a source and a `ref`.
+fn ordered(intents: &mut Vec<Intent>, listed: &[Adapter]) {
+    let order: Vec<Adapter> = listed
         .iter()
         .copied()
         .chain(
             Adapter::ALL
                 .into_iter()
-                .filter(|adapter| !adapters.contains(adapter)),
+                .filter(|adapter| !listed.contains(adapter)),
         )
         .collect();
-    let rank = |intent: &Intent| {
-        order
+    let key = |intent: &Intent| {
+        let rank = order
             .iter()
             .position(|adapter| adapter.name() == intent.source)
-            .unwrap_or(order.len())
+            .unwrap_or(order.len());
+        let source = if rank == order.len() {
+            intent.source.clone()
+        } else {
+            String::new()
+        };
+        (rank, source, intent.reference.clone())
     };
-    intents.sort_by(|a, b| {
-        rank(a)
-            .cmp(&rank(b))
-            .then_with(|| a.reference.cmp(&b.reference))
-    });
+    intents.sort_by_cached_key(key);
     intents.dedup_by(|later, earlier| {
         later.source == earlier.source && later.reference == earlier.reference
     });
-    Ok(intents)
 }
 
 /// The entry of the named intent `named` for the install at `root`, whatever
 /// the config lists: the adapter of its source resolves it against the tree at
-/// `head`, a full commit id, and the tracker (spec 4.9). It reads no change
+/// `commit`, a full commit id, and the tracker (spec 4.9). It reads no change
 /// analysis, so a caller that names one intent and runs no configured adapter
 /// needs only the commit. A failure that is not the named intent's own is the
 /// `Err` with its line.
-pub(crate) fn resolve_named(root: &Path, head: &str, named: &IntentRef) -> Result<Intent, String> {
+pub(crate) fn resolve_named(
+    root: &Path,
+    commit: &str,
+    named: &IntentRef,
+) -> Result<Intent, String> {
     let lookup = tracker::lookup(root).map_err(|error| error.to_string());
-    named_intent(root, head, named, &lookup)
+    named_intent(root, commit, named, &lookup)
 }
 
-/// The entry of the named intent `named` at `head`: the arm of its adapter, or
-/// the [`unresolved`] entry for a source that is no adapter. The `lookup` makes
+/// The entry of the named intent `named` at `commit`: the arm of its adapter, the
+/// [`unresolved`] entry for a source that is no adapter, or the one for a value
+/// that is no `<source>:<ref>`. The `lookup` makes
 /// no backend call, and only the `work-item` arm reads its `Err`.
 fn named_intent(
     root: &Path,
-    head: &str,
+    commit: &str,
     named: &IntentRef,
     lookup: &Result<Lookup, String>,
 ) -> Result<Intent, String> {
+    if named.source.is_empty() || named.reference.is_empty() {
+        return Ok(unresolved(named, NOT_SOURCE_AND_REF));
+    }
     match Adapter::named(&named.source) {
         None => Ok(unresolved(named, &no_intent_source(&named.source))),
         Some(Adapter::WorkItem) => named_work_item(lookup, named),
-        Some(Adapter::File) => named_file(root, head, named),
+        Some(Adapter::File) => named_file(root, commit, named),
+        Some(Adapter::OpenSpec) => openspec::named(root, commit, named),
     }
 }
 
@@ -321,15 +417,15 @@ fn changed_files(
 }
 
 /// The `file` intent that a caller names: the file `named.reference` below the
-/// install root, at `head`. A path that is not relative to the install is the
+/// install root, at `commit`. A path that is not relative to the install is the
 /// [`unresolved`] entry with [`PATH_NOT_RELATIVE`], and a path with no regular
-/// file at `head` is the entry with [`NO_REGULAR_FILE`].
-fn named_file(root: &Path, head: &str, named: &IntentRef) -> Result<Intent, String> {
+/// file at `commit` is the entry with [`NO_REGULAR_FILE`].
+fn named_file(root: &Path, commit: &str, named: &IntentRef) -> Result<Intent, String> {
     let path = &named.reference;
     if !is_relative_to_the_install(path) {
         return Ok(unresolved(named, PATH_NOT_RELATIVE));
     }
-    Ok(match text_at(root, head, path)? {
+    Ok(match text_at(root, commit, path)? {
         Some(text) => file_intent(path, &text),
         None => unresolved(named, NO_REGULAR_FILE),
     })
@@ -341,13 +437,13 @@ fn is_relative_to_the_install(path: &str) -> bool {
 }
 
 /// The text of the regular file `path` (from the install root) in the tree of
-/// `head`, or `None` when the tree holds no regular file there. The path
+/// `commit`, or `None` when the tree holds no regular file there. The path
 /// matches literally, so a folder, a symlink, a submodule, and a name that is
 /// only the start of another name are no file.
-fn text_at(root: &Path, head: &str, path: &str) -> Result<Option<String>, String> {
+fn text_at(root: &Path, commit: &str, path: &str) -> Result<Option<String>, String> {
     let listing = git::run_bytes(
         root,
-        &["ls-tree", "-z", head, "--", &format!(":(literal){path}")],
+        &["ls-tree", "-z", commit, "--", &format!(":(literal){path}")],
     )?;
     let listing = String::from_utf8_lossy(&listing);
     let Some((meta, name)) = listing
@@ -521,7 +617,7 @@ mod tests {
             .expect("analyze")
         }
 
-        /// [`resolve_with`] on this install.
+        /// [`resolve_with`] on this install, with at most one named intent.
         fn resolve(
             &self,
             analysis: &Analysis,
@@ -529,7 +625,13 @@ mod tests {
             named: Option<&IntentRef>,
             lookup: Result<Lookup, String>,
         ) -> Result<Vec<Intent>, String> {
-            resolve_with(&self.root(), analysis, config, named, lookup)
+            resolve_with(
+                &self.root(),
+                analysis,
+                config,
+                named.map_or(&[], std::slice::from_ref),
+                lookup,
+            )
         }
     }
 
@@ -1375,15 +1477,190 @@ mod tests {
             install.resolve(
                 &analysis,
                 &config(&["file"], &[]),
+                Some(&named("spec-kit:add-x")),
+                no_tracker()
+            ),
+            Ok(vec![unresolved(
+                "spec-kit",
+                "add-x",
+                "\"spec-kit\" is no intent source; use one of: work-item, file, openspec"
+            )])
+        );
+    }
+
+    /// An install whose range adds the change `add-x` of OpenSpec and a plan
+    /// file, and the analysis of the range.
+    fn range_with_a_change(folder: &'static str) -> (Install, Analysis) {
+        let install = Install::new(folder);
+        let base = install.head();
+        install.write(
+            "openspec/changes/add-x/proposal.md",
+            "# Add X\n\n## Why\nBecause.\n",
+        );
+        install.write("openspec/changes/add-x/tasks.md", "- [x] a\n- [ ] b\n");
+        install.write("docs/plans/a.md", "# Plan A\n\nWhy A.\n");
+        let head = install.commit("change");
+        let analysis = install.analysis(&base, &head);
+        (install, analysis)
+    }
+
+    /// The intent that the `openspec` adapter gives for `add-x` of
+    /// [`range_with_a_change`].
+    fn add_x() -> Intent {
+        Intent {
+            source: "openspec".to_string(),
+            reference: "add-x".to_string(),
+            title: Some("Add X".to_string()),
+            why: Some("Because.".to_string()),
+            tasks: Some(Tasks { done: 1, total: 2 }),
+            requirements: None,
+            validation: None,
+            artifacts: vec![
+                "openspec/changes/add-x/proposal.md".to_string(),
+                "openspec/changes/add-x/tasks.md".to_string(),
+            ],
+            unresolved: None,
+        }
+    }
+
+    #[test]
+    fn the_openspec_adapter_reads_the_changes_that_the_changed_paths_name() {
+        let (install, analysis) = range_with_a_change("");
+
+        assert_eq!(
+            install.resolve(&analysis, &config(&["openspec"], &[]), None, no_tracker()),
+            Ok(vec![add_x()])
+        );
+        assert_eq!(
+            install.resolve(&analysis, &config(&["file"], &[]), None, no_tracker()),
+            Ok(Vec::new()),
+            "an adapter that the config leaves out reads nothing"
+        );
+    }
+
+    #[test]
+    fn a_named_openspec_change_resolves_whatever_the_config_lists() {
+        let (install, analysis) = range_with_a_change("sub/");
+
+        assert_eq!(
+            install.resolve(
+                &analysis,
+                &config(&["file"], &[]),
+                Some(&named("openspec:add-x")),
+                no_tracker()
+            ),
+            Ok(vec![add_x()])
+        );
+    }
+
+    #[test]
+    fn a_named_openspec_change_that_the_range_also_changes_is_one_intent() {
+        let (install, analysis) = range_with_a_change("");
+
+        assert_eq!(
+            install.resolve(
+                &analysis,
+                &config(&["openspec"], &[]),
+                Some(&named("openspec:add-x")),
+                no_tracker()
+            ),
+            Ok(vec![add_x()])
+        );
+    }
+
+    #[test]
+    fn a_named_openspec_change_that_does_not_resolve_is_listed_with_its_line() {
+        let (install, analysis) = range_with_a_plan("");
+
+        assert_eq!(
+            install.resolve(
+                &analysis,
+                &config(&["openspec"], &[]),
                 Some(&named("openspec:add-x")),
                 no_tracker()
             ),
             Ok(vec![unresolved(
                 "openspec",
                 "add-x",
-                "\"openspec\" is no intent source; use one of: work-item, file"
+                "no openspec/ folder at the head"
             )])
         );
+    }
+
+    #[test]
+    fn the_openspec_adapter_comes_after_the_listed_adapters_in_the_order_of_all_of_them() {
+        let (install, analysis) = range_with_a_change("");
+        let refs = |sources: &[&str], named: Option<&IntentRef>| -> Vec<String> {
+            install
+                .resolve(
+                    &analysis,
+                    &config(sources, &["docs/plans/*.md"]),
+                    named,
+                    no_tracker(),
+                )
+                .expect("resolve")
+                .into_iter()
+                .map(|intent| format!("{} {}", intent.source, intent.reference))
+                .collect()
+        };
+
+        assert_eq!(
+            refs(&["openspec", "file"], None),
+            ["openspec add-x", "file docs/plans/a.md"]
+        );
+        assert_eq!(
+            refs(&["file", "openspec"], None),
+            ["file docs/plans/a.md", "openspec add-x"]
+        );
+        assert_eq!(
+            refs(&["file"], Some(&named("openspec:add-x"))),
+            ["file docs/plans/a.md", "openspec add-x"],
+            "a named intent of an adapter that the config leaves out comes after the listed ones"
+        );
+    }
+
+    #[test]
+    fn found_in_gives_the_intents_of_the_changed_paths_of_the_adapters_it_is_given() {
+        let (install, analysis) = range_with_a_change("");
+        let sources = config(&["file", "openspec"], &["docs/plans/*.md"]);
+        let found = |adapters: &[Adapter]| {
+            found_in(&install.root(), &analysis, &sources, adapters).expect("found")
+        };
+
+        assert_eq!(found(&[Adapter::OpenSpec]), vec![add_x()]);
+        assert_eq!(
+            found(&[Adapter::File]),
+            vec![file(
+                "docs/plans/a.md",
+                Some("Plan A"),
+                Some("Why A."),
+                (0, 0)
+            )]
+        );
+        assert_eq!(
+            found(&[Adapter::OpenSpec, Adapter::File])
+                .iter()
+                .map(|intent| intent.source.as_str())
+                .collect::<Vec<_>>(),
+            ["openspec", "file"],
+            "the order of the adapters that the caller gives"
+        );
+        assert_eq!(found(&[]), Vec::new());
+    }
+
+    #[test]
+    fn found_in_fails_with_the_line_of_a_failure_that_is_no_named_intents_own() {
+        let (install, mut analysis) = range_with_a_change("");
+        analysis.head = "0".repeat(40);
+
+        let result = found_in(
+            &install.root(),
+            &analysis,
+            &config(&["openspec"], &[]),
+            &[Adapter::OpenSpec],
+        );
+
+        assert!(result.is_err(), "{result:?}");
     }
 
     #[test]
@@ -1489,7 +1766,7 @@ mod tests {
             .review()
             .expect("a checked review key");
 
-        let intents = resolve(&install.root(), &analysis, &review.intent, None).expect("resolve");
+        let intents = resolve(&install.root(), &analysis, &review.intent, &[]).expect("resolve");
 
         assert_eq!(
             intents,
@@ -1822,5 +2099,133 @@ mod tests {
             .filter(|line| line.starts_with("- **FR-"))
             .count() as u64;
         assert_eq!(intent.requirements.expect("requirements").total, Some(ids));
+    }
+
+    // ---- named intents of a list: the trailers (batch 38, spec 5.1 and 5.2) ---------------
+
+    /// The intent that `source` and `reference` name, as a caller that does not
+    /// check them names it.
+    fn ref_of(source: &str, reference: &str) -> IntentRef {
+        IntentRef {
+            source: source.to_string(),
+            reference: reference.to_string(),
+        }
+    }
+
+    /// The `<source>:<ref>` of each intent, in order.
+    fn identities(intents: &[Intent]) -> Vec<String> {
+        intents
+            .iter()
+            .map(|intent| format!("{}:{}", intent.source, intent.reference))
+            .collect()
+    }
+
+    /// A value that is no `<source>:<ref>` splits at its first colon, trimmed; a
+    /// value with no colon has an empty source and the trimmed value as its ref.
+    #[test]
+    fn a_malformed_trailer_value_splits_at_its_first_colon() {
+        for (text, source, reference) in [
+            ("oops", "", "oops"),
+            ("  oops  ", "", "oops"),
+            ("file:", "file", ""),
+            (":x", "", "x"),
+            (" : ", "", ""),
+            ("a:b:c", "a", "b:c"),
+            ("file: docs/a.md ", "file", "docs/a.md"),
+        ] {
+            assert_eq!(
+                IntentRef::split(text),
+                ref_of(source, reference),
+                "{text:?}"
+            );
+        }
+    }
+
+    /// A named intent with an empty source or an empty ref is a malformed value:
+    /// it is the unresolved entry with the line of a text that is no
+    /// `<source>:<ref>`, whatever the adapter of its source would say.
+    #[test]
+    fn a_named_intent_with_an_empty_part_is_unresolved_with_the_malformed_line() {
+        let install = Install::new("");
+        let base = install.head();
+        install.write("docs/a.md", "# A\n");
+        let head = install.commit("docs: a");
+        let analysis = install.analysis(&base, &head);
+        let malformed = [
+            IntentRef::split("oops"),
+            IntentRef::split(":x"),
+            IntentRef::split("file:"),
+        ];
+
+        let intents = resolve_with(
+            &install.root(),
+            &analysis,
+            &config(&["work-item"], &[]),
+            &malformed,
+            no_tracker(),
+        )
+        .expect("resolve");
+
+        assert_eq!(identities(&intents), ["file:", ":oops", ":x"]);
+        assert!(
+            intents
+                .iter()
+                .all(|intent| intent.unresolved.as_deref() == Some(NOT_SOURCE_AND_REF)),
+            "{intents:?}"
+        );
+    }
+
+    /// A list of named intents counts each `<source>:<ref>` once, and an intent
+    /// that an adapter also finds is one intent.
+    #[test]
+    fn a_named_intent_that_the_list_repeats_counts_once() {
+        let install = Install::new("");
+        let base = install.head();
+        install.write("docs/plans/p.md", "# P\n");
+        install.write("docs/plans/q.md", "# Q\n");
+        let head = install.commit("docs: plans");
+        let analysis = install.analysis(&base, &head);
+        let names = [
+            named("file:docs/plans/p.md"),
+            named("file:docs/plans/q.md"),
+            named("file:docs/plans/p.md"),
+        ];
+
+        let intents = resolve_with(
+            &install.root(),
+            &analysis,
+            &config(&["file"], &["docs/plans/*.md"]),
+            &names,
+            no_tracker(),
+        )
+        .expect("resolve");
+
+        assert_eq!(
+            identities(&intents),
+            ["file:docs/plans/p.md", "file:docs/plans/q.md"]
+        );
+    }
+
+    /// The intents of a source that is no adapter sort by source in byte order and
+    /// then by ref, after the intents of every adapter; an adapter that the
+    /// configuration does not list keeps the order of `ADAPTERS` (spec 5.2).
+    #[test]
+    fn intents_of_sources_that_are_no_adapter_sort_by_source_then_ref() {
+        let entry = |source: &str, reference: &str| unresolved(source, reference, "line");
+        let mut intents = vec![
+            entry("zzz", "1"),
+            entry("file", "b"),
+            entry("aaa", "9"),
+            entry("work-item", "w"),
+            entry("aaa", "2"),
+            entry("", "x"),
+        ];
+
+        ordered(&mut intents, &[Adapter::OpenSpec]);
+
+        assert_eq!(
+            identities(&intents),
+            ["work-item:w", "file:b", ":x", "aaa:2", "aaa:9", "zzz:1"]
+        );
     }
 }

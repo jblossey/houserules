@@ -341,8 +341,8 @@ pub(crate) fn default_branch_name(
 /// `root`, which `install::marker` reads; `None` when the marker or the key
 /// is absent. Present but malformed data is one named line, never a silent
 /// default (`houserules.crash-paths-are-named`): a marker that cannot be read
-/// or parsed, a marker that is not a JSON object, and a value that is not a
-/// string.
+/// or parsed, a marker that is not a JSON object, and a value that is no branch
+/// name: not a string, or an empty one.
 fn configured_default_branch(root: &Path) -> Result<Option<String>, String> {
     use crate::install::marker::{DefaultBranchFault, read_default_branch_for_gate};
 
@@ -355,7 +355,7 @@ fn configured_default_branch(root: &Path) -> Result<Option<String>, String> {
             format!("durable-sha: {marker} is not valid JSON: {parse_error}")
         }
         DefaultBranchFault::NotAnObject => format!("durable-sha: {marker} is not a JSON object."),
-        DefaultBranchFault::NotAString => {
+        DefaultBranchFault::NotABranchName => {
             format!("durable-sha: defaultBranch in {marker} must be a branch name string.")
         }
     })
@@ -960,15 +960,16 @@ mod tests {
         );
     }
 
-    /// A `defaultBranch` that is not a string is one named line.
+    /// A `defaultBranch` that is no branch name, a value that is not a string or an
+    /// empty string, is one named line.
     #[test]
-    fn resolve_default_branch_names_a_default_branch_that_is_not_a_string() {
+    fn resolve_default_branch_names_a_default_branch_that_is_no_branch_name() {
         let fixture = Fixture::new();
         let root = fixture.root();
-        for value in ["5", "[\"main\"]", "null", "true", "{}"] {
+        for value in ["5", "[\"main\"]", "null", "true", "{}", "\"\""] {
             write_marker(root, &format!("{{\"defaultBranch\": {value}}}\n"));
 
-            let error = resolve_default_branch(root).expect_err("not a string");
+            let error = resolve_default_branch(root).expect_err("no branch name");
 
             assert_eq!(
                 error,

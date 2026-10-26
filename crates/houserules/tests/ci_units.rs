@@ -21,6 +21,7 @@ mod ci_support;
 #[cfg(unix)]
 mod ci_units_shell;
 mod tracker_support;
+mod validation_support;
 
 use std::fs;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -142,6 +143,37 @@ fn both_units_parse_into_the_job_set_of_spec_10_1() {
 fn both_units_take_the_inputs_of_spec_10_2() {
     assert_inputs(&github());
     assert_inputs(&gitlab("root"));
+}
+
+/// Batch 38, spec 4.3: the `validation` input reaches the two jobs that run `evidence` and
+/// `record write`, the gates job and the record job, as the variable `HOUSERULES_VALIDATION`
+/// (a script reads an input through the environment), and no other job: the floor, the
+/// report, and the push of the record read no capture. The input is empty by default, and its
+/// description says what the setup command writes.
+#[test]
+fn the_validation_input_reaches_only_the_gates_and_the_record_jobs() {
+    for (unit, expression) in [
+        (github(), "${{ inputs.validation }}"),
+        (gitlab("root"), "$[[ inputs.validation ]]"),
+    ] {
+        for role in ROLES {
+            let expected = matches!(role, "gates" | "record").then(|| expression.to_string());
+            assert_eq!(
+                unit.variable(role, "HOUSERULES_VALIDATION"),
+                expected,
+                "{role}"
+            );
+        }
+        let input = unit.input("validation");
+        assert_eq!(input["default"], json!(""));
+        let description = input["description"].as_str().expect("a description");
+        assert!(
+            description.contains("openspec validate --json")
+                && description.contains("houserules capture")
+                && description.contains("relative to the install"),
+            "{description}"
+        );
+    }
 }
 
 /// Spec 10.2: each GitHub job holds exactly its `permissions`.

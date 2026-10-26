@@ -1,0 +1,97 @@
+{
+  "id": "add-skill-cli-auto-approval",
+  "title": "add-skill-cli-auto-approval",
+  "deltaCount": 2,
+  "deltas": [
+    {
+      "spec": "cli-init",
+      "operation": "MODIFIED",
+      "description": "Modify requirement: The command SHALL generate Agent Skills for selected AI tools.",
+      "requirement": {
+        "name": "Skill Generation",
+        "text": "The command SHALL generate Agent Skills for selected AI tools.",
+        "scenarios": [
+          {
+            "name": "Generating skills for a tool",
+            "rawText": "- **WHEN** a tool is selected during initialization\n- **THEN** create 9 skill directories under `.<tool>/skills/`:\n  - `openspec-explore/SKILL.md`\n  - `openspec-new-change/SKILL.md`\n  - `openspec-continue-change/SKILL.md`\n  - `openspec-apply-change/SKILL.md`\n  - `openspec-ff-change/SKILL.md`\n  - `openspec-verify-change/SKILL.md`\n  - `openspec-sync-specs/SKILL.md`\n  - `openspec-archive-change/SKILL.md`\n  - `openspec-bulk-archive-change/SKILL.md`\n- **AND** each SKILL.md SHALL contain YAML frontmatter with name and description\n- **AND** each SKILL.md SHALL contain the skill instructions"
+          },
+          {
+            "name": "Pre-approving the OpenSpec CLI in skill frontmatter",
+            "rawText": "- **WHEN** generating a skill's YAML frontmatter\n- **THEN** the frontmatter SHALL include an `allowed-tools` field with the value `Bash(openspec:*)`\n- **AND** an agent that honors `allowed-tools` SHALL run `openspec` commands from the skill without prompting for approval\n- **AND** because `allowed-tools` pre-approves rather than restricts, any other tool the skill uses SHALL remain available under the user's existing permission settings"
+          }
+        ]
+      },
+      "requirements": [
+        {
+          "name": "Skill Generation",
+          "text": "The command SHALL generate Agent Skills for selected AI tools.",
+          "scenarios": [
+            {
+              "name": "Generating skills for a tool",
+              "rawText": "- **WHEN** a tool is selected during initialization\n- **THEN** create 9 skill directories under `.<tool>/skills/`:\n  - `openspec-explore/SKILL.md`\n  - `openspec-new-change/SKILL.md`\n  - `openspec-continue-change/SKILL.md`\n  - `openspec-apply-change/SKILL.md`\n  - `openspec-ff-change/SKILL.md`\n  - `openspec-verify-change/SKILL.md`\n  - `openspec-sync-specs/SKILL.md`\n  - `openspec-archive-change/SKILL.md`\n  - `openspec-bulk-archive-change/SKILL.md`\n- **AND** each SKILL.md SHALL contain YAML frontmatter with name and description\n- **AND** each SKILL.md SHALL contain the skill instructions"
+            },
+            {
+              "name": "Pre-approving the OpenSpec CLI in skill frontmatter",
+              "rawText": "- **WHEN** generating a skill's YAML frontmatter\n- **THEN** the frontmatter SHALL include an `allowed-tools` field with the value `Bash(openspec:*)`\n- **AND** an agent that honors `allowed-tools` SHALL run `openspec` commands from the skill without prompting for approval\n- **AND** because `allowed-tools` pre-approves rather than restricts, any other tool the skill uses SHALL remain available under the user's existing permission settings"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "spec": "command-generation",
+      "operation": "MODIFIED",
+      "description": "Modify requirement: The system SHALL define a `ToolCommandAdapter` interface for per-tool formatting.",
+      "requirement": {
+        "name": "ToolCommandAdapter interface",
+        "text": "The system SHALL define a `ToolCommandAdapter` interface for per-tool formatting.",
+        "scenarios": [
+          {
+            "name": "Adapter interface structure",
+            "rawText": "- **WHEN** implementing a tool adapter\n- **THEN** `ToolCommandAdapter` SHALL require:\n  - `toolId`: string identifier matching `AIToolOption.value`\n  - `getFilePath(commandId: string)`: returns file path for command (relative from project root, or absolute for global-scoped tools like Codex)\n  - `formatFile(content: CommandContent)`: returns complete file content with frontmatter"
+          },
+          {
+            "name": "Claude adapter formatting",
+            "rawText": "- **WHEN** formatting a command for Claude Code\n- **THEN** the adapter SHALL output YAML frontmatter with `name`, `description`, `allowed-tools`, `category`, `tags` fields\n- **AND** the `allowed-tools` field SHALL have the value `Bash(openspec:*)` so Claude Code runs `openspec` commands from the slash command without prompting for approval\n- **AND** file path SHALL follow pattern `.claude/commands/opsx/<id>.md`"
+          },
+          {
+            "name": "Cursor adapter formatting",
+            "rawText": "- **WHEN** formatting a command for Cursor\n- **THEN** the adapter SHALL output YAML frontmatter with `name` as `/opsx-<id>`, `id`, `category`, `description` fields\n- **AND** file path SHALL follow pattern `.cursor/commands/opsx-<id>.md`"
+          },
+          {
+            "name": "Windsurf adapter formatting",
+            "rawText": "- **WHEN** formatting a command for Windsurf\n- **THEN** the adapter SHALL output YAML frontmatter with `name`, `description`, `category`, `tags` fields\n- **AND** file path SHALL follow pattern `.windsurf/workflows/opsx-<id>.md`"
+          }
+        ]
+      },
+      "requirements": [
+        {
+          "name": "ToolCommandAdapter interface",
+          "text": "The system SHALL define a `ToolCommandAdapter` interface for per-tool formatting.",
+          "scenarios": [
+            {
+              "name": "Adapter interface structure",
+              "rawText": "- **WHEN** implementing a tool adapter\n- **THEN** `ToolCommandAdapter` SHALL require:\n  - `toolId`: string identifier matching `AIToolOption.value`\n  - `getFilePath(commandId: string)`: returns file path for command (relative from project root, or absolute for global-scoped tools like Codex)\n  - `formatFile(content: CommandContent)`: returns complete file content with frontmatter"
+            },
+            {
+              "name": "Claude adapter formatting",
+              "rawText": "- **WHEN** formatting a command for Claude Code\n- **THEN** the adapter SHALL output YAML frontmatter with `name`, `description`, `allowed-tools`, `category`, `tags` fields\n- **AND** the `allowed-tools` field SHALL have the value `Bash(openspec:*)` so Claude Code runs `openspec` commands from the slash command without prompting for approval\n- **AND** file path SHALL follow pattern `.claude/commands/opsx/<id>.md`"
+            },
+            {
+              "name": "Cursor adapter formatting",
+              "rawText": "- **WHEN** formatting a command for Cursor\n- **THEN** the adapter SHALL output YAML frontmatter with `name` as `/opsx-<id>`, `id`, `category`, `description` fields\n- **AND** file path SHALL follow pattern `.cursor/commands/opsx-<id>.md`"
+            },
+            {
+              "name": "Windsurf adapter formatting",
+              "rawText": "- **WHEN** formatting a command for Windsurf\n- **THEN** the adapter SHALL output YAML frontmatter with `name`, `description`, `category`, `tags` fields\n- **AND** file path SHALL follow pattern `.windsurf/workflows/opsx-<id>.md`"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "root": {
+    "path": "/home/jblossey/.cache/hr-b38/parity",
+    "source": "nearest"
+  }
+}

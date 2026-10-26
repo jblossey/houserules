@@ -1,0 +1,17 @@
+name: bracerange
+version: 1
+description: a test schema
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: p
+    template: proposal.md
+    requires: []
+  - id: tasks
+    generates: "task{1..3}.md"
+    description: t
+    template: tasks.md
+    requires: [proposal]
+apply:
+  requires: [tasks]
+  tracks: "task{1..3}.md"

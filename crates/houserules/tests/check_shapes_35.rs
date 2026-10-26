@@ -309,6 +309,11 @@ fn checks_that_miss_a_required_field() -> Vec<(&'static str, Value, Vec<&'static
             json!({"type": "runner", "level": "fail", "files": ["src/**"], "scope": "changed"}),
             vec!["check \"runner\" needs \"tool\""],
         ),
+        (
+            "an intent-required check without if",
+            json!({"type": "intent-required", "level": "fail"}),
+            vec!["check \"intent-required\" needs \"if\""],
+        ),
     ]
 }
 
@@ -732,6 +737,82 @@ fn an_override_with_each_new_check_field_validates() {
             String::new()
         ),
         "the overrides"
+    );
+}
+
+/// The two intent checks of batch 38, one for each entry of a pack copy.
+fn intent_checks() -> Vec<Value> {
+    vec![
+        entry(
+            "demo.required",
+            json!({
+                "type": "intent-required", "level": "warn", "if": ["src/**"],
+                "sources": ["file", "openspec"], "exempt_subjects": ["^chore"],
+            }),
+        ),
+        entry(
+            "demo.resolves",
+            json!({"type": "intent-resolves", "level": "fail"}),
+        ),
+    ]
+}
+
+/// Batch 38, spec 5.7, the pack half: a copy that declares `houserules/pack@1.4.0` with an
+/// `intent-required` check that sets `sources`, and an `intent-resolves` check, installs and passes
+/// `check-knowledge`.
+#[test]
+fn a_pack_copy_at_1_4_0_with_each_intent_check_validates() {
+    let dir = install();
+    let mut pack = demo_pack_of(intent_checks());
+    pack["schema"] = json!("houserules/pack@1.4.0");
+    write_json(dir.path(), "team-pack.json", &pack);
+
+    run_ok(
+        dir.path(),
+        &["pack", "add", &path_of(dir.path(), "team-pack.json")],
+    );
+
+    assert_check_knowledge_passes(dir.path(), "the installed pack");
+}
+
+/// Batch 38, spec 5.7, the override half: an override at `houserules/overrides@1.3.0` sets each
+/// intent check, `sources` included.
+#[test]
+fn an_override_with_each_intent_check_validates() {
+    let dir = install();
+    add_demo_pack(
+        dir.path(),
+        vec![
+            entry("demo.required", complete_grep_absent_check()),
+            entry("demo.resolves", complete_grep_absent_check()),
+        ],
+    );
+    let checks: Vec<Value> = intent_checks()
+        .into_iter()
+        .map(|entry| entry["check"].clone())
+        .collect();
+    write_json(
+        dir.path(),
+        "knowledge/overrides.json",
+        &json!({
+            "schema": "houserules/overrides@1.3.0",
+            "overrides": [
+                {"id": "demo.required", "fields": {"check": checks[0]}},
+                {"id": "demo.resolves", "fields": {"check": checks[1]}},
+            ],
+        }),
+    );
+
+    let output = run(dir.path(), &["check-knowledge"]);
+
+    assert_eq!(
+        (output.status.code(), stdout(&output), stderr(&output)),
+        (
+            Some(0),
+            "override demo.required: check\noverride demo.resolves: check\nknowledge: ok\n"
+                .to_string(),
+            String::new()
+        )
     );
 }
 

@@ -1,0 +1,154 @@
+[
+  {
+    "ref": "add-amp-support",
+    "archived": false,
+    "title": "add-amp-support",
+    "why": "Amp reads project skills from `.agents/skills/`, but OpenSpec does not list Amp in its tool picker or accept `amp` through `--tools`. Amp users can select the universal `.agents` target, but only if they already know how Amp discovers skills.",
+    "tasks": {
+      "done": 9,
+      "total": 9
+    },
+    "requirements": {
+      "added": 1,
+      "modified": 0,
+      "removed": 0,
+      "renamed": 0,
+      "total": 1
+    }
+  },
+  {
+    "ref": "add-qa-smoke-harness",
+    "archived": false,
+    "title": "add-qa-smoke-harness",
+    "why": "We need a faster, more reliable way to manually validate CLI behavior changes like profile/delivery sync, migration behavior, and tool-detection UX.\n\nToday, manual review is mostly ad hoc: each developer sets up state differently, runs a different command order, and checks outputs informally. This makes regressions easy to miss and slows iteration on CLI UX work.\n\nAn 80/20 solution is to add a lightweight smoke harness for deterministic non-interactive flows, plus a short manual checklist for interactive prompt behavior.",
+    "tasks": null,
+    "requirements": {
+      "added": 2,
+      "modified": 0,
+      "removed": 0,
+      "renamed": 0,
+      "total": 2
+    }
+  },
+  {
+    "ref": "add-skill-cli-auto-approval",
+    "archived": false,
+    "title": "add-skill-cli-auto-approval",
+    "why": "Every generated OpenSpec skill drives the `openspec` CLI (`openspec list`, `status`, `instructions`, …). Today the skill frontmatter never pre-approves those calls, so agents that gate Bash on permission prompt the user on every single `openspec` invocation. The workflow stalls on approvals for a first-party, read-mostly CLI the user already opted into by installing OpenSpec.\n\nThe Agent Skills standard already solves this: an `allowed-tools` frontmatter field pre-approves listed tools while a skill is active. We just aren't emitting it.",
+    "tasks": {
+      "done": 7,
+      "total": 7
+    },
+    "requirements": {
+      "added": 0,
+      "modified": 2,
+      "removed": 0,
+      "renamed": 0,
+      "total": 2
+    }
+  },
+  {
+    "ref": "add-status-next-step",
+    "archived": false,
+    "title": "Name the command that resumes a change",
+    "why": "`openspec status` reported where a change stood and stopped there. The command\nthat moves it forward was already computed: `buildNextSteps` derives it and\n`--json` publishes it as `nextSteps`. But the text surface never rendered it.\n\nSo the surface a person actually reads ended on a checklist. `openspec new\nchange` hands off with `Next: openspec status --change <name>`, and that next\ncommand then had no verb of its own. Picking a change back up after a lost\nsession, or opening one somebody else started, meant already knowing which\ncommand came next (#906).\n\nThe completion case was the worst of it. Once every planning artifact existed,\nstatus printed a lone green \"All planning artifacts complete!\", which reads as\n*you are done* even while `tasks.md` sits half-checked. That is what #906\nreports: every artifact showed `done` rather than `ready`, so the conclusion was\nthat nothing was left to run.",
+    "tasks": {
+      "done": 8,
+      "total": 8
+    },
+    "requirements": {
+      "added": 0,
+      "modified": 1,
+      "removed": 0,
+      "renamed": 0,
+      "total": 1
+    }
+  },
+  {
+    "ref": "schema-alias-support",
+    "archived": false,
+    "title": "schema-alias-support",
+    "why": "We want to rename `spec-driven` to `openspec-default` to better reflect that it's the standard/default workflow. However, renaming directly would break existing projects that have `schema: spec-driven` in their `openspec/config.yaml`. Adding alias support allows both names to work interchangeably, enabling a smooth transition with no breaking changes.",
+    "tasks": null,
+    "requirements": null
+  },
+  {
+    "ref": "2025-08-19-adopt-delta-based-changes",
+    "archived": true,
+    "title": "Adopt Delta-Based Changes for Specifications",
+    "why": "The current approach of storing complete future states in change proposals creates a poor review experience. When reviewing changes on GitHub, reviewers see entire spec files (often 100+ lines) as \"added\" in green, making it impossible to identify what actually changed. With the recent structured format adoption, we now have clear section boundaries that enable a better approach: storing only additions and modifications.",
+    "tasks": {
+      "done": 36,
+      "total": 42
+    },
+    "requirements": {
+      "added": 2,
+      "modified": 5,
+      "removed": 1,
+      "renamed": 0,
+      "total": 8
+    }
+  },
+  {
+    "ref": "2025-09-29-add-agents-md-config",
+    "archived": true,
+    "title": "Add AGENTS.md Standard Support To Init/Update",
+    "why": null,
+    "tasks": {
+      "done": 8,
+      "total": 8
+    },
+    "requirements": {
+      "added": 0,
+      "modified": 5,
+      "removed": 0,
+      "renamed": 0,
+      "total": 5
+    }
+  },
+  {
+    "ref": "2025-09-29-update-agent-instructions",
+    "archived": true,
+    "title": "Update OpenSpec Agent Instructions",
+    "why": "The current OpenSpec agent instructions need updates to follow best practices for AI assistant instructions (brevity, clarity, removing ambiguity), ensure CLI commands are current with the actual implementation, and properly document the three-stage workflow pattern that agents should follow.",
+    "tasks": {
+      "done": 52,
+      "total": 52
+    },
+    "requirements": null
+  },
+  {
+    "ref": "2025-10-14-add-codex-slash-command-support",
+    "archived": true,
+    "title": "2025-10-14-add-codex-slash-command-support",
+    "why": "- Codex (the VS Code extension formerly known as Codeium Chat) exposes \"slash commands\" by reading Markdown prompt files from `~/.codex/prompts/`. Each file name becomes the `/command` users can run, with YAML frontmatter for metadata (`description`, `argument-hint`) and `$ARGUMENTS` to capture user input. The workflow screenshot shared by Kevin Kern (\"Codex problem analyzer\") shows the format OpenSpec should target so teams can invoke curated workflows straight from the chat palette.\n- Teams already rely on OpenSpec to manage the slash-command surface area for Claude, Cursor, OpenCode, Kilo Code, and Windsurf. Leaving Codex out forces them to manually copy/paste OpenSpec guardrails into `~/.codex/prompts/*.md`, which drifts quickly and undermines the \"single source of truth\" promise of the CLI.\n- Codex commands live outside the repository (under the user's home directory), so shipping an automated configurator that both scaffolds the prompts and keeps them refreshed via `openspec upda",
+    "tasks": {
+      "done": 11,
+      "total": 11
+    },
+    "requirements": {
+      "added": 0,
+      "modified": 3,
+      "removed": 0,
+      "renamed": 0,
+      "total": 3
+    }
+  },
+  {
+    "ref": "2026-02-17-add-verify-skill",
+    "archived": true,
+    "title": "Add /opsx:verify Skill",
+    "why": "Users need a way to validate that their implementation actually matches what was requested before archiving a change. Currently, there's no systematic way to check:\n- Whether all tasks are truly complete\n- Whether the implementation covers all spec requirements and scenarios\n- Whether the implementation follows the design decisions\n- Whether the code is coherent and makes sense\n\nA user requested: \"Can we get a :verify that will ensure that the implementation matches what was requested?\"",
+    "tasks": {
+      "done": 8,
+      "total": 8
+    },
+    "requirements": {
+      "added": 6,
+      "modified": 0,
+      "removed": 0,
+      "renamed": 0,
+      "total": 6
+    }
+  }
+]

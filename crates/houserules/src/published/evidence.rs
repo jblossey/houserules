@@ -12,11 +12,11 @@ use super::route::RouteDocument;
 
 /// The evidence of a change over the range of commits from `base` to `head`:
 /// what no covering check read, the intent, the rules that failed, warned, and
-/// held, the size, the work items, and the route.
+/// held, the size, the work items, the sessions, and the route.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
-#[schemars(title = "Evidence")]
+#[schemars(title = "Evidence", transform = super::leave_sessions_optional)]
 pub(crate) struct Evidence {
-    /// The schema id, `houserules/evidence@1.0.0`.
+    /// The schema id, `houserules/evidence@1.1.0`.
     pub(crate) schema: String,
     /// The path of the install from the git top level; `.` for a top-level
     /// install.
@@ -56,13 +56,29 @@ pub(crate) struct Evidence {
     pub(crate) skipped: Vec<RuleRow>,
     /// The `Work-Item` ids of the range, sorted.
     pub(crate) work_items: Vec<String>,
+    /// The sessions that the commits of the range cite in a trailer whose key
+    /// `review.sessions.trailers` lists, oldest commit first, and in the order of
+    /// the message inside a commit.
+    pub(crate) sessions: Vec<Session>,
     /// The route decision for the same range.
     pub(crate) route: RouteDocument,
 }
 
 impl Published for Evidence {
     const NAME: &'static str = "evidence";
-    const VERSION: &'static str = "1.0.0";
+    const VERSION: &'static str = "1.1.0";
+}
+
+/// A session of an agent tool that a commit cites in a trailer, such as
+/// `Entire-Checkpoint: <id>`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub(crate) struct Session {
+    /// The full sha of the commit that holds the trailer.
+    pub(crate) commit: String,
+    /// The key of the trailer, as the commit wrote it.
+    pub(crate) trailer: String,
+    /// The value of the trailer: the reference to the session.
+    pub(crate) value: String,
 }
 
 /// The rule package that judged a change: the hashes of its sources at the two

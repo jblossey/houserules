@@ -16,7 +16,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use super::Published;
 use super::audit_result::{References, RowMode, RowResult, Summary};
 use super::change::{ChangeKind, EmptyChange, LineRange};
-use super::evidence::{Diff, JudgedRow, PackPin};
+use super::evidence::{Diff, JudgedRow, PackPin, Session};
 use super::intent::{Requirements, Tasks, Validation};
 use super::route::{Reason, Route};
 
@@ -26,7 +26,7 @@ use super::route::{Reason, Route};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[schemars(title = "Change record")]
 pub(crate) struct ChangeRecord {
-    /// The schema id, `houserules/change-record@1.0.0`.
+    /// The schema id, `houserules/change-record@1.1.0`.
     pub(crate) schema: String,
     /// The path of the install from the git top level; `.` for a top-level
     /// install.
@@ -90,7 +90,8 @@ pub(crate) struct ChangeRecord {
     /// them (spec 10.4), or the approvers could not be read and stay unknown
     /// (spec 10.1 and 10.4).
     pub(crate) reviewers_pending: bool,
-    /// The work items of the range. The minimal record has no such key.
+    /// The work items and the sessions of the range. The minimal record has no
+    /// such key.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Links")]
     pub(crate) links: Option<Links>,
@@ -104,7 +105,7 @@ pub(crate) struct ChangeRecord {
 
 impl Published for ChangeRecord {
     const NAME: &'static str = "change-record";
-    const VERSION: &'static str = "1.0.0";
+    const VERSION: &'static str = "1.1.0";
 }
 
 /// Writes the inner value of a key that is present. The `skip_serializing_if`
@@ -292,7 +293,7 @@ pub(crate) enum Artifacts {
 /// `intent`, and `route`, which the record holds on its own.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub(crate) struct RecordEvidence {
-    /// The schema id of the evidence document, `houserules/evidence@1.0.0`.
+    /// The schema id of the evidence document, `houserules/evidence@1.1.0`.
     pub(crate) schema: String,
     /// The path of the install from the git top level.
     pub(crate) install: String,
@@ -522,8 +523,10 @@ pub(crate) struct RecordRun {
     pub(crate) sha256: String,
 }
 
-/// The work items of the range in the form the budget left them.
+/// The work items and the sessions of the range in the form the budget left
+/// them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[schemars(transform = super::leave_sessions_optional)]
 pub(crate) struct Links {
     /// The `Work-Item` ids of the range, sorted; the first 50 after a cut.
     pub(crate) work_items: Vec<String>,
@@ -532,6 +535,16 @@ pub(crate) struct Links {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "u64")]
     pub(crate) work_items_more: Option<u64>,
+    /// The sessions that the commits of the range cite, oldest commit first; the
+    /// first 20 after a cut. A record of schema 1.0.0 holds no such key, and reads
+    /// as an empty list.
+    #[serde(default)]
+    pub(crate) sessions: Vec<Session>,
+    /// The number of sessions past the listed ones. The key is absent when none
+    /// was cut.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "u64")]
+    pub(crate) sessions_more: Option<u64>,
 }
 
 /// The audit of a merged change that a person ran after the merge.

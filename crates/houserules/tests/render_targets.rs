@@ -4,12 +4,15 @@
 //! enables. Each case runs the compiled binary against a scratch git
 //! repository that `houserules init` seeded.
 
+mod tracker_support;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use serde_json::{Value, json};
 use tempfile::TempDir;
+use tracker_support::OPENSPEC_SECTION;
 
 /// The line that opens the block that `render` owns.
 const BEGIN: &str = "<!-- houserules:begin -->";
@@ -1313,4 +1316,245 @@ fn check_knowledge_reports_a_stale_block_and_a_broken_block() {
             "AGENTS.md: the houserules block has no end marker <!-- houserules:end -->; add the end marker after the block"
         ]
     );
+}
+
+// ---- the OpenSpec section (batch 38, spec 6.1) ----
+
+/// Writes `relative` with `content` and stages it, so that git tracks it.
+fn track(install: &Install, relative: &str, content: &str) {
+    install.write(relative, content);
+    git(install.root(), &["add", relative]);
+}
+
+/// A tracked file below `openspec/specs/` or `openspec/changes/` gives the root block the
+/// `## OpenSpec` section directly after the standing rules, before the session section. The section
+/// goes again when git stops tracking the file.
+#[test]
+fn a_tracked_openspec_file_adds_the_section_directly_after_the_standing_rules() {
+    for path in [
+        "openspec/specs/auth/spec.md",
+        "openspec/changes/add-x/proposal.md",
+        "openspec/changes/archive/.gitkeep",
+    ] {
+        let install = Install::new(false);
+        track(&install, path, "text\n");
+
+        assert_eq!(install.render(), ["AGENTS.md: written"], "{path}");
+
+        let block = block_of(&install.read("AGENTS.md"));
+        let (standing, rest) = block
+            .split_once(&format!("\n\n{OPENSPEC_SECTION}\n\n"))
+            .unwrap_or_else(|| panic!("no section for {path}: {block}"));
+        let last = standing.lines().last().expect("a line");
+        assert!(
+            last.starts_with("- ["),
+            "the section follows the last standing rule, not {last:?}"
+        );
+        assert!(
+            rest.starts_with("## Session\n\n- Start: run `houserules list --open`."),
+            "{rest}"
+        );
+
+        git(install.root(), &["rm", "-q", "--cached", path]);
+        assert_eq!(install.render(), ["AGENTS.md: written"], "{path}");
+        assert!(!install.read("AGENTS.md").contains("## OpenSpec"), "{path}");
+    }
+}
+
+/// The section reads the tracked paths: files that the work tree holds and git does not track draw
+/// none.
+#[test]
+fn an_untracked_openspec_file_adds_no_section() {
+    let install = Install::new(false);
+    install.write("openspec/specs/auth/spec.md", "text\n");
+
+    assert_eq!(install.render(), ["render: up to date"]);
+
+    assert!(!install.read("AGENTS.md").contains("## OpenSpec"));
+}
+
+/// A root that has no planning shape gets no section: a config with a `store:` key (`config.yaml` or
+/// `config.yml`), a config with no such key, and a store folder.
+#[test]
+fn a_store_pointer_a_plain_config_and_a_store_folder_get_no_section() {
+    let cases: [(&str, &[(&str, &str)]); 4] = [
+        (
+            "a store key in config.yaml",
+            &[("openspec/config.yaml", "store: team\n")],
+        ),
+        (
+            "a store key in config.yml",
+            &[("openspec/config.yml", "store: team\n")],
+        ),
+        (
+            "a config with no store key",
+            &[("openspec/config.yaml", "schema: spec-driven\n")],
+        ),
+        (
+            "a store folder",
+            &[
+                ("openspec/specs/.openspec-store/store.yaml", "name: team\n"),
+                ("openspec/specs/a/spec.md", "text\n"),
+            ],
+        ),
+    ];
+    for (name, files) in cases {
+        let install = Install::new(false);
+        for (path, content) in files {
+            track(&install, path, content);
+        }
+
+        assert_eq!(install.render(), ["render: up to date"], "{name}");
+
+        assert!(!install.read("AGENTS.md").contains("## OpenSpec"), "{name}");
+    }
+}
+
+/// A planning shape wins over a `store:` key of the config (spec 3.1).
+#[test]
+fn a_planning_shape_wins_over_a_store_key() {
+    let install = Install::new(false);
+    track(&install, "openspec/config.yaml", "store: team\n");
+    track(&install, "openspec/changes/c/proposal.md", "text\n");
+
+    assert_eq!(install.render(), ["AGENTS.md: written"]);
+
+    assert!(install.read("AGENTS.md").contains(OPENSPEC_SECTION));
+}
+
+/// Outside a git repository the section reads the work tree, as the search for `AGENTS.md` files
+/// does.
+#[test]
+fn without_git_the_openspec_section_reads_the_work_tree() {
+    let install = Install::new(false);
+    fs::remove_dir_all(install.path(".git")).expect("remove .git");
+    install.write("openspec/config.yaml", "store: team\n");
+    let render = |install: &Install| {
+        houserules()
+            .args(["render", "--dir"])
+            .arg(install.root())
+            .output()
+            .expect("run render")
+    };
+
+    let pointer = render(&install);
+    assert_eq!(pointer.status.code(), Some(0), "{}", text(&pointer.stderr));
+    assert_eq!(lines(&pointer.stdout), ["render: up to date"]);
+
+    install.write("openspec/specs/a/spec.md", "text\n");
+    let planning = render(&install);
+    assert_eq!(
+        planning.status.code(),
+        Some(0),
+        "{}",
+        text(&planning.stderr)
+    );
+    assert_eq!(lines(&planning.stdout), ["AGENTS.md: written"]);
+    assert!(install.read("AGENTS.md").contains(OPENSPEC_SECTION));
+}
+
+/// The section follows the install's own `openspec/` folder: one at the git top level above a
+/// subdirectory install draws none, and one below the install root draws it.
+#[test]
+fn a_subdirectory_install_reads_its_own_openspec_folder() {
+    let top = tempfile::tempdir().expect("tempdir");
+    git(top.path(), &["init", "-q"]);
+    let install = top.path().join("sub");
+    fs::create_dir(&install).expect("create the install folder");
+    let init = houserules()
+        .args(["init", "--dir"])
+        .arg(&install)
+        .output()
+        .expect("run init");
+    assert_eq!(init.status.code(), Some(0), "{}", text(&init.stderr));
+    let render = || {
+        houserules()
+            .args(["render", "--dir"])
+            .arg(&install)
+            .output()
+            .expect("run render")
+    };
+
+    fs::create_dir_all(top.path().join("openspec").join("specs")).expect("create openspec/specs");
+    fs::write(
+        top.path().join("openspec").join("specs").join("a.md"),
+        "text\n",
+    )
+    .expect("write the file above the install");
+    git(top.path(), &["add", "openspec"]);
+    let above = render();
+    assert_eq!(lines(&above.stdout), ["render: up to date"]);
+
+    fs::create_dir_all(install.join("openspec").join("specs")).expect("create sub/openspec/specs");
+    fs::write(
+        install.join("openspec").join("specs").join("a.md"),
+        "text\n",
+    )
+    .expect("write the file below the install root");
+    git(top.path(), &["add", "sub/openspec"]);
+    let below = render();
+    assert_eq!(lines(&below.stdout), ["AGENTS.md: written"]);
+    let agents = fs::read_to_string(install.join("AGENTS.md")).expect("read AGENTS.md");
+    assert!(agents.contains(OPENSPEC_SECTION));
+}
+
+/// A tracked config with bytes that are no UTF-8 is read lossily, as the adapter reads it: the
+/// root is a store pointer, so `render`, `render --check`, and `check-knowledge` pass and the block
+/// holds no section.
+#[test]
+fn a_tracked_config_that_is_no_utf8_is_read_lossily() {
+    let install = Install::new(false);
+    fs::create_dir_all(install.path("openspec")).expect("create openspec/");
+    fs::write(install.path("openspec/config.yaml"), b"store: \xff\xfe\n").expect("write bytes");
+    git(install.root(), &["add", "-A"]);
+    let before = install.read("AGENTS.md");
+
+    for (args, printed) in [
+        (&["render"][..], &["render: up to date"][..]),
+        (&["render", "--check"][..], &["render: up to date"][..]),
+        (
+            &["check-knowledge"][..],
+            &[
+                "exclusion process.every-commit-names-a-work-item: opt-in",
+                "knowledge: ok",
+            ][..],
+        ),
+    ] {
+        let output = install.run(args);
+
+        assert_eq!(
+            output.status.code(),
+            Some(0),
+            "{args:?}: {}",
+            text(&output.stderr)
+        );
+        assert_eq!(lines(&output.stdout), printed, "{args:?}");
+        assert_eq!(text(&output.stderr), "", "{args:?}");
+    }
+    assert_eq!(install.read("AGENTS.md"), before);
+}
+
+/// A tracked config that the operating system cannot read, in a root with no planning shape, is one
+/// named line and exit 2, and `render` writes nothing. A folder in place of the file fails on every
+/// platform.
+#[test]
+fn a_tracked_config_that_cannot_be_read_is_one_named_line() {
+    let install = Install::new(false);
+    install.write("openspec/config.yaml", "store: team\n");
+    git(install.root(), &["add", "openspec/config.yaml"]);
+    fs::remove_file(install.path("openspec/config.yaml")).expect("remove the file");
+    fs::create_dir(install.path("openspec/config.yaml")).expect("create a folder in its place");
+    let before = install.read("AGENTS.md");
+
+    let output = install.run(&["render"]);
+
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(text(&output.stdout), "");
+    let printed = lines(&output.stderr);
+    assert_eq!(printed.len(), 1, "{printed:?}");
+    assert!(
+        printed[0].starts_with("openspec/config.yaml: "),
+        "{printed:?}"
+    );
+    assert_eq!(install.read("AGENTS.md"), before);
 }

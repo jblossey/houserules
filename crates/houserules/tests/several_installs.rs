@@ -19,7 +19,10 @@ use tempfile::TempDir;
 mod tracker_support;
 mod tree_snapshot;
 
-use tracker_support::{quoted, resolved, seed_workflow, sha256_hex};
+use tracker_support::{
+    assert_no_line_ending_warning_under_autocrlf, quoted, resolved, seed_workflow, sha256_hex,
+    with_default_git,
+};
 use tree_snapshot::{assert_same_tree, snapshot};
 
 /// A `Command` for the compiled `houserules` binary under test.
@@ -36,9 +39,11 @@ fn repo_root() -> PathBuf {
         .unwrap_or_else(|error| panic!("canonicalize {}: {error}", root.display()))
 }
 
-/// Runs `git` in `dir` and requires success.
+/// Runs `git` in `dir` and requires success. The configuration of the caller stays out of the
+/// run, so that staging a file of LF lines under `core.autocrlf=true` prints no warning.
 fn git(dir: &Path, args: &[&str]) {
-    let status = Command::new("git")
+    let mut command = Command::new("git");
+    let status = with_default_git(&mut command)
         .args(args)
         .current_dir(dir)
         .status()
@@ -664,4 +669,13 @@ fn check_commit_from_counts_the_commits_outside_a_freshly_initialized_subdirecto
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(output.status.code(), Some(0));
+}
+
+/// The fixture of the test that stages the files of a freshly initialized subdirectory prints no
+/// line-ending warning under the autocrlf suite, which injects `core.autocrlf=true`.
+#[test]
+fn staging_the_fixture_of_a_subdirectory_install_prints_no_line_ending_warning_under_autocrlf() {
+    assert_no_line_ending_warning_under_autocrlf(&[
+        "check_commit_from_counts_the_commits_outside_a_freshly_initialized_subdirectory",
+    ]);
 }

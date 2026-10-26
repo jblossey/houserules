@@ -691,5 +691,38 @@
         "notes": "batch 37; template blob 01a0819 (T16, T17: the fix-diff review of a critical task) given by path; fixture a detached commit at the batch-37 head (picocolors ^1.3.0, a history comment, a report whose self_audit drops the exact-pins fail row); exact-pins, dependency-vetting, and the self_audit omission filed Important with impact; the history comment Minor with a grep check; Tier standard checked, no tier finding; review validates, no open row, model opus; AUDIT_JSON written. Fixture noise as in batch 36 (dev-tools-are-rust-native, the brief against its Backlog line) plus tdd, wiring, and doc-comments findings; it also named the dispatch's mistyped HEAD sha"
       }
     ]
+  },
+  {
+    "date": "2026-10-26",
+    "templates": {
+      ".claude/agents/implementer.md": "267adad68f60bd195241c3935858ea1e02907d66",
+      ".claude/agents/task-reviewer.md": "9bbb7e86ed7da9b53435f1140205c9045110eafb"
+    },
+    "runs": [
+      {
+        "scenario": "dependency-add",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 7,
+        "of": 7,
+        "notes": "batch 38 (Task 11's faster loop); template blob 267adad given by path; similar =3.2.1 by cargo add --dev; vetting with releases, commits, issues, verdict, and both manifests; placement under tests/ with the reason; docs_verified the 3.2.1 source; natural RED (E0583) then GREEN on the targeted test; Work-Item trailers; validates, model sonnet, self_audit 12/12. Outside the expected behaviors: two refused commands were redone in another form."
+      },
+      {
+        "scenario": "docs-edit",
+        "agent": "implementer",
+        "model": "sonnet",
+        "pass": 4,
+        "of": 4,
+        "notes": "batch 38; template blob 267adad by path; a runbook section of six short active steps, each command run live against a scratch template edit; Work-Item trailer; validates, model sonnet, self_audit 14/14; the harness's attribution trailers left out under security-hygiene.no-coauthor."
+      },
+      {
+        "scenario": "seeded-violations",
+        "agent": "task-reviewer",
+        "model": "opus",
+        "pass": 8,
+        "of": 8,
+        "notes": "batch 38; template blob 9bbb7e8 by path; exact-pins and dependency-vetting fails filed Important with their impact; the self_audit omission filed; the history comment Minor with a grep check; Tier standard stands; validates, model opus, no open row."
+      }
+    ]
   }
 ]

@@ -10,13 +10,14 @@
 //! itself.
 //!
 //! This module is also the one module that runs `git ls-files`. The binary
-//! holds four listings: [`tracked_files`] (the index below the working
+//! holds five listings: [`tracked_files`] (the index below the working
 //! directory), [`tracked_from_top_level`] (the index of the whole repository),
-//! [`listed_by_name`] (the files of one name, tracked or untracked and not
-//! ignored), and [`submodule_paths`] (the submodules of the index). Each
-//! caller keeps its own handling of a failure and of a path that is no UTF-8.
-//! A lint test (`tests/ls_files_home.rs`) fails when another module passes the
-//! `ls-files` argument to git.
+//! [`untracked_among`] (of a list of files below the working directory, the
+//! ones that git neither tracks nor ignores), [`listed_by_name`] (the files of one name, tracked or
+//! untracked and not ignored), and [`submodule_paths`] (the submodules of the
+//! index). Each caller keeps its own handling of a failure and of a path that
+//! is no UTF-8. A lint test (`tests/ls_files_home.rs`) fails when another
+//! module passes the `ls-files` argument to git.
 
 use std::io;
 use std::path::Path;
@@ -124,6 +125,58 @@ pub(crate) fn tracked_files(root: &Path) -> Option<(Vec<String>, Vec<String>)> {
         }
     }
     Some((files, skipped))
+}
+
+/// Of `paths`, the files below `root` that git neither tracks nor ignores: the files
+/// that `git add` takes without `-f`. `paths` and the answer are `/`-separated paths
+/// relative to `root`, and the answer holds them in the order git prints them. The
+/// caller passes paths below `root`: git prints a path above it as `../…`. A path
+/// that names no file, such as a file removed since, is not in the answer. With no
+/// path the answer is empty, where git with no path would list every untracked file.
+/// It returns `None` when `root` is not a git work tree or git itself does not run. A
+/// path that is no UTF-8 is left out, since a printed `git add` line cannot name it.
+///
+/// The listing pins the settings that change the printed text. `-z` ends each path
+/// with NUL and keeps `core.quotePath` from quoting a name. No `--directory` keeps git
+/// from collapsing an untracked folder to one entry, so each file is one path.
+/// `--exclude-standard` leaves out an ignored file. `--literal-pathspecs` makes each
+/// path a name and no glob, so a file `[ab].txt` is no pattern. git stops with exit
+/// 128 when that setting meets `GIT_GLOB_PATHSPECS` or `GIT_ICASE_PATHSPECS`, so the
+/// run takes the two out of the environment of git. `GIT_NOGLOB_PATHSPECS` adds
+/// nothing beside it: git exits 0 and lists the same files, so it is no input.
+/// The directory `root` bounds the listing and the paths (no `--full-name`). Three
+/// inputs are left. The ignore rules of the repository (`.gitignore` files,
+/// `.git/info/exclude`, and `core.excludesFile`, which defaults to a file below
+/// `XDG_CONFIG_HOME` or `HOME`) decide what `git add` refuses, so they decide here
+/// too. `core.ignoreCase` changes which names an ignore rule matches, and `git add`
+/// honours it too. The repository that git finds from `root` (`GIT_DIR` and its kin)
+/// decides what is tracked. A nested repository is one entry with a trailing `/`.
+pub(crate) fn untracked_among(root: &Path, paths: &[String]) -> Option<Vec<String>> {
+    if paths.is_empty() {
+        return Some(Vec::new());
+    }
+    let mut command = super::git::command(root);
+    command
+        .env_remove("GIT_GLOB_PATHSPECS")
+        .env_remove("GIT_ICASE_PATHSPECS")
+        .args([
+            "--literal-pathspecs",
+            "ls-files",
+            "-z",
+            "--others",
+            "--exclude-standard",
+            "--",
+        ])
+        .args(paths);
+    let stdout = super::git::run_command(&mut command, None).ok()?;
+    Some(
+        stdout
+            .split(|&byte| byte == 0)
+            .filter(|entry| !entry.is_empty())
+            .filter_map(|entry| std::str::from_utf8(entry).ok())
+            .map(str::to_string)
+            .collect(),
+    )
 }
 
 /// Every path of the index of the repository that holds `root`, whatever the
@@ -235,6 +288,9 @@ mod tests {
     use std::process::Command;
 
     use super::*;
+    use crate::review::git::scratch::{
+        assert_no_line_ending_warning_under_autocrlf, fixture_git, rerun_test,
+    };
 
     fn prefix(value: &str) -> InstallPrefix {
         InstallPrefix(value.to_string())
@@ -309,16 +365,39 @@ mod tests {
         assert_eq!(prefix("sub dir/sä/").as_str(), "sub dir/sä/");
     }
 
-    /// A fresh scratch directory with `git init` already run.
+    /// A fresh scratch directory with `git init` already run, and a `core.excludesFile` of its own
+    /// at the null device: a repository-local value overrides the global one, so no ignore file of
+    /// the host hides a file from the listings under test.
     fn scratch_repo() -> tempfile::TempDir {
         let dir = tempfile::tempdir().expect("tempdir");
-        let status = Command::new("git")
-            .args(["init", "-q"])
-            .current_dir(dir.path())
-            .status()
-            .expect("run git init");
-        assert!(status.success(), "git init failed");
+        for args in [
+            &["init", "-q"][..],
+            &["config", "core.excludesFile", "/dev/null"],
+        ] {
+            let done = fixture_git(dir.path(), args, &[]);
+            assert!(
+                done.status.success(),
+                "git {args:?} failed: {}",
+                String::from_utf8_lossy(&done.stderr)
+            );
+        }
         dir
+    }
+
+    /// Writes each of `files` (a path with its text) below `root`, and the folders above it.
+    fn write_files(root: &Path, files: &[(&str, &str)]) {
+        for (path, text) in files {
+            let path = root.join(path);
+            std::fs::create_dir_all(path.parent().expect("a parent")).expect("create the folder");
+            std::fs::write(&path, text).expect("write the file");
+        }
+    }
+
+    /// Stages `paths` below `root`.
+    fn track(root: &Path, paths: &[&str]) {
+        let args = [&["add"][..], paths].concat();
+        let staged = fixture_git(root, &args, &[]);
+        assert!(staged.status.success(), "git add failed");
     }
 
     /// The prefix of a subdirectory is git's own prefix of it; at the top
@@ -355,12 +434,7 @@ mod tests {
             std::fs::create_dir_all(path.parent().expect("a parent")).expect("create the folder");
             std::fs::write(&path, text).expect("write the file");
         }
-        let status = Command::new("git")
-            .args(["add", "AGENTS.md", "a"])
-            .current_dir(root)
-            .status()
-            .expect("run git add");
-        assert!(status.success(), "git add failed");
+        track(root, &["AGENTS.md", "a"]);
 
         let mut listed: Vec<String> = listed_by_name(root, "AGENTS.md")
             .expect("a listing")
@@ -370,6 +444,153 @@ mod tests {
         listed.sort();
 
         assert_eq!(listed, ["AGENTS.md", "a/AGENTS.md", "b/c/AGENTS.md"]);
+    }
+
+    /// The listing holds the files that git neither tracks nor ignores among the paths asked, one
+    /// entry for each file: a file of an untracked folder is not collapsed to its folder. A
+    /// tracked file and an ignored file are left out, and a name with a letter outside ASCII comes
+    /// back as it is, not quoted and escaped.
+    #[test]
+    fn untracked_among_lists_each_file_that_git_neither_tracks_nor_ignores() {
+        let repo = scratch_repo();
+        let root = repo.path();
+        write_files(
+            root,
+            &[
+                ("tracked.txt", "tracked\n"),
+                ("loose.txt", "untracked\n"),
+                ("dir/one.txt", "untracked\n"),
+                ("dir/deep/two.txt", "untracked\n"),
+                ("café.md", "untracked, outside ASCII\n"),
+                ("ignored.txt", "ignored\n"),
+                ("ignored-dir/three.txt", "ignored\n"),
+                (".gitignore", "ignored.txt\nignored-dir/\n"),
+            ],
+        );
+        track(root, &["tracked.txt"]);
+        let asked: Vec<String> = [
+            "tracked.txt",
+            "loose.txt",
+            "dir/one.txt",
+            "dir/deep/two.txt",
+            "café.md",
+            "ignored.txt",
+            "ignored-dir/three.txt",
+            ".gitignore",
+        ]
+        .map(str::to_string)
+        .to_vec();
+
+        let mut listed = untracked_among(root, &asked).expect("a listing");
+        listed.sort();
+
+        assert_eq!(
+            listed,
+            [
+                ".gitignore",
+                "café.md",
+                "dir/deep/two.txt",
+                "dir/one.txt",
+                "loose.txt"
+            ]
+        );
+    }
+
+    /// The listing holds the files asked for and no other: an untracked file that is not among the
+    /// paths is not in it.
+    #[test]
+    fn untracked_among_lists_no_file_that_was_not_asked_for() {
+        let repo = scratch_repo();
+        let root = repo.path();
+        write_files(
+            root,
+            &[("asked.txt", "untracked\n"), ("other.txt", "untracked\n")],
+        );
+
+        assert_eq!(
+            untracked_among(root, &["asked.txt".to_string()]),
+            Some(vec!["asked.txt".to_string()])
+        );
+    }
+
+    /// The paths are relative to the directory that the listing reads: the answer for a
+    /// subdirectory names `in.txt`, not `sub/in.txt`.
+    #[test]
+    fn untracked_among_gives_paths_relative_to_the_directory() {
+        let repo = scratch_repo();
+        let root = repo.path();
+        write_files(
+            root,
+            &[
+                ("top.txt", "untracked\n"),
+                ("sub/in.txt", "untracked\n"),
+                ("sub/deeper/in.txt", "untracked\n"),
+            ],
+        );
+        let asked = ["in.txt", "deeper/in.txt"].map(str::to_string).to_vec();
+
+        let mut listed = untracked_among(&root.join("sub"), &asked).expect("a listing");
+        listed.sort();
+
+        assert_eq!(listed, ["deeper/in.txt", "in.txt"]);
+    }
+
+    /// No path gives an empty listing, where git with no path lists every untracked file. A path
+    /// that names no file gives none either.
+    #[test]
+    fn untracked_among_gives_nothing_for_no_path_and_for_a_path_that_names_no_file() {
+        let repo = scratch_repo();
+        let root = repo.path();
+        write_files(root, &[("loose.txt", "untracked\n")]);
+
+        assert_eq!(untracked_among(root, &[]), Some(Vec::new()));
+        assert_eq!(
+            untracked_among(root, &["gone.txt".to_string()]),
+            Some(Vec::new())
+        );
+    }
+
+    /// Each path is a name and no glob: `[ab].txt` names the file with that name, and not `a.txt`.
+    #[test]
+    fn untracked_among_reads_each_path_as_a_name() {
+        let repo = scratch_repo();
+        let root = repo.path();
+        write_files(
+            root,
+            &[("[ab].txt", "untracked\n"), ("a.txt", "untracked\n")],
+        );
+
+        assert_eq!(
+            untracked_among(root, &["[ab].txt".to_string()]),
+            Some(vec!["[ab].txt".to_string()])
+        );
+    }
+
+    /// The pathspec variables of the caller change nothing: git stops when `GIT_GLOB_PATHSPECS`
+    /// or `GIT_ICASE_PATHSPECS` meets `--literal-pathspecs`, and the run takes the two out of the
+    /// environment of git. The test runs the test of the names again with each variable set.
+    #[test]
+    fn untracked_among_ignores_the_pathspec_variables_of_the_caller() {
+        const NAMES: &str = "rules::git_paths::tests::untracked_among_reads_each_path_as_a_name";
+        for variable in ["GIT_GLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] {
+            let printed = rerun_test(NAMES, &[(variable, "1")]);
+
+            assert!(
+                printed.contains("test result: ok. 1 passed"),
+                "{variable}: {printed}"
+            );
+        }
+    }
+
+    /// A directory that is no work tree has no listing.
+    #[test]
+    fn untracked_among_has_no_listing_outside_a_work_tree() {
+        let dir = tempfile::tempdir().expect("tempdir");
+
+        assert_eq!(
+            untracked_among(dir.path(), &["loose.txt".to_string()]),
+            None
+        );
     }
 
     /// A directory that is no work tree is a failure that holds the first
@@ -416,12 +637,7 @@ mod tests {
             std::fs::create_dir_all(path.parent().expect("a parent")).expect("create the folder");
             std::fs::write(&path, text).expect("write the file");
         }
-        let status = Command::new("git")
-            .args(["add", "top.txt", "sub", "other"])
-            .current_dir(root)
-            .status()
-            .expect("run git add");
-        assert!(status.success(), "git add failed");
+        track(root, &["top.txt", "sub", "other"]);
 
         let mut listed = tracked_from_top_level(&root.join("sub")).expect("a listing");
         listed.sort();
@@ -513,5 +729,16 @@ mod tests {
             error,
             format!("{} is not inside a git repository", dir.path().display())
         );
+    }
+
+    /// The fixtures of the tests that stage files with `git add` print no line-ending warning
+    /// under the autocrlf suite, which injects `core.autocrlf=true`.
+    #[test]
+    fn staging_a_fixture_prints_no_line_ending_warning_under_autocrlf() {
+        assert_no_line_ending_warning_under_autocrlf(&[
+            "rules::git_paths::tests::listed_by_name_lists_tracked_and_untracked_matches_and_leaves_out_ignored_ones",
+            "rules::git_paths::tests::tracked_from_top_level_lists_the_whole_index_from_a_subdirectory",
+            "rules::git_paths::tests::untracked_among_lists_each_file_that_git_neither_tracks_nor_ignores",
+        ]);
     }
 }

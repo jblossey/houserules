@@ -138,7 +138,8 @@ use std::process::{Command, ExitCode, Stdio};
 
 use super::check_shape::{CheckLevel, CheckType};
 use super::git::{
-    Commit, changed_files_for, commits_in, paths_changed_against_any_parent, rev, tree_files,
+    Commit, RootCommit, changed_files_for, commits_in, paths_changed_against_any_parent, rev,
+    tree_files,
 };
 use super::git_paths::InstallPrefix;
 use super::model::{Base, CheckField, load_base};
@@ -474,7 +475,7 @@ fn check_commit(base: &Base, opts: &CheckCommitOpts) -> Result<Findings, String>
         if cochange_checks.is_empty() || commit.sha.is_empty() {
             continue;
         }
-        let files = changed_files_for(&base.root, &prefix, &commit.sha)?;
+        let files = changed_files_for(&base.root, &prefix, &commit.sha, RootCommit::Nothing)?;
         let parent_tree = match rev(&base.root, &format!("{}^", commit.sha)) {
             Ok(parent_sha) => tree_files(&base.root, &prefix, &parent_sha)?,
             Err(_) => Vec::new(), // a root commit has no parent tree: no mechanism can exist yet

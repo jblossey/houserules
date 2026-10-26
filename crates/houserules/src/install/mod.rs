@@ -36,7 +36,7 @@
 //! default of spec 4.6. It holds the `KIT_OWNED` files, the `SEED_ONCE` files,
 //! the `DEFAULT_PACKS` as copies in `knowledge/packs/` with their pins in
 //! `.houserules.json` (a new install only), the `.houserules/` line of
-//! `.gitignore`, and the marker with `schema` `houserules/install@2.3.0`. It
+//! `.gitignore`, and the marker with `schema` `houserules/install@2.4.0`. It
 //! writes no CI file (spec 10.7) and prints the line that names `houserules ci
 //! print`, with the host of the `origin` remote when it is `github.com` or
 //! `gitlab.com`. It installs no tracker and no workflow, and so writes none of
@@ -51,7 +51,9 @@
 //! the files and the pins), and, with `--add-required-packs`, adds the packs
 //! that hold the rules the workflow requires through `pack add`. It writes the
 //! `workflow` key of the marker last, so that a stop in between leaves a tree
-//! that the next run finishes.
+//! that the next run finishes. When the tree holds an OpenSpec root, `init
+//! --workflow` prints the warning of two planning workflows on stderr
+//! (`rules::two_workflows_line`) and keeps its exit code.
 //! Without `--target claude` it also leaves out the Claude files
 //! (`CLAUDE_FILES`) and the hook entries of `.claude/settings.json`, and
 //! prints the line that enables them; with the flag, on a new install or an
@@ -101,6 +103,14 @@
 //! `render_and_report` (`rules::render`) reruns this crate's own renderer
 //! on the freshly-seeded target (`rules::render`'s own module doc has the
 //! shared-helper account).
+//!
+//! `init` and `update` end with the `next:` line. It starts with `git add
+//! <paths> && ` when the index below the install root holds a file and the
+//! command wrote a file that git neither tracks nor ignores (`next_line`'s own
+//! module doc has the account), because `check-knowledge` fails on the dead
+//! globs of unstaged files in such a repository. The files that the command
+//! wrote are the ones in the record that every write of the command goes
+//! through (`written`), so the line opens no other file.
 //!
 //! # Several installs
 //!
@@ -175,9 +185,10 @@
 //! - Each hand step that the earlier steps left is printed as `hand step:
 //!   <text>` (`hand_steps` holds every text).
 //! - The restamp of the install schema: a marker with the schema
-//!   `houserules/install@2.2.0` gets `houserules/install@2.3.0` in the write of
-//!   the marker that ends `update`, and `update` prints `wrote .houserules.json
-//!   (houserules/install@2.3.0)` after that write. The step tests its own
+//!   `houserules/install@2.2.0` or `houserules/install@2.3.0` gets
+//!   `houserules/install@2.4.0` in the write of the marker that ends `update`,
+//!   and `update` prints `wrote .houserules.json (houserules/install@2.4.0)`
+//!   after that write. The step tests its own
 //!   state, so a run that stopped before the write restamps at the next run, and
 //!   a second `update` prints no such line (`houserules.migrations-finish-after-a-stop`).
 //!   The keys `runners`, `workspaces`, and `review` stay as found (`marker`'s
@@ -253,7 +264,7 @@
 //! repository (`location::refuse_overlap`), a malformed `--id-prefix`, and a
 //! pre-existing `.houserules.json` that is not valid JSON, is valid JSON but
 //! not an object, carries an invalid `idPrefix`, carries an empty/non-string
-//! `version`, or carries a `defaultBranch` that is no string (`audit` reads
+//! `version`, or carries a `defaultBranch` that is no non-empty string (`audit` reads
 //! that key). An invalid-JSON marker's inner message text is
 //! `serde_json`'s own (`read_json_object`'s own doc), the same shape
 //! `rules::deliverable::read_deliverable_value` carries for the same
@@ -316,6 +327,7 @@ mod conversion;
 pub(crate) mod hand_steps;
 mod location;
 pub(crate) mod marker;
+mod next_line;
 mod pack_moves;
 mod sync;
 
@@ -323,7 +335,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 
 use rust_embed::RustEmbed;
 use serde_json::{Map, Value, json};
@@ -334,6 +346,7 @@ use crate::emit::emit;
 use crate::node_path::resolve_like_node;
 use crate::pack::areas::{add_pack_areas, seeded_areas_of};
 use crate::packs::{kit_packs, pack_sha256, parse_pack};
+use crate::rules::git;
 use crate::tracker::{self, Adapter, TrackerConfig, TrackerInstall};
 use crate::workflow;
 
@@ -416,7 +429,8 @@ pub(crate) fn write_into(target: &Path, file: &str, content: &[u8]) -> Result<()
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
     }
-    fs::write(&path, content).map_err(|error| format!("{}: {error}", path.display()))?;
+    crate::written::write(&path, content)
+        .map_err(|error| format!("{}: {error}", path.display()))?;
     if is_executable_file(file) {
         mark_executable(&path)?;
     }
@@ -556,9 +570,8 @@ pub(crate) fn host_of_url(url: &str) -> String {
 /// (`git config --get remote.origin.url`, read locally with no network
 /// call), or `None` when there is none or `git` fails.
 pub(crate) fn origin_url(target: &Path) -> Option<String> {
-    let output = Command::new("git")
+    let output = git::command(target)
         .args(["config", "--get", "remote.origin.url"])
-        .current_dir(target)
         .output()
         .ok()
         .filter(|output| output.status.success())?;
@@ -651,7 +664,7 @@ fn merge_session_start(
         *hooks = json!({});
     }
     if hooks.is_array() {
-        fs::write(path, emit(&Value::Object(settings)))
+        crate::written::write(path, emit(&Value::Object(settings)))
             .map_err(|error| format!("{}: {error}", path.display()))?;
         return Ok(true);
     }
@@ -678,7 +691,7 @@ fn merge_session_start(
         changed = true;
     }
     if changed {
-        fs::write(path, emit(&Value::Object(settings)))
+        crate::written::write(path, emit(&Value::Object(settings)))
             .map_err(|error| format!("{}: {error}", path.display()))?;
     }
     Ok(changed)
@@ -1174,6 +1187,7 @@ fn seed(
         ));
     }
 
+    let writes = next_line::Writes::open();
     seed_kit_owned(target, &effective_prefix, claude, &owned, &mut baselines)?;
     let areas_seeded = seed_once_files(
         target,
@@ -1217,7 +1231,12 @@ fn seed(
     if !Workflow::is_held_by(&placement, &marker) {
         print_no_ci_file_line(target);
     }
-    println!("next: houserules check-knowledge && houserules check-backlog");
+    if workflow_request.is_some()
+        && let Some(line) = crate::rules::two_workflows_line(target)
+    {
+        eprintln!("{line}");
+    }
+    println!("{}", writes.line(target));
     Ok(())
 }
 
@@ -1644,6 +1663,7 @@ fn update(target: &Path, given: &Path, id_prefix: Option<String>) -> Result<(), 
     let previously_seeded = marker.is_1_x() || target.join(SCHEMA_FILE).exists();
     let effective_prefix = marker.id_prefix_or(&prefix);
     let ci_pin_lines = ci_files::pin_lines(target, &placement.top_level, &kit_version())?;
+    let writes = next_line::Writes::open();
 
     let mut hand_steps = Vec::new();
     if previously_seeded {
@@ -1735,7 +1755,7 @@ fn update(target: &Path, given: &Path, id_prefix: Option<String>) -> Result<(), 
     crate::rules::render_and_report(target)?;
     println!("kit {stamped_version} -> {running_version}");
     println!("houserules: updated {}", target.display());
-    println!("next: houserules check-knowledge && houserules check-backlog");
+    println!("{}", writes.line(target));
     Ok(())
 }
 
@@ -1860,6 +1880,45 @@ mod tests {
         assert!(!kit_version().is_empty());
     }
 
+    /// Each writer of the install adds a file to the record of the writes (`written`) when it
+    /// changes the bytes of the file, once for each write, and none when the file already holds
+    /// them.
+    #[test]
+    fn a_writer_records_a_file_only_when_it_changes_its_bytes() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let (text, json_file, nested) = (
+            dir.path().join("a.txt"),
+            dir.path().join("b.json"),
+            dir.path().join("sub").join("c.txt"),
+        );
+        let recording = crate::written::Recording::open();
+
+        assert!(write_if_changed(dir.path(), "a.txt", b"one\n").expect("write the file"));
+        assert!(!write_if_changed(dir.path(), "a.txt", b"one\n").expect("keep the file"));
+        write_json(&json_file, &json!({"key": 1})).expect("write the file");
+        write_json(&json_file, &json!({"key": 1})).expect("keep the file");
+        write_into(dir.path(), "sub/c.txt", b"two\n").expect("write the file");
+
+        assert_eq!(recording.finish(), [text, json_file, nested]);
+    }
+
+    /// The merge of the hook entries adds the settings file to the record when it adds an entry,
+    /// and keeps it out when the entry is there.
+    #[test]
+    fn a_merge_of_the_hook_entries_records_the_settings_file_when_it_adds_an_entry() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let settings = dir.path().join("settings.json");
+        fs::write(&settings, "{}\n").expect("write the settings");
+        let entry = json!({"matcher": "startup"});
+        let present = |existing: &[Value], entry: &Value| existing.contains(entry);
+        let recording = crate::written::Recording::open();
+
+        assert!(merge_session_start(&settings, vec![entry.clone()], present).expect("merge"));
+        assert!(!merge_session_start(&settings, vec![entry], present).expect("merge"));
+
+        assert_eq!(recording.finish(), [settings]);
+    }
+
     /// Injects its own list directly at the `delete_retired` call site
     /// rather than depending on `RETIRED`'s own contents (this module's
     /// own "Deletion" doc section explains the mechanism), which the next
@@ -1929,9 +1988,8 @@ mod tests {
     /// no-remote-configured case.
     fn git_repo_with_no_origin() -> tempfile::TempDir {
         let dir = tempfile::tempdir().expect("tempdir");
-        let status = std::process::Command::new("git")
+        let status = git::command(dir.path())
             .args(["init", "-q"])
-            .current_dir(dir.path())
             .status()
             .expect("run git init");
         assert!(status.success(), "git init failed");
@@ -1941,9 +1999,8 @@ mod tests {
     /// `git_repo_with_no_origin` plus a configured `origin` remote at `url`.
     fn git_repo_with_origin(url: &str) -> tempfile::TempDir {
         let dir = git_repo_with_no_origin();
-        let status = std::process::Command::new("git")
+        let status = git::command(dir.path())
             .args(["remote", "add", "origin", url])
-            .current_dir(dir.path())
             .status()
             .expect("run git remote add");
         assert!(status.success(), "git remote add failed");

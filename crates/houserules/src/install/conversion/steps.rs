@@ -29,8 +29,6 @@
 //!
 //! A path in `ownedPaths` is left as found by every step, with no line.
 
-use std::fs;
-
 use serde_json::{Value, json};
 
 use crate::baseline;
@@ -186,7 +184,7 @@ fn remove_the_seeded_startup_hook(ctx: &Context<'_>, marker: &Marker) -> Result<
     if entries.len() == before {
         return Ok(());
     }
-    fs::write(&path, emit(&Value::Object(settings)))
+    crate::written::write(&path, emit(&Value::Object(settings)))
         .map_err(|error| format!("{}: {error}", path.display()))?;
     println!(
         "edited {SETTINGS_PATH}: removed the seeded startup hook entry; the kit seeds the compaction entry alone"

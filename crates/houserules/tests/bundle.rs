@@ -743,8 +743,8 @@ fn an_intent_that_does_not_resolve_fails_with_the_line_of_its_adapter() {
     let request = Request::new(Some(budgets()), true);
     let cases = [
         (
-            "openspec:add-rate-limit",
-            "bundle check: intent `openspec:add-rate-limit`: \"openspec\" is no intent source; use one of: work-item, file\n".to_string(),
+            "spec-kit:add-rate-limit",
+            "bundle check: intent `spec-kit:add-rate-limit`: \"spec-kit\" is no intent source; use one of: work-item, file, openspec\n".to_string(),
         ),
         (
             "file:docs/plans/missing.md",
@@ -773,6 +773,82 @@ fn an_intent_that_does_not_resolve_fails_with_the_line_of_its_adapter() {
     }
 }
 
+/// Spec 3.5: the lines of the `openspec` adapter print after
+/// `intent openspec:<id>: `; a change that the head holds resolves, and its why
+/// stands for the purpose.
+#[test]
+fn an_openspec_intent_prints_the_lines_of_its_adapter_and_passes_when_it_resolves() {
+    let plain = Request::new(Some(budgets()), true);
+    let request_with_files = |files: &[(&str, &str)]| {
+        let install = Install::new("", Some(budgets()), true);
+        let base = install.head();
+        for (path, text) in files {
+            install.write(path, text);
+        }
+        install.append("src/lib.rs", 5);
+        let head = install.commit("feat: add five lines and OpenSpec files");
+        let run = header_line(&install.capture("run.txt", &["sh", "-c", "echo ok"]));
+        Request {
+            install,
+            base,
+            head,
+            run,
+        }
+    };
+    let with_a_change = request_with_files(&[(
+        "openspec/changes/add-x/proposal.md",
+        "# Add X\n\n## Why\nBecause.\n",
+    )]);
+    let with_a_store = request_with_files(&[("openspec/config.yaml", "store: team\n")]);
+    let cases = [
+        (&plain, "add-x", "no openspec/ folder at the head"),
+        (
+            &with_a_store,
+            "add-x",
+            "the OpenSpec root points at a store, which houserules does not read",
+        ),
+        (
+            &with_a_change,
+            "Not_Kebab",
+            "an OpenSpec change id is kebab-case: lowercase letters, digits, and single hyphens",
+        ),
+        (
+            &with_a_change,
+            "missing",
+            "no OpenSpec change with that id at the head, active or archived",
+        ),
+        (
+            &with_a_change,
+            "archive",
+            "no OpenSpec change with that id at the head, active or archived",
+        ),
+    ];
+    for (request, id, line) in cases {
+        let named = format!("openspec:{id}");
+        let mut parts = standard();
+        parts.insert(1, ("Intent", &named));
+
+        let output = request.check(&request.with_parts(&parts), &[]);
+
+        assert_output(
+            &output,
+            1,
+            &format!("bundle check: intent `{named}`: {line}\n"),
+            "",
+        );
+    }
+
+    let mut parts = without(&standard(), "Purpose");
+    parts.insert(0, ("Intent", "openspec:add-x"));
+    let output = with_a_change.check(&with_a_change.with_parts(&parts), &[]);
+    assert_eq!(output.status.code(), Some(0), "{}", stdout(&output));
+    assert!(
+        stdout(&output).starts_with("bundle check: ok (1 runs at "),
+        "{}",
+        stdout(&output)
+    );
+}
+
 /// The request template's placeholder `Intent: <source>:<ref>` fails the check
 /// until its author fills it in (spec 7.4).
 #[test]
@@ -786,7 +862,7 @@ fn the_placeholder_intent_of_the_template_fails() {
     assert_output(
         &output,
         1,
-        "bundle check: intent `<source>:<ref>`: \"<source>\" is no intent source; use one of: work-item, file\n",
+        "bundle check: intent `<source>:<ref>`: \"<source>\" is no intent source; use one of: work-item, file, openspec\n",
         "",
     );
 }
@@ -2250,8 +2326,8 @@ fn an_intent_that_does_not_resolve_exits_2() {
             format!("bundle write: --intent work-item:HR-9999: {NO_SUCH_WORK_ITEM}\n"),
         ),
         (
-            "openspec:x",
-            "bundle write: --intent openspec:x: \"openspec\" is no intent source; use one of: work-item, file\n".to_string(),
+            "spec-kit:x",
+            "bundle write: --intent spec-kit:x: \"spec-kit\" is no intent source; use one of: work-item, file, openspec\n".to_string(),
         ),
         (
             "plan",
@@ -2644,7 +2720,7 @@ const CHECK_ABOUT: [&str; 8] = [
 /// The help text of each argument of `bundle write`.
 const WRITE_ARGUMENTS: [&str; 9] = [
     "One or two sentences on why the change exists. Needed unless `--intent` names an intent whose adapter gives a why",
-    "The intent to name, written `<source>:<ref>`. The source is `work-item` or `file`. The command reads it in the install of the current directory, at `HEAD`",
+    "The intent to name, written `<source>:<ref>`. The source is `work-item`, `file`, or `openspec`. The command reads it in the install of the current directory, at `HEAD`",
     "A work-item id; repeat the flag or give several values",
     "The risk tier of the change",
     "The criterion that selected the tier",

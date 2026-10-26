@@ -14,6 +14,7 @@
 
 mod help_support;
 mod install_shape;
+mod note_support;
 mod schema_support;
 mod stats_support;
 mod tracker_support;
@@ -33,7 +34,7 @@ use tracker_support::{
 };
 
 /// The schema file of the change record, relative to the repository root.
-const RECORD_SCHEMA: &str = "schemas/change-record/1.0.0.json";
+const RECORD_SCHEMA: &str = "schemas/change-record/1.1.0.json";
 
 /// The notes ref of a top-level install (spec 8.1).
 const TOP_REF: &str = "refs/notes/houserules";
@@ -366,6 +367,45 @@ fn minimal_form(record: &mut Value) {
     let route = record["route"]["route"].clone();
     record["route"] = json!({"route": route, "floor": false});
     record["truncated"] = json!(["all"]);
+}
+
+// ---- a record of schema 1.0.0 -------------------------------------------------------------
+
+/// A note of schema 1.0.0, as the binary of batch 37 wrote it, lists and audits
+/// like a record of 1.1.0: `record list` reads it, and `record audit` sets its
+/// post-merge audit, changes no other byte, and adds no `sessions` key.
+#[test]
+fn a_record_of_schema_1_0_0_lists_and_audits() {
+    let install = Install::new("", &[docs_read()], None);
+    let base = install.head();
+    let head = install.edit("docs/guide.md", BASE_TIME + 100);
+    install.write_record(&base, &head, &[]);
+    let hash = install.note(&head)["rules"]["head_hash"]
+        .as_str()
+        .expect("a hash")
+        .to_string();
+    install.set_note(&head, &note_support::note_1_0_0(&base, &head, &hash));
+    let before = install.note_text(&head);
+    assert!(!before.contains("sessions"), "{before}");
+
+    let listed = install.run(&["record", "list"]);
+    let audited = install.run(&["record", "audit", &head, "--verdict", "pass", "--by", "amy"]);
+
+    assert_output(
+        &listed,
+        0,
+        &list_lines(&[(&head, "owner-review", 0, "-", "unaudited")]),
+        "",
+    );
+    assert_output(&audited, 0, "", "");
+    let audit = json!({"verdict": "pass", "by": "amy", "note": null});
+    let expected = before.replacen(
+        "\"post_merge_audit\":null",
+        &format!("\"post_merge_audit\":{audit}"),
+        1,
+    );
+    assert_ne!(expected, before);
+    assert_eq!(install.note_text(&head), expected);
 }
 
 // ---- record list -------------------------------------------------------------------------

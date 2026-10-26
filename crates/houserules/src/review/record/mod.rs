@@ -39,8 +39,10 @@ use super::ci;
 use super::evidence;
 use super::git;
 use super::intent::{self, IntentRef};
+use super::links;
 use super::route;
 use super::rules_hash;
+use super::validation;
 use crate::emit::emit;
 use crate::install::marker::Marker;
 use crate::install::marker::review::{Adapter, no_intent_source};
@@ -84,7 +86,15 @@ pub(crate) enum RecordAction {
     /// of the request), and the reviewers. The audit rows come from `--audit`,
     /// else from an audit that the command runs in process. `--intent
     /// <source>:<ref>` names an intent, else the `Intent:` line of the bundle
-    /// does. `--reviewer` names one approver; repeat the flag.
+    /// does. An `Intent: <source>:<ref>` trailer of a commit of the range adds
+    /// one too, and a trailer with a key of `review.sessions.trailers` (default
+    /// `Entire-Checkpoint`) is a session of `links.sessions`; a trailer never
+    /// makes the command fail. `--validation <file>` names a capture of
+    /// `openspec validate --json` that `houserules capture` wrote at `--head` in
+    /// a clean work tree, and each `openspec` intent takes its validation from
+    /// it. A capture that cannot be used prints one line on stderr and leaves
+    /// every validation `null`; the record is written, and the exit stays as
+    /// without the flag. `--reviewer` names one approver; repeat the flag.
     /// `--reviewers-pending` writes no reviewers and leaves room for them. A
     /// later job may set them, or the approvers could not be read and stay
     /// unknown. `--score` adds an external score to the route. `--host` records
@@ -105,7 +115,7 @@ pub(crate) enum RecordAction {
     /// else the record whose range holds the commit. It prints a Markdown
     /// summary: the packet of the change, the route, the sample, the reviewers,
     /// and the post-merge audit. `--json` prints the record document
-    /// `houserules/change-record@1.0.0` in place of it. It reads the notes ref of
+    /// `houserules/change-record@1.1.0` in place of it. It reads the notes ref of
     /// the install, and recomputes the rule hashes at the merge base and at the
     /// head from git. It exits 1 for a clone with no notes ref, for a commit with
     /// no record, and for a record whose rule hash differs from git's. It exits 2
@@ -176,10 +186,16 @@ pub(crate) struct WriteArgs {
     #[arg(long, value_name = "FILE")]
     bundle: Option<PathBuf>,
     /// The intent to add, written `<source>:<ref>` as the `Intent:` line of an
-    /// evidence bundle writes it. The source is `work-item` or `file`. Without
-    /// this flag, the `Intent:` line of the bundle names it.
+    /// evidence bundle writes it. The source is `work-item`, `file`, or
+    /// `openspec`. Without this flag, the `Intent:` line of the bundle names it.
     #[arg(long, value_name = "SOURCE:REF")]
     intent: Option<String>,
+    /// The capture file of an `openspec validate --json` run, written by `houserules capture`
+    /// at `--head` in a clean work tree. Each `openspec` intent takes the validation of its
+    /// change from it. A capture that cannot be used prints one line on stderr and leaves
+    /// every validation `null`.
+    #[arg(long, value_name = "FILE")]
+    validation: Option<PathBuf>,
     /// The login of an approver; repeat the flag. The record keeps the names
     /// sorted and without repeats, the first 20 of them, each cut to 100
     /// characters, no more names than fit 3,072 bytes of the serialized array,
@@ -239,6 +255,14 @@ impl Failure {
     fn refused(lines: Vec<String>) -> Self {
         Self { code: 1, lines }
     }
+
+    /// The failure with `line`, when there is one, before its own lines.
+    fn after(self, line: Option<String>) -> Self {
+        Self {
+            code: self.code,
+            lines: line.into_iter().chain(self.lines).collect(),
+        }
+    }
 }
 
 impl From<String> for Failure {
@@ -291,8 +315,9 @@ pub(crate) fn cmd_record(args: RecordArgs) -> ExitCode {
 struct Done {
     /// The text for stdout.
     stdout: String,
-    /// The lines for stderr: the line of an audit that could not run, and the
-    /// failure lines of the reference summary.
+    /// The lines for stderr: the line of a validation capture that was refused,
+    /// the line of an audit that could not run, and the failure lines of the
+    /// reference summary.
     stderr: Vec<String>,
 }
 
@@ -390,8 +415,28 @@ fn host_of(host: ci::Host) -> Host {
 }
 
 /// Runs `record write`: computes the record, fits it, and stores it or writes
-/// its bytes to `--out`.
+/// its bytes to `--out`. The line of a refused `--validation` capture comes
+/// before every other line on stderr, whether the command succeeds or fails.
 fn run_write(root: &Path, args: &WriteArgs) -> Result<Done, Failure> {
+    let mut refused_capture = None;
+    match write_record(root, args, &mut refused_capture) {
+        Ok(Done { stdout, stderr }) => Ok(Done {
+            stdout,
+            stderr: refused_capture.into_iter().chain(stderr).collect(),
+        }),
+        Err(failure) => Err(failure.after(refused_capture)),
+    }
+}
+
+/// Computes the record of `args`, fits it, and stores it or writes its bytes to
+/// `--out`. `refused_capture` receives the line of a `--validation` capture
+/// that cannot be used, as soon as the command has read the capture, so that
+/// the caller has it when a later step fails.
+fn write_record(
+    root: &Path,
+    args: &WriteArgs,
+    refused_capture: &mut Option<String>,
+) -> Result<Done, Failure> {
     let score = args
         .score
         .map(score_in_range)
@@ -439,7 +484,19 @@ fn run_write(root: &Path, args: &WriteArgs) -> Result<Done, Failure> {
             .and_then(|bundle| bundle.intent.as_deref())
             .and_then(|line| IntentRef::parse(line).ok())
     });
-    let intents = intent::resolve(root, &analysis, &config.intent, named.as_ref())?;
+    let linked = links::read(
+        root,
+        &analysis.base,
+        &analysis.head,
+        &config.sessions.trailers,
+    )?;
+    let mut intents = intent::resolve(root, &analysis, &config.intent, &linked.names(named))?;
+    *refused_capture = validation::fill(
+        "record",
+        args.validation.as_deref(),
+        &analysis.head,
+        &mut intents,
+    );
     let sample = if decision.route == Route::AutoMergeEligible {
         let rate = config
             .route
@@ -452,7 +509,18 @@ fn run_write(root: &Path, args: &WriteArgs) -> Result<Done, Failure> {
     } else {
         None
     };
-    let evidence = evidence::build(&analysis, &coverage, &audit, None, intents, packs, decision);
+    let evidence = evidence::build(
+        &analysis,
+        &coverage,
+        &audit,
+        None,
+        evidence::Provenance {
+            intents,
+            sessions: linked.sessions,
+        },
+        packs,
+        decision,
+    );
     let facts = document::Facts {
         analysis: &analysis,
         evidence: &evidence,

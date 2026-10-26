@@ -40,6 +40,9 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The spec of the batch, below the repository root.
 const SPEC: &str = "docs/specs/2026-10-24-batch-37-per-change-review-layer.md";
 
+/// The spec of batch 38, below the repository root.
+const SPEC_38: &str = "docs/specs/2026-10-25-batch-38-openspec-and-release.md";
+
 /// The GitHub unit, below the repository root.
 const GITHUB_UNIT: &str = ".github/workflows/houserules-review.yml";
 
@@ -92,6 +95,9 @@ const NO_ORIGIN: &str = "ci: no origin remote; pass --host github or --host gitl
 
 /// The refusal of two installs that share a key (spec 10.1).
 const SHARED_KEY: &str = "ci: <path> and <path> share the key <key>; rename one install folder";
+
+/// The refusal of an empty `defaultBranch` (spec 14 and case 13 of batch 38).
+const EMPTY_DEFAULT_BRANCH: &str = "ci: .houserules.json: defaultBranch must be a non-empty string";
 
 /// `template` with its placeholder `name` replaced by `value`.
 fn with(template: &str, name: &str, value: &str) -> String {
@@ -164,6 +170,18 @@ fn the_spec_lines_of_these_tests_are_in_the_spec() {
             "the spec does not hold this line as the test does: {line}"
         );
     }
+}
+
+/// The line of this file that the spec of batch 38 gives as a literal is in the spec
+/// (`quality.user-facing-text-is-contract`).
+#[test]
+fn the_batch_38_spec_lines_of_these_tests_are_in_the_spec() {
+    let spec = text_of(SPEC_38);
+
+    assert!(
+        spec.contains(&format!("`{EMPTY_DEFAULT_BRANCH}`")),
+        "{EMPTY_DEFAULT_BRANCH}"
+    );
 }
 
 // ---- fixtures ----
@@ -429,6 +447,7 @@ fn bind_json(value: &mut Value, dir: &str, key: &str, tracker: &str) {
                 "${{ inputs.version }}" => Value::from(VERSION),
                 "${{ inputs.install }}" | "${{ inputs.floor-install }}" => Value::from("release"),
                 "${{ inputs.setup }}" => Value::from(""),
+                "${{ inputs.validation }}" => Value::from(""),
                 "${{ inputs.tracker == 'beads' }}" => Value::Bool(tracker == "beads"),
                 TOKEN_EXPRESSION if tracker == "github" => Value::from("${{ github.token }}"),
                 TOKEN_EXPRESSION => Value::from(""),
@@ -517,6 +536,7 @@ fn expected_gitlab_inline(unit: &Unit, dir: &str, key: &str, tracker: &str) -> S
         ("floor-install", "release".to_string()),
         ("tracker", tracker.to_string()),
         ("setup", String::new()),
+        ("validation", String::new()),
         ("token-environment", format!("houserules-{key}")),
     ] {
         text = text.replace(&format!("$[[ inputs.{input} ]]"), &json(&value));
@@ -787,6 +807,33 @@ fn print_inline_gitlab_binds_every_input_and_keeps_the_unit_otherwise() {
             unit.job_keys().first().map(String::as_str),
             Some(format!("houserules-{key}-gates").as_str())
         );
+    }
+}
+
+/// Batch 38, spec 4.3: both inline forms bind the `validation` input to its empty default in the
+/// gates job and the record job, the two jobs that read it, so that a form passes no capture to
+/// `evidence` and `record write`, and the forms hold no other job that reads it.
+#[test]
+fn the_inline_forms_bind_the_validation_input_to_its_empty_default() {
+    let repo = Repo::bare();
+    let github = parse_unit(
+        &stdout(&repo.ci(&["print", "--host", "github", "--mode", "inline"])),
+        Host::GitHub,
+    );
+    let gitlab = parse_inline_unit(
+        &stdout(&repo.ci(&["print", "--host", "gitlab", "--mode", "inline"])),
+        Host::gitlab("root"),
+    );
+
+    for unit in [&github, &gitlab] {
+        for role in ci_support::ROLES {
+            let expected = matches!(role, "gates" | "record").then(String::new);
+            assert_eq!(
+                unit.variable(role, "HOUSERULES_VALIDATION"),
+                expected,
+                "{role}"
+            );
+        }
     }
 }
 
@@ -1065,6 +1112,41 @@ fn a_github_form_triggers_on_the_default_branch_that_the_repository_names() {
             "{label}"
         );
     }
+}
+
+/// HR-251: an empty `defaultBranch` names no branch, so the marker refuses it, and every form of
+/// `ci print` and `ci write` stops with the line of the marker behind the prefix of the command
+/// (exit 2) in place of a trigger `branches: [""]` that never fires. The remedy is a name or no key.
+#[test]
+fn an_empty_default_branch_is_refused_by_every_form() {
+    let repo = Repo::new("", None, json!({"defaultBranch": ""}));
+    let line = format!("{EMPTY_DEFAULT_BRANCH}\n");
+    for args in [
+        vec!["print", "--host", "github"],
+        vec!["print", "--host", "github", "--mode", "inline"],
+        vec!["print", "--host", "gitlab"],
+        vec![
+            "write",
+            "--host",
+            "github",
+            "--sha",
+            SHA,
+            "--out",
+            "wired/0.yml",
+        ],
+        vec![
+            "write",
+            "--host",
+            "github",
+            "--mode",
+            "inline",
+            "--out",
+            "wired/1.yml",
+        ],
+    ] {
+        assert_output(&repo.ci(&args), 2, "", &line);
+    }
+    assert!(!repo.at("wired").exists(), "no form wrote a file");
 }
 
 /// Spec 10.3: where the marker names no `defaultBranch` and none of the places holds a branch, each

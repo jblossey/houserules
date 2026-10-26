@@ -24,6 +24,7 @@ use super::check_packs::{
 };
 use super::glob::compile;
 use super::ignored::{IgnoreFault, ignored_among};
+use super::intent_checks::{is_spec_adapter, no_spec_adapter_line};
 use super::kit_citations::{KitScope, kit_citation_findings};
 use super::markers::{base_marker_findings, marker_findings};
 use super::model::{Base, load_base};
@@ -43,14 +44,22 @@ fn check_fields(check_type: &str) -> Option<&'static [&'static str]> {
         "report-field" => Some(&["if", "field"]),
         "durable-sha" => Some(&["files"]),
         "runner" => Some(&["tool"]),
+        "intent-required" => Some(&["if"]),
+        "intent-resolves" => Some(&[]),
         _ => None,
     }
 }
 
 /// The check types that read no file of the tree: a `commits` check reads
-/// commit messages and a `report-field` check reads a report. Neither can
-/// declare `covers`.
-const READS_NO_FILE: [&str; 2] = ["commits", "report-field"];
+/// commit messages, a `report-field` check reads a report, and the two intent
+/// checks read the trailers and the paths of the range. None can declare
+/// `covers`.
+const READS_NO_FILE: [&str; 4] = [
+    "commits",
+    "report-field",
+    "intent-required",
+    "intent-resolves",
+];
 
 /// JavaScript-style truthiness for a JSON value read through
 /// `serde_json`: absent, `null`, `false`, `0`, and `""` are falsy; every
@@ -182,9 +191,9 @@ fn regex_validity_message(pattern: &str, flags: &str) -> Option<String> {
 /// Reports, for one entry's `check` object, every field its `type` requires
 /// (`check_fields`), the `commits` type's own "needs one of four" rule
 /// (`subject`, `body_absent`, `body_line_max`, or `require_trailer`), and a
-/// `covers` key on a `commits` or `report-field` check, which reads no file
-/// (spec 4.4). An unknown `type` gives none: the schema reports it. `at`
-/// prefixes every message. `check_shape` runs this first.
+/// `covers` key on a check that reads no file ([`READS_NO_FILE`], spec 4.4).
+/// An unknown `type` gives none: the schema reports it. `at` prefixes every
+/// message. `check_shape` runs this first.
 fn required_field_findings(check: &Value, at: &str, errors: &mut Vec<String>) {
     let check_type = check.get("type").and_then(Value::as_str).unwrap_or("");
     let Some(fields) = check_fields(check_type) else {
@@ -213,7 +222,8 @@ fn required_field_findings(check: &Value, at: &str, errors: &mut Vec<String>) {
 }
 
 /// Validates one entry's `check` object's shape: every field its `type`
-/// requires (`required_field_findings`), and that `pattern`, `subject`,
+/// requires (`required_field_findings`), that each of `sources` is a spec
+/// adapter (`intent_checks`), and that `pattern`, `subject`,
 /// `body_absent`, and each string of `exempt_subjects` (whichever are
 /// present) compile as regular expressions, the patterns the commit
 /// evaluator compiles. `at` prefixes every message the same way the
@@ -227,6 +237,16 @@ pub(super) fn check_shape(check: &Value, at: &str, errors: &mut Vec<String>) {
         return; // the schema already reported an unknown type
     }
     required_field_findings(check, at, errors);
+    for source in check
+        .get("sources")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter(|source| !is_spec_adapter(source))
+    {
+        errors.push(format!("{at}: {}", no_spec_adapter_line(source)));
+    }
     // Only an absent key or an explicit `null` defaults `flags` to empty;
     // any other value -- including one the schema never sanctions, like a
     // number -- is coerced through `to_js_string` and used as-is.
@@ -361,15 +381,13 @@ const RECOGNIZED_KEYWORDS: [&str; 16] = [
 /// is reported, not swallowed.
 ///
 /// Before any of that: every key `schema` itself carries (when it is an
-/// object) is checked against `RECOGNIZED_KEYWORDS`. A schema naming a
+/// object) is checked against `RECOGNIZED_KEYWORDS`. A schema node naming a
 /// keyword this engine does not implement -- `oneOf`, `anyOf`, `allOf`,
-/// `const`, `maximum`, `format`, and so on -- used to fall through every
-/// branch below silently, leaving the field it decorated completely
-/// unchecked (HR-109: a scratch schema whose `taskNumber` carried `oneOf`
-/// stopped raising ANY finding for that field at all). Now it is its own
-/// named finding, `{at}: unsupported schema keyword "{key}"`, run first
-/// so it fires even on a schema node `$ref` would otherwise short-
-/// circuit past.
+/// `const`, `maximum`, `format`, and so on -- would leave the field it
+/// decorates unchecked (HR-109: no branch below reads the keyword), so the
+/// keyword itself is the finding, `{at}: unsupported schema keyword
+/// "{key}"`. The check runs first, so it fires even on a schema node that
+/// `$ref` would otherwise short-circuit past.
 pub(crate) fn validate(
     value: &Value,
     schema: &Value,
@@ -938,7 +956,10 @@ pub(crate) fn check_base(base: &Base) -> Vec<String> {
 /// -- distinct from a clean load whose check findings print as stderr
 /// lines and exit 1. Every override and exclusion of `overrides.json` prints
 /// to stdout first, one line each, whether the gate passes or fails
-/// (`check_packs::override_listing`): the list never fails the gate.
+/// (`check_packs::override_listing`): the list never fails the gate. The one
+/// warning of an install that runs the reference workflow beside an OpenSpec
+/// root (`render::two_workflows_line`) goes to stderr last, after a load
+/// failure and a finding alike, and changes no exit code.
 pub(crate) fn cmd_check_knowledge(
     root: Option<PathBuf>,
     kit_scope: fn(&Path) -> Result<KitScope, String>,
@@ -947,7 +968,17 @@ pub(crate) fn cmd_check_knowledge(
         Ok(root) => root,
         Err(code) => return code,
     };
-    let base = match load_base(&root) {
+    let code = check_knowledge_at(&root, kit_scope);
+    if let Some(line) = render::two_workflows_line(&root) {
+        eprintln!("{line}");
+    }
+    code
+}
+
+/// The gate of `cmd_check_knowledge` at the resolved install root `root`: what it prints and the
+/// exit code, with no warning of two planning workflows.
+fn check_knowledge_at(root: &Path, kit_scope: fn(&Path) -> Result<KitScope, String>) -> ExitCode {
+    let base = match load_base(root) {
         Ok(base) => base,
         Err(error) => {
             eprintln!("{error}");
@@ -958,29 +989,29 @@ pub(crate) fn cmd_check_knowledge(
         println!("{line}");
     }
     let mut errors = check_base(&base);
-    match kit_scope(&root) {
+    match kit_scope(root) {
         Ok(scope) => errors.extend(kit_citation_findings(&base, &scope)),
         Err(message) => errors.push(format!("{message}; kit-owned citations not checked")),
     }
-    if !errors.is_empty() {
-        for error in &errors {
-            eprintln!("{error}");
-        }
-        return ExitCode::from(1);
+    if errors.is_empty() {
+        println!("knowledge: ok");
+        return ExitCode::SUCCESS;
     }
-    println!("knowledge: ok");
-    ExitCode::SUCCESS
+    for error in &errors {
+        eprintln!("{error}");
+    }
+    ExitCode::from(1)
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs;
     use std::path::Path;
-    use std::process::Command;
 
     use serde_json::json;
 
     use super::*;
+    use crate::rules::git::command as git_command;
     use crate::rules::render::SKILL_PATH;
     use crate::rules::test_support::{pin_every_copy, write_pack_copy};
 
@@ -990,11 +1021,7 @@ mod tests {
     /// `report_claims.rs`'s own `fn git`; `gen-goldens.rs`'s module doc
     /// explains why each keeps its own rather than sharing one).
     fn git(root: &Path, args: &[&str]) -> String {
-        let output = Command::new("git")
-            .args(args)
-            .current_dir(root)
-            .output()
-            .expect("run git");
+        let output = git_command(root).args(args).output().expect("run git");
         assert!(
             output.status.success(),
             "git {args:?} failed: {}",
@@ -1031,9 +1058,8 @@ mod tests {
     /// turned error.
     #[cfg(unix)]
     fn seed_undecodable_tracked_path(root: &Path, raw_path: &std::ffi::OsStr, content: &str) {
-        let hash_output = Command::new("git")
+        let hash_output = git_command(root)
             .args(["hash-object", "-w", "--stdin"])
-            .current_dir(root)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .spawn()
@@ -1057,10 +1083,9 @@ mod tests {
             .trim()
             .to_string();
 
-        let status = Command::new("git")
+        let status = git_command(root)
             .args(["update-index", "--add", "--cacheinfo", "100644", &blob])
             .arg(raw_path)
-            .current_dir(root)
             .status()
             .expect("run git update-index --cacheinfo");
         assert!(status.success(), "git update-index --cacheinfo failed");
@@ -1664,11 +1689,56 @@ mod tests {
             "knowledge/a.json a.report",
             &mut errors,
         );
+        check_shape(
+            &json!({"type": "intent-required", "level": "warn", "if": "src/**", "covers": true}),
+            "knowledge/a.json a.required",
+            &mut errors,
+        );
+        check_shape(
+            &json!({"type": "intent-resolves", "level": "warn", "covers": false}),
+            "knowledge/a.json a.resolves",
+            &mut errors,
+        );
         assert_eq!(
             errors,
             [
                 "knowledge/a.json a.trailer: check \"commits\" cannot declare \"covers\": it reads no file",
                 "knowledge/a.json a.report: check \"report-field\" cannot declare \"covers\": it reads no file",
+                "knowledge/a.json a.required: check \"intent-required\" cannot declare \"covers\": it reads no file",
+                "knowledge/a.json a.resolves: check \"intent-resolves\" cannot declare \"covers\": it reads no file",
+            ]
+        );
+    }
+
+    /// An `intent-required` check needs its `if`; an `intent-resolves` check
+    /// needs no field. Each source that is no spec adapter is one line.
+    #[test]
+    fn the_intent_checks_need_if_and_name_each_source_that_is_no_spec_adapter() {
+        let mut errors = Vec::new();
+        check_shape(
+            &json!({"type": "intent-required", "level": "fail"}),
+            "knowledge/a.json a.required",
+            &mut errors,
+        );
+        check_shape(
+            &json!({"type": "intent-resolves", "level": "fail"}),
+            "knowledge/a.json a.resolves",
+            &mut errors,
+        );
+        check_shape(
+            &json!({
+                "type": "intent-required", "level": "fail", "if": "src/**",
+                "sources": ["file", "work-item", "nope"],
+            }),
+            "knowledge/a.json a.sources",
+            &mut errors,
+        );
+        assert_eq!(
+            errors,
+            [
+                "knowledge/a.json a.required: check \"intent-required\" needs \"if\"",
+                "knowledge/a.json a.sources: check sources \"work-item\" is no spec adapter; use file or openspec",
+                "knowledge/a.json a.sources: check sources \"nope\" is no spec adapter; use file or openspec",
             ]
         );
     }
@@ -3107,11 +3177,10 @@ mod tests {
         );
     }
 
-    /// HR-109's own regression: a schema keyword this engine does not
-    /// implement (`oneOf`, here) used to fall through every branch
-    /// silently, leaving the field it decorated completely unchecked --
-    /// `true` is neither an integer nor a string, yet the old engine
-    /// raised nothing at all. Now the keyword itself is the finding.
+    /// HR-109's regression: a schema keyword this engine does not implement
+    /// (`oneOf`, here) leaves the field it decorates unchecked -- `true` is
+    /// neither an integer nor a string, and no other rule reports it -- so
+    /// the keyword itself is the finding.
     #[test]
     fn validate_reports_an_unimplemented_oneof_keyword_as_a_named_finding() {
         let schema = json!({"oneOf": [{"type": "integer"}, {"type": "string"}]});

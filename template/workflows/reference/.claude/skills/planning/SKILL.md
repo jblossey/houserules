@@ -13,7 +13,7 @@ Write the output of every `houserules` command to a file in the batch workspace,
 
 Pick the tier from the change's risk (`process.risk-tiers`, and the Tiers section of the `orchestrating` skill). Record the tier and the criterion that selected it in the plan.
 
-Mark each critical task: a task whose change alters the CLI's commands, flags, or output, a schema, authentication or security code, or the data on disk of an install. For a critical task, the plan turns the spec's cases for the task into tests that the implementer commits first, with one recorded run that shows them failing at `BASE`. The evidence is that run and the whole suite passing at `HEAD`.
+Mark each critical task: a task whose change alters the CLI's commands, flags, or output, a schema, authentication or security code, or the data on disk of an install. For a critical task, the plan turns the spec's cases for the task into tests that the implementer commits first, with one recorded run that shows them failing at `BASE`. The evidence is that run and the whole suite passing at `HEAD`. The whole-suite half is the integration run of the person who runs the work.
 
 ## 2. Fold in technical debt
 
@@ -36,7 +36,13 @@ A task that adds or tightens a check in `check-knowledge`, `check-backlog`, or `
 
 Mark tasks parallel only when their declared file sets are disjoint and no task needs another's output (`process.parallel-on-disjoint-files`). Name the files that you regenerate at integration.
 
+The plan may name a file that two tasks share, such as a command-line entry point whose changes merge by keeping both sides. Two tasks whose only shared file is that file may run at once. You resolve the conflict of the later cherry-pick by keeping both sides and run the gates. Any other resolution is a fix round for the later task.
+
+Order the tasks in waves when some tasks need others. A wave orders the tasks; it is no barrier. A task starts as soon as every task it needs is integrated. A task that consumes only an interface that no open finding changes starts from an interim base that holds the commits of the task it needs. You integrate the commits of the consuming task alone, after the task it needs closes.
+
 A gate command that the harness refuses to an agent is a controller-run integration gate: the plan lists it, and you run it after each integration and record it in the ledger.
+
+Besides the full suite, the plan marks each suite that only you run at integration, for example a slow suite or a suite for another platform. A task's own run skips every such suite.
 
 A task that changes the implementer template, the task-reviewer template, or an eval scenario needs the eval run of the Template evaluation section of the `orchestrating` skill. Say so in the plan.
 

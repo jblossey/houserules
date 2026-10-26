@@ -1,9 +1,9 @@
 //! The git plumbing of `audit`, `check-commit`, and the `durable-sha` check:
 //! the one place that runs `git` for a range and reads its output (`rev`,
 //! `full_commit_sha`, `git_diff`, `changed_files`, `tree_files`, `show_file`, `commits_in`,
-//! `changed_files_for`, `paths_changed_against_any_parent`, `removed_lines`,
-//! `worktree_changes`). Every function returns a named one-line `Err`, never a panic
-//! (`houserules.crash-paths-are-named`).
+//! `changed_files_for` (with `RootCommit`), `paths_changed_against_any_parent`,
+//! `removed_lines`, `worktree_changes`). Every function returns a named one-line `Err`, never a
+//! panic (`houserules.crash-paths-are-named`).
 //!
 //! The review modules build their calls on the same runner (`command`,
 //! `run_command`, `run_command_with_input`, and `run_predicate`) and the same
@@ -365,9 +365,14 @@ impl Commit {
 /// are every commit of `head`. With `read_trailers`, each commit also
 /// carries its trailers (`trailers::parse` of its message, one `git` process
 /// for each commit); without it they stay empty, so a reader that never
-/// looks at a trailer pays for none. `pub(super)`: `check_commit`'s own range
-/// arm reads a git range through this same function, not a second `git log`
-/// invocation of its own.
+/// looks at a trailer pays for none. The log is read as NUL-separated records
+/// (`-z`) of five fields, each ended by a line feed but the last, the body: a
+/// sha, an author name, and a subject hold no line feed, and no commit
+/// message holds a NUL, so no byte of a message or of an author name cuts a
+/// record or a field. The call asks for `--encoding=UTF-8`, so the text of a
+/// commit reads the same whatever `i18n.logOutputEncoding` says. `pub(super)`:
+/// `check_commit`'s own range arm reads a git range through this same
+/// function, not a second `git log` invocation of its own.
 pub(super) fn commits_in(
     root: &Path,
     base: &str,
@@ -381,15 +386,20 @@ pub(super) fn commits_in(
     };
     let output = run_git(
         root,
-        &["log", "--format=%H%x00%h%x00%an%x00%s%x00%b%x1e", &commits],
+        &[
+            "log",
+            "-z",
+            "--encoding=UTF-8",
+            "--format=%H%n%h%n%an%n%s%n%b",
+            &commits,
+        ],
     )
     .map_err(|e| stderr_headline(&e))?;
     output
-        .split('\u{1e}')
-        .map(|record| record.strip_prefix('\n').unwrap_or(record))
+        .split('\0')
         .filter(|record| !record.is_empty())
         .map(|record| {
-            let mut parts = record.splitn(5, '\u{0}');
+            let mut parts = record.splitn(5, '\n');
             let sha = parts.next().unwrap_or_default().to_string();
             let short_sha = parts.next().unwrap_or_default().to_string();
             let author = parts.next().unwrap_or_default().to_string();
@@ -412,41 +422,71 @@ pub(super) fn commits_in(
         .collect()
 }
 
+/// How [`changed_files_for`] reads a root commit, which has no parent to diff
+/// against.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum RootCommit {
+    /// The root commit changed nothing, as `git diff-tree` prints it by
+    /// default.
+    Nothing,
+    /// The root commit changed every path that it holds: git reads it against
+    /// the empty tree (`--root`).
+    EveryPath,
+}
+
 /// Every path one commit (`sha`) itself changed, against its single first
 /// parent -- `git diff-tree`'s own plumbing for "what did this commit
 /// touch", one process per commit (`check_commit`'s range arm runs over
-/// CI's own PR-sized commit range, never a full-history walk). A MERGE
-/// commit (more than one parent) is read as touching NOTHING: plain `git
-/// diff-tree` needs `-m`, `-c`, or `--first-parent` to diff a merge
-/// against any parent at all, and this call passes none of them (verified
-/// live against a scratch `--no-ff` merge: empty output, exit 0, no
-/// error). That is the accepted contract here, not an oversight: this
-/// repository merges fast-forward only (`process.ff-only-merges`), so no
-/// merge commit ever reaches `check-commit`'s own range in practice, and a
-/// silently-empty file list is exactly what a per-commit `co-change` check
-/// needs on one -- `filter_matching` over an empty slice never matches
-/// `if_changed`, so the check simply does not trigger, never a false
-/// violation. `pub(super)`: `check_commit`'s own per-commit `co-change`
-/// evaluation is the only caller. The paths are install-root paths
-/// (`InstallPrefix::map`). An unresolvable `sha` or a failing `git` is a
-/// named `Err`, never a panic (`houserules.crash-paths-are-named`).
+/// CI's own PR-sized commit range, never a full-history walk). `root_commit`
+/// says how a root commit reads. A MERGE commit (more than one parent) is read
+/// as touching NOTHING: `git diff-tree` prints no path for a merge unless an
+/// option diffs it against a parent (`-m` or `--diff-merges=<format>`), and
+/// this call passes none (measured at git 2.56.0 against a scratch `--no-ff`
+/// merge: empty output, exit 0, no error). That is the accepted contract here,
+/// not an oversight: `check_commit`'s own per-commit `co-change` evaluation
+/// needs a silently-empty file list on a merge -- `filter_matching` over an
+/// empty slice never matches `if_changed`, so the check simply does not
+/// trigger, never a false violation -- and the intent checks give a merge no
+/// contribution (spec 5.5).
+///
+/// The settings of git that change the text this call parses
+/// (`houserules.parsed-git-text-pins-every-setting`): `-z` prints a name
+/// verbatim, which stops the quoting of `core.quotePath`; `--no-renames` and
+/// `--no-relative` turn off what `diff.renames` and `diff.relative` ask for, so
+/// a rename reads as two names and a path reads from the git top level
+/// (neither setting reaches the plumbing command today; the options pin them);
+/// `--ignore-submodules=none` overrides `submodule.<name>.ignore` and the
+/// `ignore` key of `.gitmodules`, which hide the path of a gitlink that a
+/// commit adds or moves. The oldest git that accepts these options is 2.28:
+/// the manual of `git diff-tree` lists `--no-relative` from 2.28.0, which
+/// added `diff.relative`, and the other two options already in 2.27.0. A git
+/// that does not know an option makes `git diff-tree` exit 129 with its usage
+/// text (measured at git 2.56.0 with an invented option). `pub(super)`:
+/// `check_commit` and the intent checks read a commit's paths through this one
+/// function. The paths are install-root paths (`InstallPrefix::map`). An
+/// unresolvable `sha` or a failing `git` is a named `Err`, never a panic
+/// (`houserules.crash-paths-are-named`).
 pub(super) fn changed_files_for(
     root: &Path,
     prefix: &InstallPrefix,
     sha: &str,
+    root_commit: RootCommit,
 ) -> Result<Vec<String>, String> {
-    let output = run_git(
-        root,
-        &[
-            "diff-tree",
-            "--no-commit-id",
-            "--name-only",
-            "-r",
-            "-z",
-            sha,
-        ],
-    )
-    .map_err(|e| stderr_headline(&e))?;
+    let mut args = vec!["diff-tree"];
+    if root_commit == RootCommit::EveryPath {
+        args.push("--root");
+    }
+    args.extend([
+        "--no-commit-id",
+        "--name-only",
+        "-r",
+        "-z",
+        "--no-renames",
+        "--no-relative",
+        "--ignore-submodules=none",
+        sha,
+    ]);
+    let output = run_git(root, &args).map_err(|e| stderr_headline(&e))?;
     Ok(prefix.map(&output))
 }
 
@@ -455,8 +495,15 @@ pub(super) fn changed_files_for(
 /// diff against each parent of a merge, and the same paths as plain
 /// `diff-tree` for a commit with one parent. `check_commit`'s skip decision
 /// reads it through `InstallPrefix::changes_only_outside`, so a merge that
-/// brings a path below the install root is not skipped. A failing `git` is
-/// a named `Err` (`houserules.crash-paths-are-named`).
+/// brings a path below the install root is not skipped.
+/// `--ignore-submodules=none` overrides `submodule.<name>.ignore` and the
+/// `ignore` key of `.gitmodules`, which hide a gitlink that a commit adds,
+/// moves, or brings in by a merge. A hidden gitlink below the install root
+/// would not count: a commit that changes it together with a path outside the
+/// root would be skipped. `-z` stops the quoting of `core.quotePath`. The call
+/// passes neither `--no-renames` nor `--no-relative`: `diff.renames` and
+/// `diff.relative` do not reach `-m` (git 2.56.0). A failing `git` is a named
+/// `Err` (`houserules.crash-paths-are-named`).
 pub(super) fn paths_changed_against_any_parent(root: &Path, sha: &str) -> Result<String, String> {
     run_git(
         root,
@@ -467,6 +514,7 @@ pub(super) fn paths_changed_against_any_parent(root: &Path, sha: &str) -> Result
             "-r",
             "-m",
             "-z",
+            "--ignore-submodules=none",
             sha,
         ],
     )
@@ -611,6 +659,234 @@ mod tests {
         String::from_utf8_lossy(&output.stdout).trim().to_string()
     }
 
+    /// Writes `files` (paths from `root`), stages every change, commits with
+    /// `subject`, and gives the full sha of the new commit.
+    fn commit_files(root: &Path, files: &[(&str, &str)], subject: &str) -> String {
+        for (path, content) in files {
+            let target = root.join(path);
+            std::fs::create_dir_all(target.parent().expect("a parent")).expect("create folders");
+            std::fs::write(target, content).expect("write a file");
+        }
+        git_in(root, &["add", "-A"]);
+        git_in(
+            root,
+            &[
+                "commit",
+                "-q",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                subject,
+            ],
+        );
+        rev_parse(root, "HEAD")
+    }
+
+    /// The paths that the commit `sha` changed, as the install at `root` sees
+    /// them, with a root commit read as `root_commit` says.
+    fn paths_of(root: &Path, sha: &str, root_commit: RootCommit) -> Vec<String> {
+        let prefix = InstallPrefix::of(root).expect("the install prefix");
+        changed_files_for(root, &prefix, sha, root_commit).expect("read the paths of the commit")
+    }
+
+    /// A commit changed the paths of its diff against its first parent: an added
+    /// path by its name, a deleted path by its old name, a rename by both names;
+    /// a merge changed nothing.
+    #[test]
+    fn a_commit_changes_its_diff_against_its_first_parent_and_a_merge_nothing() {
+        let repo = empty_repo();
+        let top = repo.path();
+        commit_files(top, &[("a.txt", "a\n"), ("b.txt", "b\n")], "root");
+        git_in(top, &["checkout", "-q", "-b", "feat"]);
+        let feature = commit_files(top, &[("c.txt", "c\n")], "feat");
+        git_in(top, &["checkout", "-q", "main"]);
+        commit_files(top, &[("d.txt", "d\n")], "main");
+        git_in(top, &["checkout", "-q", "feat"]);
+        git_in(top, &["merge", "-q", "--no-ff", "main", "-m", "merge main"]);
+        let merge = rev_parse(top, "HEAD");
+        git_in(top, &["rm", "-q", "b.txt"]);
+        git_in(top, &["mv", "a.txt", "e.txt"]);
+        let moved = commit_files(top, &[], "move and delete");
+
+        for root_commit in [RootCommit::Nothing, RootCommit::EveryPath] {
+            assert_eq!(paths_of(top, &feature, root_commit), ["c.txt"]);
+            assert_eq!(
+                paths_of(top, &merge, root_commit),
+                Vec::<String>::new(),
+                "a merge"
+            );
+            assert_eq!(
+                paths_of(top, &moved, root_commit),
+                ["a.txt", "b.txt", "e.txt"]
+            );
+        }
+    }
+
+    /// A root commit has no parent to diff against: the caller says whether it
+    /// changed nothing or every path that it holds.
+    #[test]
+    fn a_root_commit_reads_as_the_caller_asks() {
+        let repo = empty_repo();
+        let root = commit_files(repo.path(), &[("a.txt", "a\n"), ("b.txt", "b\n")], "root");
+
+        assert_eq!(
+            paths_of(repo.path(), &root, RootCommit::Nothing),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            paths_of(repo.path(), &root, RootCommit::EveryPath),
+            ["a.txt", "b.txt"]
+        );
+    }
+
+    /// The repository's own settings do not change the paths of a commit: not
+    /// `diff.renames` (a rename keeps both names), not `diff.relative` (a path
+    /// reads from the git top level, which the install prefix then cuts), and
+    /// not `core.quotePath` (a name with a byte above ASCII is not quoted).
+    #[test]
+    fn the_settings_of_the_repository_do_not_change_the_paths_of_a_commit() {
+        let repo = empty_repo();
+        let top = repo.path();
+        commit_files(
+            top,
+            &[("sub/a.txt", "same\n"), ("sub/z.txt", "z\n")],
+            "root",
+        );
+        git_in(top, &["mv", "sub/a.txt", "sub/\u{e9}.txt"]);
+        let moved = commit_files(top, &[], "rename");
+        for (key, value) in [
+            ("diff.renames", "copies"),
+            ("diff.relative", "true"),
+            ("core.quotePath", "true"),
+            ("diff.noprefix", "true"),
+        ] {
+            git_in(top, &["config", key, value]);
+        }
+
+        assert_eq!(
+            paths_of(&top.join("sub"), &moved, RootCommit::Nothing),
+            ["a.txt", "\u{e9}.txt"],
+            "from the install"
+        );
+        assert_eq!(
+            paths_of(top, &moved, RootCommit::Nothing),
+            ["sub/a.txt", "sub/\u{e9}.txt"],
+            "from the top"
+        );
+    }
+
+    /// A repository with a `.gitmodules` entry for `mod`, a commit that adds the
+    /// gitlink `mod`, and a commit that moves it. Gives the shas of the last
+    /// two.
+    fn gitlink_history(top: &Path) -> (String, String) {
+        let gitmodules = "[submodule \"mod\"]\n\tpath = mod\n\turl = ./nowhere\n";
+        commit_files(top, &[(".gitmodules", gitmodules)], "the submodule entry");
+        let gitlink_commit = |sha: char, subject: &str| {
+            let entry = format!("160000,{},mod", sha.to_string().repeat(40));
+            git_in(top, &["update-index", "--add", "--cacheinfo", &entry]);
+            git_in(top, &["commit", "-q", "--no-verify", "-m", subject]);
+            rev_parse(top, "HEAD")
+        };
+        (
+            gitlink_commit('1', "a gitlink"),
+            gitlink_commit('2', "a gitlink moves"),
+        )
+    }
+
+    /// Runs `check` once under each way to hide a submodule from `git diff-tree`:
+    /// `submodule.mod.ignore = all` in the configuration, and `ignore = all` in
+    /// `.gitmodules`. The name of the setting is the argument of `check`.
+    fn under_each_submodule_ignore_setting(top: &Path, check: impl Fn(&str)) {
+        git_in(top, &["config", "submodule.mod.ignore", "all"]);
+        check("config");
+        git_in(top, &["config", "--unset", "submodule.mod.ignore"]);
+        let gitmodules = top.join(".gitmodules");
+        let mut text = std::fs::read_to_string(&gitmodules).expect("read .gitmodules");
+        text.push_str("\tignore = all\n");
+        std::fs::write(&gitmodules, text).expect("write .gitmodules");
+        check(".gitmodules");
+    }
+
+    /// A gitlink, which is the path of a submodule, is a changed path whatever
+    /// the repository says about ignoring submodules: not
+    /// `submodule.<name>.ignore` in the configuration, and not `ignore = all` in
+    /// `.gitmodules`, which both hide a submodule from `git diff-tree`.
+    #[test]
+    fn a_submodule_ignore_setting_does_not_hide_the_path_of_a_gitlink() {
+        let repo = empty_repo();
+        let top = repo.path();
+        let (added, moved) = gitlink_history(top);
+
+        under_each_submodule_ignore_setting(top, |setting| {
+            for sha in [&added, &moved] {
+                assert_eq!(
+                    paths_of(top, sha, RootCommit::Nothing),
+                    ["mod"],
+                    "{setting}"
+                );
+            }
+        });
+    }
+
+    /// The skip decision of `check_commit` reads the paths of a commit against
+    /// every parent: a gitlink is one of them whatever the repository says about
+    /// ignoring submodules, for a commit that adds it, a commit that moves it,
+    /// and a merge that brings it in.
+    #[test]
+    fn a_submodule_ignore_setting_does_not_hide_a_gitlink_from_the_skip_decision() {
+        let repo = empty_repo();
+        let top = repo.path();
+        let (added, moved) = gitlink_history(top);
+        git_in(top, &["branch", "feat", &moved]);
+        git_in(top, &["reset", "-q", "--hard", &added]);
+        commit_files(top, &[("d.txt", "d\n")], "other");
+        git_in(top, &["merge", "-q", "--no-ff", "feat", "-m", "merge"]);
+        let merge = rev_parse(top, "HEAD");
+
+        under_each_submodule_ignore_setting(top, |setting| {
+            for (sha, what) in [(&added, "added"), (&moved, "moved"), (&merge, "merge")] {
+                let paths = paths_changed_against_any_parent(top, sha).expect("read the paths");
+                assert!(
+                    paths.split('\0').any(|path| path == "mod"),
+                    "{what}, {setting}: {paths:?}"
+                );
+            }
+        });
+    }
+
+    /// A path outside the install root is no path of the install.
+    #[test]
+    fn a_path_outside_the_install_root_is_no_changed_path() {
+        let repo = empty_repo();
+        let both = commit_files(
+            repo.path(),
+            &[
+                ("sub/in.txt", "in\n"),
+                ("out.txt", "out\n"),
+                ("sub2/x.txt", "x\n"),
+            ],
+            "root",
+        );
+
+        assert_eq!(
+            paths_of(&repo.path().join("sub"), &both, RootCommit::EveryPath),
+            ["in.txt"]
+        );
+    }
+
+    /// A commit that git does not know is a named error, never an empty list.
+    #[test]
+    fn a_commit_that_git_cannot_read_is_a_named_error() {
+        let repo = empty_repo();
+        commit_files(repo.path(), &[("a.txt", "a\n")], "root");
+        let prefix = InstallPrefix::of(repo.path()).expect("the install prefix");
+
+        let error = changed_files_for(repo.path(), &prefix, &"0".repeat(40), RootCommit::EveryPath)
+            .expect_err("a bad sha");
+
+        assert!(!error.is_empty() && !error.contains('\n'), "{error}");
+    }
+
     /// A local replace ref, which a CI clone does not fetch, changes no
     /// commit that a ref resolves to: here a tag object replaced by a tag of
     /// another commit.
@@ -702,6 +978,167 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["second", "first"]
         );
+    }
+
+    /// A message and an author name may hold any byte but NUL, so the record
+    /// separator byte `0x1e` cuts no commit and no field: a range of three commits
+    /// reads as three, each with its whole subject, body, author, and trailers.
+    #[test]
+    fn a_separator_byte_in_a_commit_cuts_neither_the_commit_nor_a_field() {
+        let dir = empty_repo();
+        let top = dir.path();
+        git_in(top, &["commit", "-q", "--allow-empty", "-m", "base"]);
+        let base = rev_parse(top, "HEAD");
+        git_in(
+            top,
+            &[
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "\u{1e}one",
+                "-m",
+                "body \u{1e} here",
+                "-m",
+                "Work-Item: HR-1",
+            ],
+        );
+        git_in(
+            top,
+            &[
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "two",
+                "-m",
+                "\u{1e}at the start of a line\nand more",
+                "-m",
+                "Work-Item: HR-2",
+            ],
+        );
+        git_in(
+            top,
+            &[
+                "-c",
+                "user.name=a\u{1e}b",
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "three",
+            ],
+        );
+        let head = rev_parse(top, "HEAD");
+
+        let commits = commits_in(top, &base, &head, true).expect("commits");
+
+        let fields = |commit: &Commit| {
+            (
+                commit.subject.clone(),
+                commit.body.clone(),
+                commit.author.clone(),
+                commit.trailers.clone(),
+            )
+        };
+        let expected = |subject: &str, body: &str, author: &str, work_item: Option<&str>| {
+            let trailers = work_item
+                .map(|id| ("Work-Item".to_string(), id.to_string()))
+                .into_iter()
+                .collect();
+            (
+                subject.to_string(),
+                body.to_string(),
+                author.to_string(),
+                trailers,
+            )
+        };
+        assert_eq!(
+            commits.iter().map(fields).collect::<Vec<_>>(),
+            [
+                expected("three", "", "a\u{1e}b", None),
+                expected(
+                    "two",
+                    "\u{1e}at the start of a line\nand more\n\nWork-Item: HR-2\n",
+                    "t",
+                    Some("HR-2")
+                ),
+                expected(
+                    "\u{1e}one",
+                    "body \u{1e} here\n\nWork-Item: HR-1\n",
+                    "t",
+                    Some("HR-1")
+                ),
+            ]
+        );
+        for commit in &commits {
+            assert!(commit.sha.len() >= 40, "{}", commit.sha);
+            assert!(commit.sha.starts_with(&commit.short_sha), "{commit:?}");
+            assert!(!commit.short_sha.is_empty(), "{commit:?}");
+        }
+        assert_eq!(commits[0].sha, head);
+    }
+
+    /// The fields of a record end at a line feed, and the body is the last: a
+    /// subject of several lines reads as one line, so it never shifts the body.
+    #[test]
+    fn a_subject_of_several_lines_is_one_field_and_the_body_follows_it() {
+        let dir = empty_repo();
+        let top = dir.path();
+        git_in(top, &["commit", "-q", "--allow-empty", "-m", "base"]);
+        let base = rev_parse(top, "HEAD");
+        git_in(
+            top,
+            &[
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "line one\nline two",
+                "-m",
+                "the body\nof two lines",
+            ],
+        );
+        let head = rev_parse(top, "HEAD");
+
+        let commits = commits_in(top, &base, &head, false).expect("commits");
+
+        assert_eq!(commits.len(), 1);
+        assert_eq!(commits[0].subject, "line one line two");
+        assert_eq!(commits[0].body, "the body\nof two lines\n");
+    }
+
+    /// A message and an author name read as UTF-8 whatever log encoding the
+    /// repository asks for (`i18n.logOutputEncoding`).
+    #[test]
+    fn a_commit_is_read_as_utf_8_whatever_the_log_encoding_of_the_repository() {
+        let dir = empty_repo();
+        let top = dir.path();
+        git_in(top, &["commit", "-q", "--allow-empty", "-m", "base"]);
+        let base = rev_parse(top, "HEAD");
+        git_in(top, &["config", "i18n.logOutputEncoding", "ISO-8859-1"]);
+        git_in(
+            top,
+            &[
+                "-c",
+                "user.name=Ren\u{e9}",
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "docs: caf\u{e9}",
+                "-m",
+                "cr\u{e8}me",
+            ],
+        );
+        let head = rev_parse(top, "HEAD");
+
+        let commits = commits_in(top, &base, &head, false).expect("commits");
+
+        assert_eq!(commits.len(), 1);
+        assert_eq!(commits[0].subject, "docs: caf\u{e9}");
+        assert_eq!(commits[0].body, "cr\u{e8}me\n");
+        assert_eq!(commits[0].author, "Ren\u{e9}");
     }
 
     /// A short prefix of a commit sha resolves to the full sha. A blob id, a

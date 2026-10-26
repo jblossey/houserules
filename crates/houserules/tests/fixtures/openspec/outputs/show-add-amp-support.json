@@ -1,0 +1,62 @@
+{
+  "id": "add-amp-support",
+  "title": "add-amp-support",
+  "deltaCount": 1,
+  "deltas": [
+    {
+      "spec": "ai-tool-paths",
+      "operation": "ADDED",
+      "description": "Add requirement: OpenSpec SHALL expose Amp as a supported skills-only tool that uses Amp's project Agent Skills directory.",
+      "requirement": {
+        "name": "Amp skills integration",
+        "text": "OpenSpec SHALL expose Amp as a supported skills-only tool that uses Amp's project Agent Skills directory.",
+        "scenarios": [
+          {
+            "name": "Selecting Amp",
+            "rawText": "- **WHEN** the user selects Amp in `openspec init` or passes `--tools amp`\n- **THEN** OpenSpec SHALL generate the active profile's skills under `.agents/skills/`\n- **AND** the generated skills SHALL use `/openspec-<skill>` references\n- **AND** OpenSpec SHALL NOT generate command files for Amp"
+          },
+          {
+            "name": "Detecting an Amp project",
+            "rawText": "- **WHEN** a project contains an `.amp/` directory\n- **THEN** OpenSpec SHALL detect Amp as an available tool"
+          },
+          {
+            "name": "Updating an Amp-owned skill tree",
+            "rawText": "- **GIVEN** `.agents/skills/.openspec-target` names `amp`\n- **WHEN** `openspec update` runs\n- **THEN** OpenSpec SHALL refresh the Amp skill tree through the shared skill generator"
+          },
+          {
+            "name": "Sharing the Agent Skills directory",
+            "rawText": "- **WHEN** Amp is selected with another tool that writes `.agents/skills/`\n- **THEN** OpenSpec SHALL write one compatible skill tree rather than letting the tools overwrite each other"
+          }
+        ]
+      },
+      "requirements": [
+        {
+          "name": "Amp skills integration",
+          "text": "OpenSpec SHALL expose Amp as a supported skills-only tool that uses Amp's project Agent Skills directory.",
+          "scenarios": [
+            {
+              "name": "Selecting Amp",
+              "rawText": "- **WHEN** the user selects Amp in `openspec init` or passes `--tools amp`\n- **THEN** OpenSpec SHALL generate the active profile's skills under `.agents/skills/`\n- **AND** the generated skills SHALL use `/openspec-<skill>` references\n- **AND** OpenSpec SHALL NOT generate command files for Amp"
+            },
+            {
+              "name": "Detecting an Amp project",
+              "rawText": "- **WHEN** a project contains an `.amp/` directory\n- **THEN** OpenSpec SHALL detect Amp as an available tool"
+            },
+            {
+              "name": "Updating an Amp-owned skill tree",
+              "rawText": "- **GIVEN** `.agents/skills/.openspec-target` names `amp`\n- **WHEN** `openspec update` runs\n- **THEN** OpenSpec SHALL refresh the Amp skill tree through the shared skill generator"
+            },
+            {
+              "name": "Sharing the Agent Skills directory",
+              "rawText": "- **WHEN** Amp is selected with another tool that writes `.agents/skills/`\n- **THEN** OpenSpec SHALL write one compatible skill tree rather than letting the tools overwrite each other"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "root": {
+    "path": "/home/jblossey/.cache/hr-b38/parity",
+    "source": "nearest"
+  }
+}

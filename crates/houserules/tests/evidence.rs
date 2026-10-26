@@ -10,6 +10,7 @@
 mod help_support;
 mod schema_support;
 mod tracker_support;
+mod validation_support;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -23,9 +24,13 @@ use tracker_support::{
     add_submodule, assert_output, commit_all, copy_dir, edit_marker, git, houserules, repo_root,
     scratch_git_repo, stderr, stdout,
 };
+use validation_support::{
+    arg, capture_of, clean_capture, document_of, header as capture_header, item, openspec_review,
+    refusals, refused_captures, validation, validations,
+};
 
 /// The schema file of the evidence document, relative to the repository root.
-const EVIDENCE_SCHEMA: &str = "schemas/evidence/1.0.0.json";
+const EVIDENCE_SCHEMA: &str = "schemas/evidence/1.1.0.json";
 
 /// The schema file of the route decision, relative to the repository root.
 const ROUTE_SCHEMA: &str = "schemas/route/1.0.0.json";
@@ -39,6 +44,15 @@ const COVERAGE_LINE: &str =
 
 /// The name of git's empty tree for a repository that hashes with SHA-1.
 const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+/// The file of the spec of batch 38, below `docs/specs/`.
+const SPEC_FILE: &str = "2026-10-25-batch-38-openspec-and-release.md";
+
+/// The `Sessions:` line of a change with no session (spec 5.3).
+const NO_SESSIONS_LINE: &str = "Sessions: none";
+
+/// The line for an `Intent:` value that is no `<source>:<ref>` (batch-37 spec 4.9).
+const NOT_SOURCE_AND_REF: &str = "an intent is written <source>:<ref>";
 
 // ---- fixtures -------------------------------------------------------------------------
 
@@ -187,6 +201,24 @@ impl Install {
         git(self.top.path(), &["rev-parse", "HEAD"])
             .trim()
             .to_string()
+    }
+
+    /// Replaces the message of the commit at `HEAD` and gives the sha of the new
+    /// commit.
+    fn reword_head(&self, message: &str) -> String {
+        git(
+            self.top.path(),
+            &[
+                "commit",
+                "-q",
+                "--amend",
+                "--allow-empty",
+                "--no-verify",
+                "-m",
+                message,
+            ],
+        );
+        self.head()
     }
 
     /// A path in the scratch directory outside the repository.
@@ -343,6 +375,7 @@ fn an_unconfigured_change_prints_the_whole_packet() {
              \n\
              Diff: +3 -0 lines in 1 files\n\
              Work items: none\n\
+             Sessions: none\n\
              \n\
              ### Route\n\
              \n\
@@ -1306,10 +1339,11 @@ fn the_document_validates_with_both_range_forms() {
             "judged",
             "skipped",
             "work_items",
+            "sessions",
             "route"
         ]
     );
-    assert_eq!(document["schema"], "houserules/evidence@1.0.0");
+    assert_eq!(document["schema"], "houserules/evidence@1.1.0");
     assert_eq!(
         keys(&document["rules"]),
         ["merge_base_hash", "head_hash", "packs"]
@@ -1514,6 +1548,1083 @@ fn a_range_from_the_empty_tree_has_no_merge_base() {
     );
     assert_eq!(document["rules"]["merge_base_hash"], Value::Null);
     assert_valid(&document, EVIDENCE_SCHEMA);
+}
+
+// ---- trailers: intents and sessions (batch 38, spec 5.1 to 5.3; case 4) -------------------
+
+/// The value of the session trailer in the cases below: the form of a checkpoint
+/// of the Entire tool.
+const CHECKPOINT: &str = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+
+/// The line `Sessions:` of `packet`.
+fn sessions_line(packet: &str) -> String {
+    packet
+        .lines()
+        .find(|line| line.starts_with("Sessions: "))
+        .unwrap_or_else(|| panic!("no Sessions line in:\n{packet}"))
+        .to_string()
+}
+
+/// The `review` key that lists the session trailer keys `keys`.
+fn sessions_review(keys: &[&str]) -> Value {
+    json!({"sessions": {"trailers": keys}})
+}
+
+/// A change with no session trailer prints `Sessions: none` after the work items,
+/// and the document holds an empty `sessions` list after `work_items` (spec 5.3).
+#[test]
+fn a_change_with_no_session_trailer_prints_sessions_none() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    install.append("docs/guide.md", 1);
+    install.commit("docs: edit the guide\n\nReviewed-by: someone");
+
+    let (packet, document) = install.packet_and_document(&base, &[]);
+
+    assert_eq!(
+        section(&packet, "### Size and links"),
+        [
+            "",
+            "Diff: +1 -0 lines in 1 files",
+            "Work items: none",
+            NO_SESSIONS_LINE
+        ]
+    );
+    assert_eq!(document["sessions"], json!([]));
+    assert_eq!(document["schema"], "houserules/evidence@1.1.0");
+    assert_valid(&document, EVIDENCE_SCHEMA);
+}
+
+/// Version 1.1.0 adds `sessions` as an optional key: the schema does not require
+/// it, because a new required key is a major version. The document of the command
+/// prints the key always, and the same document without it stays valid.
+#[test]
+fn the_evidence_schema_1_1_0_does_not_require_the_sessions_key() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    install.append("docs/guide.md", 1);
+    install.commit("docs: edit the guide");
+    let (_, mut document) = install.packet_and_document(&base, &[]);
+    assert!(document.get("sessions").is_some(), "the command prints it");
+
+    document
+        .as_object_mut()
+        .expect("an object")
+        .remove("sessions");
+
+    assert_valid(&document, EVIDENCE_SCHEMA);
+}
+
+/// The line of this file that the spec of batch 38 gives as a literal is in the
+/// spec (`quality.user-facing-text-is-contract`).
+#[test]
+fn the_spec_lines_of_these_tests_are_in_the_spec() {
+    let spec = fs::read_to_string(repo_root().join("docs").join("specs").join(SPEC_FILE))
+        .expect("read the spec");
+
+    assert!(
+        spec.contains(&format!("`{NO_SESSIONS_LINE}`")),
+        "{NO_SESSIONS_LINE}"
+    );
+}
+
+/// The default session key `Entire-Checkpoint` fills the line and the document
+/// (spec 5.1 and 5.3): the commit as a full sha, the key as the commit wrote it,
+/// and the value; the line prints the short sha, the key, and the value in a code
+/// span. Two runs give the same bytes.
+#[test]
+fn an_entire_checkpoint_trailer_is_a_session_of_the_packet_and_the_document() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    install.append("docs/guide.md", 1);
+    let head = install.commit(&format!(
+        "docs: edit the guide\n\nEntire-Checkpoint: {CHECKPOINT}"
+    ));
+
+    let (packet, document) = install.packet_and_document(&base, &[]);
+
+    assert_eq!(
+        section(&packet, "### Size and links"),
+        [
+            "".to_string(),
+            "Diff: +1 -0 lines in 1 files".to_string(),
+            "Work items: none".to_string(),
+            format!(
+                "Sessions: {} Entire-Checkpoint: `{CHECKPOINT}`",
+                short(&head)
+            )
+        ]
+    );
+    assert_eq!(
+        document["sessions"],
+        json!([{"commit": head, "trailer": "Entire-Checkpoint", "value": CHECKPOINT}])
+    );
+    assert_eq!(
+        keys(&document["sessions"][0]),
+        ["commit", "trailer", "value"]
+    );
+    assert_valid(&document, EVIDENCE_SCHEMA);
+    let (again, document_again) = install.packet_and_document(&base, &[]);
+    assert_eq!((again, document_again), (packet, document));
+}
+
+/// `review.sessions.trailers` lists the keys: a key matches without regard to its
+/// case, as git matches trailer keys, and the document keeps the key as the commit
+/// wrote it. The sessions come in commit order, oldest first, and in the order of
+/// the message inside a commit. A trailer of another key is no session.
+#[test]
+fn a_configured_session_key_matches_in_any_case_and_the_sessions_come_in_commit_order() {
+    let install = Install::new(
+        "",
+        &[],
+        Some(sessions_review(&["Entire-Checkpoint", "Session-Id"])),
+    );
+    let base = install.head();
+    let first = install.commit("docs: one\n\nsession-id: s-1");
+    let second = install.commit("docs: two\n\nENTIRE-CHECKPOINT: cp-2\nSession-Id: s-2");
+    install.commit("docs: three\n\nReviewed-by: someone\nSigned-off-by: someone");
+
+    let (packet, document) = install.packet_and_document(&base, &[]);
+
+    assert_eq!(
+        sessions_line(&packet),
+        format!(
+            "Sessions: {} session-id: `s-1`, {} ENTIRE-CHECKPOINT: `cp-2`, {} Session-Id: `s-2`",
+            short(&first),
+            short(&second),
+            short(&second)
+        )
+    );
+    assert_eq!(
+        document["sessions"],
+        json!([
+            {"commit": first, "trailer": "session-id", "value": "s-1"},
+            {"commit": second, "trailer": "ENTIRE-CHECKPOINT", "value": "cp-2"},
+            {"commit": second, "trailer": "Session-Id", "value": "s-2"},
+        ])
+    );
+    assert_valid(&document, EVIDENCE_SCHEMA);
+}
+
+/// The key list replaces the default: an unlisted key is no session, `[]` reads
+/// none, and a key that the config repeats in another case reads once.
+#[test]
+fn the_session_keys_of_the_config_replace_the_default() {
+    let message = format!("docs: edit\n\nEntire-Checkpoint: {CHECKPOINT}\nSession-Id: s-1");
+    for (keys, expected) in [
+        (vec!["Session-Id"], vec!["Session-Id: `s-1`"]),
+        (vec![], vec![]),
+        (vec!["session-id", "SESSION-ID"], vec!["Session-Id: `s-1`"]),
+    ] {
+        let install = Install::new("", &[], Some(sessions_review(&keys)));
+        let base = install.head();
+        install.append("docs/guide.md", 1);
+        let head = install.commit(&message);
+
+        let (packet, document) = install.packet_and_document(&base, &[]);
+
+        let entries: Vec<String> = expected
+            .iter()
+            .map(|entry| format!("{} {entry}", short(&head)))
+            .collect();
+        let line = if entries.is_empty() {
+            NO_SESSIONS_LINE.to_string()
+        } else {
+            format!("Sessions: {}", entries.join(", "))
+        };
+        assert_eq!(sessions_line(&packet), line, "{keys:?}");
+        assert_eq!(
+            document["sessions"].as_array().map(Vec::len),
+            Some(expected.len()),
+            "{keys:?}"
+        );
+    }
+}
+
+/// The packet lists at most 20 sessions and then `... and <k> more`, and cuts each
+/// value to 100 characters; the document holds every session whole.
+#[test]
+fn the_packet_lists_20_sessions_and_the_document_lists_them_all() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    let long = "v".repeat(150);
+    install.commit(&format!("docs: 0\n\nEntire-Checkpoint: {long}"));
+    for number in 1..21 {
+        install.commit(&format!("docs: {number}\n\nEntire-Checkpoint: cp-{number}"));
+    }
+
+    let (packet, document) = install.packet_and_document(&base, &[]);
+
+    let sessions = document["sessions"].as_array().expect("the sessions");
+    assert_eq!(sessions.len(), 21);
+    assert_eq!(sessions[0]["value"], json!(long));
+    let entry = |session: &Value, value: &str| {
+        format!(
+            "{} Entire-Checkpoint: `{value}`",
+            short(session["commit"].as_str().expect("a commit"))
+        )
+    };
+    let mut entries = vec![entry(&sessions[0], &"v".repeat(100))];
+    for (index, session) in sessions.iter().enumerate().take(20).skip(1) {
+        entries.push(entry(session, &format!("cp-{index}")));
+    }
+    assert_eq!(
+        sessions_line(&packet),
+        format!("Sessions: {}, ... and 1 more", entries.join(", "))
+    );
+    assert_valid(&document, EVIDENCE_SCHEMA);
+}
+
+/// A value with a control character prints as a JSON string inside the span
+/// (spec 4.8 of batch 37); the document holds the value as it is.
+#[test]
+fn a_session_value_with_a_control_character_prints_as_a_json_string() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    let head = install.commit("docs: edit\n\nEntire-Checkpoint: a\u{1}b");
+
+    let (packet, document) = install.packet_and_document(&base, &[]);
+
+    assert_eq!(
+        sessions_line(&packet),
+        format!(
+            "Sessions: {} Entire-Checkpoint: `\"a\\u0001b\"`",
+            short(&head)
+        )
+    );
+    assert_eq!(document["sessions"][0]["value"], json!("a\u{1}b"));
+}
+
+/// A value that starts with a quote prints as a JSON string inside the span, as a value with a
+/// control character does: the span of the packet never shows a value that starts with a quote as
+/// it is.
+#[test]
+fn a_session_value_that_starts_with_a_quote_prints_as_a_json_string() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    let head = install.commit("docs: edit\n\nEntire-Checkpoint: \"a\"");
+
+    let (packet, document) = install.packet_and_document(&base, &[]);
+
+    assert_eq!(
+        sessions_line(&packet),
+        format!(
+            "Sessions: {} Entire-Checkpoint: `\"\\\"a\\\"\"`",
+            short(&head)
+        )
+    );
+    assert_eq!(document["sessions"][0]["value"], json!("\"a\""));
+}
+
+/// A message may hold any byte but NUL: a record separator byte (`0x1e`) in its
+/// body, at the start of one of its lines, or in a trailer value loses neither
+/// the `Intent:` trailer nor the session trailer of the commit, and the commit
+/// that follows is read as it is.
+#[test]
+fn a_message_with_a_record_separator_byte_keeps_its_intent_and_session_trailers() {
+    let install = Install::new("", &[], None);
+    install.write("docs/plans/p.md", "# The plan\n\nWhy.\n");
+    install.commit("docs: add the plan");
+    let base = install.head();
+    let middle = install.commit(
+        "docs: one\n\nbody \u{1e} here\n\nIntent: file:docs/plans/p.md\nEntire-Checkpoint: ck-rs",
+    );
+    let line_start =
+        install.commit("docs: two\n\n\u{1e}at the start\n\nEntire-Checkpoint: ck-start");
+    let in_value = install.commit("docs: three\n\nEntire-Checkpoint: a\u{1e}b");
+
+    let (packet, document) = install.packet_and_document(&base, &[]);
+
+    assert!(packet.contains("### Intent (1)"), "{packet}");
+    assert_eq!(document["intent"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        document["sessions"],
+        json!([
+            {"commit": middle, "trailer": "Entire-Checkpoint", "value": "ck-rs"},
+            {"commit": line_start, "trailer": "Entire-Checkpoint", "value": "ck-start"},
+            {"commit": in_value, "trailer": "Entire-Checkpoint", "value": "a\u{1e}b"},
+        ])
+    );
+    assert_valid(&document, EVIDENCE_SCHEMA);
+}
+
+/// The Failed row of a failing `Intent:` trailer prints a value with an escape byte as a JSON
+/// string and a value that spells the six characters of its escape as they are, so the row tells
+/// the byte from the text.
+#[test]
+fn the_failed_row_of_an_intent_trailer_tells_a_control_character_from_text_that_spells_it() {
+    let resolving = entry(
+        "team.intents-resolve",
+        json!({"type": "intent-resolves", "level": "fail"}),
+    );
+    let install = Install::new("", &[resolving], None);
+    let base = install.head();
+    let byte = install.commit("docs: byte\n\nIntent: x\u{1b}y");
+    let byte_packet = install.packet(&["--base", &base]);
+    let text = install.commit("docs: text\n\nIntent: x\\u001by");
+    let text_packet = install.packet(&["--base", &byte]);
+
+    let row = |commit: &str, value: &str| {
+        format!(
+            "- `team.intents-resolve`: `{} Intent: {value}: {NOT_SOURCE_AND_REF}`",
+            short(commit)
+        )
+    };
+    assert_eq!(
+        section(&byte_packet, "### Failed (1)"),
+        ["", &row(&byte, "\"x\\u001by\"")]
+    );
+    assert_eq!(
+        section(&text_packet, "### Failed (1)"),
+        ["", &row(&text, "x\\u001by")]
+    );
+}
+
+/// The Failed row of a failing `Intent:` trailer prints a value that starts with a quote as a JSON
+/// string, as it prints a value with an escape byte, so a printed value starts with a quote exactly
+/// when it is a JSON string. The row tells the escape byte from the text that spells the JSON form
+/// of the byte (`"x\u001by"`).
+#[test]
+fn the_failed_row_of_an_intent_trailer_tells_a_control_character_from_a_value_that_starts_with_a_quote()
+ {
+    let resolving = entry(
+        "team.intents-resolve",
+        json!({"type": "intent-resolves", "level": "fail"}),
+    );
+    let install = Install::new("", &[resolving], None);
+    let base = install.head();
+    let byte = install.commit("docs: byte\n\nIntent: x\u{1b}y");
+    let byte_packet = install.packet(&["--base", &base]);
+    let quoted = install.commit("docs: quoted\n\nIntent: \"x\\u001by\"");
+    let quoted_packet = install.packet(&["--base", &byte]);
+
+    assert_eq!(
+        section(&byte_packet, "### Failed (1)"),
+        [
+            "",
+            &format!(
+                r#"- `team.intents-resolve`: `{} Intent: "x\u001by": {NOT_SOURCE_AND_REF}`"#,
+                short(&byte)
+            )
+        ]
+    );
+    assert_eq!(
+        section(&quoted_packet, "### Failed (1)"),
+        [
+            "",
+            &format!(
+                r#"- `team.intents-resolve`: `{} Intent: "\"x\\u001by\"": {NOT_SOURCE_AND_REF}`"#,
+                short(&quoted)
+            )
+        ]
+    );
+}
+
+/// A range from git's empty tree reads the trailers of every commit of the head,
+/// the first commit included.
+#[test]
+fn a_range_from_the_empty_tree_reads_the_trailers_of_every_commit() {
+    let install = Install::new("", &[], None);
+    let root = install.reword_head("chore: base\n\nEntire-Checkpoint: cp-root");
+    let later = install.commit("docs: edit\n\nEntire-Checkpoint: cp-later");
+
+    let (_, document) = install.packet_and_document(EMPTY_TREE, &[]);
+
+    assert_eq!(
+        document["sessions"],
+        json!([
+            {"commit": root, "trailer": "Entire-Checkpoint", "value": "cp-root"},
+            {"commit": later, "trailer": "Entire-Checkpoint", "value": "cp-later"},
+        ])
+    );
+}
+
+/// An `Intent:` trailer names an intent whatever `review.intent.sources` lists
+/// (spec 5.1): a `file` and an `openspec` intent come after the configured
+/// `work-item` adapter, in the order of the adapters, with the fields of their
+/// own adapters.
+#[test]
+fn intent_trailers_name_a_plan_and_an_openspec_change() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    install.write("docs/plans/p.md", "# The plan\n\nWhy.\n\n- [x] one\n");
+    install.write(
+        "openspec/changes/add-x/proposal.md",
+        "# Add x\n\n## Why\n\nBecause x.\n",
+    );
+    install.write("openspec/changes/add-x/tasks.md", "- [x] a\n- [ ] b\n");
+    install.commit("docs: add the plan\n\nIntent: openspec:add-x\nIntent: file:docs/plans/p.md");
+
+    let (packet, document) = install.packet_and_document(&base, &[]);
+
+    assert_eq!(
+        section(&packet, "### Intent (2)"),
+        [
+            "",
+            "`file docs/plans/p.md`: `The plan`",
+            "Why:",
+            "```",
+            "Why.",
+            "```",
+            "Tasks: 1 of 1 done",
+            "",
+            "`openspec add-x`: `Add x`",
+            "Why:",
+            "```",
+            "Because x.",
+            "```",
+            "Tasks: 1 of 2 done"
+        ]
+    );
+    let sources: Vec<&str> = document["intent"]
+        .as_array()
+        .expect("the intents")
+        .iter()
+        .map(|intent| intent["source"].as_str().expect("a source"))
+        .collect();
+    assert_eq!(sources, ["file", "openspec"]);
+    assert_valid(&document, EVIDENCE_SCHEMA);
+}
+
+/// The key `Intent` matches without regard to its case, and a `<source>:<ref>`
+/// that the trailers, a second commit, and `--intent` name counts once (spec
+/// 5.1).
+#[test]
+fn an_intent_named_by_trailers_and_by_the_flag_counts_once() {
+    let install = Install::new("", &[], None);
+    install.write("docs/plans/p.md", "# The plan\n\nWhy.\n");
+    install.commit("docs: add the plan");
+    let base = install.head();
+    install.commit("docs: one\n\nIntent: file:docs/plans/p.md");
+    install.commit("docs: two\n\nintent: file:docs/plans/p.md");
+
+    let (packet, document) =
+        install.packet_and_document(&base, &["--intent", "file:docs/plans/p.md"]);
+
+    assert_eq!(
+        document["intent"].as_array().map(Vec::len),
+        Some(1),
+        "{packet}"
+    );
+    assert!(packet.contains("### Intent (1)"), "{packet}");
+}
+
+/// A malformed `Intent:` value and a value whose source is no adapter print as
+/// unresolved intents with the line of the adapter, and the command exits 0: a
+/// commit's text never makes `evidence` exit 2 (spec 5.2). A malformed value is
+/// split at its first colon, and a value with no colon has an empty source. The
+/// unlisted `file` adapter comes first, then the sources that are no adapter, by
+/// source and then by ref.
+#[test]
+fn a_malformed_intent_trailer_and_an_unknown_source_print_unresolved_intents() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    install.append("docs/guide.md", 1);
+    install.commit("docs: edit\n\nIntent: jira:ABC-1\nIntent: oops\nIntent: file:");
+
+    let output = install.evidence(&["--base", &base]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert_eq!(stderr(&output), "");
+    let (packet, document) = install.packet_and_document(&base, &[]);
+
+    let malformed = "an intent is written <source>:<ref>";
+    let unknown = "\"jira\" is no intent source; use one of: work-item, file, openspec";
+    assert_eq!(
+        section(&packet, "### Intent (3)"),
+        [
+            "".to_string(),
+            format!("`file `: {malformed}"),
+            "".to_string(),
+            format!("` oops`: {malformed}"),
+            "".to_string(),
+            format!("`jira ABC-1`: {unknown}"),
+        ]
+    );
+    let entry = |source: &str, reference: &str, line: &str| {
+        json!({
+            "source": source, "ref": reference, "title": null, "why": null,
+            "tasks": null, "requirements": null, "validation": null, "artifacts": [],
+            "unresolved": line,
+        })
+    };
+    assert_eq!(
+        document["intent"],
+        json!([
+            entry("file", "", malformed),
+            entry("", "oops", malformed),
+            entry("jira", "ABC-1", unknown),
+        ])
+    );
+    assert_valid(&document, EVIDENCE_SCHEMA);
+}
+
+/// The sources that are no adapter sort by source in byte order, then by ref, and
+/// after the intents of the configured adapters (spec 5.2).
+#[test]
+fn intents_of_unknown_sources_sort_by_source_then_ref_after_the_configured_ones() {
+    let review =
+        json!({"intent": {"sources": ["work-item", "file"], "files": ["docs/plans/*.md"]}});
+    let install = Install::new("", &[], Some(review));
+    let base = install.head();
+    install.write("docs/plans/b.md", "# Plan B\n\nWhy B.\n");
+    install.commit("docs: add a plan\n\nIntent: zzz:1\nIntent: aaa:9\nIntent: aaa:2");
+
+    let (_, document) = install.packet_and_document(&base, &[]);
+
+    let identities: Vec<String> = document["intent"]
+        .as_array()
+        .expect("the intents")
+        .iter()
+        .map(|intent| {
+            format!(
+                "{}:{}",
+                intent["source"].as_str().expect("a source"),
+                intent["ref"].as_str().expect("a ref")
+            )
+        })
+        .collect();
+    assert_eq!(
+        identities,
+        ["file:docs/plans/b.md", "aaa:2", "aaa:9", "zzz:1"]
+    );
+}
+
+/// The trailers come from the commits of the range, not from the work tree: a
+/// head that is not checked out gives its own sessions.
+#[test]
+fn the_sessions_of_a_head_that_is_not_checked_out_come_from_its_commits() {
+    let install = Install::new("", &[], None);
+    let base = install.head();
+    let head = install.commit("docs: edit\n\nEntire-Checkpoint: cp-head");
+    install.commit("docs: later\n\nEntire-Checkpoint: cp-later");
+
+    let (_, document) = install.packet_and_document(&base, &["--head", &head]);
+
+    assert_eq!(
+        document["sessions"],
+        json!([{"commit": head, "trailer": "Entire-Checkpoint", "value": "cp-head"}])
+    );
+}
+
+// ---- the validation capture (batch 38, spec 4; case 3) ---------------------------------
+
+/// An install whose base commit holds nothing of OpenSpec and whose next commit adds the
+/// active changes `ids`, each with a proposal (the title `Change <id>`) and a task list. It
+/// gives the install, the base commit, and the head. It stays in this file: it builds the
+/// `Install` type of this file.
+fn openspec_changes(ids: &[&str]) -> (Install, String, String) {
+    let install = Install::new("", &[], Some(openspec_review()));
+    let base = install.head();
+    for id in ids {
+        install.write(
+            &format!("openspec/changes/{id}/proposal.md"),
+            &format!("# Change {id}\n\n## Why\n\nBecause {id}.\n"),
+        );
+        install.write(
+            &format!("openspec/changes/{id}/tasks.md"),
+            "- [x] a\n- [ ] b\n",
+        );
+    }
+    let head = install.commit("feat: add the changes");
+    (install, base, head)
+}
+
+/// Writes `text` as the file `name` of the scratch directory and gives its path. It stays in
+/// this file: it reads the scratch directory of the `Install` type of this file.
+fn capture_file(install: &Install, name: &str, text: &str) -> PathBuf {
+    let path = install.scratch_file(name);
+    fs::write(&path, text).expect("write the capture");
+    path
+}
+
+/// The line that `evidence` prints for a capture that it refuses (spec 4.1).
+fn refusal_line(path: &Path, reason: &str) -> String {
+    format!("evidence: --validation {}: {reason}\n", path.display())
+}
+
+/// A valid run fills the validation of the `openspec` intent: the document holds
+/// `{tool, ok, summary}` in that order, and the packet prints its line in the block of the
+/// intent, after the counts. A command with no refusal prints nothing on stderr (spec 4.1,
+/// 4.2).
+#[test]
+fn a_valid_run_fills_the_validation_of_the_openspec_intent() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let capture = capture_file(
+        &install,
+        "validation.json",
+        &clean_capture(&head, &document_of(&[item("add-x", "change", true, &[])])),
+    );
+
+    let (packet, document) = install.packet_and_document(&base, &["--validation", arg(&capture)]);
+
+    assert_eq!(validations(&document), [validation(true, "no issues")]);
+    assert_eq!(
+        keys(&document["intent"][0]["validation"]),
+        ["tool", "ok", "summary"]
+    );
+    assert_eq!(
+        section(&packet, "### Intent (1)"),
+        [
+            "",
+            "`openspec add-x`: `Change add-x`",
+            "Why:",
+            "```",
+            "Because add-x.",
+            "```",
+            "Tasks: 1 of 2 done",
+            "Validation: `openspec` ok: `no issues`"
+        ]
+    );
+    assert_valid(&document, EVIDENCE_SCHEMA);
+}
+
+/// The summary counts every issue of every level, and `ok` is the verdict of the item
+/// (spec 4.2): `no issues`, `1 issue`, `2 issues`, and `<n> issues`.
+#[test]
+fn the_summary_counts_every_issue_of_every_level() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    for (valid, levels, summary) in [
+        (false, vec!["ERROR"], "1 issue"),
+        (false, vec!["ERROR", "WARNING"], "2 issues"),
+        (true, vec!["WARNING"], "1 issue"),
+        (true, vec!["WARNING", "INFO"], "2 issues"),
+        (false, vec!["ERROR", "ERROR", "WARNING"], "3 issues"),
+        (true, vec![], "no issues"),
+    ] {
+        let capture = capture_file(
+            &install,
+            "validation.json",
+            &clean_capture(
+                &head,
+                &document_of(&[item("add-x", "change", valid, &levels)]),
+            ),
+        );
+
+        let (packet, document) =
+            install.packet_and_document(&base, &["--validation", arg(&capture)]);
+
+        assert_eq!(
+            validations(&document),
+            [validation(valid, summary)],
+            "{levels:?}"
+        );
+        let line = format!(
+            "Validation: `openspec` {}: `{summary}`",
+            if valid { "ok" } else { "failed" }
+        );
+        assert!(
+            packet.lines().any(|found| found == line),
+            "{line}\n{packet}"
+        );
+    }
+}
+
+/// A change with no item in the run keeps `validation: null` and prints no line, and the
+/// command prints nothing on stderr (spec 4.2). So does an archived change, which
+/// `openspec validate --all` lists no item for (spec 4.1).
+#[test]
+fn a_run_with_no_item_for_the_change_keeps_validation_null() {
+    let (install, base, _) = openspec_changes(&["add-x"]);
+    install.write(
+        "openspec/changes/archive/2026-01-02-old-change/proposal.md",
+        "# Old change\n\n## Why\n\nBecause.\n",
+    );
+    let head = install.commit("docs: archive a change");
+    let capture = capture_file(
+        &install,
+        "validation.json",
+        &clean_capture(
+            &head,
+            &document_of(&[item("other-change", "change", false, &["ERROR"])]),
+        ),
+    );
+
+    let (packet, document) = install.packet_and_document(&base, &["--validation", arg(&capture)]);
+
+    let refs: Vec<&str> = document["intent"]
+        .as_array()
+        .expect("the intents")
+        .iter()
+        .map(|intent| intent["ref"].as_str().expect("a ref"))
+        .collect();
+    assert_eq!(refs, ["2026-01-02-old-change", "add-x"]);
+    assert_eq!(validations(&document), [Value::Null, Value::Null]);
+    assert!(!packet.contains("Validation:"), "{packet}");
+}
+
+/// A capability that shares the id of the change is another item (spec 4.2): the item of
+/// type `change` counts, whatever the order, and a capability alone gives no validation.
+#[test]
+fn a_capability_with_the_id_of_the_change_is_another_item() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let capability = item("add-x", "spec", false, &["ERROR", "ERROR"]);
+    let change = item("add-x", "change", true, &["WARNING"]);
+    for items in [
+        vec![capability.clone(), change.clone()],
+        vec![change, capability.clone()],
+    ] {
+        let capture = capture_file(
+            &install,
+            "validation.json",
+            &clean_capture(&head, &document_of(&items)),
+        );
+
+        let (_, document) = install.packet_and_document(&base, &["--validation", arg(&capture)]);
+
+        assert_eq!(validations(&document), [validation(true, "1 issue")]);
+    }
+    let capture = capture_file(
+        &install,
+        "validation.json",
+        &clean_capture(&head, &document_of(&[capability])),
+    );
+
+    let (_, document) = install.packet_and_document(&base, &["--validation", arg(&capture)]);
+
+    assert_eq!(validations(&document), [Value::Null]);
+}
+
+/// Each `openspec` intent takes the item of its own change, and an intent of another source
+/// ignores the capture even when an item holds its ref (spec 4.2).
+#[test]
+fn each_openspec_intent_takes_its_own_item_and_other_sources_ignore_the_capture() {
+    let (install, base, _) = openspec_changes(&["add-x", "add-y"]);
+    install.write("docs/plans/p.md", "# The plan\n\nWhy.\n");
+    let head = install.commit("docs: add the plan");
+    let capture = capture_file(
+        &install,
+        "validation.json",
+        &clean_capture(
+            &head,
+            &document_of(&[
+                item("add-y", "change", false, &["ERROR"]),
+                item("add-x", "change", true, &[]),
+                item("docs/plans/p.md", "change", false, &["ERROR"]),
+            ]),
+        ),
+    );
+
+    let (_, document) = install.packet_and_document(
+        &base,
+        &[
+            "--validation",
+            arg(&capture),
+            "--intent",
+            "file:docs/plans/p.md",
+        ],
+    );
+
+    let pairs: Vec<(String, Value)> = document["intent"]
+        .as_array()
+        .expect("the intents")
+        .iter()
+        .map(|intent| {
+            (
+                format!(
+                    "{} {}",
+                    intent["source"].as_str().expect("a source"),
+                    intent["ref"].as_str().expect("a ref")
+                ),
+                intent["validation"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        pairs,
+        [
+            ("openspec add-x".to_string(), validation(true, "no issues")),
+            ("openspec add-y".to_string(), validation(false, "1 issue")),
+            ("file docs/plans/p.md".to_string(), Value::Null),
+        ]
+    );
+}
+
+/// A named `openspec` intent that does not resolve keeps its line and `validation: null`,
+/// even when the run holds an item of that id: every other field of an unresolved intent is
+/// `null`.
+#[test]
+fn an_unresolved_openspec_intent_keeps_validation_null() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let capture = capture_file(
+        &install,
+        "validation.json",
+        &clean_capture(&head, &document_of(&[item("ghost", "change", true, &[])])),
+    );
+
+    let (_, document) = install.packet_and_document(
+        &base,
+        &["--validation", arg(&capture), "--intent", "openspec:ghost"],
+    );
+
+    let ghost = document["intent"]
+        .as_array()
+        .expect("the intents")
+        .iter()
+        .find(|intent| intent["ref"] == "ghost")
+        .expect("the named intent");
+    assert_eq!(
+        ghost["unresolved"],
+        "no OpenSpec change with that id at the head, active or archived"
+    );
+    assert_eq!(ghost["validation"], Value::Null);
+}
+
+/// A capture that `evidence` cannot use is no error (spec 4.1): it prints
+/// `evidence: --validation <path>: <reason>` on stderr, keeps every `validation` `null`, and
+/// gives the packet, the document, and the exit 0 that the same range gives without the flag.
+/// Each reason is pinned whole, and a text from the capture prints on one line.
+#[test]
+fn a_capture_that_cannot_be_used_prints_its_line_and_changes_nothing_else() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let (baseline_packet, baseline) = install.packet_and_document(&base, &[]);
+    assert_eq!(validations(&baseline), [Value::Null]);
+    let other = "9".repeat(40);
+    for refusal in refusals(&head, &other) {
+        let path = capture_file(&install, "validation.json", &refusal.file);
+        let target = install.scratch_file("with-flag.json");
+
+        let output = install.evidence(&[
+            "--base",
+            &base,
+            "--validation",
+            arg(&path),
+            "--json",
+            arg(&target),
+        ]);
+
+        assert_eq!(
+            output.status.code(),
+            Some(0),
+            "{}: {}",
+            refusal.name,
+            stderr(&output)
+        );
+        assert_eq!(
+            stderr(&output),
+            refusal_line(&path, &refusal.reason),
+            "{}",
+            refusal.name
+        );
+        assert_eq!(stdout(&output), baseline_packet, "{}", refusal.name);
+        assert_eq!(read_file_json(&target), baseline, "{}", refusal.name);
+    }
+}
+
+/// A capture file that the operating system cannot read gives the line with the error of the
+/// operating system, verbatim: the file is missing, or the path is a folder (spec 4.1).
+#[test]
+fn a_capture_that_cannot_be_read_prints_the_error_of_the_operating_system() {
+    let (install, base, _) = openspec_changes(&["add-x"]);
+    let (baseline_packet, baseline) = install.packet_and_document(&base, &[]);
+    for path in [
+        install.scratch_file("missing.json"),
+        install.scratch.path().to_path_buf(),
+    ] {
+        let error = fs::read(&path).expect_err("the path cannot be read");
+        let target = install.scratch_file("with-flag.json");
+
+        let output = install.evidence(&[
+            "--base",
+            &base,
+            "--validation",
+            arg(&path),
+            "--json",
+            arg(&target),
+        ]);
+
+        assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+        assert_eq!(
+            stderr(&output),
+            refusal_line(&path, &format!("cannot be read ({error})"))
+        );
+        assert_eq!(stdout(&output), baseline_packet);
+        assert_eq!(read_file_json(&target), baseline);
+    }
+}
+
+/// A capture that `evidence` refuses prints its line on every path that follows, before the
+/// failure lines, and the exit stays as without the flag (spec 4.1): a `--json` or an `--out`
+/// into a folder that does not exist stops the run with the line of the write and the exit 2.
+/// Each reason is pinned whole.
+#[test]
+fn a_refused_capture_prints_its_line_before_the_failure_of_a_write() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let captures = refused_captures(install.scratch.path(), &head, &"9".repeat(40));
+    for flag in ["--json", "--out"] {
+        let target = install.scratch_file("no").join("such").join("target");
+        let error = fs::write(&target, "").expect_err("the folder does not exist");
+        let write_error = format!("{}: {error}\n", target.display());
+        let without = install.evidence(&["--base", &base, flag, arg(&target)]);
+        assert_output(&without, 2, "", &write_error);
+
+        for capture in &captures {
+            let output = install.evidence(&[
+                "--base",
+                &base,
+                "--validation",
+                arg(&capture.path),
+                flag,
+                arg(&target),
+            ]);
+
+            assert_eq!(
+                (output.status.code(), stdout(&output), stderr(&output)),
+                (
+                    Some(2),
+                    String::new(),
+                    format!(
+                        "{}{write_error}",
+                        refusal_line(&capture.path, &capture.reason)
+                    )
+                ),
+                "{flag}: {}",
+                capture.name
+            );
+        }
+    }
+}
+
+/// A document with no summary and no root is a document (spec 4.1 asks for the version `1.0`
+/// and the items), and the exit 1 that `openspec validate` gives for a failing item is no
+/// error: only the header binds the run.
+#[test]
+fn a_bare_document_and_the_exit_of_a_failing_run_are_no_refusal() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let mut failed = capture_header(Some(&head), Some(false));
+    failed["exit"] = json!(1);
+    let bare =
+        r#"{"version":"1.0","items":[{"id":"add-x","type":"change","valid":false,"issues":[1]}]}"#;
+    let capture = capture_file(
+        &install,
+        "validation.json",
+        &capture_of(&failed, &format!("{bare}\n")),
+    );
+
+    let (_, document) = install.packet_and_document(&base, &["--validation", arg(&capture)]);
+
+    assert_eq!(validations(&document), [validation(false, "1 issue")]);
+}
+
+/// The capture binds to the head of the range, not to the commit that is checked out: a
+/// capture of `--head` is used while a later commit is checked out, and a capture of the
+/// checked-out commit is refused for the earlier `--head` (spec 4.1;
+/// `houserules.commit-bound-documents-read-the-commit`).
+#[test]
+fn the_capture_binds_to_the_head_of_the_range_and_not_to_the_checked_out_commit() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let later = install.commit("docs: later");
+    let items = document_of(&[item("add-x", "change", false, &["ERROR"])]);
+    let at_head = capture_file(&install, "at-head.json", &clean_capture(&head, &items));
+    let at_later = capture_file(&install, "at-later.json", &clean_capture(&later, &items));
+
+    let (_, document) =
+        install.packet_and_document(&base, &["--head", &head, "--validation", arg(&at_head)]);
+    let output = install.evidence(&[
+        "--base",
+        &base,
+        "--head",
+        &head,
+        "--validation",
+        arg(&at_later),
+    ]);
+
+    assert_eq!(validations(&document), [validation(false, "1 issue")]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert_eq!(
+        stderr(&output),
+        refusal_line(
+            &at_later,
+            &format!("ran at {}, not at {}", short(&later), short(&head))
+        )
+    );
+}
+
+/// A second run over the same range and the same capture gives the same bytes.
+#[test]
+fn the_same_capture_gives_the_same_bytes_twice() {
+    let (install, base, head) = openspec_changes(&["add-x"]);
+    let capture = capture_file(
+        &install,
+        "validation.json",
+        &clean_capture(
+            &head,
+            &document_of(&[item("add-x", "change", false, &["ERROR", "INFO"])]),
+        ),
+    );
+
+    let first = install.packet_and_document(&base, &["--validation", arg(&capture)]);
+    let second = install.packet_and_document(&base, &["--validation", arg(&capture)]);
+
+    assert_eq!(first, second);
+}
+
+/// A capture that `houserules capture` wrote binds the head and the clean tree as a hand
+/// written header does: the run of a clean work tree is used, and the run of a tree with an
+/// untracked file is refused as dirty. The capture runs `cat`, which stands for the run of
+/// `openspec validate`; Windows runners do not all hold `cat`.
+#[cfg(unix)]
+#[test]
+fn a_capture_that_houserules_wrote_binds_the_head_and_the_clean_tree() {
+    let (install, base, _) = openspec_changes(&["add-x"]);
+    let output = install.scratch_file("openspec-output.json");
+    fs::write(
+        &output,
+        document_of(&[item("add-x", "change", true, &["WARNING"])]),
+    )
+    .expect("write the output of the tool");
+    let capture = |name: &str| -> PathBuf {
+        let out = install.scratch_file(name);
+        let run = houserules()
+            .arg("capture")
+            .arg("--out")
+            .arg(&out)
+            .args(["--", "cat"])
+            .arg(&output)
+            .current_dir(install.top.path())
+            .output()
+            .expect("run capture");
+        assert_eq!(run.status.code(), Some(0), "{}", stderr(&run));
+        out
+    };
+
+    let clean = capture("clean.json");
+    let (_, document) = install.packet_and_document(&base, &["--validation", arg(&clean)]);
+    fs::write(install.top.path().join("untracked.txt"), "x\n").expect("write a file");
+    let dirty = capture("dirty.json");
+    let refused = install.evidence(&["--base", &base, "--validation", arg(&dirty)]);
+
+    assert_eq!(validations(&document), [validation(true, "1 issue")]);
+    assert_eq!(refused.status.code(), Some(0), "{}", stderr(&refused));
+    assert_eq!(
+        stderr(&refused),
+        refusal_line(&dirty, "ran in a dirty work tree")
+    );
+}
+
+/// The lines of this file that the spec of batch 38 gives as literals are in the spec
+/// (`quality.user-facing-text-is-contract`).
+#[test]
+fn the_validation_lines_of_these_tests_are_in_the_spec() {
+    let spec = fs::read_to_string(repo_root().join("docs").join("specs").join(SPEC_FILE))
+        .expect("read the spec");
+
+    for line in [
+        "evidence: --validation <path>: <reason>",
+        "record:",
+        "cannot be read (<os error>)",
+        "is no capture (<the line of capture's reader>)",
+        "ran outside a git work tree",
+        "ran at <head7>, not at <head7>",
+        "ran in a dirty work tree",
+        "holds no JSON (<serde line>)",
+        "is no openspec validate document (version \"1.0\" with items)",
+        "no issues",
+        "1 issue",
+        "<n> issues",
+        "Validation: openspec <ok|failed>: <summary>",
+    ] {
+        assert!(spec.contains(&format!("`{line}`")), "{line}");
+    }
 }
 
 // ---- the cap ----------------------------------------------------------------------------
@@ -1732,13 +2843,13 @@ fn an_intent_whose_source_is_no_adapter_exits_2() {
     let install = Install::new("", &[], None);
     let base = install.head();
 
-    let output = install.evidence(&["--base", &base, "--intent", "openspec:add-x"]);
+    let output = install.evidence(&["--base", &base, "--intent", "spec-kit:add-x"]);
 
     assert_output(
         &output,
         2,
         "",
-        "evidence: --intent openspec:add-x: \"openspec\" is no intent source; use one of: work-item, file\n",
+        "evidence: --intent spec-kit:add-x: \"spec-kit\" is no intent source; use one of: work-item, file, openspec\n",
     );
 }
 
@@ -1946,15 +3057,19 @@ fn a_git_older_than_2_41_exits_2_with_its_line() {
 // ---- the help ---------------------------------------------------------------------------
 
 /// The sentences of the `about` of `evidence`.
-const ABOUT: [&str; 12] = [
+const ABOUT: [&str; 16] = [
     "Writes the reviewer packet of a change.",
     "The packet starts with the uncovered surface: the changed files and line ranges that no check with `covers: true` read.",
     "Then it lists the intent of the change, the failed, warned, proven, and judged rules, the size of the diff with the work items, and the route.",
     "It prints the packet as Markdown on stdout, for a comment on a pull or merge request, or writes it to `--out`.",
-    "`--json` also writes the document `houserules/evidence@1.0.0`.",
+    "`--json` also writes the document `houserules/evidence@1.1.0`.",
     "The audit rows come from `--audit`, else from an audit that the command runs in process.",
     "`--review` names a review deliverable: a judged rule then shows the verdict of that review.",
     "`--intent <source>:<ref>` adds an intent to the packet, as the `Intent:` line of an evidence bundle writes it.",
+    "An `Intent: <source>:<ref>` trailer of a commit of the range adds one too, and a trailer with a key of `review.sessions.trailers` (default `Entire-Checkpoint`) fills the `Sessions:` line; a trailer never makes the command fail.",
+    "`--validation <file>` names a capture of `openspec validate --json` that `houserules capture` wrote at `--head` in a clean work tree.",
+    "Each `openspec` intent then shows the validation of its change.",
+    "A capture that cannot be used prints one line on stderr and leaves every validation `null`; the exit stays as without the flag.",
     "A packet over 60,000 characters is cut, and each cut list ends with the count of the items that it leaves out.",
     "The packet is the same for the same range and the same rules.",
     "It exits 0 whatever the audit finds.",
@@ -1962,15 +3077,16 @@ const ABOUT: [&str; 12] = [
 ];
 
 /// The help text of each argument of `evidence`.
-const ARGUMENTS: [&str; 9] = [
+const ARGUMENTS: [&str; 10] = [
     "The base ref of the range. The range runs from the merge base of `--base` and `--head` to `--head`",
     "The head ref of the range; defaults to `HEAD`",
     "The file that `audit --json` wrote for the same range. Its `base` and `head` must name the same commits as `--base` and `--head`. Without this flag, the command runs the audit in process",
     "A review deliverable of the kind `task-review`, `re-review`, or `branch-review`, as JSON. A judged rule shows the result of its `rule_adherence` row; a rule with no row shows that no verdict is recorded",
-    "The intent to add, written `<source>:<ref>` as the `Intent:` line of an evidence bundle writes it. The source is `work-item` or `file`",
+    "The intent to add, written `<source>:<ref>` as the `Intent:` line of an evidence bundle writes it. The source is `work-item`, `file`, or `openspec`",
+    "The capture file of an `openspec validate --json` run, written by `houserules capture` at `--head` in a clean work tree. Each `openspec` intent takes the validation of its change from it. A capture that cannot be used prints one line on stderr and leaves every validation `null`",
     "An external score from 0 to 1 for the route. It needs `review.route.ownerScore` or `review.route.seniorScore`",
     "Writes the packet to this file in place of stdout",
-    "Also writes the evidence document `houserules/evidence@1.0.0` to this file",
+    "Also writes the evidence document `houserules/evidence@1.1.0` to this file",
     "Install root to read from; defaults to the nearest directory at or above the current one that holds `.houserules.json`, no higher than the git top level, else the git top level",
 ];
 

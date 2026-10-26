@@ -1,6 +1,6 @@
 {
   "name": "process",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "schema": "houserules/pack@1.2.0",
   "topics": {
     "process": {
@@ -32,7 +32,9 @@
       "standing": true,
       "summary": "Ask the project's owner or decider when information is missing. Do not assume.",
       "body": [
-        "Who answers depends on the project and its environment: a human owner in a supervised setup, an orchestrator or manager agent in a fully autonomous one. Name the project's actual decider once known, in AGENTS.md or a knowledge entry."
+        "Who answers depends on the project and its environment: a human owner in a supervised setup, an orchestrator or manager agent in a fully autonomous one. Name the project's actual decider once known, in AGENTS.md or a knowledge entry.",
+        "A reading that the spec or the handoff leaves open, and that a test would pin, is a question before the author of the change writes that test. The author stops, names the reading and its choices, and asks the person who runs the work. The person who runs the work rules every such reading it finds when it writes the handoff.",
+        "The person who runs the work asks the project's owner or decider in a plain message, never in a question tool that holds its turn. It keeps working: it starts every task and fix round that needs no ruling, and it sends the ruling to the waiting agent when it arrives."
       ],
       "tags": [
         "users"
@@ -50,7 +52,7 @@
       "standing": true,
       "summary": "The tracker drives all work. Select work items before you start; every requirement traces to an item.",
       "body": [
-        "Work items live in the installed tracker. Read them with `houserules list --open`, `get <id>`, `batch <n>`; tick items with `set <id> status=done batch=<n>`."
+        "Work items live in the installed tracker. Read them with `houserules list --open`, `get <id>`, `batch <n>`. Create the batch record of <n> first: an entry in the batch file of the JSON tracker, or a batch issue on the GitHub and Beads trackers. Then tick items with `set <id> status=done batch=<n>`."
       ],
       "tags": [
         "backlog",
@@ -232,7 +234,8 @@
         "The `mode` label follows when the shown run happened, not the failure's flavor: `natural` only when the shown RED ran pre-commit; a post-hoc recapture is `reconstructed` and the tdd entry says so; a disclosed-mutation proof is `mutation`.",
         "Two label failures are common: a mutation proof's RED must show the test FAILING under the mutation — a capture showing the tests passing proves nothing; and a post-commit recapture is `reconstructed` regardless of what also ran earlier — the label follows the shown run, and one report uses one label for one procedure.",
         "A RED against a stub of an implementation already drafted is a `mutation` entry, not a `natural` one.",
-        "A critical task (`process.risk-tiers`) carries its evidence in two parts. The spec's cases become tests before any code, and one recorded run shows them failing at the base commit. The evidence is that run and the whole suite passing at the head. The author of the change still works test-first for every further change; the task needs no recorded RED and GREEN for each further step and no disclosed-mutation proof."
+        "A critical task (`process.risk-tiers`) carries its evidence in two parts. The spec's cases become tests before any code, and one recorded run shows them failing at the base commit. The evidence is that run and the whole suite passing at the head. The whole-suite half is the integration run of the person who runs the work. For a task that runs in the shared checkout, that run is the one at the close of the task. The author of the change still works test-first for every further change; the task needs no recorded RED and GREEN for each further step and no disclosed-mutation proof.",
+        "A test added after the recorded RED carries its own RED or a mutation row in the same report entry; the first RED proves only the tests that existed when it ran."
       ],
       "tags": [
         "testing"
@@ -899,7 +902,7 @@
       "body": [
         "The tier sets the pipeline's depth. Light: one task; docs, comments, config values, or a dependency bump only; no executable behavior change; no task is critical. The work item's body is the spec, and the project's owner or decider still approves it. The pipeline is an author of the change, one task review, and the live run. It has no plan document and no branch review.",
         "Standard: every change that is not light. The pipeline is a short spec with the decision gate, a plan, an author of the change, one task review, at most one re-review, and the live run. A branch review runs only for a batch of two or more tasks.",
-        "A critical task is a task whose change alters the commands, flags, or output of a command-line interface, a schema, authentication or security code, or the data that an installed product keeps on disk. It runs inside the standard tier with its own evidence: the plan writes the spec's cases for the task as tests before any code; the author of the change commits them first with one recorded run that shows them failing at the base commit, then makes them pass; the evidence is that run and the whole suite passing at the head (`process.tdd`).",
+        "A critical task is a task whose change alters the commands, flags, or output of a command-line interface, a schema, authentication or security code, or the data that an installed product keeps on disk. It runs inside the standard tier with its own evidence: the plan writes the spec's cases for the task as tests before any code; the author of the change commits them first with one recorded run that shows them failing at the base commit, then makes them pass; the evidence is that run and the whole suite passing at the head (`process.tdd`). The whole-suite half is the integration run of the person who runs the work. For a task that runs in the shared checkout, that run is the one at the close of the task.",
         "A critical task gets one task review. The person who runs the work checks each fix by re-running the reviewer's own reproduction and records the check (`process.fix-round-verification-record`). A Critical or Important finding goes to a fresh author of the change; a Minor finding is fixed directly. A fix round that fixes a Critical or Important finding, or that changes files beyond the files its findings name, then gets one review of its fix diff. That review files only new breakage. Only a new Critical or Important finding of it opens a further round, which closes by the check of the person who runs the work; no second fix-diff review runs.",
         "A lighter tier drops only what its pipeline names: the light tier drops the plan document and the branch review, and the standard tier drops the branch review for a one-task batch. Every tier keeps item selection, the live run, the finish, and rollout and acceptance.",
         "One tier covers the batch: the highest tier that any of its changes needs. A critical task follows its own evidence rule inside the tier of the batch.",
@@ -958,6 +961,7 @@
         "A fix round that holds only Minor fixes closes with a verification note (`process.fix-round-verification-record`), never with a re-review. The person who runs the work runs the check that each Minor finding names and cites its result in the note.",
         "A re-review reads the fix diff and the original findings only. It files new findings at their impact (`process.severity-by-impact`). Only a new Critical or Important finding opens a further round. A new Minor finding joins a Minor-only round.",
         "Re-reviews per task: light 0, standard 1. A critical task gets no re-review of its original findings; it gets one fix-diff review after a fix round that fixes a Critical or Important finding or changes files beyond its findings' files (`process.risk-tiers`). A branch-review fix wave has the same cap as the batch's tier.",
+        "While a fix-diff review or a re-review runs, the person who runs the work may integrate the fix and run the integration gates. When the review files a new Critical or Important finding, the person who runs the work undoes the integration (the batch branch returns to the commit before it) and the task opens its next round.",
         "At the cap, the open non-critical findings become one work item with the reason (a deferral under `process.no-tech-debt`). An open Critical finding goes to the project's owner or decider.",
         "A light task with an Important or Critical finding moves up to the standard tier and gets its one re-review."
       ],
@@ -1020,6 +1024,8 @@
         "Each parallel author of a change works in its own git worktree, on its own branch from the same base commit.",
         "Every agent of one session gets the same scratchpad path, and two agents that write one file name there overwrite each other without an error. The handoff of a parallel agent names its scratch root, `<scratchpad>/task-<N>/`, and the agent writes scratch files nowhere else.",
         "The person who runs the work integrates a finished task onto the batch branch one at a time (cherry-pick), runs the gates after each, and writes the old-to-new commit map to the record. A conflict or a red gate at integration is a fix round for the later task.",
+        "Two tasks whose only shared file is a file that the plan names as shared, such as a command-line entry point whose changes merge by keeping both sides, may run at once. The person who runs the work resolves the cherry-pick conflict of the later task at integration, keeping both sides, and runs the gates. A resolution that needs more than keeping both sides is a fix round for the later task.",
+        "A task that runs in the shared checkout has no cherry-pick: it integrates when its author closes. At that close, the person who runs the work runs the full suite and every suite the plan marks as integration-only, before the next handoff. A red in that run is a fix round for the task.",
         "A parallel task's fix round commits in the task's own worktree on its own fix base commit, because a worktree-isolated agent cannot run git against the shared checkout. The person who runs the work cherry-picks that commit, runs the gates, and extends the commit map in the record.",
         "Reviews of different tasks may run at the same time: reviewers do not write to the tree. The review of a task starts after its author closes.",
         "At most three agents run at once unless the plan sets a lower limit. The record states each handoff's start and close."

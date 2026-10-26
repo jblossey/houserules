@@ -68,7 +68,8 @@ pub(crate) fn read_json(path: &Path) -> Result<Value, String> {
 /// creating `path`'s parent directory (`backlog/archive/` or
 /// `knowledge/archive/`, on a repository's first sweep) if it does not yet
 /// exist. A file whose bytes already equal the emitted text is left alone,
-/// so its modification time stays.
+/// so its modification time stays, and it is no entry of the record of the
+/// writes (`written`).
 ///
 /// `pub(crate)`: the `pack` commands write every knowledge file and the
 /// install marker through it, so each file keeps one format and no command
@@ -81,7 +82,7 @@ pub(crate) fn write_json(path: &Path, value: &Value) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
     }
-    fs::write(path, content).map_err(|error| format!("{}: {error}", path.display()))
+    crate::written::write(path, content).map_err(|error| format!("{}: {error}", path.display()))
 }
 
 /// Collects every `.json` file name from an already-opened `read_dir`,

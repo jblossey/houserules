@@ -21,11 +21,16 @@ use tracker_support::{
 const FILES: [&str; 6] = [
     "audit-result/1.0.0.json",
     "capture/1.0.0.json",
-    "change-record/1.0.0.json",
-    "evidence/1.0.0.json",
+    "change-record/1.1.0.json",
+    "evidence/1.1.0.json",
     "route/1.0.0.json",
     "rule-package/1.0.0.json",
 ];
+
+/// The published files that the generator no longer writes, because version 1.1.0
+/// of the evidence and of the change record replaced them (batch 38). A release
+/// holds them, so their files and their rows stay.
+const SUPERSEDED: [&str; 2] = ["change-record/1.0.0.json", "evidence/1.0.0.json"];
 
 /// Creates the lightweight tag `name` at HEAD of the repository `repo`, with
 /// signing off whatever the user configured.
@@ -116,9 +121,9 @@ fn manifest(root: &Path) -> Value {
         .expect("parse the manifest")
 }
 
-/// The manifest that a correct `--record` writes for this checkout's schemas.
-fn recorded_manifest() -> Value {
-    let rows: Vec<Value> = FILES
+/// The manifest rows of `files`, each with the digest of the committed file.
+fn manifest_of(files: &[&str]) -> Value {
+    let rows: Vec<Value> = files
         .iter()
         .map(|file| {
             let bytes = fs::read(repo_root().join("schemas").join(file)).expect("read");
@@ -126,6 +131,19 @@ fn recorded_manifest() -> Value {
         })
         .collect();
     json!({ "files": rows })
+}
+
+/// The manifest that a correct `--record` writes for this checkout's schemas.
+fn recorded_manifest() -> Value {
+    manifest_of(&FILES)
+}
+
+/// The manifest that `--record` leaves after it ran over a manifest that lists
+/// [`SUPERSEDED`]: the rows of `FILES` and of `SUPERSEDED`, by path.
+fn kept_manifest() -> Value {
+    let mut files: Vec<&str> = FILES.iter().chain(SUPERSEDED.iter()).copied().collect();
+    files.sort_unstable();
+    manifest_of(&files)
 }
 
 /// Sets the digest of the manifest row for `file` in `root` to `digest`.
@@ -348,7 +366,7 @@ fn the_default_run_writes_every_schema_file_and_never_the_manifest() {
         (
             Some(0),
             "wrote schemas/audit-result/1.0.0.json\nwrote schemas/capture/1.0.0.json\n\
-             wrote schemas/change-record/1.0.0.json\nwrote schemas/evidence/1.0.0.json\nwrote schemas/route/1.0.0.json\n\
+             wrote schemas/change-record/1.1.0.json\nwrote schemas/evidence/1.1.0.json\nwrote schemas/route/1.0.0.json\n\
              wrote schemas/rule-package/1.0.0.json\n"
                 .to_string(),
             String::new()
@@ -380,7 +398,7 @@ fn record_adds_a_row_for_every_file_that_has_none() {
         (
             Some(0),
             "recorded schemas/audit-result/1.0.0.json\nrecorded schemas/capture/1.0.0.json\n\
-             recorded schemas/change-record/1.0.0.json\nrecorded schemas/evidence/1.0.0.json\nrecorded schemas/route/1.0.0.json\n\
+             recorded schemas/change-record/1.1.0.json\nrecorded schemas/evidence/1.1.0.json\nrecorded schemas/route/1.0.0.json\n\
              recorded schemas/rule-package/1.0.0.json\n"
                 .to_string(),
             String::new()
@@ -393,6 +411,51 @@ fn record_adds_a_row_for_every_file_that_has_none() {
         (Some(0), String::new(), String::new()),
         "a second --record changes nothing and prints nothing"
     );
+}
+
+/// The files of version 1.0.0 of the evidence and the change record are
+/// published and never change: `--record` writes no row for them again, leaves
+/// their rows as they are, and holds a row for each 1.1.0 file (batch 38, case 6).
+#[test]
+fn record_keeps_the_rows_of_a_version_that_it_no_longer_generates() {
+    let repo = repo_with_schemas();
+    let before = manifest(repo.path());
+
+    let output = gen_schemas(repo.path(), &["--record"]);
+
+    assert_eq!(
+        (output.status.code(), out(&output), err(&output)),
+        (Some(0), String::new(), String::new())
+    );
+    assert_eq!(
+        manifest(repo.path()),
+        before,
+        "a second record changes nothing"
+    );
+    let rows: Vec<&str> = before["files"]
+        .as_array()
+        .expect("rows")
+        .iter()
+        .map(|row| row["path"].as_str().expect("a path"))
+        .collect();
+    for kept in [
+        "change-record/1.0.0.json",
+        "change-record/1.1.0.json",
+        "evidence/1.0.0.json",
+        "evidence/1.1.0.json",
+    ] {
+        assert!(rows.contains(&kept), "{kept} is missing from {rows:?}");
+    }
+    for old in ["change-record/1.0.0.json", "evidence/1.0.0.json"] {
+        let bytes = fs::read(repo.path().join("schemas").join(old)).expect("read");
+        let row = before["files"]
+            .as_array()
+            .expect("rows")
+            .iter()
+            .find(|row| row["path"] == old)
+            .expect("a row");
+        assert_eq!(row["sha256"], json!(sha256_hex(&bytes)), "{old}");
+    }
 }
 
 #[test]
@@ -424,7 +487,7 @@ fn record_replaces_the_row_of_a_file_that_no_release_tag_holds() {
         ),
         "the tag v0.9.0 predates the file and the tag snapshot is no release tag"
     );
-    assert_eq!(manifest(repo.path()), recorded_manifest());
+    assert_eq!(manifest(repo.path()), kept_manifest());
 }
 
 #[test]

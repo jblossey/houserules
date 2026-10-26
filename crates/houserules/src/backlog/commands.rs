@@ -85,11 +85,22 @@ fn round_trip_remedy(relative: &str) -> &'static str {
     }
 }
 
+/// What `check_archive` reads from `backlog/archive/`.
+#[derive(Default)]
+struct Archived {
+    /// The id of every archived item, so a `see` citation to one still resolves.
+    item_ids: HashSet<String>,
+    /// The number of every batch record of `backlog/archive/batches.json`, so an
+    /// item of a batch that the archive holds still names a batch that exists.
+    batch_numbers: HashSet<i64>,
+}
+
 /// Validates every file directly under `backlog/archive/` against its own
 /// backlog schema def -- `itemsFile` for every file except `batches.json`,
 /// which validates as `batchesFile` -- and collects every archived item's
 /// id, so a `see` citation to one still resolves
-/// (`knowledge-base.ids-are-permanent`, below).
+/// (`knowledge-base.ids-are-permanent`, below), and every archived batch's
+/// number.
 ///
 /// An absent `backlog/archive/` directory is not itself a finding. Any
 /// other reason the directory or one of its files cannot be read or
@@ -104,15 +115,15 @@ fn round_trip_remedy(relative: &str) -> &'static str {
 /// `rules::check`'s own `check_archive` keeps for `knowledge/archive/`: an
 /// archived item's other cross-file invariants (a duplicate id, a batch
 /// membership) are not judged here.
-fn check_archive(b: &LoadedBacklog, errors: &mut Vec<String>) -> HashSet<String> {
-    let mut ids = HashSet::new();
+fn check_archive(b: &LoadedBacklog, errors: &mut Vec<String>) -> Archived {
+    let mut archived = Archived::default();
     let dir = b.root.join("backlog/archive");
     let names = match crate::archive::list_archive_json_files(&dir) {
         Ok(Some(names)) => names,
-        Ok(None) => return ids,
+        Ok(None) => return archived,
         Err(message) => {
             errors.push(message);
-            return ids;
+            return archived;
         }
     };
     for name in names {
@@ -126,7 +137,9 @@ fn check_archive(b: &LoadedBacklog, errors: &mut Vec<String>) -> HashSet<String>
                 };
                 check_ref(&content, def, &relative, b, errors);
                 errors.extend(marker_findings(&content, &relative));
-                if name != "batches.json" {
+                if name == "batches.json" {
+                    archived.batch_numbers.extend(batch_numbers_of(&content));
+                } else {
                     for item in content
                         .get("items")
                         .and_then(Value::as_array)
@@ -134,7 +147,7 @@ fn check_archive(b: &LoadedBacklog, errors: &mut Vec<String>) -> HashSet<String>
                         .flatten()
                     {
                         if let Some(id) = item.get("id").and_then(Value::as_str) {
-                            ids.insert(id.to_string());
+                            archived.item_ids.insert(id.to_string());
                         }
                     }
                 }
@@ -142,16 +155,30 @@ fn check_archive(b: &LoadedBacklog, errors: &mut Vec<String>) -> HashSet<String>
             Err(message) => errors.push(message),
         }
     }
-    ids
+    archived
+}
+
+/// The number of every batch record of the batches file `content`
+/// (`backlog/batches.json` or `backlog/archive/batches.json`).
+fn batch_numbers_of(content: &Value) -> impl Iterator<Item = i64> + '_ {
+    content
+        .get("batches")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|batch| batch.get("number").and_then(Value::as_i64))
 }
 
 /// Validates a loaded backlog against its schema and every cross-file
-/// invariant. Returns `(errors, warnings)`; an empty `errors` has
-/// `check-backlog` print `warn:` lines for each warning, then "backlog:
-/// ok", and exit 0 (`cli.rs`).
+/// invariant: duplicate ids, a `see` that names no item, an item of
+/// `backlog/items/` whose `batch` no batch record of `backlog/batches.json` or
+/// `backlog/archive/batches.json` holds (one finding for each such item), and
+/// the checks of the batch records themselves. Returns `(errors, warnings)`; an
+/// empty `errors` has `check-backlog` print `warn:` lines for each warning,
+/// then "backlog: ok", and exit 0 (`cli.rs`).
 pub(crate) fn check_backlog(b: &LoadedBacklog) -> (Vec<String>, Vec<String>) {
     let mut archive_errors = Vec::new();
-    let archived_ids = check_archive(b, &mut archive_errors);
+    let archived = check_archive(b, &mut archive_errors);
 
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
@@ -220,7 +247,7 @@ pub(crate) fn check_backlog(b: &LoadedBacklog) -> (Vec<String>, Vec<String>) {
         return (errors, warnings);
     }
 
-    let mut ids: HashSet<String> = archived_ids.clone();
+    let mut ids: HashSet<String> = archived.item_ids.clone();
     for amendment in b
         .amendments
         .get("amendments")
@@ -272,6 +299,9 @@ pub(crate) fn check_backlog(b: &LoadedBacklog) -> (Vec<String>, Vec<String>) {
         }
     }
 
+    let known_batches: HashSet<i64> = batch_numbers_of(&b.batches)
+        .chain(archived.batch_numbers.iter().copied())
+        .collect();
     for section in &b.sections {
         for item in section
             .content
@@ -296,6 +326,15 @@ pub(crate) fn check_backlog(b: &LoadedBacklog) -> (Vec<String>, Vec<String>) {
                     ));
                 }
             }
+            if let Some(batch) = item.get("batch").and_then(Value::as_i64)
+                && !known_batches.contains(&batch)
+            {
+                errors.push(format!(
+                    "{} {id}: batch {batch} is not in backlog/batches.json or \
+                     backlog/archive/batches.json",
+                    section.file
+                ));
+            }
             let status = item
                 .get("status")
                 .and_then(Value::as_str)
@@ -314,7 +353,7 @@ pub(crate) fn check_backlog(b: &LoadedBacklog) -> (Vec<String>, Vec<String>) {
         .items
         .iter()
         .map(|(id, _)| id.as_str())
-        .chain(archived_ids.iter().map(String::as_str))
+        .chain(archived.item_ids.iter().map(String::as_str))
         .collect();
     let mut numbers: HashSet<i64> = HashSet::new();
     let mut in_progress = 0u32;

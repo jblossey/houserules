@@ -185,6 +185,7 @@ mod tests {
     use std::process::Command;
 
     use super::*;
+    use crate::review::git::scratch::{assert_no_line_ending_warning_under_autocrlf, fixture_git};
 
     /// A placement below `/repo` with the path `components`.
     fn placement(components: &[&str]) -> Placement {
@@ -362,15 +363,8 @@ mod tests {
         mark(dir.path(), "ignored");
         mark(dir.path(), "gone");
         fs::write(dir.path().join(".gitignore"), "ignored/\n").expect("write .gitignore");
-        let git = |args: &[&str]| {
-            let status = Command::new("git")
-                .args(args)
-                .current_dir(dir.path())
-                .status()
-                .expect("run git");
-            assert!(status.success(), "git {args:?} failed");
-        };
-        git(&["add", "a", "gone"]);
+        let staged = fixture_git(dir.path(), &["add", "a", "gone"], &[]);
+        assert!(staged.status.success(), "git add failed");
         fs::remove_file(dir.path().join("gone").join(INSTALL_MARKER)).expect("remove the marker");
         let own = Placement {
             top_level: dir.path().to_path_buf(),
@@ -526,5 +520,14 @@ mod tests {
         let target = dir.path().join("a").join("b");
         fs::create_dir_all(&target).expect("create target");
         assert_eq!(nearest_ancestor_holding_git(&target), None);
+    }
+
+    /// The fixture of the test that stages two markers with `git add` prints no line-ending
+    /// warning under the autocrlf suite, which injects `core.autocrlf=true`.
+    #[test]
+    fn staging_the_fixture_prints_no_line_ending_warning_under_autocrlf() {
+        assert_no_line_ending_warning_under_autocrlf(&[
+            "install::location::tests::other_installs_lists_the_other_markers_git_lists",
+        ]);
     }
 }

@@ -17,13 +17,14 @@ mod v1_4_0;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::{Map, Value, json};
 
 use tracker_support::{
     LINE_B, commit_all, edit_marker, git, install_with_backlog_dir, install_without_backlog,
-    read_json, repo_root, run, run_ok, scratch_git_repo, sha256_hex, stderr, stdout, write_json,
+    kit_content_at, read_json, repo_root, run, run_ok, scratch_git_repo, sha256_hex, stderr,
+    stdout, write_json,
 };
 
 /// The version the workflow pins: the version of the binary.
@@ -71,18 +72,6 @@ fn path_of(dir: &Path, relative: &str) -> PathBuf {
     relative
         .split('/')
         .fold(dir.to_path_buf(), |path, part| path.join(part))
-}
-
-/// The bytes of `template/<path>` at the git reference `reference` of this
-/// repository, or `None` when the path does not exist there.
-fn kit_content_at(reference: &str, path: &str) -> Option<Vec<u8>> {
-    let output = Command::new("git")
-        .arg("show")
-        .arg(format!("{reference}:template/{path}"))
-        .current_dir(repo_root())
-        .output()
-        .expect("run git show");
-    output.status.success().then_some(output.stdout)
 }
 
 /// The bytes of the file of the reference workflow at the install path `path`,

@@ -514,7 +514,8 @@ pub(crate) fn write_backlog_id_pattern(
     if rewritten == text {
         return Ok(false);
     }
-    fs::write(&path, rewritten).map_err(|error| command(format!("{}: {error}", path.display())))?;
+    crate::written::write(&path, rewritten)
+        .map_err(|error| command(format!("{}: {error}", path.display())))?;
     Ok(true)
 }
 

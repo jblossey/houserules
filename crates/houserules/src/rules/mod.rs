@@ -79,6 +79,12 @@
 //! also the one place that looks for the default branch, and gives
 //! `houserules ci` its name (`default_branch_name`).
 //!
+//! `intent_checks` is the logic of the `intent-required` and `intent-resolves`
+//! check types: the paths of a range that `if` matches, the `Intent:` trailers
+//! of its commits, and the intents that the OpenSpec and file adapters find
+//! (`intent_checks.rs`'s own module doc has the account; batch 38, spec 5.5).
+//! `runner/intent.rs` builds their audit rows.
+//!
 //! No command in this binary ever constructs or strictly parses a
 //! schema-exact deliverable: `validate_deliverable` validates every
 //! deliverable kind through the generic schema engine directly (never a
@@ -105,6 +111,7 @@ pub(crate) mod git;
 mod git_paths;
 mod glob;
 mod ignored;
+mod intent_checks;
 mod kit_citations;
 mod markers;
 mod model;
@@ -116,7 +123,7 @@ mod runner;
 mod stats;
 #[cfg(test)]
 mod test_support;
-mod trailers;
+pub(crate) mod trailers;
 mod validate_deliverable;
 
 pub(crate) use audit::{audit_result, cmd_audit};
@@ -126,7 +133,7 @@ pub(crate) use check_packs::{imports_agents_md, pin_mismatch_line};
 pub(crate) use durable_sha::default_branch_name;
 pub(crate) use git_paths::{
     InstallPrefix, ListingFailure, listed_by_name, submodule_paths, tracked_files,
-    tracked_from_top_level,
+    tracked_from_top_level, untracked_among,
 };
 pub(crate) use glob::compile;
 pub(crate) use ignored::ignored_among;
@@ -136,6 +143,8 @@ pub(crate) use kit_citations::{Scan, kit_citation_findings, scan_kit_citations};
 pub(crate) use markers::marker_findings;
 pub(crate) use model::{Base, RESERVED, load_base};
 pub(crate) use read::{IndexOpts, cmd_for, cmd_index, cmd_standing, cmd_topics, get_entries};
-pub(crate) use render::{GitLocation, cmd_render, git_location_from_cwd, render_and_report};
+pub(crate) use render::{
+    GitLocation, cmd_render, git_location_from_cwd, render_and_report, two_workflows_line,
+};
 pub(crate) use stats::cmd_stats;
 pub(crate) use validate_deliverable::cmd_validate;

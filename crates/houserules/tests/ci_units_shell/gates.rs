@@ -497,46 +497,64 @@ fn the_github_gates_steps_after_the_checks_run_when_an_earlier_step_failed() {
     }
 }
 
+/// Runs the gates script of the GitLab unit for merge request 7 in a repository whose
+/// checked-out commit is the first one and whose source head is the second, with the stub
+/// `houserules` (which fails the subcommand `fail`) and the answer `request` of the host (a
+/// failing call for `None`). `extra` adds environment variables or replaces the ones of the
+/// run, and `work_file` writes the file `(path, text)` below the work directory first. It
+/// gives the output of the script, the sandbox, the first commit, and the second.
+fn run_gitlab_gates(
+    fail: &str,
+    request: Option<&str>,
+    extra: &[(&str, &str)],
+    work_file: Option<(&str, &str)>,
+) -> (Output, Sandbox, String, String) {
+    let unit = gitlab("root");
+    let sandbox = Sandbox::new();
+    let remote = sandbox.path().join("remote").join("widgets.git");
+    let repository = sandbox.work();
+    let (first, second) = repository_with_origin(&repository, &remote);
+    git(&repository, &["checkout", "-q", &first]);
+    sandbox.install_program("houserules", SCRIPTED_HOUSERULES);
+    if let Some((path, content)) = work_file {
+        let target = path
+            .split('/')
+            .fold(repository.clone(), |folder, part| folder.join(part));
+        fs::create_dir_all(target.parent().expect("a parent")).expect("create the folders");
+        fs::write(target, content).expect("write the work file");
+    }
+    match request {
+        Some(body) => sandbox.reply("GET", "/api/v4/projects/5/merge_requests/7", body),
+        None => sandbox.fail("GET", "/api/v4/projects/5/merge_requests/7"),
+    }
+    let mut pairs = vec![
+        ("HOUSERULES_DIR", "."),
+        ("HOUSERULES_SOURCE", "none"),
+        ("HOUSERULES_TRACKER", ""),
+        ("HOUSERULES_SETUP", ""),
+        ("CI_PIPELINE_SOURCE", "merge_request_event"),
+        ("CI_API_V4_URL", "https://gitlab.example/api/v4"),
+        ("CI_MERGE_REQUEST_PROJECT_ID", "5"),
+        ("CI_MERGE_REQUEST_IID", "7"),
+        ("CI_MERGE_REQUEST_DIFF_BASE_SHA", first.as_str()),
+        ("CI_MERGE_REQUEST_SOURCE_BRANCH_SHA", second.as_str()),
+        ("CI_MERGE_REQUEST_SOURCE_BRANCH_NAME", "feature/x"),
+        ("CI_COMMIT_SHA", "cccccccccccccccccccccccccccccccccccccccc"),
+        ("CI_JOB_TOKEN", "job-token"),
+        ("STUB_FAIL", fail),
+    ];
+    pairs.extend_from_slice(extra);
+    let env = env_of(&unit, "gates", &pairs);
+    let output = sandbox.run_sh(&unit.job_script("gates"), env);
+    (output, sandbox, first, second)
+}
+
 /// Spec 10.1, 10.4: the GitLab gates script of a merge request reads the request
 /// from the API into a file, checks out the source head, runs the checks, and
 /// runs `evidence` and `route` even when a check failed; the job then fails.
 #[test]
 fn the_gitlab_gates_script_runs_evidence_and_route_after_a_failed_check() {
-    let unit = gitlab("root");
-    let run = |fail: &str, request: Option<&str>| {
-        let sandbox = Sandbox::new();
-        let remote = sandbox.path().join("remote").join("widgets.git");
-        let repository = sandbox.work();
-        let (first, second) = repository_with_origin(&repository, &remote);
-        git(&repository, &["checkout", "-q", &first]);
-        sandbox.install_program("houserules", SCRIPTED_HOUSERULES);
-        match request {
-            Some(body) => sandbox.reply("GET", "/api/v4/projects/5/merge_requests/7", body),
-            None => sandbox.fail("GET", "/api/v4/projects/5/merge_requests/7"),
-        }
-        let env = env_of(
-            &unit,
-            "gates",
-            &[
-                ("HOUSERULES_DIR", "."),
-                ("HOUSERULES_SOURCE", "none"),
-                ("HOUSERULES_TRACKER", ""),
-                ("HOUSERULES_SETUP", ""),
-                ("CI_PIPELINE_SOURCE", "merge_request_event"),
-                ("CI_API_V4_URL", "https://gitlab.example/api/v4"),
-                ("CI_MERGE_REQUEST_PROJECT_ID", "5"),
-                ("CI_MERGE_REQUEST_IID", "7"),
-                ("CI_MERGE_REQUEST_DIFF_BASE_SHA", first.as_str()),
-                ("CI_MERGE_REQUEST_SOURCE_BRANCH_SHA", second.as_str()),
-                ("CI_MERGE_REQUEST_SOURCE_BRANCH_NAME", "feature/x"),
-                ("CI_COMMIT_SHA", "cccccccccccccccccccccccccccccccccccccccc"),
-                ("CI_JOB_TOKEN", "job-token"),
-                ("STUB_FAIL", fail),
-            ],
-        );
-        let output = sandbox.run_sh(&unit.job_script("gates"), env);
-        (output, sandbox, first, second)
-    };
+    let run = |fail: &str, request: Option<&str>| run_gitlab_gates(fail, request, &[], None);
     let request = json!({
         "description": "## Evidence bundle\r\nPurpose: x\r\n```houserules-run\r\n{}\r\n```\r\nIntent: file:docs/plans/a.md\r\n",
         "author": {"username": "amy"}
@@ -680,4 +698,226 @@ fn the_gitlab_setup_command_runs_at_the_source_head() {
         "without the checkout the setup command sees the merge commit"
     );
     assert_ne!(seen, second);
+}
+
+/// Spec 4.3 (batch 38): the `Write the evidence packet` step of the GitHub unit passes
+/// `--validation <dir>/<input>` to `evidence` when the input is set and the file exists, after
+/// `--audit` and before `--intent`; a set input whose file does not exist prints one notice
+/// and passes no flag; an empty input does neither.
+#[test]
+fn the_github_evidence_step_passes_the_validation_capture_that_exists() {
+    let unit = github();
+    for case in validation_cases() {
+        let sandbox = Sandbox::new();
+        sandbox.install_program("houserules", SCRIPTED_HOUSERULES);
+        let evidence = sandbox.temp().join("houserules-evidence-root");
+        fs::create_dir_all(&evidence).expect("create the evidence folder");
+        fs::write(evidence.join("description.md"), "no section\n").expect("write the description");
+        fs::write(evidence.join("audit.json"), "{}\n").expect("write the audit");
+        if let Some(left) = &case.left {
+            leave(&sandbox.work(), left);
+        }
+        let summary = text(&sandbox.temp().join("summary.md"));
+        let env = env_of(
+            &unit,
+            "gates",
+            &[
+                ("HOUSERULES_DIR", case.dir),
+                ("HOUSERULES_KEY", "root"),
+                ("HOUSERULES_BASE", "base-sha"),
+                ("HOUSERULES_HEAD", "head-sha"),
+                ("HOUSERULES_VALIDATION", case.input),
+                ("GITHUB_STEP_SUMMARY", summary.as_str()),
+            ],
+        );
+
+        let output = sandbox.run_bash(&unit.step_script("gates", "Write the evidence packet"), env);
+
+        let name = format!("{:?} {:?}", case.dir, case.input);
+        assert_eq!(output.status.code(), Some(0), "{name}: {}", stderr(&output));
+        let flag = case
+            .passed
+            .map_or(String::new(), |path| format!(" --validation {path}"));
+        assert_eq!(
+            houserules_log(&sandbox),
+            vec![format!(
+                "evidence --base base-sha --head head-sha --dir {} --audit {}{flag} --out {} --json {}",
+                case.dir,
+                text(&evidence.join("audit.json")),
+                text(&evidence.join("evidence.md")),
+                text(&evidence.join("evidence.json"))
+            )],
+            "{name}"
+        );
+        let printed = case.notice.map_or(String::new(), |path| {
+            format!("::notice::{}\n", validation_notice(path))
+        });
+        assert_eq!(stdout(&output), printed, "{name}");
+    }
+}
+
+/// When `evidence` refuses the intent, the step runs it again without the intent: both calls
+/// carry the capture, and the notice of an absent file prints once (spec 4.3).
+#[test]
+fn the_github_evidence_step_passes_the_capture_to_both_calls_and_prints_one_notice() {
+    let unit = github();
+    for present in [true, false] {
+        let sandbox = Sandbox::new();
+        sandbox.install_program("houserules", SCRIPTED_HOUSERULES);
+        let evidence = sandbox.temp().join("houserules-evidence-root");
+        fs::create_dir_all(&evidence).expect("create the evidence folder");
+        fs::write(
+            evidence.join("description.md"),
+            "## Evidence bundle\n\nIntent: file:docs/plans/a.md\n",
+        )
+        .expect("write the description");
+        if present {
+            leave(&sandbox.work(), &Left::File("validation.json"));
+        }
+        let summary = text(&sandbox.temp().join("summary.md"));
+        let env = env_of(
+            &unit,
+            "gates",
+            &[
+                ("HOUSERULES_DIR", "."),
+                ("HOUSERULES_KEY", "root"),
+                ("HOUSERULES_BASE", "base-sha"),
+                ("HOUSERULES_HEAD", "head-sha"),
+                ("HOUSERULES_VALIDATION", "validation.json"),
+                ("GITHUB_STEP_SUMMARY", summary.as_str()),
+                ("STUB_REJECT_INTENT", "1"),
+            ],
+        );
+
+        let output = sandbox.run_bash(&unit.step_script("gates", "Write the evidence packet"), env);
+
+        assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+        let out = text(&evidence.join("evidence.md"));
+        let json = text(&evidence.join("evidence.json"));
+        let flag = if present {
+            " --validation ./validation.json"
+        } else {
+            ""
+        };
+        assert_eq!(
+            houserules_log(&sandbox),
+            vec![
+                format!(
+                    "evidence --base base-sha --head head-sha --dir .{flag} --intent=file:docs/plans/a.md --out {out} --json {json}"
+                ),
+                format!(
+                    "evidence --base base-sha --head head-sha --dir .{flag} --out {out} --json {json}"
+                ),
+            ]
+        );
+        let printed = if present {
+            String::new()
+        } else {
+            format!("::notice::{}\n", validation_notice("./validation.json"))
+        };
+        assert_eq!(stdout(&output), printed);
+    }
+}
+
+/// Spec 4.3 (batch 38): the gates script of the GitLab unit passes `--validation <dir>/<input>`
+/// to `evidence` under the same rule as the GitHub step, with the notice of an absent file
+/// printed once.
+#[test]
+fn the_gitlab_gates_script_passes_the_validation_capture_that_exists() {
+    let request = json!({
+        "description": "## Evidence bundle\nIntent: file:docs/plans/a.md\n",
+        "author": {"username": "amy"}
+    })
+    .to_string();
+    for case in validation_cases() {
+        let work_file = match &case.left {
+            Some(Left::File(path)) => Some((*path, "a capture\n")),
+            _ => None,
+        };
+        let name = format!("{:?} {:?}", case.dir, case.input);
+
+        let (output, sandbox, first, second) = run_gitlab_gates(
+            "",
+            Some(&request),
+            &[
+                ("HOUSERULES_DIR", case.dir),
+                ("HOUSERULES_VALIDATION", case.input),
+            ],
+            work_file,
+        );
+
+        assert_eq!(
+            output.status.code(),
+            Some(0),
+            "{name}: {}{}",
+            stdout(&output),
+            stderr(&output)
+        );
+        let out = "houserules-evidence-root";
+        let flag = case
+            .passed
+            .map_or(String::new(), |path| format!(" --validation {path}"));
+        let calls = houserules_log(&sandbox);
+        let expected = format!(
+            "evidence --base {first} --head {second} --dir {} --audit {out}/audit.json{flag} --intent=file:docs/plans/a.md --out {out}/evidence.md --json {out}/evidence.json",
+            case.dir
+        );
+        assert!(calls.contains(&expected), "{name}: {calls:?}");
+        let printed = case.notice.map_or(String::new(), |path| {
+            format!("{}\n", validation_notice(path))
+        });
+        assert_eq!(stdout(&output), printed, "{name}");
+    }
+}
+
+/// When `evidence` refuses the intent, the GitLab script runs it again without the intent: both
+/// calls carry the capture, and `route` takes none (spec 4.3).
+#[test]
+fn the_gitlab_gates_script_passes_the_capture_to_both_evidence_calls_and_not_to_route() {
+    let request = json!({
+        "description": "## Evidence bundle\nIntent: file:docs/plans/a.md\n",
+        "author": {"username": "amy"}
+    })
+    .to_string();
+
+    let (output, sandbox, first, second) = run_gitlab_gates(
+        "",
+        Some(&request),
+        &[
+            ("HOUSERULES_VALIDATION", "validation.json"),
+            ("STUB_REJECT_INTENT", "1"),
+        ],
+        Some(("validation.json", "a capture\n")),
+    );
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}{}",
+        stdout(&output),
+        stderr(&output)
+    );
+    let out = "houserules-evidence-root";
+    let calls = houserules_log(&sandbox);
+    let evidence: Vec<&String> = calls
+        .iter()
+        .filter(|call| call.starts_with("evidence "))
+        .collect();
+    assert_eq!(
+        evidence,
+        [
+            &format!(
+                "evidence --base {first} --head {second} --dir . --audit {out}/audit.json --validation ./validation.json --intent=file:docs/plans/a.md --out {out}/evidence.md --json {out}/evidence.json"
+            ),
+            &format!(
+                "evidence --base {first} --head {second} --dir . --audit {out}/audit.json --validation ./validation.json --out {out}/evidence.md --json {out}/evidence.json"
+            ),
+        ]
+    );
+    let route: Vec<&String> = calls
+        .iter()
+        .filter(|call| call.starts_with("route "))
+        .collect();
+    assert_eq!(route.len(), 1);
+    assert!(!route[0].contains("--validation"), "{route:?}");
 }

@@ -334,12 +334,10 @@ fn declared_exception_counts(
 /// it out): how many tracked paths actually start with it. Printed
 /// unconditionally, `0` included, for the identical reason
 /// `declared_exception_counts` prints every label's count: a prefix
-/// matching zero tracked files excludes nothing at all, and that was
-/// invisible until this count existed -- `EXCLUDED_PREFIXES` used to
-/// carry a `.superpowers/` entry in exactly that state (`.gitignore`
-/// already keeps that whole tree untracked, so the entry never excluded
-/// a single file), retired once this count exposed it (HR-115's own
-/// `vacuous-exception-gate` review finding).
+/// matching zero tracked files excludes nothing at all, and only this
+/// count shows it. A `.superpowers/` entry would be such a prefix:
+/// `.gitignore` keeps that whole tree untracked, so the entry could never
+/// exclude a single file.
 fn excluded_prefix_counts(tracked: &[String]) -> Vec<(&'static str, usize)> {
     EXCLUDED_PREFIXES
         .iter()

@@ -1,0 +1,70 @@
+{
+  "id": "add-status-next-step",
+  "title": "Name the command that resumes a change",
+  "deltaCount": 1,
+  "deltas": [
+    {
+      "spec": "cli-artifact-workflow",
+      "operation": "MODIFIED",
+      "description": "Modify requirement: The workflow SHALL use `openspec status` output to determine what can be created next, rather than a separate next-command surface.",
+      "requirement": {
+        "name": "Next Artifact Discovery",
+        "text": "The workflow SHALL use `openspec status` output to determine what can be created next, rather than a separate next-command surface.",
+        "scenarios": [
+          {
+            "name": "Discover next artifacts from status output",
+            "rawText": "- **WHEN** a user needs to know which artifact to create next\n- **THEN** `openspec status --change <id>` identifies ready artifacts with `[ ]`\n- **AND** the first `[ ]` entry is the schema's recommended next artifact\n- **AND** no dedicated \"next command\" is required to continue the workflow"
+          },
+          {
+            "name": "Status names the command that moves the change forward",
+            "rawText": "- **WHEN** a user runs `openspec status --change <id>` in text mode and a next step resolves\n- **THEN** the output ends with a `Next:` line naming exactly one command to run\n- **AND** that command is `openspec instructions <artifact> --change \"<id>\" --json` for the first ready artifact while any planning artifact is still ready\n- **AND** it is `openspec instructions apply --change \"<id>\" --json` once every planning artifact exists, printed after the completion line rather than in place of it, because that line alone reads as \"you are done\" while implementation tasks remain\n- **AND** the named artifact is never one the change skipped, which satisfies its dependents but must not be created\n- **AND** the artifact id comes from the resolved schema, so a project whose schema declares neither of the default artifact names still gets a usable command"
+          },
+          {
+            "name": "The named command carries the store selection",
+            "rawText": "- **WHEN** the resolved root is a store\n- **THEN** the `Next:` command includes `--store <id>`, so it resolves against the same root the status was read from rather than the pointer repo"
+          },
+          {
+            "name": "Both surfaces name the same command",
+            "rawText": "- **WHEN** a next step resolves\n- **THEN** the command printed on the `Next:` line and the command inside the JSON `nextSteps` sentence are derived from one resolution, so the two surfaces cannot name different commands\n- **AND** the `Next:` line never appears in `--json` output, which stays parseable"
+          },
+          {
+            "name": "No next step resolves",
+            "rawText": "- **WHEN** no artifact is ready and planning is not complete, or a change in an `--all` sweep failed to load\n- **THEN** no `Next:` line is printed for it, rather than a guessed or shared command"
+          }
+        ]
+      },
+      "requirements": [
+        {
+          "name": "Next Artifact Discovery",
+          "text": "The workflow SHALL use `openspec status` output to determine what can be created next, rather than a separate next-command surface.",
+          "scenarios": [
+            {
+              "name": "Discover next artifacts from status output",
+              "rawText": "- **WHEN** a user needs to know which artifact to create next\n- **THEN** `openspec status --change <id>` identifies ready artifacts with `[ ]`\n- **AND** the first `[ ]` entry is the schema's recommended next artifact\n- **AND** no dedicated \"next command\" is required to continue the workflow"
+            },
+            {
+              "name": "Status names the command that moves the change forward",
+              "rawText": "- **WHEN** a user runs `openspec status --change <id>` in text mode and a next step resolves\n- **THEN** the output ends with a `Next:` line naming exactly one command to run\n- **AND** that command is `openspec instructions <artifact> --change \"<id>\" --json` for the first ready artifact while any planning artifact is still ready\n- **AND** it is `openspec instructions apply --change \"<id>\" --json` once every planning artifact exists, printed after the completion line rather than in place of it, because that line alone reads as \"you are done\" while implementation tasks remain\n- **AND** the named artifact is never one the change skipped, which satisfies its dependents but must not be created\n- **AND** the artifact id comes from the resolved schema, so a project whose schema declares neither of the default artifact names still gets a usable command"
+            },
+            {
+              "name": "The named command carries the store selection",
+              "rawText": "- **WHEN** the resolved root is a store\n- **THEN** the `Next:` command includes `--store <id>`, so it resolves against the same root the status was read from rather than the pointer repo"
+            },
+            {
+              "name": "Both surfaces name the same command",
+              "rawText": "- **WHEN** a next step resolves\n- **THEN** the command printed on the `Next:` line and the command inside the JSON `nextSteps` sentence are derived from one resolution, so the two surfaces cannot name different commands\n- **AND** the `Next:` line never appears in `--json` output, which stays parseable"
+            },
+            {
+              "name": "No next step resolves",
+              "rawText": "- **WHEN** no artifact is ready and planning is not complete, or a change in an `--all` sweep failed to load\n- **THEN** no `Next:` line is printed for it, rather than a guessed or shared command"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "root": {
+    "path": "/home/jblossey/.cache/hr-b38/parity",
+    "source": "nearest"
+  }
+}

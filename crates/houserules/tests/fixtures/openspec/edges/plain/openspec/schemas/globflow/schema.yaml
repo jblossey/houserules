@@ -1,0 +1,17 @@
+name: globflow
+version: 1
+description: a test schema
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: p
+    template: proposal.md
+    requires: []
+  - id: tasks
+    generates: "work/*.md"
+    description: t
+    template: tasks.md
+    requires: [proposal]
+apply:
+  requires: [tasks]
+  tracks: "work/*.md"

@@ -239,6 +239,61 @@ fn a_bad_range_prints_one_finding_and_exits_1() {
     );
 }
 
+/// A message may hold any byte but NUL: a record separator byte (`0x1e`) in the body of a commit
+/// makes no second commit of it, so a clean range stays clean.
+#[test]
+fn a_separator_byte_in_a_message_of_a_range_makes_no_second_commit() {
+    let dir = make_repo();
+    let base_sha = commit(dir.path(), "chore: base");
+    commit(
+        dir.path(),
+        "feat: good\n\nbody \u{1e} here\n\u{1e}at a line start",
+    );
+    let output = houserules()
+        .args(["check-commit", "--from", &base_sha])
+        .current_dir(dir.path())
+        .output()
+        .expect("run check-commit");
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.stdout, b"check-commit: ok\n");
+    assert_eq!(output.stderr, b"");
+}
+
+/// A subject is read as UTF-8 whatever log encoding the repository asks for
+/// (`i18n.logOutputEncoding`): a subject pattern that needs a non-ASCII letter holds for a clean
+/// range.
+#[test]
+fn a_subject_with_a_non_ascii_letter_is_read_as_utf_8_whatever_the_log_encoding() {
+    let dir = make_repo();
+    write_file(
+        dir.path(),
+        "knowledge/team.json",
+        r#"{
+            "$schema": "./schema.json", "topic": "team", "title": "team title",
+            "entries": [{
+                "id": "team.cafe", "kind": "rule", "area": "global",
+                "standing": true, "summary": "A subject names the cafe.", "body": ["x"],
+                "tags": [], "source": {"date": "2026-10-26", "by": "user"},
+                "check": {"type": "commits", "level": "fail", "subject": "^docs: café$"}
+            }]
+        }"#,
+    );
+    let base_sha = commit(dir.path(), "docs: café");
+    git(
+        dir.path(),
+        &["config", "i18n.logOutputEncoding", "ISO-8859-1"],
+    );
+    commit(dir.path(), "docs: café");
+    let output = houserules()
+        .args(["check-commit", "--from", &base_sha])
+        .current_dir(dir.path())
+        .output()
+        .expect("run check-commit");
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.stdout, b"check-commit: ok\n");
+    assert_eq!(output.stderr, b"");
+}
+
 #[test]
 fn an_unresolvable_from_ref_is_a_named_error_exit_2() {
     let dir = make_repo();

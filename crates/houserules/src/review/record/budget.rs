@@ -34,6 +34,9 @@ const TEXT_CHARS: usize = 1_000;
 /// The most work items that a cut list keeps.
 const WORK_ITEMS_KEPT: usize = 50;
 
+/// The most sessions that a cut list keeps.
+const SESSIONS_KEPT: usize = 20;
+
 /// The most runs that a cut bundle keeps.
 const RUNS_KEPT: usize = 20;
 
@@ -319,8 +322,8 @@ fn cut_bundle(bundle: &mut RecordBundle) -> bool {
 
 /// Step 7: the why of each intent, and the purpose, the criterion, and the
 /// budget reason of the bundle, go to 1,000 characters; the artifacts of an
-/// intent become a count; the work items and the runs go to their first 50 and
-/// 20 and a count.
+/// intent become a count; the work items, the runs, and the sessions go to their
+/// first 50, 20, and 20 and a count.
 fn cut_texts(record: &mut ChangeRecord) -> Vec<&'static str> {
     let mut names = Vec::new();
     if let Intents::Full(intents) = &mut record.intent {
@@ -354,14 +357,16 @@ fn cut_texts(record: &mut ChangeRecord) -> Vec<&'static str> {
     {
         names.push("bundle");
     }
-    if let Some(links) = &mut record.links
-        && cut_list(
+    if let Some(links) = &mut record.links {
+        let mut changed = cut_list(
             &mut links.work_items,
             &mut links.work_items_more,
             WORK_ITEMS_KEPT,
-        )
-    {
-        names.push("links");
+        );
+        changed |= cut_list(&mut links.sessions, &mut links.sessions_more, SESSIONS_KEPT);
+        if changed {
+            names.push("links");
+        }
     }
     names
 }
@@ -1146,5 +1151,46 @@ mod tests {
 
         assert_eq!(result["base"], json!(BASE));
         assert_eq!(result["key"], json!(KEY));
+    }
+
+    /// The sessions of a record that cites `count` checkpoints.
+    fn sessions(count: u32) -> Value {
+        Value::Array(
+            (0..count)
+                .map(|number| {
+                    json!({"commit": KEY, "trailer": "Entire-Checkpoint", "value": format!("cp-{number}")})
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn step_7_cuts_the_sessions_to_the_first_20_and_a_count() {
+        let mut value = quiet(full(0));
+        value["links"]["sessions"] = sessions(25);
+
+        let result = one_byte_under(&value);
+
+        assert_eq!(result["links"]["sessions"], sessions(20));
+        assert_eq!(result["links"]["sessions_more"], json!(5));
+        assert_eq!(result["truncated"], json!(["links"]));
+    }
+
+    #[test]
+    fn step_7_keeps_20_sessions_whole_and_counts_the_one_past_them() {
+        let mut value = quiet(full(0));
+        value["links"]["sessions"] = sessions(20);
+        value["bundle"]["purpose"] = json!("p".repeat(5_000));
+
+        let result = one_byte_under(&value);
+
+        assert_eq!(result["links"]["sessions"], sessions(20));
+        assert!(result["links"].get("sessions_more").is_none());
+
+        value["links"]["sessions"] = sessions(21);
+        let result = one_byte_under(&value);
+
+        assert_eq!(result["links"]["sessions"], sessions(20));
+        assert_eq!(result["links"]["sessions_more"], json!(1));
     }
 }
