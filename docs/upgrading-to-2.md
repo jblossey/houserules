@@ -259,7 +259,7 @@ houserules init --tracker github --repo <owner>/<name>
 houserules init --tracker beads
 ```
 
-`--repo` is optional for GitHub. Without it, `init` reads the `origin` remote. Every command that sets `tracker` also writes the `backlogId` pattern of the deliverables schema for the tracker, and the seeded CI workflow for it. `update` does both too.
+`--repo` is optional for GitHub. Without it, `init` reads the `origin` remote. Every command that sets `tracker` also writes the `backlogId` pattern of the deliverables schema for the tracker, and brings the seeded CI workflow of an install that holds one to the form of the tracker. It writes no workflow for an install that holds none. `update` does both too.
 
 An install keeps its tracker. `init --tracker` with the same tracker changes nothing for the tracker and exits 0. These cases refuse, exit 2, and write nothing:
 
@@ -274,9 +274,9 @@ No command moves data from one tracker to another. The `migrating-knowledge` ski
 
 **JSON.** The tracker keeps the `backlog/` files and the schema of 1.x. The commands that you used in 1.x print what they printed.
 
-**GitHub Issues.** The tracker runs the `gh` CLI. houserules never reads, takes, or stores a token: `gh` keeps its own login. An item is an issue with a `type:<t>` label. `check-backlog` names the `gh label create <label>` command for each `houserules:` label that your repository lacks. The seeded CI workflow gets the job-level permissions `contents: read` and `issues: read`, and the step-level environment `GH_TOKEN: ${{ github.token }}` on the steps that run `check-backlog` and `audit`.
+**GitHub Issues.** The tracker runs the `gh` CLI. houserules never reads, takes, or stores a token: `gh` keeps its own login. An item is an issue with a `type:<t>` label. `check-backlog` names the `gh label create <label>` command for each `houserules:` label that your repository lacks. The seeded CI workflow of an install that holds one gets the job-level permissions `contents: read` and `issues: read`, and the step-level environment `GH_TOKEN: ${{ github.token }}` on the steps that run `check-backlog` and `audit`.
 
-**Beads.** The tracker runs the `bd` CLI. houserules sets `BD_DISABLE_METRICS=1` and `DO_NOT_TRACK=1` on every `bd` it starts, in a project and in its CI, so an adopter never sends bd usage events through houserules. A user's own `bd` calls keep bd's own setting. The seeded CI workflow of a Beads install installs `bd` at a pinned release and runs `bd bootstrap`, because a fresh clone has no Beads store. `update` reads the issue prefix from `bd` again and rewrites the `backlogId` pattern when it changed. Where `bd` cannot be reached, `update` keeps the pattern, prints the unreachable line on stderr, and finishes.
+**Beads.** The tracker runs the `bd` CLI. houserules sets `BD_DISABLE_METRICS=1` and `DO_NOT_TRACK=1` on every `bd` it starts, in a project and in its CI, so an adopter never sends bd usage events through houserules. A user's own `bd` calls keep bd's own setting. The seeded CI workflow of an install that holds one with the Beads tracker installs `bd` at a pinned release and runs `bd bootstrap`, because a fresh clone has no Beads store. `update` reads the issue prefix from `bd` again and rewrites the `backlogId` pattern when it changed. Where `bd` cannot be reached, `update` keeps the pattern, prints the unreachable line on stderr, and finishes.
 
 `update` keeps a CI workflow that you changed, and prints a [hand step](#hand-step-a-ci-workflow-that-lacks-the-lines-of-your-tracker) when the workflow lacks the lines of your tracker.
 
@@ -325,7 +325,7 @@ Deferred: WI-015 the split changes the public API
 ```
 
 - A commit that delivers several items writes one `Work-Item:` trailer for each.
-- Trailers follow the trailer rules of git: the `Key: value` lines of the last paragraph. houserules reads no trailer from the body of a pull request.
+- Trailers follow the trailer rules of git: the `Key: value` lines of the last paragraph. houserules reads no trailer from the body of a pull or merge request.
 - `audit` resolves every trailer of its range through the installed tracker. An id that matches no id shape of the tracker fails without a call to the tracker.
 - A `Deferred:` trailer passes when it names a reason and the item carries a deferral with a reason.
 - `audit --report` and `audit --workspace` also resolve each `issues[].backlog` id of the reviews and reports they read.
@@ -428,9 +428,8 @@ Every install holds a core skill, `.claude/skills/houserules-step/SKILL.md`, and
 - the line `.houserules/` in `.gitignore`
 - `.claude/schemas/deliverables.json`
 - `AGENTS.md` with its block, each directory `AGENTS.md` that `render` writes for the installed packs (none for the `knowledge-base` pack alone), `CLAUDE.md`, and `docs/README.md`
-- `.github/workflows/knowledge.yml`, on a GitHub-hosted origin
 
-It writes no tracker, no workflow, no `backlog/` directory, and no eval file. Every gate passes on that install. `check-knowledge` prints `knowledge: ok`, and `check-backlog` prints line A and exits 0. A second `update` writes nothing under `backlog/` and no eval file.
+It writes no tracker, no workflow, no CI file, no `backlog/` directory, and no eval file. Every gate passes on that install. `check-knowledge` prints `knowledge: ok`, and `check-backlog` prints line A and exits 0. A second `update` writes nothing under `backlog/` and no eval file.
 
 The conversion does not reduce an install of 1.x to the minimal default. It adopts the tracker and the workflow files that it finds.
 
@@ -465,7 +464,7 @@ houserules 1.x had three tiers: light, standard, and full. 2.0 has two, light an
 
 - A critical task changes the commands, flags, or output of a command-line interface, a schema, authentication or security code, or the data that an install keeps on disk.
 - The plan writes the cases of a critical task as tests before any code. The author of the change commits them first, with one recorded run that shows them failing at the base commit, and then makes them pass. The evidence is that run and the whole suite passing at the head.
-- A critical task gets one task review and never a re-review.
+- A critical task gets one task review and no re-review of its original findings. A fix round that fixes a Critical or Important finding, or that changes files beyond the files its findings name, then gets one review of its fix diff.
 - The light tier applies when no task is critical, where 1.x asked that no `full-tier` entry applied.
 
 The `full-tier` tag is gone. No kit text reads it, so an entry of your own that carries the tag no longer changes anything. Delete the tag, or keep it as a plain label.
@@ -494,7 +493,7 @@ git -C ../kit-reference remote add origin https://github.com/example/reference.g
 houserules init --dir ../kit-reference
 ```
 
-The GitHub origin makes `init` write the CI workflow too. To compare a file of your tracker, run `houserules init --tracker <name> --dir ../kit-reference` as well, with `json` or `github` for `<name>`: it writes `backlog/schema.json` for the JSON tracker, the `backlogId` pattern, and the CI workflow of that tracker. Delete `../kit-reference` when you are done.
+The `origin` remote lets `init --tracker github` read the repository. To compare a file of your tracker, run `houserules init --tracker <name> --dir ../kit-reference` as well, with `json` or `github` for `<name>`: it writes `backlog/schema.json` for the JSON tracker and the `backlogId` pattern. `init` writes no CI file, so the reference install holds no workflow to compare. Delete `../kit-reference` when you are done.
 
 The Beads tracker needs a store first, because `init --tracker beads` refuses without one. `bd init` links an origin remote to the store and contacts it, so it runs before the `remote add` line. For Beads, make the reference install with this block instead:
 
@@ -576,13 +575,19 @@ Copy `../kit-reference/knowledge/schema.json` over `knowledge/schema.json`.
 ### Hand step: a CI workflow of your own
 
 ```text
-hand step: <path> differs from every workflow that houserules 1.x released, so houserules update kept it; compare it with the workflow that houserules init writes, and merge the rest by hand
+hand step: <path> differs from every workflow that houserules 1.x released, so houserules update kept it; compare it with the seeded workflow of this release, template/.github/workflows/knowledge.yml in the houserules repository, and merge the rest by hand
 ```
 
-`<path>` is the workflow file, `.github/workflows/knowledge.yml` for an install at the top level of the repository. `update` replaces a workflow that equals one of the workflows of houserules 1.x. It keeps yours. Compare it with the workflow of the kit and merge by hand:
+`<path>` is the workflow file, relative to the top level of the repository: `.github/workflows/knowledge.yml` for an install at the top level. `update` replaces a workflow that equals one of the workflows of houserules 1.x. It keeps yours. Compare it with the seeded workflow of this release, `template/.github/workflows/knowledge.yml` in the houserules repository, and merge by hand. That file is the form for an install at the top level of the repository with no tracker or the JSON tracker. The seeded workflow of another install differs from it:
+
+- **The GitHub tracker:** the workflow also holds `issues: read` and the `GH_TOKEN` env. The hand step [a CI workflow that lacks the lines of your tracker](#hand-step-a-ci-workflow-that-lacks-the-lines-of-your-tracker) names them.
+- **The Beads tracker:** the workflow also holds the steps that install `bd` and bootstrap the store, and it lacks `persist-credentials: false`. The same hand step names the steps. The hand step [a Beads CI workflow that drops its credential](#hand-step-a-beads-ci-workflow-that-drops-its-credential) names the input.
+- **An install in a subdirectory:** the file is `.github/workflows/knowledge-<folder>.yml`, where `<folder>` is the path of the install below the top level with each `/` replaced by `-`. The `name` is `knowledge (<install path>)`, each of the two triggers has a `paths` filter on `<install path>/**`, and the job has `working-directory: <install path>` as the default of its steps.
+
+The reference install holds no workflow, because `init` writes none, so fetch the file of your release (`<version>` is the release that you run). Run the command from the top level of the repository, with the path that the line names in place of `<path>`:
 
 ```sh
-diff .github/workflows/knowledge.yml ../kit-reference/.github/workflows/knowledge.yml
+curl -fsSL https://raw.githubusercontent.com/jblossey/houserules/v<version>/template/.github/workflows/knowledge.yml | diff <path> -
 ```
 
 To keep your workflow for good, list its path in `ownedPaths`.
@@ -725,7 +730,7 @@ The Beads tracker:
 hand step: <path> lacks the steps that the beads tracker needs; add a step that installs bd <bd-version> from its GitHub release, and a step that runs bd bootstrap --yes, before the step that runs houserules check-backlog
 ```
 
-Copy the two steps from the workflow that `houserules init` writes for the Beads tracker. They download `bd`, check its checksum, and bootstrap the store from the data of the origin.
+Copy the two steps from the jobs that `houserules ci print --host github --mode inline` prints for an install with the Beads tracker. They download `bd`, check its checksum, and bootstrap the store from the data of the origin.
 
 ## The commit-msg hook
 
@@ -759,7 +764,7 @@ Use `.githooks/commit-msg` for an install at the top level.
 
 ## Changes of install schema 2.2.0
 
-`update` stamps `houserules/install@2.2.0` on an install of `2.1.0` and prints `wrote .houserules.json (houserules/install@2.2.0)` once. It also brings `.gitignore` to hold the line `.houserules/`, which keeps the batch workspaces out of git too. The file decides what `update` does:
+Install schema `houserules/install@2.2.0` added the keys `runners` and `workspaces`. `update` brings `.gitignore` to hold the line `.houserules/`, which keeps the batch workspaces out of git too. The file decides what `update` does:
 
 - A `.houserules/step/` line becomes `.houserules/` in its place, and `update` prints `merged .gitignore (.houserules/step/ replaced by .houserules/)`.
 - A file that holds neither line gets `.houserules/` at its end, and `update` prints `merged .gitignore (.houserules/ added)`.
@@ -902,6 +907,51 @@ Replace the scalar with the block, for example for the GitHub tracker:
 
 The scalar `permissions: read-all` holds every read scope, so `update` prints no line for the permissions of a workflow that holds it. The other lines of the workflow, such as the `GH_TOKEN` env, still come when the workflow lacks them.
 
+### Hand step: a CI workflow with `contents: write` or another scope that is not `read`, with no gates job, or with no valid YAML
+
+`update` reads a workflow that you changed as YAML. The gates job is each job that has a step whose `run` holds `houserules check-knowledge`, whatever the name and the indentation of the job. `update` reads the markers of each such job by themselves: a marker of another job is no marker of the gates job. `<job>` is the name of the job under `jobs`.
+
+A `permissions` mapping that grants `contents: write` gets this line:
+
+```text
+hand step: <path> grants contents: write in the <job> job; replace it with contents: read
+```
+
+Replace the scope:
+
+```yaml
+    permissions:
+      contents: read
+```
+
+A `permissions` mapping can hold a scope that the gates job needs with another value than `read`. The scopes are `contents`, and `issues` for the GitHub tracker. The value can be `none`, or `write` for `issues`. The mapping gets this line, where `<scope>` and `<value>` are the key and the value that the copy holds:
+
+```text
+hand step: <path> sets <scope>: <value> in the <job> job; replace it with <scope>: read
+```
+
+Replace the value. Do not add a second key.
+
+```yaml
+    permissions:
+      contents: read
+      issues: read
+```
+
+A workflow with no job that runs `houserules check-knowledge` gets this line, and no other line for the workflow:
+
+```text
+hand step: <path> has no job that runs houserules check-knowledge; houserules update checks no permissions there
+```
+
+A file that the YAML parser rejects gets this line, and no other line for the workflow. `<parser-line>` is the parser's own text, with the place of the fault:
+
+```text
+hand step: <path> is not valid YAML (<parser-line>); houserules update checks no permissions there
+```
+
+Fix the file. `update` writes no YAML into your workflow.
+
 ### Hand step: a CI workflow that persists its credential
 
 ```text
@@ -1007,3 +1057,81 @@ The migration commit, or the first reports after it, can fail these checks. Each
 - **A task report in flight across the upgrade fails `validate`,** and `check-report-claims` fails each of its runs with `<label>: no capture; run the command through houserules capture`, also on an install that kept the old schema. Rewrite the report in the new form.
 - **`audit` of the update commit fails `process.evals-rerun`** on an install of the reference workflow, because `update` rewrote its templates. The remedy is the one in [the reds that an upgrade causes by design](#the-reds-that-an-upgrade-causes-by-design): run your scenarios and append the run to `.claude/evals/record.json`.
 - **`check-knowledge` fails a pack copy or an override whose pattern does not compile.** It tests the patterns of a check in a pack copy and in an override as it does in a local entry, and prints `<file> <id>: check <field> is not a valid regex (<message>)`. Correct the pattern.
+
+## The review layer
+
+houserules 2.0 adds a per-change review layer. Each pull or merge request gets one report, and each merge gets one record. Five commands compute them: `evidence`, `route`, `bundle`, `record`, and `ci`. The layer is opt-in. A project that never wires it sees no new gate, and `update` changes only the files that the sections below name.
+
+### What `init` and `update` write now
+
+`init` writes no CI file. When the install holds no seeded workflow after the run, `init` prints one line, with `<host>` filled in from the `origin` remote (`github or gitlab` when the remote names no known host):
+
+```text
+init: houserules wrote no CI file; to run the gates and the review layer in your pipeline, run houserules ci print --host <host>
+```
+
+`update` writes no CI file either, and it does not write a deleted seeded workflow again. An install that holds the seeded `.github/workflows/knowledge.yml` keeps it. The workflow runs the gates only, and `update` keeps it current through its baseline as before. Once for each install, `update` prints this line and records `reviewLayerOffered: true` in `.houserules.json`:
+
+```text
+update: <path> runs the houserules gates; to add the review layer, run houserules ci print --host github
+```
+
+A file that `houserules ci write` created starts with the comment `# Written by houserules ci write; rewrite it with houserules ci write --force and the flags that wrote it.` and a second line with the version of the binary. When that version differs from the binary's, `update` prints `update: <path> pins houserules <old>; this binary is <new>: run houserules ci write --force with the flags that wrote it (a GitHub reference file takes the --sha of v<new>)`, and it writes nothing. Run the command again with the flags that you gave `ci write` the first time. For a GitHub reference file, give `--sha` the commit of the tag of the new release.
+
+### The three ways of wiring
+
+`houserules ci print` gives the first two of three ways, and `houserules ci write` gives the third. None of them edits a CI file that houserules did not create:
+
+- **Reference.** `houserules ci print --host github` or `--host gitlab` prints the lines that call the unit of this release, and writes nothing. The unit is a reusable workflow on GitHub, pinned by the commit sha of the release tag: the output names the `git ls-remote` command that resolves the sha. It is a file for `include: remote` on GitLab, with an `integrity` hash. Add the lines to the pipeline file of the project.
+- **Inline.** With `--mode inline`, `houserules ci print` prints the jobs of the unit with the inputs of the install filled in. Use it for a project that keeps the jobs in its own pipeline file, for a self-hosted GitHub (it cannot call a workflow on github.com by default), and for a GitLab that cannot reach github.com.
+- **A file of its own.** `houserules ci write --host github --sha <sha>`, with the commit of the release tag as `<sha>`, or `houserules ci write --host gitlab`, creates a new file that holds the same lines and adds its path to `review.ci.files`. `--host github --mode inline` needs no `--sha`. It never writes into an existing file. `houserules ci write --template` writes the template of the pull or merge request, and only where the host reads none yet.
+
+`--host` defaults to the host of the `origin` remote when that is github.com or gitlab.com. Another origin needs the flag. A line at the end of the output asks you to add the file that holds the lines to `review.ci.files` in `.houserules.json`, so that a change to it routes to `senior-review`.
+
+### The commands of the layer
+
+Each command reads the repository and files. No command talks to the host beyond the tracker that the install names: the GitHub tracker runs gh, as audit does. The jobs of the unit talk to the host.
+
+- `houserules evidence --base <ref> --out <file>` writes the reviewer packet as Markdown. With `--audit <file>`, the result of `audit --json` for the same range, it runs no second audit.
+- `houserules route --base <ref> --json <file>` decides `auto-merge-eligible`, `owner-review`, or `senior-review`. `houserules route --base <ref> --no-audit --json <file>` computes the floor, which runs no project tool. An install with no `review.route` setting gets `owner-review` for each change, and `senior-review` for a change to a rule source.
+- `houserules bundle write` writes the evidence bundle section from the captures of the final gate run. `houserules bundle check --body <file> --base <ref> --head <ref>` checks the description of the request. Its exit status is the gate: 0 for a clean bundle, 1 when it prints a finding, 2 for a setup error.
+- `houserules record write --base <ref> --head <ref> --out <file>` computes the record of a push to the default branch. The note lives under `refs/notes/houserules` (`refs/notes/houserules-sub/<install path>` for an install below the top level). A clone does not fetch it: `git fetch origin refs/notes/houserules:refs/notes/houserules`. Then `houserules record show <sha>` prints the record.
+
+The rule `process.evidence-before-review` of the `process` pack (version `2.1.0`) asks for the bundle. The same version changes the bodies of `process.risk-tiers` and `process.bounded-review-loop`: a critical task gets one task review and no re-review of its original findings, and a fix round of the kind that `process.risk-tiers` names gets one review of its fix diff. The `writing-style` pack (version `1.0.2`) changes one word: its README rule asks whether pull or merge requests are accepted.
+
+### The GitLab token
+
+The job token of GitLab cannot post a note, set a commit status, set a label, read approvals, or push. The jobs `report` and `record-push` read the CI/CD variable `HOUSERULES_TOKEN`, which the project creates masked and hidden, with the environment scope `houserules-<key>` (`<key>` is `root` for an install at the top level). Only those two jobs name that environment, so the jobs that run houserules, `setup`, or the code of the request cannot read the token. Prefer a project access token (the scopes `api` and `write_repository`, the role Developer). On gitlab.com Free, project access tokens need Premium or Ultimate: use a personal access token of a dedicated member with the role Developer. A personal access token reaches every project that its user can reach. An access token expires after at most 365 days: rotate it. Until then `report` and `record-push` print their notice and post and push nothing, and the pipeline stays green.
+
+### The limits of the review layer
+
+- On GitHub, a label or a status that the job token sets starts no workflow run. A workflow that acts on the route listens to `workflow_run` of the review workflow, not to `labeled`.
+- The post-merge sample is unsteerable only under a host merge that writes a new commit (a squash, a merge commit, or a rebase on the host). Under a fast-forward merge the key of the record is the head of the author, so the author knows the draw before the merge.
+- A project that needs tools for its runner checks passes the install step to the `setup` input of the unit. The job that computes the floor runs no `setup`.
+- A request runs its own edited CI definition on both hosts. A request that edits the wiring sets its own status and label. The mitigation is a required status from a protected-branch rule, plus the rule-source floor: a file in `review.ci.files` routes to `senior-review`. A request that edits a file of `review.ci.files` also controls its own run, which a required code-owner review of those files mitigates (a `CODEOWNERS` rule on GitHub, code owners with approval rules on GitLab, a Premium feature).
+- `floor-install: runner:<path>` holds only on a fresh runner or an unwritable path: a GitHub-hosted runner, a GitLab docker executor, or a runner user that cannot write the path. On a reused runner the request could replace the file.
+- On GitLab, a description edit starts no pipeline. Run the pipeline again to check the new description.
+
+### Changes of install schema 2.3.0
+
+`update` stamps `houserules/install@2.3.0` on a marker of `houserules/install@2.2.0` and prints `wrote .houserules.json (houserules/install@2.3.0)` once. It leaves a marker of any other schema as it is, `2.1.0` included. The keys `runners`, `workspaces`, and `review` keep their values. These keys and ids are new:
+
+| Name | What it is |
+|---|---|
+| `houserules/install@2.3.0` | The install schema that holds the keys below. |
+| `review` | The key of `.houserules.json` that configures the layer: `diffExclude`, `route`, `bundle`, `intent`, `ci`, and `record`. `check-knowledge` fails a fault in it with one line that names the key. |
+| `reviewLayerOffered` | `true` once `update` has printed the opt-in line for the install. |
+| `covers` | A field of the `check` of a knowledge entry. `covers: true` makes the check count as coverage of the files it reads. No entry of the kit sets it. `update` brings `knowledge/schema.json` to the version that names the field. |
+| `houserules/pack@1.3.0` | The schema id of a pack copy whose check sets `covers`. |
+| `houserules/overrides@1.2.0` | The schema id of a `knowledge/overrides.json` whose override sets `covers`. The overrides schema reads any minor of its major, so an older id does not fail. |
+
+### The reds of the review layer by design
+
+Each red is correct, and each has a remedy:
+
+- **A project that wires the review layer:** its open requests fail `bundle check` until each carries a bundle. The remedy is `houserules bundle write` into the description, and on GitLab a new run. A request of a bot fails too unless `review.bundle.exemptAuthors` names the author or `review.bundle.exemptBranches` matches the branch.
+- **An install that holds the seeded `knowledge.yml`:** no red. `update` prints the opt-in line once. An install whose seeded workflow was deleted gets no workflow and no line.
+- **A fresh install:** no CI file and no red. `init` prints its line. The first request of the install has no rule sources at its merge base, so the packet and the record show `merge_base_rules: "absent"`.
+- **A project with runner checks whose tools the job `record` does not get:** the record holds `audit.error` and no red. The remedy is the `setup` input of the unit.
+- **A GitLab project without `HOUSERULES_TOKEN`, or with an expired one:** no comment, status, label, or record push, and one notice for each run. The remedy is to create or rotate the token. No red.
+- **A check that you meant as coverage:** it is not coverage until its entry declares `covers: true`. No red.

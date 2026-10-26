@@ -30,6 +30,7 @@ rules stay enforced instead of drifting into a wiki nobody reads.
 - [The houserules step](#the-houserules-step)
 - [Evidence](#evidence)
 - [Runners](#runners)
+- [The review layer](#the-review-layer)
 - [Ownership model](#ownership-model)
 - [The reference workflow](#the-reference-workflow)
 - [Measure process cost](#measure-process-cost)
@@ -137,17 +138,19 @@ An install of houserules 1.x converts to the 2.0 layout in the same run.
 [docs/upgrading-to-2.md](docs/upgrading-to-2.md) lists what changes and
 each hand step that `update` can print.
 
-The knowledge schema (`knowledge/schema.json`), the deliverables schema
-(`.claude/schemas/deliverables.json`), and the CI workflow
-(`.github/workflows/knowledge.yml`) are a kind of file that `houserules
-files` lists as `d3Files`. `init` writes each once and records a
-baseline for it. `update` keeps each current through that baseline: it
-rewrites a copy that still equals its baseline, keeps and lists a copy
-that you changed, and leaves a copy that you list in `ownedPaths` as it
-is. The CI workflow installs the release that `.houserules.json` records.
-`update` replaces a CI workflow of houserules 1.x that equals the workflow
-of a release. It keeps a CI workflow with steps of your own and prints a
-hand step. Copy the install step from the kit's
+The knowledge schema (`knowledge/schema.json`) and the deliverables schema
+(`.claude/schemas/deliverables.json`) are a kind of file that `houserules
+files` lists as `d3Files`. So is the CI workflow
+(`.github/workflows/knowledge.yml`) of an install that an earlier release
+seeded. `init` writes each schema once and records a baseline for it, and
+it writes no CI workflow. `update` keeps each file current through that
+baseline: it rewrites a copy that still equals its baseline, keeps and
+lists a copy that you changed, and leaves a copy that you list in
+`ownedPaths` as it is. It never writes a CI workflow that is absent. The
+seeded CI workflow installs the release that `.houserules.json` records.
+`update` replaces a seeded workflow of houserules 1.x that equals the
+workflow of a release. It keeps a seeded workflow with steps of your own and
+prints a hand step. Copy the install step from the kit's
 [`template/.github/workflows/knowledge.yml`](https://github.com/jblossey/houserules/blob/main/template/.github/workflows/knowledge.yml)
 into it, or compare the two files.
 
@@ -187,10 +190,9 @@ git add -A && git commit -m 'chore: install houserules knowledge setup'
 
 `init` installs the minimal default: the `knowledge-base` pack (your
 starting rules), the schemas, `AGENTS.md` and `CLAUDE.md`, the
-`migrating-knowledge` and `houserules-step` skills, and a CI workflow on a
-GitHub-hosted origin. It installs no tracker and no workflow. It then
-renders the harness files and stamps `.houserules.json` with the binary's
-version. Both gates pass on this install:
+`migrating-knowledge` and `houserules-step` skills. It installs no tracker,
+no workflow, and no CI file. It then renders the harness files and stamps
+`.houserules.json` with the binary's version. Both gates pass on this install:
 
 ```text
 knowledge: ok
@@ -217,6 +219,11 @@ houserules topics
 ```sh
 houserules get knowledge-base.ids-are-permanent   # one entry, in full
 ```
+
+`init` writes no CI file. To run the gates and the review layer in your
+pipeline, run `houserules ci print --host github` (or `--host gitlab`): it
+prints the lines to add, and writes nothing. See
+[The review layer](#the-review-layer).
 
 Add more of the kit when you need it:
 
@@ -297,14 +304,15 @@ houserules init --dir services/api
 - Every path a gate matches is relative to the install root, and a
   changed path outside it is out of scope. `check-commit` checks only the
   commits that touch the install root.
-- The CI workflow stays at the git top level, as
+- A CI workflow that an earlier release seeded stays at the git top level, as
   `.github/workflows/knowledge-<folder>.yml`, where `<folder>` is the
   install root's path with each `/` replaced by `-` (`knowledge-services-api.yml`
   here). It carries a `working-directory` and a `paths` filter for the
-  subdirectory. A repository can hold several installs, each with its own
-  workflow; `init` refuses a new root that nests with another install or
-  reuses a workflow file name. A root that already holds its
+  subdirectory. A repository can hold several installs; `init` refuses a new
+  root that nests with another install. A root that already holds its
   `.houserules.json` is no new root: `init` there runs no such check.
+  `houserules ci print` and `ci write` give each install its own key, and
+  they refuse two installs of one repository that share a key.
 - houserules never sets `core.hooksPath`. Where the install runs the
   reference workflow, activate its commit-msg hook with `git config
   core.hooksPath services/api/.githooks`, or call it from your hook manager
@@ -359,23 +367,25 @@ the Claude Code files are opt-in.
   doc comments, ASD-STE100 writing style, and more). Your project adds
   its own topics, areas, and rules on top, and overrides or excludes a
   rule of the kit.
-- **A CI gate** (`.github/workflows/knowledge.yml`), on a GitHub-hosted
-  origin: `check-knowledge`, `check-backlog`, and a PR audit, each a
-  `houserules` command. The gate first installs the release that
-  `.houserules.json` records, so it runs the binary your kit files came
-  from. It reads the version from the line that starts with two spaces
-  and `"version": "<text>"`, the layout `houserules` writes. When
-  `.houserules.json` is missing or has no such line (a minified or
-  re-indented stamp, or a null version), the gate installs the latest
-  release and prints a notice that says so; run `houserules update` to
-  write the stamp, or to name the error in it. The job runs with a
+- **CI wiring** (`houserules ci`, opt-in): `init` writes no CI file.
+  `houserules ci print --host github` or `--host gitlab` prints the lines
+  that run `check-knowledge`, `check-backlog`, an audit of the pull or merge
+  request, and the review layer in your own pipeline, and `houserules ci write`
+  creates a file of its own. See [The review layer](#the-review-layer). An
+  install that an earlier release seeded keeps its
+  `.github/workflows/knowledge.yml`, and `update` keeps it current. That
+  workflow first installs the release that `.houserules.json` records, so it
+  runs the binary your kit files came from. It reads the version from the
+  line that starts with two spaces and `"version": "<text>"`, the layout
+  `houserules` writes. When `.houserules.json` is missing or has no such line
+  (a minified or re-indented stamp, or a null version), the workflow installs
+  the latest release and prints a notice that says so; run `houserules update`
+  to write the stamp, or to name the error in it. The job runs with a
   read-only token (`contents: read`), and every form but Beads drops the
-  persisted checkout credential. The steps that run the
-  gates follow your tracker: the GitHub form adds the `issues: read`
-  permission and a `GH_TOKEN`, and the Beads form installs `bd` at a pinned
-  release and bootstraps the store. On other hosts `init`
-  prints a skip note and the `migrating-knowledge` skill covers
-  generating the equivalent gate.
+  persisted checkout credential. The steps that run the gates follow your
+  tracker: the GitHub form adds the `issues: read` permission and a
+  `GH_TOKEN`, and the Beads form installs `bd` at a pinned release and
+  bootstraps the store.
 
 ## Packs
 
@@ -454,8 +464,8 @@ houserules init --tracker beads    # a Beads store, through bd
   clone: `init --tracker beads` refuses without a store. houserules sets
   `BD_DISABLE_METRICS=1` and `DO_NOT_TRACK=1` on every `bd` it starts, so an
   adopter never sends bd usage events through houserules. A user's own `bd`
-  calls keep bd's own setting. The seeded CI workflow of a Beads install
-  installs `bd` and bootstraps the store.
+  calls keep bd's own setting. The CI jobs of a Beads install install `bd`
+  and bootstrap the store.
 
 The work-item commands are the same on every tracker: `list`, `batch`,
 `get`, `set`, `defer`, `check-backlog`, and `archive`. An install keeps its
@@ -706,9 +716,11 @@ The row of the entry shows the result:
 
 The tool reads the working tree, so a triggered runner check needs the tree at
 `--head` checked out: `--head` is the checked-out commit, and no file that the
-tool reads differs from its content there. The seeded CI workflow checks out
-the head of a pull request for this reason. It installs no tool: add the
-install step of your tools to your own CI.
+tool reads differs from its content there. The jobs that `houserules ci`
+wires check out the head of the pull or merge request for this reason, and so
+does a workflow that an earlier release seeded. The jobs install no tool: pass
+the install step of your tools to the `setup` input of the unit, or add it to
+your own CI.
 
 `audit` stops with exit 2, one line on stderr, and no rows when a triggered
 check cannot run:
@@ -725,6 +737,63 @@ and SARIF output that is missing, invalid, or reports a failed run.
 and each malformed entry of `runners`. The `migrating-knowledge` skill covers
 how to run such a tool without network access.
 
+## The review layer
+
+A reviewer needs three facts about a change: what it did, what no check read,
+and who must look at it. The review layer writes them down. Each pull or merge
+request gets one report, and each merge gets one record. houserules computes
+both from git, the rules of the install, and the files that your CI hands it.
+No command talks to the host beyond the tracker that the install names: the GitHub tracker runs gh, as audit does.
+
+The commands below continue the [quick start](#quick-start): a repository where
+`houserules init` ran and one commit holds its files. The block adds a file and
+a commit, then asks for the route of the change:
+
+```sh
+mkdir -p src
+echo 'fn parse_header() {}' > src/parser.rs
+git add src && git commit -q -m 'feat: add the parser'
+houserules route --base HEAD~1
+```
+
+```text
+route: owner-review
+no area: `src/parser.rs` -> owner-review
+```
+
+An install with no `review` setting gets `owner-review` for each change, and
+`senior-review` for a change to a rule source. The `review` key sets the rest.
+
+| Command | What it writes |
+|---|---|
+| `houserules evidence --base <ref>` | The reviewer packet, with the uncovered surface first |
+| `houserules route --base <ref>` | The route of the change |
+| `houserules bundle write` and `bundle check` | The evidence bundle for the description of the request, and the check of it |
+| `houserules record write` and `record show` | The change record of a merge, kept as a git note |
+| `houserules ci print` and `ci write` | The lines or the file that wire all of this into GitHub or GitLab |
+
+`init` writes no CI file. To run the gates and the review layer in your
+pipeline, run `houserules ci print --host github` or `--host gitlab`. The output
+calls the unit that this release publishes: a reusable workflow for GitHub and
+a file for `include: remote` for GitLab. `--mode inline` prints the jobs
+themselves, and `houserules ci write` creates a file of its own. The
+`migrating-knowledge` skill and [docs/upgrading-to-2.md](docs/upgrading-to-2.md)
+give the three ways, the GitLab token, and the limits of the layer.
+
+The keys and ids that the layer adds:
+
+| Name | What it is |
+|---|---|
+| `review` | The key of `.houserules.json` that configures the layer: `diffExclude`, `route`, `bundle`, `intent`, `ci`, and `record`. `check-knowledge` fails a fault in it with one line that names the key |
+| `review.route` | The route of an area or a path, thresholds for an external score, and `sampleRate`. An entry with `auto-merge-eligible` names `maxDiffLines` and `maxUncoveredShare` |
+| `review.bundle` | `budgets` (the diff budget of each risk tier), `exemptAuthors`, and `exemptBranches` |
+| `review.intent` | `sources` (`work-item` or `file`) and `files` (globs of the files that the `file` source reads) |
+| `review.ci.files` | The CI files of your own that call houserules; a change to one routes to `senior-review` |
+| `review.record.maxBytes` | The size budget of a change record, at least 8,192 |
+| `covers` | A field of the `check` of a knowledge entry. `covers: true` makes the check count as coverage of the files it reads. No entry of the kit sets it |
+| `houserules/pack@1.3.0` | The schema id of a pack copy whose check sets `covers` |
+| `houserules/overrides@1.2.0` | The schema id of a `knowledge/overrides.json` whose override sets `covers` |
+
 ## Ownership model
 
 Every path houserules writes falls into one of seven classes, and
@@ -739,11 +808,10 @@ Every path houserules writes falls into one of seven classes, and
   `init` merges its hook entries into an existing file instead of
   skipping it.
 - **Kept current through a baseline** (`d3Files`) — the knowledge schema,
-  the deliverables schema, and the CI workflow. `init` writes each once and
-  baselines it, and `update` keeps it at the content of the kit unless you
-  changed it. The CI workflow is written only when your `origin` resolves
-  to GitHub; `update` backfills it if your origin becomes GitHub-hosted
-  later.
+  the deliverables schema, and the CI workflow of an install that an earlier
+  release seeded. `init` writes each schema once and baselines it, and
+  `update` keeps each file at the content of the kit unless you changed it.
+  `init` writes no CI workflow, and `update` never writes one that is absent.
 - **Tracker files** (`trackerFiles`) — the JSON tracker: its five data
   files are seed-once, and `backlog/schema.json` is kept current through a
   baseline. `init --tracker json` writes them, and `update` restores or
@@ -783,7 +851,7 @@ generated by `houserules render` from `knowledge/`, and so is the
 |---|---|
 | kit-owned (`kitOwned`) | `tools/claude-session-start.sh` (with `--target claude`), `.claude/skills/migrating-knowledge/SKILL.md`, `.claude/skills/houserules-step/SKILL.md`, `tools/houserules-step.sh` |
 | seed-once (`seedOnce`) | `knowledge/areas.json`, `docs/README.md`, `AGENTS.md`, `CLAUDE.md` |
-| kept current through a baseline (`d3Files`) | `knowledge/schema.json`, `.claude/schemas/deliverables.json`, `.github/workflows/knowledge.yml` (GitHub-hosted origin only) |
+| kept current through a baseline (`d3Files`) | `knowledge/schema.json`, `.claude/schemas/deliverables.json`, `.github/workflows/knowledge.yml` (an install that an earlier release seeded) |
 | tracker files (`trackerFiles`) | `backlog/batches.json`, `backlog/amendments.json`, `backlog/decisions.json`, `backlog/parked.json`, `backlog/items/general.json`, `backlog/schema.json` |
 | workflow files (`workflowFiles`) | `.claude/agents/implementer.md`, `.claude/agents/task-reviewer.md`, `.claude/agents/branch-reviewer.md`, `.claude/agents/spec-reviewer.md`, `.claude/skills/orchestrating/SKILL.md`, `.claude/skills/finishing-a-feature/SKILL.md`, `.claude/skills/designing/SKILL.md`, `.claude/skills/planning/SKILL.md`, `.claude/evals/dependency-add.json`, `.claude/evals/docs-edit.json`, `.claude/evals/seeded-violations.json`, `.githooks/commit-msg`, `tools/reference-session-start.sh` |
 | workflow data (`workflowData`) | `.claude/evals/record.json` |
@@ -1009,11 +1077,21 @@ Working with evidence:
 | `capture --out <file> -- <command>...` | Runs a command and writes its output to the file under a header (the command, the directory, the times, the exit status, `HEAD`, and a dirty flag); it exits with the exit code of the command |
 | `report-facts <report> --base <ref>` | Fills the fact fields of a task report from git and from captures: the commits, the changed files, the `sha256`, `command`, and `exit` of each run, the `sha256` of each recorded citation, and, with `--audit <file>`, the self-audit |
 
+Reviewing a change:
+
+| Command | What it does |
+|---|---|
+| `evidence` | Writes the reviewer packet of a range as Markdown, and with `--json` as a document: the uncovered surface first, then the intent, the failed, warned, proven, and judged rules, the diff size, and the route |
+| `route` | Decides the route of a range, `auto-merge-eligible`, `owner-review`, or `senior-review`; `--no-audit` computes the floor, which runs no check |
+| `bundle <write\|check>` | `write` writes the evidence bundle section for the description of a pull or merge request from captures; `check` fails a description with a missing part, a stale run, or a diff over its budget |
+| `record <write\|show\|list\|audit>` | Keeps a change record for each merge as a git note: `write` computes it, `show` prints it and checks its rule hashes against git, `list` lists the records, and `audit` adds a post-merge verdict; `stats --records <range>` reports the review coverage of the records in a range |
+| `ci <print\|write>` | Prints the lines that wire the review layer into GitHub or GitLab, or creates a file of its own for them; neither edits a CI file that it did not create |
+
 Installing:
 
 | Command | What it does |
 |---|---|
-| `init` | Seeds the minimal default into a git repository from the embedded payload; `--tracker json\|github\|beads` (with `--repo` for GitHub) installs a tracker, `--workflow reference` installs the reference workflow (`--add-required-packs` adds the packs it needs), `--target claude` adds the Claude Code files, and `--dir <subdir>` installs in a subdirectory; it adds `.houserules/` to `.gitignore` |
+| `init` | Seeds the minimal default into a git repository from the embedded payload; `--tracker json\|github\|beads` (with `--repo` for GitHub) installs a tracker, `--workflow reference` installs the reference workflow (`--add-required-packs` adds the packs it needs), `--target claude` adds the Claude Code files, and `--dir <subdir>` installs in a subdirectory; it adds `.houserules/` to `.gitignore`; it writes no CI file |
 | `update` | Syncs kit-owned files, moves the kit packs and the workflow files, converts an install of houserules 1.x, removes retired files, brings `.gitignore` to hold `.houserules/`, reports version drift; it refuses a directory that holds no install |
 | `files` | Prints the file classes of the kit as JSON: kit-owned, seed-once, pack copies, kept current through a baseline, tracker files, workflow files, and workflow data |
 
@@ -1031,8 +1109,8 @@ override (one id, one source). The full contract lives in [docs/design.md](docs/
 ## Contributing and support
 
 Questions and bug reports go to
-[GitHub issues](https://github.com/jblossey/houserules/issues). Pull
-requests are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) covers the
+[GitHub issues](https://github.com/jblossey/houserules/issues).
+Contributions are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) covers the
 development workflow, the batch process, and the gates a change must
 pass.
 
