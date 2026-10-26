@@ -35,7 +35,7 @@ Generated from knowledge/ by houserules render. Do not edit.
 
 ## Standing rules
 
-- [houserules.1-0-surface-is-frozen] Past 1.0, a CLI command/flag change or a schema constraint change is a breaking change: get an owner ruling and bump the major version.
+- [houserules.breaking-changes-need-an-owner-ruling] A change that would prompt a major release (a `!` commit or a `BREAKING CHANGE` footer) needs an owner ruling before it merges.
 - [houserules.tag-pilot-is-read-only] Treat the tag-pilot checkout outside this repository as read-only: never modify it, commit there, run its agents, or run `init` or `update` against it.
 - [houserules.template-is-the-source] Edit the kit in `template/`, then run `houserules update --dir .`; never hand-edit the root copies or the generated rules and skill.
 - [process.ask-when-missing] Ask the user when information is missing. Do not assume.

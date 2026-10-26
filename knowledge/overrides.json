@@ -73,7 +73,6 @@
       "id": "process.ask-when-missing",
       "fields": {
         "summary": "Ask the user when information is missing. Do not assume.",
-        "body": [],
         "tags": [
           "users",
           "ruled-keep"
@@ -565,7 +564,8 @@
           "A dedicated compliance pass over the existing codebase is its own backlog item; new code complies immediately.",
           "Tests assert behavior, not implementation details, and can fail. Clean up global and module state (mocks, prototypes) after each test; an auto-restore setting covers only spies, so a mock created in a module-mock factory gets its own explicit afterEach reset.",
           "Re-implementing another engine's input language (regex syntax, glob syntax) is the canonical build-vs-library violation: validity verdicts come from an engine of that language; a hand-rolled scan may only choose message wording after the engine has decided (batch 16: the glob translator missed nested braces and panicked; the regex scan flipped four verdicts against V8).",
-          "Shared integration-test helpers live in the support modules of `crates/houserules/tests/` (`ls -d crates/houserules/tests/*support* crates/houserules/tests/common` lists them). A test uses the helper that a module holds and never copies it; a new shared helper goes into a module."
+          "Shared integration-test helpers live in the support modules of `crates/houserules/tests/` (`ls -d crates/houserules/tests/*support* crates/houserules/tests/common` lists them). A test uses the helper that a module holds and never copies it; a new shared helper goes into a module.",
+          "A struct whose fields a reader fills names, in its doc comment, the production reader of each field, so a field that no reader fills shows (batch-37 branch review, six tasks; design.md 282)."
         ],
         "tags": [
           "quality",
@@ -635,7 +635,8 @@
           "Batch-27 retrospective: a seed-once file's instruction set is keyed to an enumerated field with three values - absent, present-generic, present-with-own-content; an instruction written for one names what holds for the other two. The batch-27 instance was the untested third state (own CLAUDE.md content, no AGENTS.md, reached by update's backfill).",
           "A printed remedy is an instruction: list the states that reach the finding and follow the line as printed in each; a state the line cannot clear gets its own arm or a named limit (batch 28: the task review found one such state of the citation lint's remedy, an unseeded id in a kept file; the branch review found two more, an archived entry the adopter wants retired and an adopter topic name).",
           "A ruling with a named set of outcomes states the count in every text that lists them ('one of three ways'), so a grep for the count finds a text that lists fewer (batch 32 task 2: a contested finding had three outcomes, and two texts named two).",
-          "A counting or selection rule that the template, the pack, and the spec state has one wording in all three, and one test reads all three (batch 37, T10 and T17)."
+          "A counting or selection rule that the template, the pack, and the spec state has one wording in all three, and one test reads all three (batch 37, T10 and T17).",
+          "An upgrade guide's reds enumerate every release population that the upgrade proof seeds (`git tag --list 'v0.3.0' 'v1.*'`), the pre-1.0 release included, and the proof's list of differences is the check."
         ],
         "tags": [
           "templates",
@@ -755,7 +756,8 @@
           "When a commit closes a tracked item, grep the tracked docs for that item's id in the same commit: the closing commit owns every sentence that scheduled the work.",
           "A premise about a third-party platform is a claim: quote the page's own sentence before a brief, a spec, or an entry restates it.",
           "The sweep for a corrected fact is a grep for the fact's key nouns over the tracked tree and the project's work documents, in the commit that corrects the fact.",
-          "A sentence that denies a behavior ('no command talks to the host') names each exception that the code holds (batch 37 branch review: the GitHub tracker runs gh)."
+          "A sentence that denies a behavior ('no command talks to the host') names each exception that the code holds (batch 37 branch review: the GitHub tracker runs gh).",
+          "A spec that names a printed line for a population names the line that population prints, measured on that population (a 1.x marker prints the conversion line, not the restamp line; batch 38 upgrade proof)."
         ]
       }
     },
@@ -792,6 +794,11 @@
           "Check recent releases, commit activity, and issue responsiveness.",
           "Outdated, stale, or abandoned dependencies are a no-go.",
           "A crate that enters only the lockfile gets the same check: its repository's recent releases, commit activity, and issue responsiveness, not the registry data alone."
+        ],
+        "tags": [
+          "dependencies",
+          "supply-chain",
+          "ruled-keep"
         ]
       }
     }

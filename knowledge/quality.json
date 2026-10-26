@@ -39,7 +39,8 @@
         "When a configuration key gains a second consumer, sweep the texts that define the key, not only the texts of the command that changed (batch 28: `overrides` also decides which kit-owned files check-knowledge reads, and the seeded docs/README.md that defines the key was outside the sweep).",
         "When a change alters which inputs reach an existing error path, re-read every message on that path with the new inputs and name each case. A message that misstates the cause for a newly reachable input is a contract defect, even when the refusal is right (batch 32 task 1: `unknown id` for a known controller entry).",
         "Every printed line of a command has a test that pins it whole, and every help sentence that names a condition is tested against each state of that condition.",
-        "A command task pins each printed line from the spec file with a test that reads the spec, as `the_spec_lines_of_these_tests_are_in_the_spec` (`tests/ci_command.rs`) does, and the spec is amended before that test commit (batch 37: twelve tasks failed this rule)."
+        "A command task pins each printed line from the spec file with a test that reads the spec, as `the_spec_lines_of_these_tests_are_in_the_spec` (`tests/ci_command.rs`) does, and the spec is amended before that test commit (batch 37: twelve tasks failed this rule).",
+        "A task that prints a value read from a commit, a trailer, or a capture prints it through review::text on every surface, the audit's evidence included; a value with a control character or a leading double quote prints as a JSON string, so a printed value starts with a quote exactly when it is one; a test asserts both forms (batch 38 task 12)."
       ],
       "tags": [
         "cli",
@@ -88,7 +89,8 @@
         "A presence check pins presence. It passes when a second trigger, permission, or key stands beside the pinned one (batch 30 task 1: four forbidden shapes passed three pins of a workflow).",
         "Keep the forbidden shapes as a permanent table in the test, and add the harmless edits too (a comment, a reordered key): a pin that fails for a harmless edit is as wrong as one that passes a forbidden shape.",
         "A hand-written reader of a file format is part of the pin: mutate around its limits (comment lines, blank lines, key order).",
-        "Narrowed at batch 33's close (stats: 3 of 3 findings minor or on a deliverable): the rule governs contract surfaces, such as CLI output, a schema, or a generated file."
+        "Narrowed at batch 33's close (stats: 3 of 3 findings minor or on a deliverable): the rule governs contract surfaces, such as CLI output, a schema, or a generated file.",
+        "A command whose output the spec calls deterministic gets a two-run byte pin in its own task (tests/intent_checks.rs holds the shape)."
       ],
       "tags": [
         "tests",

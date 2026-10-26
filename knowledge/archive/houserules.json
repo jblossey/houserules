@@ -151,6 +151,42 @@
         "houserules.payload-embeds-checkout-bytes"
       ],
       "status": "retired"
+    },
+    {
+      "id": "houserules.1-0-surface-is-frozen",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "Past 1.0, a CLI command/flag change or a schema constraint change is a breaking change: get an owner ruling and bump the major version.",
+      "body": [
+        "The frozen CLI surface: the 29 `Command` variants `crates/houserules/src/main.rs` defines, enumerated by the `no_subcommand_carries_a_long_about_beyond_its_short_one` test (`cargo test --bin houserules no_subcommand_carries_a_long_about_beyond_its_short_one`, asserts the count) and captured verbatim by `cargo run --release --quiet --bin houserules -- --help`.",
+        "The frozen schema surface: `knowledge/schema.json`, `template/knowledge/schema.json`, `backlog/schema.json`, `template/backlog/schema.json`, `.claude/schemas/deliverables.json`, and `template/.claude/schemas/deliverables.json` -- their constraints, not a prose restatement of them. `git rev-parse HEAD:<path>` pins each copy to its blob id at the freeze; design.md 5.82 carries the six ids.",
+        "Adding, removing, or renaming a subcommand or flag, or tightening or loosening a required field, an enum, a textList floor, or an id-shape pattern in any of the six schema files needs an owner ruling and a major-version bump, never a patch or minor release.",
+        "Widening a positional argument's arity (one value to one or more) adds, removes, and renames no subcommand or flag and leaves every existing call unchanged: it is not a surface change (design.md 5.91, owner 2026-10-09).",
+        "Neither surface is gated mechanically by this entry; design.md 5.82 is the durable record an owner supersession amends (process.owner-rulings-need-owner-supersession).",
+        "The freeze ends at the 2.0.0 release: the entry is retired then (design.md 5.220, HR-238). From 2.0.0 on, a standing successor entry holds the rule that every change which would prompt a major release needs an owner ruling (design.md 5.221)."
+      ],
+      "tags": [
+        "cli",
+        "schema",
+        "breaking-change",
+        "freeze"
+      ],
+      "verify": [
+        "crates/houserules/src/main.rs",
+        "knowledge/schema.json",
+        "template/knowledge/schema.json",
+        "backlog/schema.json",
+        "template/backlog/schema.json",
+        ".claude/schemas/deliverables.json",
+        "template/.claude/schemas/deliverables.json"
+      ],
+      "source": {
+        "date": "2026-09-15",
+        "by": "user",
+        "ref": "docs/specs/2026-09-14-batch-25-v1-readiness.md §3; design.md 5.82"
+      },
+      "status": "retired"
     }
   ]
 }

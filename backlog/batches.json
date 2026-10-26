@@ -35,22 +35,6 @@
         "state": "planned",
         "text": "Folded into batch 33 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98), so HR-144 (issue 38) moved to batch 33. HR-129 and HR-153 had moved there on 2026-10-10 (design.md 5.96, D5). Batch 29 holds no item."
       }
-    },
-    {
-      "number": 38,
-      "items": [
-        "HR-209",
-        "HR-190",
-        "HR-212",
-        "HR-223",
-        "HR-238"
-      ],
-      "summary": "2.0.0, the last batch: OpenSpec support (HR-209) with spec and session links in the audit (HR-190), the upgrade-path live proof, and the issue comments of the release (HR-212).",
-      "kickoff": "the owner's rulings of 2026-10-15 (design.md 5.97 to 5.102) and the meta-spec docs/specs/2026-10-15-release-2-0-0-meta-spec.md",
-      "status": {
-        "state": "planned",
-        "text": "Rows ruled 2026-10-21 (design.md 193). Its spec starts after batch 37 merges."
-      }
     }
   ]
 }

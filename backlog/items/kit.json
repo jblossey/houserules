@@ -339,22 +339,6 @@
       ]
     },
     {
-      "id": "HR-190",
-      "type": "feat",
-      "title": "Link specs and agent sessions into the audit (issue 70)",
-      "body": [
-        "Issue 70 asks that audit and evidence read optional commit trailers and PR links for a spec reference (Spec Kit, OpenSpec, or a plan file) and an agent session reference (for example Entire-Checkpoint), show them in the evidence packet, and offer two optional rules: changes in configured areas reference a spec, and a referenced spec file exists. Acceptance: trailers are optional unless a rule requires them; houserules has no dependency on any spec or session tool.",
-        "The owner scheduled it for 2.0.0 on 2026-10-15: every open GitHub issue ships in 2.0.0 (design.md 5.98). Close issue 70 on the 2.0.0 release.",
-        "Back in 2.0.0 by the owner's ruling of 2026-10-21 (design.md 193)."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 38,
-      "see": [
-        "HR-185"
-      ]
-    },
-    {
       "id": "HR-193",
       "type": "feat",
       "title": "Route every rule and configuration change to human review (issue 73)",
@@ -502,27 +486,6 @@
       ]
     },
     {
-      "id": "HR-209",
-      "type": "feat",
-      "title": "Compatibility with OpenSpec in 2.0.0",
-      "body": [
-        "Owner, 2026-10-21, verbatim: \"I just caught a gap in the meta-spec: we need to be compatible in some way with openspec and github spec kit (openspec has preference).\"",
-        "Research so far (controller, 2026-10-21, against the current docs: OpenSpec v1.14.3, docs/agent-contract.md, docs/customization.md, docs/supported-tools.md; Spec Kit v1.2.2, docs/reference/agentic-sdd.md, docs/reference/extensions.md): OpenSpec keeps specs and changes under openspec/ (changes/<id>/proposal.md, design.md, tasks.md, delta specs; archive/), has a JSON agent contract (list, show, status, validate, archive --json), and takes project context, per-artifact rules, and apply/archive guidance from openspec/config.yaml. Spec Kit keeps .specify/ and per-feature spec.md, plan.md, tasks.md, and has an extension system with before_<command> and after_<command> hooks registered in .specify/extensions.yml.",
-        "Open: the owner rules what compatible means (coexistence, the houserules step inside their implement phase, their changes as work items, houserules rules rendered into their context), the release it lands in, and whether it supersedes design.md 184(2) (no recipe for another workflow ships).",
-        "Ruled 2026-10-21 (design.md 191): OpenSpec support ships in 2.0.0; Spec Kit moves to HR-210, a minor release after 2.0.0.",
-        "Batch-37 T5 review (2026-10-25, task-5-review.json issue 6): OpenSpec's current concepts page shows a proposal's `## Intent` section and no RENAMED delta section, while spec 4.9's table of batch 37 reads `## Why` and counts renamed requirements. The adapter of this item settles which sections it reads from the OpenSpec version it pins, and amends that table.",
-        "Ruled 2026-10-25 (design.md 266): an `openspec` intent adapter and an `openspec validate --json` file input for evidence, record, and bundle check, plus a documented openspec/config.yaml hookup in the README and docs; houserules never edits that file; 184(2) is superseded for that hookup only."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 38,
-      "see": [
-        "HR-180",
-        "HR-181",
-        "HR-210"
-      ]
-    },
-    {
       "id": "HR-210",
       "type": "feat",
       "title": "Compatibility with GitHub Spec Kit in a minor release after 2.0.0",
@@ -553,22 +516,6 @@
       ]
     },
     {
-      "id": "HR-212",
-      "type": "chore",
-      "title": "Comment on each GitHub issue at the 2.0.0 release: the part 2.0.0 covers and the part that follows",
-      "body": [
-        "Owner, 2026-10-21 (design.md 193), verbatim: \"Upon release of 2.0.0 i want the github issues to be commented on with what part is covered and what follows.\"",
-        "Scope: at the 2.0.0 release, for every GitHub issue that a 2.0.0 or 2.x item names, post one comment stating what 2.0.0 delivers for the issue and what follows in which 2.x item; close an issue that 2.0.0 delivers whole. Enumerate the issues from the item bodies at release time (a saved script and its output in the release batch's workspace); the owner reviews the comment texts before they are posted."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 38,
-      "see": [
-        "HR-211",
-        "HR-210"
-      ]
-    },
-    {
       "id": "HR-217",
       "type": "chore",
       "milestone": null,
@@ -587,23 +534,6 @@
           "crates/houserules/src/install/ci_workflow.rs"
         ]
       }
-    },
-    {
-      "id": "HR-223",
-      "type": "chore",
-      "title": "Rewrite README for 2.0.0: when and why houserules fits, the consistency layer, and its clean integration",
-      "body": [
-        "Owner, 2026-10-21, verbatim: \"Make sure that you rewrite the readme when we publish v2. Users must know at a glance when and why houserules is the right solution for them and they must know that houserules can be the central layer that keeps their ai-native coding consistent instead of diverging into whatever agents deem correct in the moment with their limited knowledge of a session. Adhere to the best-practices of README writing that you have once researched and make sure to research beforehand, what makes houserules unique and strong against other solutions and make those advantages clear.\"",
-        "Owner, 2026-10-21, verbatim: \"Also make clear that it integrates cleanly with the other solutions (which in and of itself is a big strength of houserules v2).\"",
-        "Scope: (1) Research first, at spec time, with sources recorded in the batch workspace: current README practice (re-checked against the batch-26 research of design.md 84 and writing-style.readme-is-an-adopter-funnel), and what makes houserules unique and strong against the other solutions that adopters weigh (for example per-harness rule files such as AGENTS.md, CLAUDE.md, Cursor rules, and Copilot instructions; rule-sync tools; spec-driven toolkits such as OpenSpec and Spec Kit; agent memory banks); each claimed advantage is verified against the tree and the sources, never assumed. (2) The README's first screen says when and why houserules is the right solution, and that it can be the central layer that keeps AI-native coding consistent across agents, harnesses, and sessions, instead of each agent deciding in the moment from a session's limited knowledge. (3) The rest follows the adopter funnel: value, install, runnable usage, then depth; no process history, no claims that rot with releases. (4) The README makes clear that houserules integrates cleanly with those other solutions, a strength of 2.0 in its own right: it renders into the harnesses' own rule files, reads work items through the adopter's tracker, and works under OpenSpec and other workflows; each integration claim is shown by a run, not asserted. (5) The owner reviews the rewrite before the release is cut."
-      ],
-      "milestone": null,
-      "status": "open",
-      "batch": 38,
-      "see": [
-        "HR-212",
-        "HR-209"
-      ]
     },
     {
       "id": "HR-225",
@@ -693,19 +623,6 @@
       "batch": null
     },
     {
-      "id": "HR-238",
-      "type": "chore",
-      "milestone": null,
-      "status": "open",
-      "title": "Retire the surface freeze at 2.0.0; a successor entry: a breaking change needs an owner ruling",
-      "body": [
-        "Owner rulings 2026-10-23: design.md 5.220 (\"After the 2.0.0 release, the freeze does not apply anymore\"; \"Retire at 2.0.0\") and 5.221 (\"If a change would prompt a major release, i.e. a breaking change, I still need to rule about it.\"). In the release batch, set the entry's status to retired and run houserules archive, so that the 2.0.0 tag ships without it; the freeze of design.md 5.82 ends with it.",
-        "Add a standing successor entry (source.by user, design.md 5.221) whose summary states that a change which would prompt a major release (a `!` commit or a `BREAKING CHANGE` footer) needs an owner ruling before it merges, and whose body names houserules.1-0-surface-is-frozen as the entry it replaces (link it with `see`; knowledge-base.ids-are-permanent).",
-        "Sweep for pointers to the old entry id and to the freeze (process.pointer-sweep-unfiltered) and repoint them to the successor or drop them."
-      ],
-      "batch": 38
-    },
-    {
       "id": "HR-239",
       "type": "feat",
       "milestone": "2.x",
@@ -729,7 +646,8 @@
         "Owner ruling 2026-10-23 (design.md 5.224; process.implementer-model-per-task holds the levels, moves, and record). One data point per batch from batch 37 on: batch, task, level, review findings by severity, fix rounds, re-reviews, tokens and tool uses, and the same counts of the batch's sonnet tasks.",
         "Gate (design.md 5.225): after every fourth data point, and at once after a Critical finding on a haiku task, the owner rules on the data table (continue, change levels or moves, stop, or haiku as the default up to a level). Data point 0 does not count toward the first four.",
         "Data point 0 (batch 34, before the trial): the scratch live-run task of case 22 on haiku; opus review 0 Critical, 0 Important, 7 Minor (4 on the implementer's report hygiene). Batches 35 and 36 ran no haiku task (every task on sonnet: none met the simple-task bar).",
-        "Data point 1 (batch 37): T15 (HR-236, five test files) on haiku at L1; opus review 0 Critical, 1 Important (the report left out CI's PR audit, a red from BASE), 4 Minor; 1 fix round (haiku), 0 re-reviews; implementer 256,753 + 221,078 tokens and 144 + 80 tool uses. The batch's 18 sonnet tasks (T1 to T19 but T15, the live-run fixes T18 and T19 included): reviews 1 Critical, 42 Important, 88 Minor; 22 fix rounds; 7 re-reviews or fix-diff reviews. Move: one Important finding keeps the next haiku task at L1 (batch 38 plans T7 at L1)."
+        "Data point 1 (batch 37): T15 (HR-236, five test files) on haiku at L1; opus review 0 Critical, 1 Important (the report left out CI's PR audit, a red from BASE), 4 Minor; 1 fix round (haiku), 0 re-reviews; implementer 256,753 + 221,078 tokens and 144 + 80 tool uses. The batch's 18 sonnet tasks (T1 to T19 but T15, the live-run fixes T18 and T19 included): reviews 1 Critical, 42 Important, 88 Minor; 22 fix rounds; 7 re-reviews or fix-diff reviews. Move: one Important finding keeps the next haiku task at L1 (batch 38 plans T7 at L1).",
+        "Data point 2 (batch 38): T7 (HR-248, one pack-pin helper across seven test files) on haiku at L1; opus review 0 Critical, 0 Important, 1 Minor (a bare hash literal); 1 fix round (haiku, Minor only, closed by a controller verification note), 0 re-reviews; fix round 202,527 tokens and 91 tool uses (the ledger holds no token count for round 0); one report-prose slip (a false concern that check-report-claims has no source in the tree). The batch's 11 sonnet tasks (T1 to T12 but T7, the branch-review fix wave T12 included): reviews and re-reviews 0 Critical, 14 Important, 47 Minor; 19 fix rounds (median 2 per task); 9 re-reviews or fix-diff reviews. Move: no Critical or Important finding and no more fix rounds (1) than the sonnet median (2), so the next haiku task runs at L2. The owner gate falls at data point 4."
       ],
       "batch": null
     },
@@ -751,26 +669,6 @@
       }
     },
     {
-      "id": "HR-244",
-      "type": "fix",
-      "milestone": null,
-      "status": "open",
-      "title": "Drop the history narration from three 'used to' doc comments in crates/",
-      "body": [
-        "The corpus run of design.md 227 found three doc comments in crates/ that narrate history with 'used to': residue-gate.rs (the old `.superpowers/` entry of `EXCLUDED_PREFIXES`) and two in rules/check.rs (a keyword that 'used to fall through'). writing-style.code-comments keeps the constraint and drops the history; the warn check leaves 'used to' judged, so no gate catches them.",
-        "Rewrite each comment to state the current constraint only. `git grep -nE '//.*\\bused to\\b' -- 'crates/**/*.rs'` lists the five matches; two of them ('used to resolve', 'used to prove') are current and stay."
-      ],
-      "batch": null,
-      "deferral": {
-        "reason": "The corpus run of design.md 227 found three doc comments in crates/ that narrate history with 'used to': residue-gate.rs (the old `.superpowers/` entry of `EXCLUDED_PREFIXES`) and two in rules/check.rs (a keyword that 'used to fall through'). writing-style.code-comments keeps the constraint and drops the history; the warn check leaves 'used to' judged, so no gate catches them.",
-        "origin": "design.md 227, the corpus run of the history-phrase check",
-        "files": [
-          "crates/houserules/src/bin/residue-gate.rs",
-          "crates/houserules/src/rules/check.rs"
-        ]
-      }
-    },
-    {
       "id": "HR-247",
       "type": "feat",
       "milestone": "2.x",
@@ -781,48 +679,6 @@
         "Found while answering the owner's GitLab question of 2026-10-24 (design.md 244): the tracker adapters are json, github (GitHub Issues), and beads; a GitLab project that keeps its work items in GitLab Issues has no adapter, so Work-Item trailers and bundle work items resolve only through json or beads there.",
         "Needs: the adapter's reads (resolve an id to status and title) through the GitLab API with a token the adopter provides (5.136: an adapter reaches its own backend), and its setup step in the migrating-knowledge skill."
       ]
-    },
-    {
-      "id": "HR-248",
-      "type": "chore",
-      "milestone": null,
-      "status": "open",
-      "title": "Share one canonical pack-pin helper across the tests that pin a pack copy",
-      "body": [
-        "Batch-37 T15 review issue 5: six test files copy the canonical pack pin (clone, sort_all_objects, to_vec, sha256_hex): check_packs.rs, pack_moves.rs, kit_citations.rs, every_commit_entry.rs, help_36.rs, pack.rs. HR-236 scoped the digest only, and two of the files lie outside T15's file set. quality.principles sends a compliance pass over existing tests to its own item: add a pack_pin helper to tracker_support/mod.rs; init_install.rs's canonical_sha256 stays, because its doc requires an independent sort."
-      ],
-      "batch": null,
-      "deferral": {
-        "reason": "Batch-37 T15 review issue 5: six test files copy the canonical pack pin (clone, sort_all_objects, to_vec, sha256_hex): check_packs.rs, pack_moves.rs, kit_citations.rs, every_commit_entry.rs, help_36.rs, pack.rs. HR-236 scoped the digest only, and two of the files lie outside T15's file set. quality.principles sends a compliance pass over existing tests to its own item: add a pack_pin helper to tracker_support/mod.rs; init_install.rs's canonical_sha256 stays, because its doc requires an independent sort.",
-        "origin": "batch-37 T15 review, issues[4]",
-        "files": [
-          "crates/houserules/tests/check_packs.rs",
-          "crates/houserules/tests/pack_moves.rs",
-          "crates/houserules/tests/kit_citations.rs",
-          "crates/houserules/tests/every_commit_entry.rs",
-          "crates/houserules/tests/help_36.rs",
-          "crates/houserules/tests/pack.rs",
-          "crates/houserules/tests/tracker_support/mod.rs"
-        ]
-      }
-    },
-    {
-      "id": "HR-249",
-      "type": "chore",
-      "milestone": null,
-      "status": "open",
-      "title": "Silence the LF-to-CRLF warnings that test fixtures print under the autocrlf suite",
-      "body": [
-        "Batch-37 T4 review issue 11: the autocrlf suite (core.autocrlf=true injected through GIT_CONFIG_COUNT) prints about 80 lines of `warning: in the working copy of '<path>', LF will be replaced by CRLF the next time Git touches it` from test fixtures that stage LF files (AGENTS.md, CLAUDE.md, backlog/*.json, knowledge/*.json, sub/ installs): 74 in t4-test-autocrlf.txt, 82 in int-t3-test-autocrlf.txt at the batch-37 T3 integration. The noise comes from content before batch 37 and hides a new warning in a gate capture. Fix: find the fixture helpers that stage files and make each capture of the autocrlf suite free of these lines, then pin the count at 0."
-      ],
-      "batch": null,
-      "deferral": {
-        "reason": "Batch-37 T4 review issue 11: the autocrlf suite (core.autocrlf=true injected through GIT_CONFIG_COUNT) prints about 80 lines of `warning: in the working copy of '<path>', LF will be replaced by CRLF the next time Git touches it` from test fixtures that stage LF files (AGENTS.md, CLAUDE.md, backlog/*.json, knowledge/*.json, sub/ installs): 74 in t4-test-autocrlf.txt, 82 in int-t3-test-autocrlf.txt at the batch-37 T3 integration. The noise comes from content before batch 37 and hides a new warning in a gate capture. Fix: find the fixture helpers that stage files and make each capture of the autocrlf suite free of these lines, then pin the count at 0.",
-        "origin": "batch-37 T4 review, issues[10]",
-        "files": [
-          "crates/houserules/tests"
-        ]
-      }
     },
     {
       "id": "HR-250",
@@ -843,25 +699,6 @@
       }
     },
     {
-      "id": "HR-251",
-      "type": "bug",
-      "milestone": null,
-      "status": "open",
-      "title": "Refuse an empty defaultBranch in the install marker",
-      "body": [
-        "Batch-37 T12 fix-diff review (task-12-review-r1.json, out_of_scope[0]): `Marker::validate` accepts any string as `defaultBranch`, the empty string included. `durable-sha` refuses an empty name as naming no branch, while the GitHub forms of `ci print` and `ci write` print `branches: [\"\"]` with exit 0, a trigger that never fires. Fix: reject an empty `defaultBranch` at marker validation with one named line, so every reader sees the same refusal; pin it in the marker tests and in `ci_command`. Deferred: the change is a constraint of the install marker that `check-knowledge` and every command read, beyond the files of T12, and it needs its upgrade walk."
-      ],
-      "batch": null,
-      "deferral": {
-        "reason": "Batch-37 T12 fix-diff review (task-12-review-r1.json, out_of_scope[0]): `Marker::validate` accepts any string as `defaultBranch`, the empty string included. `durable-sha` refuses an empty name as naming no branch, while the GitHub forms of `ci print` and `ci write` print `branches: [\"\"]` with exit 0, a trigger that never fires. Fix: reject an empty `defaultBranch` at marker validation with one named line, so every reader sees the same refusal; pin it in the marker tests and in `ci_command`. Deferred: the change is a constraint of the install marker that `check-knowledge` and every command read, beyond the files of T12, and it needs its upgrade walk.",
-        "origin": "batch-37 T12 fix-diff review, out_of_scope[0]",
-        "files": [
-          "crates/houserules/src/install/marker.rs",
-          "crates/houserules/src/review/ci.rs"
-        ]
-      }
-    },
-    {
       "id": "HR-252",
       "type": "chore",
       "milestone": null,
@@ -869,7 +706,8 @@
       "title": "Route every git call of the crate through rules::git::command",
       "body": [
         "Batch-37 T12 fix-diff review (controller check): 69 direct `Command::new(\"git\")` spawns in 24 source files of the crate, the runner's own one included (enumeration: `grep -ro 'Command::new(\"git\")' crates/houserules/src | wc -l`, at the batch-37 head after T12's integration) bypass `rules::git::command`, which sets `LC_ALL=C` and `GIT_NO_REPLACE_OBJECTS=1`. A replace ref in an adopter's clone can change what such a call reads, for example the ancestry that `durable-sha` checks. Fix: route every git call of the crate through `rules::git::command` (test helpers and the dev binaries included, or each exception named with its reason), and add a test that greps the crate for a direct spawn. Deferred: crate-wide, beyond the files of batch 37; the review layer already uses the runner.",
-        "Batch 38 (spec section 14, design.md 275) folds the part in its own files: rules/audit.rs, rules/check.rs, rules/trailers.rs, and every file of its section 15 that spawns git. This item keeps the remaining direct spawns and the crate-wide grep test; it stays open after batch 38."
+        "Batch 38 (spec section 14, design.md 275) folds the part in its own files: rules/audit.rs, rules/check.rs, rules/trailers.rs, and every file of its section 15 that spawns git. This item keeps the remaining direct spawns and the crate-wide grep test; it stays open after batch 38.",
+        "After batch 38 (Task 8 review, ruled by the controller): the direct spawns of crates/houserules/src/rules/git_paths.rs stay (the runner rules/git.rs depends on that module, so it cannot start git through the runner; name the reason in the gate), and the test modules of rules/git_paths.rs and install/location.rs keep direct spawns that predate batch 38. tests/git_spawns.rs checks the batch-38 part only (the files added since b9dd0d0e plus five named files); the crate-wide grep of this item covers the rest."
       ],
       "batch": null,
       "deferral": {
@@ -927,7 +765,9 @@
       "body": [
         "Batch-37 stats.json (batches 33 to 37) and branch-review.json propose deterministic checks for judged rules that failed or drew findings in two or more workspaces: houserules.platform-gated-tests (a lint test that fails a #[cfg(unix)], #[cfg(windows)], or #[cfg(target_os line whose previous non-blank line is no comment); houserules.task-gates-mirror-ci (a report-facts `gates` field listing the gate commands in `tests`, with a report-field check); process.report-evidence-verbatim and process.claims-match-artifacts (check-report-claims extended to the file:line references of self_review and concerns); process.wiring-checks-run-the-resolution; quality.absence-is-designed (a lint test that fails an Option printed with {:?} in a user-facing line); quality.lint-the-token-not-the-document; process.evidence-outlives-the-session (a check that fails a report citing a session scratchpad path); process.closure-claims-carry-enumeration (a report-field text check for every/all/no remaining without a capture); writing-style.doc-comments (RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps in mise run lint); and houserules.pinned-git-text-runs-hermetic (a grep-absent warn for a git grep -l without --no-color).",
         "The narrow rows of stats (task-gates-mirror-ci, deliverables-json, absence-is-designed: narrow to contract surfaces) are decided with the mechanize rows of the same ids: a deterministic check narrows the judged rule by itself (branch-review recommendation).",
-        "Deferred: each check is a code change of its own with its paper walk (process.gates-cover-generated-commits); batch 37 closes on its own scope. The git grep pattern hits two #[cfg(test)] calls of review/git.rs that parse no names, so that check needs a test-code exclusion first."
+        "Deferred: each check is a code change of its own with its paper walk (process.gates-cover-generated-commits); batch 37 closes on its own scope. The git grep pattern hits two #[cfg(test)] calls of review/git.rs that parse no names, so that check needs a test-code exclusion first.",
+        "Data point (batch 38, measured 2026-10-26): `cargo doc --no-deps --document-private-items` with -D rustdoc::broken_intra_doc_links and -D rustdoc::private_intra_doc_links fails on main b9dd0d0e with the same diagnostics as the batch-38 head: gen-schemas.rs:8 and :29 (private `registry`), rules/render/agents_md.rs:2 (`block`), report_claims/natural_red.rs:200, rules/render/mod.rs (two links), review/record/notes.rs:6 (`write` is both a function and a macro). The doc gate fixes them first.",
+        "Batch-38 close (stats.json over batches 34 to 38, read against batch-38's knowledge): mechanize rows for houserules.platform-gated-tests, houserules.task-gates-mirror-ci, process.wiring-checks-run-the-resolution, and quality.absence-is-designed; narrow rows for houserules.task-gates-mirror-ci, process.deliverables-json, and quality.absence-is-designed. The branch review advises keeping all four judged (no check type reads those surfaces) and narrowing none; recorded here for the mechanize work."
       ],
       "batch": null,
       "deferral": {
@@ -950,7 +790,8 @@
       "body": [
         "Branch-review.json template_defects 3 and 4: the implementer template asks every fix round for a mutation row on each added test that passes before the fix, while the task-reviewer template's step 9 lifts the row for a critical task; and the implementer template's refusal line lacks the sentence of process.refused-commands-hand-back's body that names a shell glob or a variable as another way (the dependency-add eval implementer redid two refused commands, .claude/evals/record.json).",
         "Fix: add to the fix-round paragraph that the row is optional for a critical task, and copy the refusal sentence into the template's refusal line; run every eval scenario (process.evals-rerun).",
-        "Deferred: a change of the implementer template needs an eval run, and batch 37's run closed at its controller step 5; the batch that next changes a template or a scenario takes it."
+        "Deferred: a change of the implementer template needs an eval run, and batch 37's run closed at its controller step 5; the batch that next changes a template or a scenario takes it.",
+        "Batch-38 branch review, template defect: the implementer template carries no sentence on refused commands; a refused command was re-run in another form twice (the eval dependency-add run; Task 10 round 0). Fix: one sentence in the Working rules: a command the harness refuses is named in concerns and never run in another form (an inline program, a wrapper, a changed environment); the eval run follows the change."
       ],
       "batch": null,
       "deferral": {
@@ -1006,6 +847,475 @@
           "template/knowledge/areas.json"
         ]
       }
+    },
+    {
+      "id": "HR-259",
+      "type": "bug",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Print the singular for a count of one in the review layer's lines",
+      "body": [
+        "Batch-37 rollout check (design.md 279): `record show b9dd0d0e` prints the item ``- `AGENTS.md`: 1 changed lines``. The same plural follows a count of one in `deleted after line <n>: <k> lines` (review/evidence.rs), `### Uncovered surface (<u> of <n> changed lines)` (review/record/document.rs), and `diff <n> lines` (review/bundle.rs).",
+        "Fix: amend the batch-37 spec's lines (4.2, 4.4, the bundle check line) to name the singular form for a count of one; pin each line with a count of one and of two.",
+        "Deferred: the lines are spec-fixed text, so the fix needs a spec amendment; a fold into batch 38's Task 3, which changes review/evidence.rs and review/record/*, is an owner question."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: the lines are spec-fixed text, so the fix needs a spec amendment; a fold into batch 38's Task 3 is an owner question.",
+        "origin": "batch 37 rollout check (design.md 279)",
+        "files": [
+          "crates/houserules/src/review/record/document.rs",
+          "crates/houserules/src/review/evidence.rs",
+          "crates/houserules/src/review/bundle.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-261",
+      "type": "feat",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Let an adopter plug in its own tracker adapter without a change to houserules",
+      "body": [
+        "Owner request, 2026-10-26: houserules adopters write their own tracker adapter as a plugin, without merging it upstream into houserules.",
+        "Today the tracker contract (HR-180, design.md 5.104) has built-in adapters only: JSON, GitHub Issues, and Beads, chosen with init --tracker json|github|beads (crates/houserules/src/tracker/). An adopter's tracker needs a change to the binary.",
+        "Acceptance: an adapter outside the binary fulfills the whole contract (list and its filters, batch, set, get, check-backlog, the backlog half of archive, the deferral operation) and passes the same conformance suite as the built-in adapters (design.md 5.132, crates/houserules/tests/tracker_conformance.rs); an install names it in .houserules.json; an adapter that is missing, fails, or breaks the protocol fails the gate with one line naming the adapter and its setup step (5.136).",
+        "Open for the item's spec: how houserules loads the adapter (for example an external command that speaks a versioned JSON protocol over stdin and stdout, with a published schema), how the conformance suite runs against it, and how the adapter's id shapes reach get's routing (5.139).",
+        "Model: the `runners` key of `.houserules.json` (batch 35; crates/houserules/src/install/marker/runners.rs, rules/runner/external.rs) already lets an adopter plug in a check tool with no change to houserules: a command, a parser (`sarif` or `exit-code`), and an install line, with one named line for a missing or misconfigured tool. A tracker adapter needs a richer protocol than one verdict per call, because it answers every operation of the contract; the spec reuses the runners shape (command, protocol version, install line) where it fits."
+      ],
+      "batch": null
+    },
+    {
+      "id": "HR-262",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Move the test files' own repo_root copies to the shared helper",
+      "body": [
+        "Batch-38 Task 11 fix-diff review, out of scope: thirteen test files define their own repo_root (for example crates/houserules/tests/dogfood.rs:43, kit_texts.rs:11, init_install.rs:29) beside tracker_support::repo_root.",
+        "Fix: call the shared helper from each, with no expectation change; a grep test finds no other definition."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: thirteen files outside batch 38's planned files; no behavior change.",
+        "origin": "batch 38 Task 11 fix-diff review, out_of_scope",
+        "files": [
+          "crates/houserules/tests/dogfood.rs",
+          "crates/houserules/tests/kit_texts.rs",
+          "crates/houserules/tests/init_install.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-263",
+      "type": "test",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Guard that a released pack version's text never changes",
+      "body": [
+        "Batch-38 Task 11 fix-diff review, out of scope: update skips a kit pack whose pin version equals the binary's (crates/houserules/src/install/pack_moves.rs:65-71) and prints nothing, so an install of an earlier build of the same version keeps its old text silently. KIT_PACK_VERSIONS' one-move-per-change rule makes that safe only while the version is unreleased.",
+        "Fix: a test that compares each KIT_PACK_VERSIONS row of a released version with the pack's text in the release that shipped it, so a released version's checksum never moves."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: a guard over released content, outside batch 38's task; no released pack version changed.",
+        "origin": "batch 38 Task 11 fix-diff review, out_of_scope",
+        "files": [
+          "crates/houserules/src/packs.rs",
+          "crates/houserules/src/install/pack_moves.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-264",
+      "type": "bug",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Pin the git settings of check-commit's message-file arm",
+      "body": [
+        "Batch-38 Task 4 fix round 2, concern: staged_paths in crates/houserules/src/rules/check_commit.rs (the arm the commit-msg hook runs) reads the staged paths with none of the pins the range readers carry since batch 38 (--ignore-submodules=none, --no-renames, --no-relative). It may show the exposure Task 4 measured on the range readers: submodule.<name>.ignore hides a gitlink that a commit adds or moves. Unmeasured.",
+        "Fix: measure it with the probe of t4r1-review-probe-submodule.sh against the staged form; pin each setting that changes the text, each with a test, as houserules.parsed-git-text-pins-every-setting asks."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: unmeasured, and outside batch 38's planned files; the range form that CI runs carries the pins.",
+        "origin": "batch 38 Task 4 fix round 2, concerns",
+        "files": [
+          "crates/houserules/src/rules/check_commit.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-265",
+      "type": "feat",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Report a SessionStart hook entry whose script is gone",
+      "body": [
+        "Batch-38 Task 9 review, ruling (b): spec 6.2's removal steps take the reference workflow out by hand; a user who skips the step that removes the hook entry from .claude/settings.json keeps an entry that runs ${CLAUDE_PROJECT_DIR}/tools/reference-session-start.sh, which no longer exists: sh exits 127 at each session start, and no gate reports it (t9rev-probe-removal.txt, variant skip-hook).",
+        "Fix: check-knowledge (or update) names a hook entry of the install's harness settings whose command points at a missing kit script, with the step that removes it."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: spec 6.2 rules that no command removes a workflow in 2.0.0; the printed steps leave a working install.",
+        "origin": "batch 38 Task 9 review, ruling (b)",
+        "files": [
+          "crates/houserules/src/rules/check.rs",
+          "crates/houserules/src/install/mod.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-266",
+      "type": "test",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Keep the caller's git variables out of every test fixture",
+      "body": [
+        "Batch-38 Task 8 fix round, concern: tests/git_spawns.rs now removes every GIT_ variable of the caller; other fixtures under crates/houserules/tests inherit GIT_DIR and GIT_INDEX_FILE, so a suite run from a git hook (git sets both for hooks) runs them against the hook's repository.",
+        "Fix: the shared scratch-repository helpers of tracker_support and common remove the caller's GIT_ variables, with a child re-run test under GIT_DIR and GIT_INDEX_FILE."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: outside batch 38's planned files; CI and the task gates run the suite outside hooks.",
+        "origin": "batch 38 Task 8 fix round 1, concerns",
+        "files": [
+          "crates/houserules/tests/tracker_support/mod.rs",
+          "crates/houserules/tests/common/mod.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-267",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Move the remaining Markdown readers of the tests to docs_support",
+      "body": [
+        "Batch-38 Task 9 fix round: crates/houserules/tests/docs_support/mod.rs holds the one fence-aware block and section reader; help_support::fenced_blocks_of (tests/help_support/mod.rs) and the section reader of tests/workflow_texts_37.rs predate it and stay.",
+        "Fix: their callers use docs_support; a grep test finds no other Markdown block reader under crates/houserules/tests."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: older test files outside batch 38's planned files; no behavior change.",
+        "origin": "batch 38 Task 9 fix round 1, concerns",
+        "files": [
+          "crates/houserules/tests/help_support/mod.rs",
+          "crates/houserules/tests/workflow_texts_37.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-268",
+      "type": "feat",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Name the kept 1.x CI workflow of an unstamped install in a hand step",
+      "body": [
+        "Batch-38 upgrade proof (upgrade-proof.md, difference 3): on a 1.x install with no .houserules.json, `update --id-prefix` keeps the seeded 1.x workflow .github/workflows/knowledge.yml and prints no hand step for it, where a stamped install gets `wrote .github/workflows/knowledge.yml`. With no baseline, update cannot tell the kit's workflow from an edit, so it keeps it; the adopter learns nothing.",
+        "Fix: `update` prints a hand step for each kit-named workflow file it keeps on an install with no baseline, with the guide's remedy; the guide's batch-38 red (Task 9) names the remedy until then."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: a new update line on a rare 1.x population; the guide states the red and its remedy in 2.0.0.",
+        "origin": "batch 38 upgrade proof, difference 3",
+        "files": [
+          "crates/houserules/src/install/conversion/mod.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-269",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Cite knowledge-base.cite-durable-refs from step 4b of the finishing skill (issue 50)",
+      "body": [
+        "Issue 50 asks the finishing skill's step 4b (the sweep of interim SHAs) to name the rule it serves; the skill names no rule id there (t0-search-step-4b.txt).",
+        "Fix: step 4b names knowledge-base.cite-durable-refs, in the template and its root copy, with the eval run if a template it reads changes."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: found after the batch-38 kit texts closed; a kit text change.",
+        "origin": "batch 38 issue-comment drafts (issue-comments.md, Not covered)",
+        "files": [
+          "template/workflows/reference/.claude/skills/finishing-a-feature/SKILL.md"
+        ]
+      }
+    },
+    {
+      "id": "HR-270",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Document rule-sync tools such as Packmind beside houserules (issues 64 and 71)",
+      "body": [
+        "Issue 64 (point 3) and issue 71 (point 5) ask the docs to name rule-sync tools such as Packmind, as an alternative upstream of shared rules; the tree names none (t0-no-packmind.txt).",
+        "Fix: research the current tools from their own docs, then a docs section that states when each fits beside houserules' packs, with no claim that rots with a release."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: needs its own research of current tools; outside batch 38's spec.",
+        "origin": "batch 38 issue-comment drafts (issue-comments.md, Not covered)",
+        "files": [
+          "docs/README.md"
+        ]
+      }
+    },
+    {
+      "id": "HR-271",
+      "type": "feat",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Show the overrides in the evidence packet (issue 71)",
+      "body": [
+        "Issue 71 (point 4) asks the evidence packet to show the overrides that shape the rule package; the packet shows the rules hash and, in JSON, the pinned packs only (t0-live-4-evidence-overrides.txt).",
+        "Fix: the packet and evidence@<next> name each override of the install (id and the fields it overrides), bounded and cut as the other lists; a published schema version moves by its rule."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: a published-schema change after 2.0.0's 1.1.0 documents.",
+        "origin": "batch 38 issue-comment drafts (issue-comments.md, Not covered)",
+        "files": [
+          "crates/houserules/src/review/evidence.rs",
+          "crates/houserules/src/published/evidence.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-272",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Fix three defects of the orchestrating skill that batch 38 found",
+      "body": [
+        "Batch-38 branch review, template defects of template/workflows/reference/.claude/skills/orchestrating/SKILL.md: (1) the integration bullet writes the old-to-new commit map to the ledger while branch-reviewer.md reads it from its own workspace file; name one form (a <task>-sha-map.txt file per task, full shas from git rev-parse); (2) the batch close runs `houserules stats` without naming the checkout, and a run from another checkout reads that checkout's knowledge; name the checkout of the batch branch; (3) the brief rules name no write form, and an unquoted heredoc ran the backtick spans of a brief as commands; name a quoted heredoc or a script.",
+        "Fix: the three sentences in the template and the root copy, with branch-reviewer.md aligned to (1)."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: a kit text change after batch 38's kit texts closed; the controller follows the three forms in this repository now.",
+        "origin": "batch 38 branch review, template_defects",
+        "files": [
+          "template/workflows/reference/.claude/skills/orchestrating/SKILL.md",
+          "template/workflows/reference/.claude/agents/branch-reviewer.md"
+        ]
+      }
+    },
+    {
+      "id": "HR-273",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Pin log.showSignature in the commits_in log call",
+      "body": [
+        "rules::git::commits_in reads `git log` without --no-show-signature, the pin that review::links::read carries. With log.showSignature=true, git prints a line before the sha of each record (`No signature` for a commit whose signature it cannot verify), and every field of the record shifts (t12-signature-probe.txt, an ssh-signed commit).",
+        "Fix: add --no-show-signature to the call, with one test for the signature line (a signed commit under log.showSignature=true); houserules.parsed-git-text-pins-every-setting names the rule. The call already asks for --encoding=UTF-8."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: the signature pin needs a signed-commit fixture that runs on three operating systems, which is outside the two findings of the fix wave of batch 38.",
+        "origin": "batch 38 task 12, fix wave of the branch review (t12-signature-probe.txt)",
+        "files": [
+          "crates/houserules/src/rules/git.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-274",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Embed the kit files of houserules 0.3.0 in the released table of update",
+      "body": [
+        "Deferred: the owner ruled design.md 284 (a): 2.0.0 documents the 0.3.0 population as a red with its hand steps; embedding its contents waits for 2.x.",
+        "Fix: add the kit files that houserules 0.3.0 seeded and that update keeps (the deliverables schema, the dependency-add scenario, and the knowledge schema; the v0.3.0 rows of the batch-38 upgrade proof name them) to crates/houserules/released/ with index rows for 0.3.0; rerun the six v0.3.0 rows of the proof; then drop the 0.3.0 bullet of the guide's reds and the 0.3.0 clause of meta-spec 7."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: the owner ruled design.md 284 (a): 2.0.0 documents the 0.3.0 population as a red with its hand steps; embedding its contents waits for 2.x.",
+        "origin": "design.md 284; batch 38 branch review issue 2; upgrade-proof.md (the v0.3.0 rows)",
+        "files": [
+          "crates/houserules/released/index.json",
+          "docs/upgrading-to-2.md"
+        ]
+      }
+    },
+    {
+      "id": "HR-275",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Name the evidence rows that did not run apart from the proven rows in the packet and the record",
+      "body": [
+        "Deferred: found by the README discovery after the branch review; the packet and the record list rows whose evidence is 'not triggered' or '0 files checked' under Proven. Verify first, then change the label (a CLI output change)."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: found by the README discovery after the branch review; the packet and the record list rows whose evidence is 'not triggered' or '0 files checked' under Proven. Verify first, then change the label (a CLI output change).",
+        "origin": "design.md 287; batch 38 README discovery (discovery-what-houserules-is.md, section 8)",
+        "files": [
+          "crates/houserules/src/review/evidence.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-276",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Say whether init turns on the commit-msg hook it writes, and how to turn it on",
+      "body": [
+        "Deferred: found by the README discovery after the branch review; init --workflow reference writes .githooks/commit-msg and leaves core.hooksPath unset without a line that says so. Verify first."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: found by the README discovery after the branch review; init --workflow reference writes .githooks/commit-msg and leaves core.hooksPath unset without a line that says so. Verify first.",
+        "origin": "design.md 287; batch 38 README discovery (discovery-what-houserules-is.md, section 8)",
+        "files": [
+          "crates/houserules/src/install/mod.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-277",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Print one line per file on a second init: not kept and then wrote for the deliverables schema",
+      "body": [
+        "Deferred: reproduced by the controller (verify-disc-2): a second init --tracker json prints kept .claude/schemas/deliverables.json and later wrote .claude/schemas/deliverables.json; found after the branch review."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: reproduced by the controller (verify-disc-2): a second init --tracker json prints kept .claude/schemas/deliverables.json and later wrote .claude/schemas/deliverables.json; found after the branch review.",
+        "origin": "design.md 287; batch 38 README discovery (discovery-what-houserules-is.md, section 8)",
+        "files": [
+          "crates/houserules/src/install/mod.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-278",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Show why a runner row failed in the audit evidence, not only its exit code",
+      "body": [
+        "Deferred: found by the README discovery after the branch review; a failed runner row says only 'exited 1'. Verify first."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: found by the README discovery after the branch review; a failed runner row says only 'exited 1'. Verify first.",
+        "origin": "design.md 287; batch 38 README discovery (discovery-what-houserules-is.md, section 8)",
+        "files": [
+          "crates/houserules/src/rules/runner/mod.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-279",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Shorten the long help texts: about text of a few lines, the detail in long help or docs",
+      "body": [
+        "Deferred: found by the README discovery after the branch review; update --help is one 8 KB paragraph. A help change is a CLI output change for a later release."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: found by the README discovery after the branch review; update --help is one 8 KB paragraph. A help change is a CLI output change for a later release.",
+        "origin": "design.md 287; batch 38 README discovery (discovery-what-houserules-is.md, section 8)",
+        "files": [
+          "crates/houserules/src/main.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-281",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Report an unknown batch on the GitHub and Beads trackers, as check-backlog does on the JSON tracker",
+      "body": [
+        "Deferred: Task 14 fixed the JSON tracker; its probe showed the same gap in check_contract of the GitHub and Beads trackers (an item labelled batch:7 with no batch issue passes). Each needs its own fixture."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: Task 14 fixed the JSON tracker; its probe showed the same gap in check_contract of the GitHub and Beads trackers (an item labelled batch:7 with no batch issue passes). Each needs its own fixture.",
+        "origin": "design.md 289; batch 38 task 14 report, concerns 4 and 5",
+        "files": [
+          "crates/houserules/src/tracker/hosted/check.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-282",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Let houserules batch read an archived batch, as check-backlog accepts it",
+      "body": [
+        "Deferred: houserules batch <n> reads only backlog/batches.json and says unknown batch for a batch in backlog/archive/batches.json, which check-backlog now accepts; found by Task 14 after its scope closed."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: houserules batch <n> reads only backlog/batches.json and says unknown batch for a batch in backlog/archive/batches.json, which check-backlog now accepts; found by Task 14 after its scope closed.",
+        "origin": "design.md 289; batch 38 task 14 report, concerns 4 and 5",
+        "files": [
+          "crates/houserules/src/backlog/commands.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-283",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Print a next line that passes after init --workflow reference without --add-required-packs",
+      "body": [
+        "Deferred: found by the Task 14 fix-diff review, pre-existing; init names the missing packs, but its next line runs check-knowledge, which exits 1 on them. Outside spec 20."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: found by the Task 14 fix-diff review, pre-existing; init names the missing packs, but its next line runs check-knowledge, which exits 1 on them. Outside spec 20.",
+        "origin": "design.md 289; batch 38 task 14 fix-diff review, out_of_scope (task-14-review-r1.json)",
+        "files": [
+          "crates/houserules/src/install/next_line.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-284",
+      "type": "chore",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Decide the next line of an update that writes nothing while the install is still untracked",
+      "body": [
+        "Deferred: spec 20.1 reads 'the command wrote', so an update that rewrites no file prints the plain line, and following it fails on dead globs while the install is untracked. An owner question for 2.x."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Deferred: spec 20.1 reads 'the command wrote', so an update that rewrites no file prints the plain line, and following it fails on dead globs while the install is untracked. An owner question for 2.x.",
+        "origin": "design.md 289; batch 38 task 14 fix-diff review, out_of_scope (task-14-review-r1.json)",
+        "files": [
+          "crates/houserules/src/install/next_line.rs"
+        ]
+      }
+    },
+    {
+      "id": "HR-285",
+      "type": "feat",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Add visualizations to the README, and explain and link every houserules term at first use",
+      "body": [
+        "Owner, 2026-10-26 (design.md 290): the README is still a wall of text that is hard to understand. Add diagrams where a picture shows the mechanism better than prose: the core loop (entries, for, render, audit), what init writes into a repository, the optional layers on top of the core, and the review flow of a change (intent, evidence, route, record).",
+        "The README uses no houserules term without an explanation: each term (entry, area, standing rule, pack, check, judged rule, intent, packet, route, record, tracker, kit, render target, and every other term of the product's own vocabulary) is explained in plain words where it first appears and links to its entry in a short glossary of the README.",
+        "Diagrams render on GitHub (Mermaid or an SVG in the repository) and read in both the light and the dark theme; a test or a check lists the glossary terms and fails on a term that the README uses before its explanation or without its glossary link.",
+        "Run the readme-rework skill for the change (a minor release: the personas of the changed sections, and persona 13)."
+      ],
+      "batch": null
     }
   ]
 }

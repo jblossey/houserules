@@ -580,6 +580,28 @@
         "state": "done",
         "text": "Batch 37 closed 2026-10-26: 20 tasks, the eval run, the local live run, the branch review and its fix wave. It merges ff-only after green CI (design.md 262), and the controller accepts it after the merge (design.md 264)."
       }
+    },
+    {
+      "number": 38,
+      "items": [
+        "HR-209",
+        "HR-190",
+        "HR-212",
+        "HR-223",
+        "HR-238",
+        "HR-260",
+        "HR-244",
+        "HR-248",
+        "HR-249",
+        "HR-251",
+        "HR-280"
+      ],
+      "summary": "2.0.0, the last batch: OpenSpec support (HR-209) with spec and session links in the audit (HR-190), the upgrade-path live proof, and the issue comments of the release (HR-212).",
+      "kickoff": "the owner's rulings of 2026-10-15 (design.md 5.97 to 5.102) and the meta-spec docs/specs/2026-10-15-release-2-0-0-meta-spec.md",
+      "status": {
+        "state": "done",
+        "text": "Batch 38 closed 2026-10-26: 14 tasks (T11 the faster loop, T12 the branch-review fix wave, T13 the README rework, T14 two first-run fixes), the eval run, the upgrade proof, the local live run, and the branch review. The folded HR-244, HR-248, HR-249, and HR-251 close with it. It merges ff-only after green CI and the owner's README review (design.md 276, 277), and the controller accepts it after the merge (design.md 265)."
+      }
     }
   ]
 }

@@ -163,10 +163,10 @@
       "id": "houserules.readme-mirrors-kit-owned",
       "kind": "rule",
       "area": "docs",
-      "summary": "When `KIT_OWNED` gains or loses a path, update README's agent-layer bullet and ownership table in the same commit.",
+      "summary": "When `KIT_OWNED` gains or loses a path, update the ownership table of docs/ownership.md, and any README list of kit files, in the same commit.",
       "body": [
-        "README.md enumerates the kit-owned skills twice: the agent-layer bullet and the ownership-manifest table.",
-        "No test pins these enumerations; batch 5's task 1 review caught both stale after KIT_OWNED grew. A co-change check would misfire (bin changes without README constantly), so the rule stays judged."
+        "The ownership table moved from README.md to docs/ownership.md with the README rework of batch 38 (design.md 285).",
+        "crates/houserules/tests/readme_funnel.rs pins that table against the output of `houserules files`; a list of kit files in the README stays unpinned, so the rule stays judged for it."
       ],
       "tags": [
         "readme",
@@ -178,6 +178,7 @@
         "ref": "batch 5 task 1 review, finding 3"
       },
       "verify": [
+        "docs/ownership.md",
         "README.md",
         "crates/houserules/src/install/mod.rs"
       ]
@@ -359,7 +360,8 @@
         "In a parity port, name an error arm only where the reference engine itself errors — measure the reference first (batch 18 T3: merge_settings named two arms the frozen JS seeds cleanly, because the JS's ??= replaces null; the fix re-measured both engines and mirrored).",
         "Two recurring shapes count as reproduced crashes (batch 22 T1/T2, each filed twice before landing): a synthesized io::Error replacing the operating system's own error text, and a silent skip of an unreadable directory entry. Report the OS's error verbatim; only NotFound is tolerable absence.",
         "A fallible call added in front of an existing named failure arm is a new arm. List every `?` and `map_err` of the touched function and show the line each arm prints, in the same commit (batch 28 task 2: `current_dir()?` placed ahead of the git call printed a bare OS error from a removed working directory).",
-        "A command that wraps a git failure prints git's own `fatal:` or `error:` line, never a notice that git prints before it (`review/record/notes.rs`), and a reader that cannot tell a count from a missing history says so (`review/record/range.rs`; batch 37, T9 and T10)."
+        "A command that wraps a git failure prints git's own `fatal:` or `error:` line, never a notice that git prints before it (`review/record/notes.rs`), and a reader that cannot tell a count from a missing history says so (`review/record/range.rs`; batch 37, T9 and T10).",
+        "A reader that splits git's output on an in-band byte (0x1e, a line end) drops a record silently; separate records with NUL (`-z`, `%x00`), the one byte a commit message cannot hold, or name the record it could not read (batch 38 branch review, review/links.rs)."
       ],
       "tags": [
         "rust",
@@ -515,9 +517,10 @@
       "kind": "rule",
       "area": "rust",
       "standing": false,
-      "summary": "A task-end gate run includes every check CI runs on push or pull request; a local gate list that omits a CI check is stale.",
+      "summary": "A task's gate list holds every check CI runs; the task runs each but the full suite and the autocrlf suite, which the controller runs at integration.",
       "body": [
         "The contract surface is the gate list that CI runs: the jobs in `.github/workflows/ci.yml` and the `lint` and `test` tasks in `mise.toml`. A task-end gate run covers every check on it: a mingw-w64 C compiler installed first (`gcc-mingw-w64-x86-64`, needed once a `-sys` crate landed, houserules.c-toolchain-crates-need-ci-mingw), cargo fmt --check, the full suite, clippy, the windows-gnu cross-target clippy with `-D warnings`, the lint chain (shellcheck, cargo deny, both knowledge gates, render --check, the residue gate, the vacuous-exception gate, the payload-stamp gate, the dist-generate-check gate), the published-schemas gate (`gen-schemas --check`, which ci.yml's `checks` job runs as `cargo run --quiet --bin gen-schemas -- --check`), and -- pull-request only -- a check-commit range pass (`houserules check-commit --from $(git merge-base main HEAD) --to HEAD`, ci.yml's own check-commit job) and a knowledge-base audit of the diff (`mise run audit -- --base <PR base> --head <PR head>`).",
+        "Who runs what (design.md 280): an implementer's task-end run and a fix round run every check of that list but two. In place of the full suite they run the tests of the files they change: each test file they add or change, each integration test file that runs a command whose source they change, and the unit tests of each changed source module (`cargo test --locked --bin houserules <module path>`); the report names the targets. They skip the autocrlf suite. A fix round also runs each finding's Check line. The controller runs the full suite and the autocrlf suite once per integration, and a red there opens a fix round for the task.",
         "Derive the list from .github/workflows and mise.toml, not from memory and not from an earlier report's account of the gates; when CI gains a check, the task-end list gains it in the same change. How a report narrates the gates it ran is a deliverable matter outside this rule: judge it under process.claims-match-artifacts.",
         "The check-commit range pass matters most for a per-commit knowledge check: it judges every commit back to the real merge base with main, never only a fix round's own diff, so an omission here is exactly how a per-commit check ships unrun against the range CI actually judges (batch 24 T1 fix round 6: a per-commit co-change check went unrun at CI's own --from until this entry named the job).",
         "Origin: batch 22 T1 - three review rounds closed with cargo fmt --check red at HEAD because no round's gate list named it; CI would have failed the first push."
@@ -712,41 +715,6 @@
         "date": "2026-09-15",
         "by": "review",
         "ref": "batch 25 T2 review, finding 4"
-      }
-    },
-    {
-      "id": "houserules.1-0-surface-is-frozen",
-      "kind": "rule",
-      "area": "global",
-      "standing": true,
-      "summary": "Past 1.0, a CLI command/flag change or a schema constraint change is a breaking change: get an owner ruling and bump the major version.",
-      "body": [
-        "The frozen CLI surface: the 29 `Command` variants `crates/houserules/src/main.rs` defines, enumerated by the `no_subcommand_carries_a_long_about_beyond_its_short_one` test (`cargo test --bin houserules no_subcommand_carries_a_long_about_beyond_its_short_one`, asserts the count) and captured verbatim by `cargo run --release --quiet --bin houserules -- --help`.",
-        "The frozen schema surface: `knowledge/schema.json`, `template/knowledge/schema.json`, `backlog/schema.json`, `template/backlog/schema.json`, `.claude/schemas/deliverables.json`, and `template/.claude/schemas/deliverables.json` -- their constraints, not a prose restatement of them. `git rev-parse HEAD:<path>` pins each copy to its blob id at the freeze; design.md 5.82 carries the six ids.",
-        "Adding, removing, or renaming a subcommand or flag, or tightening or loosening a required field, an enum, a textList floor, or an id-shape pattern in any of the six schema files needs an owner ruling and a major-version bump, never a patch or minor release.",
-        "Widening a positional argument's arity (one value to one or more) adds, removes, and renames no subcommand or flag and leaves every existing call unchanged: it is not a surface change (design.md 5.91, owner 2026-10-09).",
-        "Neither surface is gated mechanically by this entry; design.md 5.82 is the durable record an owner supersession amends (process.owner-rulings-need-owner-supersession).",
-        "The freeze ends at the 2.0.0 release: the entry is retired then (design.md 5.220, HR-238). From 2.0.0 on, a standing successor entry holds the rule that every change which would prompt a major release needs an owner ruling (design.md 5.221)."
-      ],
-      "tags": [
-        "cli",
-        "schema",
-        "breaking-change",
-        "freeze"
-      ],
-      "verify": [
-        "crates/houserules/src/main.rs",
-        "knowledge/schema.json",
-        "template/knowledge/schema.json",
-        "backlog/schema.json",
-        "template/backlog/schema.json",
-        ".claude/schemas/deliverables.json",
-        "template/.claude/schemas/deliverables.json"
-      ],
-      "source": {
-        "date": "2026-09-15",
-        "by": "user",
-        "ref": "docs/specs/2026-09-14-batch-25-v1-readiness.md §3; design.md 5.82"
       }
     },
     {
@@ -1013,10 +981,11 @@
       "id": "houserules.diff-tree-prints-nothing-for-a-merge",
       "kind": "gotcha",
       "area": "cli",
-      "summary": "git diff-tree -r prints no paths for a merge commit unless -m, -c, or --first-parent is given; a path filter over commits must read every parent diff.",
+      "summary": "git diff-tree -r prints no paths for a merge commit unless -m or --diff-merges=<format> is given; a path filter over commits must read every parent diff.",
       "body": [
         "check-commit's subdirectory skip read changed paths per commit and skipped every merge as touching nothing.",
-        "The fix reads the paths of every parent diff, and an empty commit is checked, never skipped (spec 8, clarified at batch 33 task 5's review)."
+        "The fix reads the paths of every parent diff, and an empty commit is checked, never skipped (spec 8, clarified at batch 33 task 5's review).",
+        "Measured at git 2.56.0 (batch 38, Task 4's fix round, t4-git-settings.txt): no option, --first-parent, -c, and --cc print nothing for a merge; -m prints the paths against each parent; --diff-merges=first-parent prints the first-parent paths."
       ],
       "tags": [
         "git",
@@ -1174,7 +1143,8 @@
       "body": [
         "An added optional field is a minor version. A removed or renamed field, a new required field, or a narrower type is a major version. A change of the schema text that changes no document, such as a generator update, is a patch version.",
         "The CLI's major version rises only when a schema that it emits by default takes a major version (design.md 5.117, 5.146(1)). The read schemas, the commands, and the flags follow D2 (design.md 5.146(2)).",
-        "`schemas/published.json` lists each published file with its SHA-256, and a test fails a listed file whose bytes differ: a published version never changes (spec 9.4 of batch 37)."
+        "`schemas/published.json` lists each published file with its SHA-256, and a test fails a listed file whose bytes differ: a published version never changes (spec 9.4 of batch 37).",
+        "A field that a reader of the document may leave out is optional in the schema (`required` unchanged), as `sessions` in evidence and change-record 1.1.0."
       ],
       "tags": [
         "schema",
@@ -1216,7 +1186,8 @@
       "summary": "A reader of git's text pins every setting, attribute source, and variable that changes the parsed text, each with a test; the one input left is named.",
       "body": [
         "Enumerate the settings from `git config --list --show-origin` and the `git diff` manual, pin each (`-c <key>=<value>`, `--attr-source`, `GIT_ATTR_NOSYSTEM`, the cleared `GIT_DIFF_OPTS` and pathspec variables), and keep the enumeration in the workspace (batch 37, T4: t4-fix2-git-calls.txt).",
-        "A setting that no option can turn off (`$GIT_DIR/info/attributes`) is a named input of the command's doc comment."
+        "A setting that no option can turn off (`$GIT_DIR/info/attributes`) is a named input of the command's doc comment.",
+        "The batch-38 enumeration: `diff-tree` pins --no-renames, --no-relative, and --ignore-submodules=none; `interpret-trailers` pins core.commentChar=#; a listing uses -z and a `:(literal)` pathspec; tests/git_spawns.rs clears the caller's GIT_ variables, and HR-266 extends that to every test fixture."
       ],
       "tags": [
         "git",
@@ -1237,7 +1208,8 @@
       "summary": "A document that names a commit reads every input from that commit through git, never from the working tree.",
       "body": [
         "The packet, the route document, and the change record name `head`; the rules hash, the packs, the marker's `review.ci.files`, and the intent files are read with `git ls-tree`, `cat-file`, and `grep` at that commit (`review/rules_hash.rs`, `review/intent.rs`).",
-        "A test runs the command at a head that is not checked out and asserts the document shows the commit's values (batch 37, T7: review7-repro.sh R2)."
+        "A test runs the command at a head that is not checked out and asserts the document shows the commit's values (batch 37, T7: review7-repro.sh R2).",
+        "The readers that follow it also include review/intent/openspec/tree.rs (ls-tree -r -z and cat-file at the commit) and review/links.rs (the git log of the range); tests/evidence.rs the_sessions_of_a_head_that_is_not_checked_out_come_from_its_commits pins it for the session links."
       ],
       "tags": [
         "git",
@@ -1269,6 +1241,49 @@
         "date": "2026-10-26",
         "by": "review",
         "ref": "batch 37 branch review; task-8-review.json issue 1"
+      }
+    },
+    {
+      "id": "houserules.breaking-changes-need-an-owner-ruling",
+      "kind": "rule",
+      "area": "global",
+      "standing": true,
+      "summary": "A change that would prompt a major release (a `!` commit or a `BREAKING CHANGE` footer) needs an owner ruling before it merges.",
+      "body": [
+        "It replaces houserules.1-0-surface-is-frozen, which froze the 1.x surface until 2.0.0 (design.md 5.220). After 2.0.0 a command, flag, or schema may change in a minor release when the change is not breaking; a breaking change still needs the owner's ruling (design.md 5.221)."
+      ],
+      "tags": [
+        "cli",
+        "schema",
+        "breaking-change"
+      ],
+      "source": {
+        "date": "2026-10-23",
+        "by": "user",
+        "ref": "design.md 5.221"
+      },
+      "see": [
+        "houserules.1-0-surface-is-frozen"
+      ]
+    },
+    {
+      "id": "houserules.readme-rework-at-release",
+      "kind": "procedure",
+      "area": "docs",
+      "summary": "Before each release, rework the README with the `readme-rework` skill, scaled to the release: major, minor, or patch.",
+      "body": [
+        "The skill (.claude/skills/readme-rework/SKILL.md) holds the steps, the scale table, the discovery brief, the persona brief, and the persona catalog with the capabilities each persona exercises.",
+        "A major release runs a discovery by an agent that never reads the README, every persona before and after the rewrite, and a rewrite whose frame comes from the discovery. A minor release runs the personas of the capabilities it changes; a patch release fixes only the facts it made stale.",
+        "The README follows open-source README practice, never a section per persona (design.md 286); the release runbook (docs/runbook.md, Cutting a release) points here."
+      ],
+      "tags": [
+        "readme",
+        "release"
+      ],
+      "source": {
+        "date": "2026-10-26",
+        "by": "user",
+        "ref": "design.md 285 to 288"
       }
     }
   ]
