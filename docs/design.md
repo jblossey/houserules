@@ -3915,3 +3915,17 @@ Each item records the ruling with its date, or stays marked open.
     into the GitHub release, and post the HR-212 comments
     (`issue-comments.md`); the owner-gated proposals of the batch-38 batch
     report. Source: controller, 2026-10-27.
+295. **The batch-38 retrospective proposals are accepted - ruled
+    2026-10-27.** The owner, verbatim: "Resolve as recommended", to the
+    three proposals of the batch-38 batch report that change a standing
+    entry. Each lands in this repository's override of the entry in
+    `knowledge/overrides.json`; the kit's packs do not change. (1)
+    `process.closure-claims-carry-enumeration`: a doc comment that says
+    `every` or `only` about files of the tree cites the `git ls-files` or
+    grep that lists them. The override now holds the pack's body with that
+    sentence added. (2) `process.evidence-outlives-the-session`: a
+    controller deliverable whose tables come from scripts copies the
+    scripts and the rerun check beside its captures; a cache path is
+    provenance only. (3) `quality.principles`: before a task adds a test
+    helper, `grep -n 'fn <helper>' crates/houserules/tests/*.rs` finds a
+    copy that already exists. Source: owner, 2026-10-27.
