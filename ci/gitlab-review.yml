@@ -58,7 +58,7 @@ spec:
     default: [tags, retry, interruptible]
   variables:
     GIT_DEPTH: '0'
-    HOUSERULES_VERSION: '1.4.0' # x-release-please-version
+    HOUSERULES_VERSION: '2.0.0' # x-release-please-version
     HOUSERULES_DIR: $[[ inputs.dir ]]
     HOUSERULES_KEY: $[[ inputs.key ]]
     HOUSERULES_SH:

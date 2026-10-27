@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0",
+  "version": "2.0.0",
   "idPrefix": "HR",
   "baselines": {
     "tools/claude-session-start.sh": "9a35725d9b0a90f851bb7974b57f9d94769a78f7d544c472bcd216cc5d408f7d",
