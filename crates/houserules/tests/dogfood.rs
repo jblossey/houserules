@@ -361,6 +361,10 @@ fn houserules_json_stamps_the_installed_version_and_the_hr_id_prefix() {
         stamp["version"],
         serde_json::json!(env!("CARGO_PKG_VERSION"))
     );
+    assert_eq!(
+        stamp["workflow"]["version"],
+        serde_json::json!(env!("CARGO_PKG_VERSION"))
+    );
     assert_eq!(stamp["idPrefix"], serde_json::json!("HR"));
     assert_eq!(
         stamp["schema"],

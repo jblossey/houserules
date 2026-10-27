@@ -61,7 +61,7 @@
   ],
   "workflow": {
     "name": "reference",
-    "version": "1.4.0",
+    "version": "2.0.0",
     "files": {
       ".claude/agents/branch-reviewer.md": "13da26c23be8f2eaff4c6e238bd79218cf22a53430c6b35137c889b010dec7ae",
       ".claude/agents/implementer.md": "9b9da53a6e0d482bc5634503bd2a28b9e53bc049319686a86edd5012393c92d9",

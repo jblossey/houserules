@@ -4,6 +4,7 @@
   "include-component-in-tag": false,
   "extra-files": [
     { "type": "json", "path": "/.houserules.json", "jsonpath": "$.version" },
+    { "type": "json", "path": "/.houserules.json", "jsonpath": "$.workflow.version" },
     { "type": "generic", "path": "/ci/gitlab-review.yml" }
   ],
   "plugins": [

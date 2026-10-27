@@ -1336,6 +1336,18 @@
           ".github/workflows/houserules-review.yml"
         ]
       }
+    },
+    {
+      "id": "HR-287",
+      "type": "bug",
+      "milestone": "2.0",
+      "status": "done",
+      "title": "Keep workflow.version of .houserules.json in step with the release PR",
+      "body": [
+        "Batch-38 rollout (design.md 294): after the 2.0.0 release merge, `houserules update --dir .` at f432e929 changed `.houserules.json` `workflow.version` from 1.4.0 to 2.0.0. release-please updates only `$.version`; 2.0.0 is the first release with a `workflow` block.",
+        "Fix: a second extra-files entry for `$.workflow.version` (release-please v17.6.0 chains the updates of one path, src/strategies/base.ts mergeUpdates); the dogfood stamp test pins `workflow.version` to the crate version; the restamp lands with it."
+      ],
+      "batch": 38
     }
   ]
 }

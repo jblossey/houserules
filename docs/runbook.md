@@ -20,13 +20,15 @@ a tag pushed by the default `GITHUB_TOKEN` starts no workflow
 (`release-type: "rust"`, reading that crate's own `Cargo.toml` as the
 version source). `include-component-in-tag: false` keeps every release
 tag plain (`v<version>`, docs/design.md §5.20, reaffirmed §5.72 after a
-since-rejected reversal at §5.71). The one `extra-files` entry,
-`/.houserules.json`'s `json`/`$.version` update, anchors to the
-repository root with a leading `/`, since the package sits off root; it
-folds this repository's own kit-version restamp into the release PR
-itself, so the PR's own `crates/houserules/Cargo.toml` bump and
-`.houserules.json`'s `version` field land in the same commit (see
-`houserules.post-release-restamp` below). `changelog-path:
+since-rejected reversal at §5.71). Two `extra-files` entries,
+`/.houserules.json`'s `json` updates of `$.version` and
+`$.workflow.version`, anchor to the repository root with a leading `/`,
+since the package sits off root; they fold this repository's own
+kit-version restamp into the release PR itself, so the PR's own
+`crates/houserules/Cargo.toml` bump and both version fields of
+`.houserules.json` land in the same commit (see
+`houserules.post-release-restamp` below). A third entry updates the
+release version in `/ci/gitlab-review.yml`. `changelog-path:
 "/CHANGELOG.md"` keeps release notes in the existing
 root changelog instead of starting a second one under
 `crates/houserules/`. The `cargo-workspace` plugin keeps the
@@ -276,8 +278,9 @@ force a real self-replace without waiting for a release:
 
 release-please's PR bumps `crates/houserules/Cargo.toml`'s version (the
 `rust` release-type's own native update, HR-073) and, in the same PR,
-rewrites `.houserules.json`'s `version` field to match (the
-`/.houserules.json` `extra-files` entry). The version half of the restamp
+rewrites `.houserules.json`'s `version` and `workflow.version` fields to
+match (the two `/.houserules.json` `extra-files` entries). The version half
+of the restamp
 therefore already rides the PR and needs no post-merge step;
 `crates/houserules/tests/dogfood.rs`'s
 `houserules_json_stamps_the_installed_version_and_the_hr_id_prefix` test

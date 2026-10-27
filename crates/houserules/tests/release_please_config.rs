@@ -257,11 +257,12 @@ fn extra_files_are_anchored_to_the_repository_root() {
     }
 }
 
-/// `extra-files` carries exactly two entries, both version entries:
+/// `extra-files` carries exactly three entries, all version entries:
 ///
-/// - the `/.houserules.json` `json`/`jsonpath` update that folds this
-///   repository's own kit-version restamp into the release PR itself
-///   (`houserules.post-release-restamp`, branch review batch 24 issue 2);
+/// - the two `/.houserules.json` `json`/`jsonpath` updates, of `$.version` and
+///   of `$.workflow.version`, that fold this repository's own kit-version
+///   restamp into the release PR itself (`houserules.post-release-restamp`);
+///   release-please chains the updates of one path in the order listed;
 /// - the `generic` update of `/ci/gitlab-review.yml`, the GitLab unit of the
 ///   review layer, whose one line that carries the release annotation holds the
 ///   release version (`ci_units.rs` pins that line to the crate's version).
@@ -280,6 +281,7 @@ fn extra_files_contains_only_the_version_entry() {
         config["extra-files"],
         serde_json::json!([
             { "type": "json", "path": "/.houserules.json", "jsonpath": "$.version" },
+            { "type": "json", "path": "/.houserules.json", "jsonpath": "$.workflow.version" },
             { "type": "generic", "path": "/ci/gitlab-review.yml" }
         ])
     );
