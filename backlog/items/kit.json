@@ -1316,6 +1316,26 @@
         "Run the readme-rework skill for the change (a minor release: the personas of the changed sections, and persona 13)."
       ],
       "batch": null
+    },
+    {
+      "id": "HR-286",
+      "type": "bug",
+      "milestone": "2.x",
+      "status": "open",
+      "title": "Stop the review unit from showing a cancelled report check on a pull request",
+      "body": [
+        "Batch-38 rollout check (design.md 294): release PR #83 got two `pull_request` runs of the review unit one second apart (runs 40470962088 and 40470964926, on the release PR's head). The report job of `.github/workflows/houserules-review.yml` uses the group `houserules-report-<key>-<pr>` with `cancel-in-progress: true`, so the report that started second cancelled the other. The pull request lists a cancelled `review / report` check beside the passing one; `gh pr checks 83` exits 0.",
+        "Any pull request whose head moves and whose description changes within seconds gets the same noise, as a bot pull request does.",
+        "Fix: measure which concurrency form keeps one report per pull request without a cancelled check run, against the current GitHub Actions docs; pin it in the unit test of the workflow text and in the GitLab unit when it has the same group."
+      ],
+      "batch": null,
+      "deferral": {
+        "reason": "Found after the batch-38 merge; it blocks no check and needs a design read of the concurrency forms.",
+        "origin": "batch 38 rollout check (design.md 294)",
+        "files": [
+          ".github/workflows/houserules-review.yml"
+        ]
+      }
     }
   ]
 }

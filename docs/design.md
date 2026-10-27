@@ -3894,3 +3894,24 @@ Each item records the ruling with its date, or stays marked open.
     each change to its intent, but reads no meaning of code and signs
     nothing (README Limits); the owner chose this wording. Source: owner,
     2026-10-27.
+294. **Batch 38 accepted by the controller - 2026-10-27, under 265.** (1)
+    Batch 38 merged ff-only from the CLI at e3f9e6f8 (PR #91, after green
+    checks on three operating systems; 276). (2) The acceptance rests on the
+    batch's acceptance cases (the upgrade proof run 2, the live run, and the
+    final gates at the head, in the batch-38 ledger) and on the rollout
+    checks of spec 18.3: on main at e3f9e6f8 the `ci`, `review`, `codeql`,
+    `schemas`, and `release-please` workflows pass
+    (`post-merge-main-runs.txt` in the batch-38 workspace); each of the
+    eight published schema documents on Pages serves its file with `$id`
+    equal to its URL (`post-merge-pages-ids.txt`); the `review` workflow's
+    record job wrote the change record of e3f9e6f8 (`record show e3f9e6f8`,
+    `post-merge-record-e3f9e6f.md`); release PR #83 has refreshed onto
+    e3f9e6f8 with the 2.0.0 bump and the generated changelog, and is
+    mergeable (`post-merge-pr83-diff.txt`). (3) The rollout check found one
+    defect, filed as HR-286: two runs of the review unit on PR #83 one
+    second apart left a cancelled `review / report` check beside the
+    passing one. It blocks no acceptance case. (4) What remains is the
+    owner's: merge PR #83 to cut 2.0.0, paste or adjust `release-note.md`
+    into the GitHub release, and post the HR-212 comments
+    (`issue-comments.md`); the owner-gated proposals of the batch-38 batch
+    report. Source: controller, 2026-10-27.
