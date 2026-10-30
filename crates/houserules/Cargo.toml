@@ -41,7 +41,7 @@ walkdir = "=2.5.0"
 libc = "=0.2.191"
 
 [dev-dependencies]
-jsonschema = { version = "=0.60.1", default-features = false }
+jsonschema = { version = "=0.60.2", default-features = false }
 
 # dist ships every archive with the whole crate's binaries otherwise (the four
 # dev tools under src/bin/ alongside houserules itself). Restrict every dist
