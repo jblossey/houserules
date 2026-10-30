@@ -16,7 +16,7 @@ license = "MIT"
 repository = "https://github.com/jblossey/houserules"
 
 [dependencies]
-axoupdater = { version = "=0.10.2", default-features = false, features = ["github_releases", "blocking"] }
+axoupdater = { version = "=0.10.3", default-features = false, features = ["github_releases", "blocking"] }
 base64 = "=0.23.1"
 clap = { version = "=4.6.7", features = ["derive"] }
 dirs = "=7.0.0"
