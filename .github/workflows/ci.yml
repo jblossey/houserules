@@ -17,7 +17,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       # Pin mise: an unpinned latest broke every job on an unpublished upstream release (HR-083).
-      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.9.2
       # axoupdater's github_releases/blocking features (HR-133) pull in
@@ -48,7 +48,7 @@ jobs:
         with:
           fetch-depth: 0
       # Pin mise: an unpinned latest broke every job on an unpublished upstream release (HR-083).
-      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.9.2
       # The action runs `mise install`, which installs every tool of mise.toml,
@@ -67,7 +67,7 @@ jobs:
         with:
           fetch-depth: 0
       # Pin mise: an unpinned latest broke every job on an unpublished upstream release (HR-083).
-      - uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.9.2
       - run: >
