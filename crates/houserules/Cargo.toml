@@ -33,7 +33,7 @@ serde_json = { version = "=1.0.154", features = ["preserve_order"] }
 sha2 = "=0.11.1"
 shlex = "=2.0.1"
 tempfile = "=3.27.0"
-tokio = { version = "=1.53.3", default-features = false, features = ["rt", "time"] }
+tokio = { version = "=1.54.1", default-features = false, features = ["rt", "time"] }
 url = "=2.5.8"
 walkdir = "=2.5.0"
 
