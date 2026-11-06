@@ -20,7 +20,7 @@ axoupdater = { version = "=0.10.3", default-features = false, features = ["githu
 base64 = "=0.23.1"
 clap = { version = "=4.6.7", features = ["derive"] }
 dirs = "=7.0.0"
-globset = "=0.4.20"
+globset = "=0.4.21"
 indexmap = { version = "=2.14.2", features = ["serde"] }
 jiff = { version = "=0.2.38", default-features = false, features = ["std"] }
 percent-encoding = "=2.3.2"
